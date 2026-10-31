@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<root
+  type="SDL3ApplicationFabric"
+  renderer="VulkanRendererBackend"
+  path="config/SDLWindowConfig.xml"
+  mode="Game" />

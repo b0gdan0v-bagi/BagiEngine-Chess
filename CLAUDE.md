@@ -2,7 +2,7 @@
 
 ## Overview
 
-`ChessGame` is an `IGame` (name `Chess`, scene `ChessScene`). Executable `BagiChess`. Infrastructure and how a game is registered: `src/Modules/Games/CLAUDE.md`. Namespace `BECore::Chess`. The game's content is in `games/Chess/config/` (`SceneConfig.xml`, `TextureLibrary.xml`) and `games/Chess/assets/`.
+`ChessGame` is an `IGame` (name `Chess`, scene `ChessScene`). Executable `BagiChess`. Infrastructure and how a game is registered: `src/Modules/Games/CLAUDE.md`. Namespace `BECore::Chess`. The game's content is in `games/Chess/config/` (`ApplicationConfig.xml`, `SceneConfig.xml`, `TextureLibrary.xml`) and `games/Chess/assets/`. `BagiChess` starts in Game mode (`mode="Game"` in its `ApplicationConfig.xml`, no editor); set `mode="Editor"` to open it in the scene editor.
 
 ## Layout
 
