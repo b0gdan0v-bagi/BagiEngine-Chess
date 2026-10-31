@@ -1,0 +1,47 @@
+<?xml version="1.0"?>
+<!--
+  Chess piece sprite atlas (assets/chess_test.png is 700x381, laid out as a
+  6x2 uniform grid: columns King, Queen, Rook, Bishop, Knight, Pawn;
+  top row White, bottom row Black). Cell width ≈ 116.67, cell height ≈ 190.5.
+-->
+<root>
+  <sprites>
+    <sprite name="WhiteKing" texturePath="assets/chess_test.png">
+      <srcRect x="0" y="0" w="116.67" h="190.5" />
+    </sprite>
+    <sprite name="WhiteQueen" texturePath="assets/chess_test.png">
+      <srcRect x="116.67" y="0" w="116.67" h="190.5" />
+    </sprite>
+    <sprite name="WhiteRook" texturePath="assets/chess_test.png">
+      <srcRect x="233.33" y="0" w="116.67" h="190.5" />
+    </sprite>
+    <sprite name="WhiteBishop" texturePath="assets/chess_test.png">
+      <srcRect x="350" y="0" w="116.67" h="190.5" />
+    </sprite>
+    <sprite name="WhiteKnight" texturePath="assets/chess_test.png">
+      <srcRect x="466.67" y="0" w="116.67" h="190.5" />
+    </sprite>
+    <sprite name="WhitePawn" texturePath="assets/chess_test.png">
+      <srcRect x="583.33" y="0" w="116.67" h="190.5" />
+    </sprite>
+
+    <sprite name="BlackKing" texturePath="assets/chess_test.png">
+      <srcRect x="0" y="190.5" w="116.67" h="190.5" />
+    </sprite>
+    <sprite name="BlackQueen" texturePath="assets/chess_test.png">
+      <srcRect x="116.67" y="190.5" w="116.67" h="190.5" />
+    </sprite>
+    <sprite name="BlackRook" texturePath="assets/chess_test.png">
+      <srcRect x="233.33" y="190.5" w="116.67" h="190.5" />
+    </sprite>
+    <sprite name="BlackBishop" texturePath="assets/chess_test.png">
+      <srcRect x="350" y="190.5" w="116.67" h="190.5" />
+    </sprite>
+    <sprite name="BlackKnight" texturePath="assets/chess_test.png">
+      <srcRect x="466.67" y="190.5" w="116.67" h="190.5" />
+    </sprite>
+    <sprite name="BlackPawn" texturePath="assets/chess_test.png">
+      <srcRect x="583.33" y="190.5" w="116.67" h="190.5" />
+    </sprite>
+  </sprites>
+</root>

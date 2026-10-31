@@ -1,0 +1,32 @@
+# Chess Module Guidelines
+
+## Overview
+
+`ChessGame` is an `IGame` (name `Chess`, scene `ChessScene`). Infrastructure and how a game is registered: `src/Modules/Games/CLAUDE.md`. Namespace `BECore::Chess`.
+
+## Layout
+
+```
+src/Chess/
+├── ChessGame.{h,cpp}         IGame; owns the shared ChessGameModel; Start() and Reset() reset the model
+├── Game/                     plain C++ rules, no scene or renderer
+│   ├── ChessTypes.h          Square (file, rank), PieceType, PieceColor
+│   ├── ChessBoard.*          8x8 storage and accessors only, no rules
+│   ├── MoveGenerator.*       static Generate(board, from) -> pseudo-legal target squares
+│   └── ChessGameModel.*      turn, selected square, legal moves, piece handles; OnSquareClicked drives select/move
+└── Components/               scene glue (IComponent)
+    ├── ChessBoardComponent   draws the board and highlights, turns mouse clicks into OnSquareClicked
+    └── ChessPieceComponent   logical handle of one piece; drives its TransformComponent from the model
+```
+
+- State lives in `ChessGameModel`. Components never keep game state: they reach the model through `GameManager::GetInstance().GetActive()->Cast<ChessGame>()` and do nothing when Chess is not the active game.
+- A piece node in `ChessScene` is a `ChessPieceComponent` + `SpriteRendererComponent` (artwork from `TextureLibrary`, `config/TextureLibrary.xml`) + `TransformComponent`. `OnAttached` registers the piece with the model at its starting square; `Reset()` sends every handle back.
+- Board geometry (`_originX`, `_originY`, `_squareSize`) is reflected so it can be tuned in the scene editor.
+
+## Rules scope (MVP)
+
+`MoveGenerator` produces pseudo-legal moves only: no check or checkmate, no castling, no en passant, no promotion. Do not assume legality beyond that, and extend the generator (with tests) rather than patching around it in the model or components.
+
+## Tests
+
+`tests/Chess/MoveGeneratorTest.cpp` (pure logic, no engine services needed). New rule code goes into `Game/` and gets a gtest case; see `.claude/rules/tests-module.md`.

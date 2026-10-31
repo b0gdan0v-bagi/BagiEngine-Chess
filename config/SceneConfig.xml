@@ -1,0 +1,248 @@
+<?xml version="1.0"?>
+<SceneManager>
+  <scenes>
+    <scene
+      type="Scene"
+      name="ChessScene">
+      <nodes>
+        <node name="Board">
+          <components>
+            <component type="ChessBoardComponent" originX="100" originY="60" squareSize="80" />
+          </components>
+        </node>
+
+        <!-- White back rank (rank 0) -->
+        <node name="WhiteRook_a1">
+          <components>
+            <component type="TransformComponent" x="0" y="0" width="80" height="80" />
+            <component type="SpriteRendererComponent" spriteId="WhiteRook" />
+            <component type="ChessPieceComponent" file="0" rank="0" />
+          </components>
+        </node>
+        <node name="WhiteKnight_b1">
+          <components>
+            <component type="TransformComponent" x="0" y="0" width="80" height="80" />
+            <component type="SpriteRendererComponent" spriteId="WhiteKnight" />
+            <component type="ChessPieceComponent" file="1" rank="0" />
+          </components>
+        </node>
+        <node name="WhiteBishop_c1">
+          <components>
+            <component type="TransformComponent" x="0" y="0" width="80" height="80" />
+            <component type="SpriteRendererComponent" spriteId="WhiteBishop" />
+            <component type="ChessPieceComponent" file="2" rank="0" />
+          </components>
+        </node>
+        <node name="WhiteQueen_d1">
+          <components>
+            <component type="TransformComponent" x="0" y="0" width="80" height="80" />
+            <component type="SpriteRendererComponent" spriteId="WhiteQueen" />
+            <component type="ChessPieceComponent" file="3" rank="0" />
+          </components>
+        </node>
+        <node name="WhiteKing_e1">
+          <components>
+            <component type="TransformComponent" x="0" y="0" width="80" height="80" />
+            <component type="SpriteRendererComponent" spriteId="WhiteKing" />
+            <component type="ChessPieceComponent" file="4" rank="0" />
+          </components>
+        </node>
+        <node name="WhiteBishop_f1">
+          <components>
+            <component type="TransformComponent" x="0" y="0" width="80" height="80" />
+            <component type="SpriteRendererComponent" spriteId="WhiteBishop" />
+            <component type="ChessPieceComponent" file="5" rank="0" />
+          </components>
+        </node>
+        <node name="WhiteKnight_g1">
+          <components>
+            <component type="TransformComponent" x="0" y="0" width="80" height="80" />
+            <component type="SpriteRendererComponent" spriteId="WhiteKnight" />
+            <component type="ChessPieceComponent" file="6" rank="0" />
+          </components>
+        </node>
+        <node name="WhiteRook_h1">
+          <components>
+            <component type="TransformComponent" x="0" y="0" width="80" height="80" />
+            <component type="SpriteRendererComponent" spriteId="WhiteRook" />
+            <component type="ChessPieceComponent" file="7" rank="0" />
+          </components>
+        </node>
+
+        <!-- White pawns (rank 1) -->
+        <node name="WhitePawn_a2">
+          <components>
+            <component type="TransformComponent" x="0" y="0" width="80" height="80" />
+            <component type="SpriteRendererComponent" spriteId="WhitePawn" />
+            <component type="ChessPieceComponent" file="0" rank="1" />
+          </components>
+        </node>
+        <node name="WhitePawn_b2">
+          <components>
+            <component type="TransformComponent" x="0" y="0" width="80" height="80" />
+            <component type="SpriteRendererComponent" spriteId="WhitePawn" />
+            <component type="ChessPieceComponent" file="1" rank="1" />
+          </components>
+        </node>
+        <node name="WhitePawn_c2">
+          <components>
+            <component type="TransformComponent" x="0" y="0" width="80" height="80" />
+            <component type="SpriteRendererComponent" spriteId="WhitePawn" />
+            <component type="ChessPieceComponent" file="2" rank="1" />
+          </components>
+        </node>
+        <node name="WhitePawn_d2">
+          <components>
+            <component type="TransformComponent" x="0" y="0" width="80" height="80" />
+            <component type="SpriteRendererComponent" spriteId="WhitePawn" />
+            <component type="ChessPieceComponent" file="3" rank="1" />
+          </components>
+        </node>
+        <node name="WhitePawn_e2">
+          <components>
+            <component type="TransformComponent" x="0" y="0" width="80" height="80" />
+            <component type="SpriteRendererComponent" spriteId="WhitePawn" />
+            <component type="ChessPieceComponent" file="4" rank="1" />
+          </components>
+        </node>
+        <node name="WhitePawn_f2">
+          <components>
+            <component type="TransformComponent" x="0" y="0" width="80" height="80" />
+            <component type="SpriteRendererComponent" spriteId="WhitePawn" />
+            <component type="ChessPieceComponent" file="5" rank="1" />
+          </components>
+        </node>
+        <node name="WhitePawn_g2">
+          <components>
+            <component type="TransformComponent" x="0" y="0" width="80" height="80" />
+            <component type="SpriteRendererComponent" spriteId="WhitePawn" />
+            <component type="ChessPieceComponent" file="6" rank="1" />
+          </components>
+        </node>
+        <node name="WhitePawn_h2">
+          <components>
+            <component type="TransformComponent" x="0" y="0" width="80" height="80" />
+            <component type="SpriteRendererComponent" spriteId="WhitePawn" />
+            <component type="ChessPieceComponent" file="7" rank="1" />
+          </components>
+        </node>
+
+        <!-- Black pawns (rank 6) -->
+        <node name="BlackPawn_a7">
+          <components>
+            <component type="TransformComponent" x="0" y="0" width="80" height="80" />
+            <component type="SpriteRendererComponent" spriteId="BlackPawn" />
+            <component type="ChessPieceComponent" file="0" rank="6" />
+          </components>
+        </node>
+        <node name="BlackPawn_b7">
+          <components>
+            <component type="TransformComponent" x="0" y="0" width="80" height="80" />
+            <component type="SpriteRendererComponent" spriteId="BlackPawn" />
+            <component type="ChessPieceComponent" file="1" rank="6" />
+          </components>
+        </node>
+        <node name="BlackPawn_c7">
+          <components>
+            <component type="TransformComponent" x="0" y="0" width="80" height="80" />
+            <component type="SpriteRendererComponent" spriteId="BlackPawn" />
+            <component type="ChessPieceComponent" file="2" rank="6" />
+          </components>
+        </node>
+        <node name="BlackPawn_d7">
+          <components>
+            <component type="TransformComponent" x="0" y="0" width="80" height="80" />
+            <component type="SpriteRendererComponent" spriteId="BlackPawn" />
+            <component type="ChessPieceComponent" file="3" rank="6" />
+          </components>
+        </node>
+        <node name="BlackPawn_e7">
+          <components>
+            <component type="TransformComponent" x="0" y="0" width="80" height="80" />
+            <component type="SpriteRendererComponent" spriteId="BlackPawn" />
+            <component type="ChessPieceComponent" file="4" rank="6" />
+          </components>
+        </node>
+        <node name="BlackPawn_f7">
+          <components>
+            <component type="TransformComponent" x="0" y="0" width="80" height="80" />
+            <component type="SpriteRendererComponent" spriteId="BlackPawn" />
+            <component type="ChessPieceComponent" file="5" rank="6" />
+          </components>
+        </node>
+        <node name="BlackPawn_g7">
+          <components>
+            <component type="TransformComponent" x="0" y="0" width="80" height="80" />
+            <component type="SpriteRendererComponent" spriteId="BlackPawn" />
+            <component type="ChessPieceComponent" file="6" rank="6" />
+          </components>
+        </node>
+        <node name="BlackPawn_h7">
+          <components>
+            <component type="TransformComponent" x="0" y="0" width="80" height="80" />
+            <component type="SpriteRendererComponent" spriteId="BlackPawn" />
+            <component type="ChessPieceComponent" file="7" rank="6" />
+          </components>
+        </node>
+
+        <!-- Black back rank (rank 7) -->
+        <node name="BlackRook_a8">
+          <components>
+            <component type="TransformComponent" x="0" y="0" width="80" height="80" />
+            <component type="SpriteRendererComponent" spriteId="BlackRook" />
+            <component type="ChessPieceComponent" file="0" rank="7" />
+          </components>
+        </node>
+        <node name="BlackKnight_b8">
+          <components>
+            <component type="TransformComponent" x="0" y="0" width="80" height="80" />
+            <component type="SpriteRendererComponent" spriteId="BlackKnight" />
+            <component type="ChessPieceComponent" file="1" rank="7" />
+          </components>
+        </node>
+        <node name="BlackBishop_c8">
+          <components>
+            <component type="TransformComponent" x="0" y="0" width="80" height="80" />
+            <component type="SpriteRendererComponent" spriteId="BlackBishop" />
+            <component type="ChessPieceComponent" file="2" rank="7" />
+          </components>
+        </node>
+        <node name="BlackQueen_d8">
+          <components>
+            <component type="TransformComponent" x="0" y="0" width="80" height="80" />
+            <component type="SpriteRendererComponent" spriteId="BlackQueen" />
+            <component type="ChessPieceComponent" file="3" rank="7" />
+          </components>
+        </node>
+        <node name="BlackKing_e8">
+          <components>
+            <component type="TransformComponent" x="0" y="0" width="80" height="80" />
+            <component type="SpriteRendererComponent" spriteId="BlackKing" />
+            <component type="ChessPieceComponent" file="4" rank="7" />
+          </components>
+        </node>
+        <node name="BlackBishop_f8">
+          <components>
+            <component type="TransformComponent" x="0" y="0" width="80" height="80" />
+            <component type="SpriteRendererComponent" spriteId="BlackBishop" />
+            <component type="ChessPieceComponent" file="5" rank="7" />
+          </components>
+        </node>
+        <node name="BlackKnight_g8">
+          <components>
+            <component type="TransformComponent" x="0" y="0" width="80" height="80" />
+            <component type="SpriteRendererComponent" spriteId="BlackKnight" />
+            <component type="ChessPieceComponent" file="6" rank="7" />
+          </components>
+        </node>
+        <node name="BlackRook_h8">
+          <components>
+            <component type="TransformComponent" x="0" y="0" width="80" height="80" />
+            <component type="SpriteRendererComponent" spriteId="BlackRook" />
+            <component type="ChessPieceComponent" file="7" rank="7" />
+          </components>
+        </node>
+      </nodes>
+    </scene>
+  </scenes>
+</SceneManager>
