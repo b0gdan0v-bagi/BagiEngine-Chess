@@ -36,7 +36,7 @@ namespace BECore::Chess {
 
     void ChessPieceComponent::OnAttached() {
         RegisterWithModel();
-        Subscribe<SceneEvents::SceneUpdateEvent, &ChessPieceComponent::OnUpdate>(this);
+        SubscribeInScene<SceneEvents::SceneUpdateEvent, &ChessPieceComponent::OnUpdate>(this);
     }
 
     void ChessPieceComponent::OnUpdate(const SceneEvents::SceneUpdateEvent&) {

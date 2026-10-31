@@ -43,8 +43,8 @@ namespace BECore::Chess {
 
     void ChessBoardComponent::OnAttached() {
         s_active = this;
-        Subscribe<SceneEvents::SceneDrawEvent, &ChessBoardComponent::OnDraw>(this);
-        Subscribe<SDLEvents::MouseButtonDownEvent, &ChessBoardComponent::OnMouseDown>(this);
+        SubscribeInScene<SceneEvents::SceneDrawEvent, &ChessBoardComponent::OnDraw>(this);
+        SubscribeInScene<SDLEvents::MouseButtonDownEvent, &ChessBoardComponent::OnMouseDown>(this);
     }
 
     void ChessBoardComponent::SquareToPixel(int file, int rank, float& outX, float& outY) const {
