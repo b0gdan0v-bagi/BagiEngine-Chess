@@ -2,7 +2,7 @@
 
 ## Overview
 
-`ChessGame` is an `IGame` (name `Chess`, scene `ChessScene`). Infrastructure and how a game is registered: `src/Modules/Games/CLAUDE.md`. Namespace `BECore::Chess`.
+`ChessGame` is an `IGame` (name `Chess`, scene `ChessScene`). Executable `BagiChess`. Infrastructure and how a game is registered: `src/Modules/Games/CLAUDE.md`. Namespace `BECore::Chess`. The game's content is in `games/Chess/config/` (`SceneConfig.xml`, `TextureLibrary.xml`) and `games/Chess/assets/`.
 
 ## Layout
 
@@ -20,7 +20,7 @@ src/Chess/
 ```
 
 - State lives in `ChessGameModel`. Components never keep game state: they reach the model through `GameManager::GetInstance().GetActive()->Cast<ChessGame>()` and do nothing when Chess is not the active game.
-- A piece node in `ChessScene` is a `ChessPieceComponent` + `SpriteRendererComponent` (artwork from `TextureLibrary`, `config/TextureLibrary.xml`) + `TransformComponent`. `OnAttached` registers the piece with the model at its starting square; `Reset()` sends every handle back.
+- A piece node in `ChessScene` is a `ChessPieceComponent` + `SpriteRendererComponent` (artwork from `TextureLibrary`, `games/Chess/config/TextureLibrary.xml`) + `TransformComponent`. `OnAttached` registers the piece with the model at its starting square; `Reset()` sends every handle back.
 - Board geometry (`_originX`, `_originY`, `_squareSize`) is reflected so it can be tuned in the scene editor.
 
 ## Rules scope (MVP)
@@ -29,4 +29,4 @@ src/Chess/
 
 ## Tests
 
-`tests/Chess/MoveGeneratorTest.cpp` (pure logic, no engine services needed). New rule code goes into `Game/` and gets a gtest case; see `.claude/rules/tests-module.md`.
+`games/Chess/tests/MoveGeneratorTest.cpp`, executable `ChessTests` (pure logic, no engine services needed). New rule code goes into `Game/` and gets a gtest case; see `.claude/rules/tests-module.md`.
