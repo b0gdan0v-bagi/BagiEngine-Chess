@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Chess/ChessGameControl.h>
 #include <Chess/Game/ChessGameModel.h>
 #include <Games/IGame.h>
 
@@ -13,11 +14,13 @@ namespace BECore::Chess {
      *
      * Auto-registered into AbstractFactory<IGame> via the BE_CLASS reflection
      * machinery — no extra hand-written registrar required.
+     *
+     * Owns the adapter of the external control API (ChessGameControl) next to the model it drives.
      */
     class ChessGame : public IGame {
         BE_CLASS(ChessGame)
     public:
-        ChessGame() = default;
+        ChessGame();
         ~ChessGame() override = default;
 
         PoolString GetName() const override;
@@ -26,6 +29,8 @@ namespace BECore::Chess {
         void Start() override;
         void Stop() override;
         void Reset() override;
+
+        IControllableGame* AsControllable() override;
 
         ChessGameModel& GetModel() noexcept {
             return _model;
@@ -39,6 +44,7 @@ namespace BECore::Chess {
 
     private:
         ChessGameModel _model;
+        ChessGameControl _control;
     };
 
 }  // namespace BECore::Chess

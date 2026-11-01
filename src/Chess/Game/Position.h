@@ -8,7 +8,7 @@
 namespace BECore::Chess {
 
     /// Why a FEN string was rejected.
-    CORE_ENUM(FenError, uint8_t, WrongFieldCount, BadPiecePlacement, BadSideToMove, BadCastling, BadEnPassant, BadClock, BadKingCount, PawnOnBackRank, OpponentInCheck)
+    CORE_ENUM(FenError, uint8_t, WrongFieldCount, BadPiecePlacement, BadSideToMove, BadCastling, BadEnPassant, BadClock, BadKingCount, PawnOnBackRank, TooManyPieces, OpponentInCheck)
 
     /// Bits of Position::CastlingRights().
     constexpr int kWhiteKingSide = 1;
@@ -33,8 +33,9 @@ namespace BECore::Chess {
      * The en passant square is kept only when a pawn of the side to move could capture onto it, so two positions that
      * are the same for the rules always have the same key and the same FEN.
      *
-     * Standard chess only (no Chess960). Every position holds exactly one king per side, no pawn on a back rank, and the
-     * side that is not to move is never in check; FromFen() rejects anything else, so the lookups below can rely on it.
+     * Standard chess only (no Chess960). Every position holds exactly one king per side, no pawn on a back rank, at most
+     * 16 pieces per side (the 16 it started with) and the side that is not to move is never in check; FromFen() rejects
+     * anything else, so the lookups below can rely on it.
      */
     class Position {
     public:

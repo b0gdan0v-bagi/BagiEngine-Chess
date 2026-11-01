@@ -23,6 +23,8 @@ namespace BECore::Chess {
         constexpr int kEnPassantRankWhiteToMove = 5;  // rank index of the square behind a pawn that black just pushed two squares
         constexpr int kEnPassantRankBlackToMove = 2;
 
+        constexpr int kMaxPiecesPerSide = 16;  // promotion changes a piece, never adds one
+
         constexpr size_t kFenMinFields = 4;
         constexpr size_t kFenMaxFields = 6;
 
@@ -143,6 +145,11 @@ namespace BECore::Chess {
         }
         if ((pos.Pieces(PieceType::Pawn) & (kRank1 | kRank8)) != 0) {
             return std::unexpected(FenError::PawnOnBackRank);
+        }
+        for (const auto color : {PieceColor::White, PieceColor::Black}) {
+            if (PopCount(pos.Pieces(color)) > kMaxPiecesPerSide) {
+                return std::unexpected(FenError::TooManyPieces);
+            }
         }
 
         // 2. Side to move.

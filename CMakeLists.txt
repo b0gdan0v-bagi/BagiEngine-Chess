@@ -28,4 +28,7 @@ if(ENGINE_BUILD_TESTS)
         SOURCES ${CHESS_TEST_SOURCES}
         LINK ChessModule
     )
+
+    # Starts BagiChess with the control API and plays a few moves, a mate and a promotion over WebSocket
+    be_add_game_control_tests(BagiChess SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/tests/control_smoke.py)
 endif()

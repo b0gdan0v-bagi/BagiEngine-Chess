@@ -18,7 +18,7 @@ namespace BECore::Chess::Tests {
         /// Plays a move given in UCI through TryMove (so castling, en passant and under-promotion work too).
         bool Play(ChessGameModel& model, eastl::string_view uci) {
             const auto move = MoveGenerator::ParseUci(model.GetPosition(), uci);
-            return move.has_value() && model.TryMove(*move);
+            return move.has_value() && model.TryMove(*move).has_value();
         }
 
         /// Plays "e2 e4"-style click pairs; each pair is a selection followed by a target.
@@ -42,7 +42,10 @@ namespace BECore::Chess::Tests {
 
             /// The handle that started on @p square.
             [[nodiscard]] const void* At(eastl::string_view square) const {
-                return &_slots[static_cast<size_t>(SqIdx(square))];
+                return AtIndex(SqIdx(square));
+            }
+            [[nodiscard]] const void* AtIndex(int sq) const {
+                return &_slots[static_cast<size_t>(sq)];
             }
 
         private:
@@ -141,6 +144,19 @@ namespace BECore::Chess::Tests {
         EXPECT_FALSE(model.TryMove(Mv("e7e5"))) << "not black's turn";
         EXPECT_FALSE(model.TryMove(Move{}));
         EXPECT_EQ(model.GetPosition().ToFen(), eastl::string(Position::kStartFen));
+    }
+
+    TEST(ChessGameModelTest, TryMoveSaysWhyItRefusedAMove) {
+        ChessGameModel model;
+        const auto illegal = model.TryMove(Mv("e2e5"));
+        ASSERT_FALSE(illegal.has_value());
+        EXPECT_EQ(illegal.error(), MoveError::IllegalMove);
+
+        ClickMoves(model, {"f2", "f3", "e7", "e5", "g2", "g4", "d8", "h4"});
+        ASSERT_TRUE(model.IsGameOver());
+        const auto afterTheEnd = model.TryMove(Mv("e2e3"));
+        ASSERT_FALSE(afterTheEnd.has_value());
+        EXPECT_EQ(afterTheEnd.error(), MoveError::GameOver) << "a finished game says so even for a move that would be legal";
     }
 
     TEST(ChessGameModelTest, TryMoveNeedsNoSelection) {
@@ -247,6 +263,157 @@ namespace BECore::Chess::Tests {
         }
         EXPECT_EQ(model.GetStatus(), GameStatus::DrawThreefold);
         EXPECT_FALSE(model.GetWinner().has_value());
+    }
+
+    // ---- History and version ----
+
+    TEST(ChessGameModelTest, PlayedMovesAreKeptInOrder) {
+        ChessGameModel model;
+        EXPECT_TRUE(model.GetMoves().empty());
+        EXPECT_EQ(model.GetStartFen(), eastl::string(Position::kStartFen));
+
+        for (const char* uci : {"e2e4", "e7e5", "g1f3"}) {
+            ASSERT_TRUE(Play(model, uci)) << uci;
+        }
+        ASSERT_EQ(model.GetMoves().size(), 3u);
+        EXPECT_EQ(model.GetMoves()[0], Mv("e2e4"));
+        EXPECT_EQ(model.GetMoves()[2], Mv("g1f3"));
+
+        EXPECT_FALSE(model.TryMove(Mv("e2e5")).has_value());
+        EXPECT_EQ(model.GetMoves().size(), 3u) << "a refused move is not history";
+    }
+
+    TEST(ChessGameModelTest, VersionGrowsWithEveryChangeAndNeverWithASelection) {
+        ChessGameModel model;
+        uint64_t version = model.GetVersion();
+
+        Click(model, "e2");
+        EXPECT_EQ(model.GetVersion(), version) << "selecting moves nothing";
+
+        EXPECT_FALSE(model.TryMove(Mv("e2e5")).has_value());
+        EXPECT_EQ(model.GetVersion(), version) << "a refused move changes nothing";
+
+        ASSERT_TRUE(Play(model, "e2e4"));
+        EXPECT_GT(model.GetVersion(), version);
+        version = model.GetVersion();
+
+        model.Reset();
+        EXPECT_GT(model.GetVersion(), version) << "a new game is a change, even from the position it already had";
+        version = model.GetVersion();
+
+        model.SetPosition(PositionFromFen(kKiwipeteFen));
+        EXPECT_GT(model.GetVersion(), version);
+    }
+
+    TEST(ChessGameModelTest, ClickedMovesCountAsMovesToo) {
+        ChessGameModel model;
+        const uint64_t version = model.GetVersion();
+        ClickMoves(model, {"e2", "e4"});
+        EXPECT_EQ(model.GetMoves().size(), 1u);
+        EXPECT_GT(model.GetVersion(), version);
+    }
+
+    TEST(ChessGameModelTest, ResetForgetsTheMoves) {
+        ChessGameModel model;
+        ASSERT_TRUE(Play(model, "e2e4"));
+        model.Reset();
+        EXPECT_TRUE(model.GetMoves().empty());
+    }
+
+    // ---- Setting a position ----
+
+    TEST(ChessGameModelTest, SetPositionStartsAGameFromThatPosition) {
+        ChessGameModel model;
+        ASSERT_TRUE(Play(model, "e2e4"));
+        Click(model, "e7");
+
+        model.SetPosition(PositionFromFen(kKiwipeteFen));
+
+        EXPECT_EQ(model.GetPosition().ToFen(), eastl::string(kKiwipeteFen));
+        EXPECT_EQ(model.GetStartFen(), eastl::string(kKiwipeteFen));
+        EXPECT_TRUE(model.GetMoves().empty());
+        EXPECT_FALSE(model.HasSelection());
+        EXPECT_EQ(model.GetStatus(), GameStatus::Ongoing);
+        EXPECT_TRUE(Play(model, "e1g1")) << "the castling rights of the FEN are in force";
+        ASSERT_EQ(model.GetMoves().size(), 1u);
+    }
+
+    TEST(ChessGameModelTest, SetPositionOfAFinishedGameStartsItFinished) {
+        ChessGameModel model;
+        model.SetPosition(PositionFromFen("6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1"));
+        EXPECT_EQ(model.GetStatus(), GameStatus::Ongoing);
+        ASSERT_TRUE(Play(model, "a1a8"));
+        EXPECT_EQ(model.GetStatus(), GameStatus::Checkmate);
+
+        model.SetPosition(PositionFromFen("7k/5Q2/6K1/8/8/8/8/8 b - - 0 1"));
+        EXPECT_EQ(model.GetStatus(), GameStatus::Stalemate);
+        EXPECT_TRUE(model.IsGameOver());
+        EXPECT_FALSE(model.TryMove(Mv("h8g8")).has_value());
+
+        model.Reset();
+        EXPECT_EQ(model.GetStatus(), GameStatus::Ongoing);
+    }
+
+    TEST(ChessGameModelTest, SetPositionDealsEveryPieceToAHandle) {
+        ChessGameModel model;
+        const Handles handles(model);
+        const Position opening = Position::Start();
+        model.SetPosition(PositionFromFen(kKiwipeteFen));
+
+        // Each handle stands on a square that holds the piece it reports, and every piece ends up with exactly one handle
+        eastl::array<int, kSquareCount> handlesOnSquare{};
+        for (int start = 0; start < kSquareCount; ++start) {
+            if (opening.GetPieceAt(Square::FromIndex(start)).IsEmpty()) {
+                continue;
+            }
+            const void* handle = handles.AtIndex(start);
+            ASSERT_TRUE(model.IsActive(handle)) << "the handle that started on square " << start;
+            const Square at = model.GetSquareOf(handle);
+            ASSERT_TRUE(at.IsInside());
+            EXPECT_TRUE(model.GetPieceOf(handle) == model.GetPieceAt(at)) << "the handle that started on square " << start;
+            ++handlesOnSquare[static_cast<size_t>(at.Index())];
+        }
+        for (int sq = 0; sq < kSquareCount; ++sq) {
+            EXPECT_EQ(handlesOnSquare[static_cast<size_t>(sq)], model.GetPieceAt(Square::FromIndex(sq)).IsEmpty() ? 0 : 1) << "square " << sq;
+        }
+    }
+
+    TEST(ChessGameModelTest, SetPositionTakesTheHandlesWithoutAPieceOffTheBoard) {
+        ChessGameModel model;
+        const Handles handles(model);
+        const Position opening = Position::Start();
+        model.SetPosition(PositionFromFen("4k3/8/8/8/8/8/8/4K3 w - - 0 1"));
+
+        int kings = 0;
+        int others = 0;
+        for (int start = 0; start < kSquareCount; ++start) {
+            if (opening.GetPieceAt(Square::FromIndex(start)).IsEmpty()) {
+                continue;
+            }
+            const void* handle = handles.AtIndex(start);
+            if (!model.IsActive(handle)) {
+                EXPECT_FALSE(model.GetSquareOf(handle).IsInside());
+            } else if (model.GetPieceOf(handle).type == PieceType::King) {
+                ++kings;
+            } else {
+                ++others;
+            }
+        }
+        EXPECT_EQ(kings, 2);
+        EXPECT_EQ(others, 0);
+    }
+
+    TEST(ChessGameModelTest, ResetBringsTheHandlesBackAfterASetPosition) {
+        ChessGameModel model;
+        const Handles handles(model);
+        model.SetPosition(PositionFromFen("4k3/8/8/8/8/8/8/4K3 w - - 0 1"));
+        model.Reset();
+
+        for (const char* name : {"a1", "e1", "h1", "a2", "d7", "e8", "h8"}) {
+            EXPECT_TRUE(model.IsActive(handles.At(name))) << name;
+            EXPECT_EQ(model.GetSquareOf(handles.At(name)), Sq(name)) << name;
+        }
+        EXPECT_TRUE(model.GetPieceOf(handles.At("d1")).type == PieceType::Queen);
     }
 
     // ---- Piece handles ----

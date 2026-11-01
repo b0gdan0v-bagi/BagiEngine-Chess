@@ -8,13 +8,19 @@
 
 namespace BECore::Chess {
 
+    /// Why ChessGameModel::TryMove() refused a move.
+    CORE_ENUM(MoveError, uint8_t, GameOver, IllegalMove)
+
     /**
      * @brief Stateful match wrapper around Position + MoveGenerator.
      *
      * Owns the position, the selected square (the "from" half of a pending move, set by OnSquareClicked() in response to
-     * the user clicking a square) and the status of the game. Every move goes through TryMove(): it is checked against the
-     * legal moves, applied, and the status is worked out again (EvaluateStatus()). Once the status is not Ongoing no move
-     * is accepted until Reset().
+     * the user clicking a square), the status of the game and the moves played since it began. Every move goes through
+     * TryMove(): it is checked against the legal moves, applied, and the status is worked out again (EvaluateStatus()).
+     * Once the status is not Ongoing no move is accepted until Reset() or SetPosition().
+     *
+     * GetVersion() grows with every change a controller has to see (a new game, a position set from outside, a played
+     * move) and never goes back; selecting a piece does not move it.
      *
      * Also tracks visual-piece identities through opaque handles so the scene layer can render moves and captures
      * without re-deriving identity from piece type/color. Each handle is bound at registration time to its starting
@@ -32,6 +38,17 @@ namespace BECore::Chess {
         /// handles to their start squares; clears selection.
         void Reset();
 
+        /**
+         * @brief Start a game from @p position instead of the opening one (it becomes the start of the move list).
+         *
+         * Pass a position that came from Position::FromFen(), so that it carries no history. The registered handles are
+         * dealt out again: for each color, in the order of their start squares, to the pieces of that color in the order of
+         * the squares; a handle that finds no piece leaves the board. FromFen() allows 16 pieces per color at most, which
+         * is how many handles a color has in the scene. The status is worked out for the new position (a position that is
+         * already mated, stalemated or drawn starts as a finished game); selection is cleared.
+         */
+        void SetPosition(const Position& position);
+
         /// Whose turn it is to move.
         [[nodiscard]] PieceColor GetTurn() const noexcept {
             return _position.SideToMove();
@@ -39,6 +56,17 @@ namespace BECore::Chess {
 
         [[nodiscard]] const Position& GetPosition() const noexcept {
             return _position;
+        }
+        /// The FEN the game began from: the opening position, or the one given to SetPosition().
+        [[nodiscard]] const eastl::string& GetStartFen() const noexcept {
+            return _startFen;
+        }
+        /// The moves played since the game began, in order.
+        [[nodiscard]] const eastl::vector<Move>& GetMoves() const noexcept {
+            return _moves;
+        }
+        [[nodiscard]] uint64_t GetVersion() const noexcept {
+            return _version;
         }
         [[nodiscard]] Piece GetPieceAt(Square s) const noexcept {
             return _position.GetPieceAt(s);
@@ -98,9 +126,9 @@ namespace BECore::Chess {
          * The one place a move is applied; it does not need a selection. Moves come from MoveGenerator (see
          * MoveGenerator::ParseUci() for text input), which is the way to play a promotion to a piece other than a queen.
          *
-         * @return true if the move was legal and has been played.
+         * @return nothing when the move has been played; GameOver once the game is finished, IllegalMove for any other move.
          */
-        bool TryMove(Move move);
+        std::expected<void, MoveError> TryMove(Move move);
 
         /// Register a visual identity that lives at @p startSquare. Idempotent.
         void RegisterPiece(PieceHandle handle, Square startSquare);
@@ -130,7 +158,12 @@ namespace BECore::Chess {
         void Capture(Square at);
         PieceTrack* MoveHandle(Square from, Square to);
 
+        void BeginGame(const Position& position);
+
         Position _position = Position::Start();
+        eastl::string _startFen;
+        eastl::vector<Move> _moves;
+        uint64_t _version = 0;
         GameStatus _status = GameStatus::Ongoing;
         bool _hasSelected = false;
         Square _selected{};

@@ -62,6 +62,11 @@ namespace BECore::Chess::Tests {
         EXPECT_TRUE(IsRejectedWith("4k3/8/8/8/8/8/8/p3K3 w - - 0 1", FenError::PawnOnBackRank));
     }
 
+    TEST(PositionTest, FenRejectsMoreThanSixteenPiecesOfOneSide) {
+        EXPECT_TRUE(IsRejectedWith("4k3/8/8/8/8/N7/PPPPPPPP/NNNNKNNN w - - 0 1", FenError::TooManyPieces)) << "seventeen";
+        EXPECT_TRUE(Position::FromFen("4k3/8/8/8/8/8/PPPPPPPP/NNNNKNNN w - - 0 1").has_value()) << "sixteen is the most";
+    }
+
     TEST(PositionTest, FenRejectsBadSideToMove) {
         EXPECT_TRUE(IsRejectedWith("4k3/8/8/8/8/8/8/4K3 x - - 0 1", FenError::BadSideToMove));
     }

@@ -1,6 +1,7 @@
 #include "ChessGameModel.h"
 
 #include <EASTL/algorithm.h>
+#include <EASTL/sort.h>
 
 namespace BECore::Chess {
 
@@ -20,14 +21,52 @@ namespace BECore::Chess {
     }
 
     void ChessGameModel::Reset() {
-        _position = Position::Start();
-        _status = GameStatus::Ongoing;
-        ClearSelection();
+        BeginGame(Position::Start());
         for (auto& [handle, track] : _pieces) {
             track.current = track.start;
             track.piece = track.startPiece;
             track.active = true;
         }
+    }
+
+    void ChessGameModel::SetPosition(const Position& position) {
+        BeginGame(position);
+
+        for (const PieceColor color : {PieceColor::White, PieceColor::Black}) {
+            // The map has no order of its own; the order of the start squares makes the deal the same on every run.
+            eastl::vector<PieceTrack*> tracks;
+            for (auto& [handle, track] : _pieces) {
+                if (track.startPiece.color == color) {
+                    tracks.push_back(&track);
+                }
+            }
+            eastl::sort(tracks.begin(), tracks.end(), [](const PieceTrack* left, const PieceTrack* right) { return left->start.Index() < right->start.Index(); });
+
+            size_t next = 0;
+            for (int sq = 0; sq < kSquareCount && next < tracks.size(); ++sq) {
+                const Piece piece = _position.PieceAt(sq);
+                if (piece.IsEmpty() || piece.color != color) {
+                    continue;
+                }
+                PieceTrack& track = *tracks[next++];
+                track.current = Square::FromIndex(sq);
+                track.piece = piece;
+                track.active = true;
+            }
+            for (; next < tracks.size(); ++next) {
+                tracks[next]->current = kOffBoard;
+                tracks[next]->active = false;
+            }
+        }
+    }
+
+    void ChessGameModel::BeginGame(const Position& position) {
+        _position = position;
+        _startFen = _position.ToFen();
+        _moves.clear();
+        _status = EvaluateStatus(_position);
+        ClearSelection();
+        ++_version;
     }
 
     std::optional<PieceColor> ChessGameModel::GetWinner() const noexcept {
@@ -61,7 +100,7 @@ namespace BECore::Chess {
             // The moves of a promoting pawn share a target; they are listed queen first, so the first match is the queen.
             for (const Move move : _selectedMoves) {
                 if (move.To() == s) {
-                    return TryMove(move);
+                    return TryMove(move).has_value();
                 }
             }
             if (!clicked.IsEmpty() && clicked.color == _position.SideToMove()) {
@@ -81,20 +120,22 @@ namespace BECore::Chess {
         return false;
     }
 
-    bool ChessGameModel::TryMove(Move move) {
+    std::expected<void, MoveError> ChessGameModel::TryMove(Move move) {
         if (IsGameOver()) {
-            return false;
+            return std::unexpected(MoveError::GameOver);
         }
         const MoveList legal = MoveGenerator::GenerateLegal(_position);
         if (eastl::find(legal.begin(), legal.end(), move) == legal.end()) {
-            return false;
+            return std::unexpected(MoveError::IllegalMove);
         }
 
         RelocatePieces(move);
         _position.DoMove(move);
+        _moves.push_back(move);
         ClearSelection();
         _status = EvaluateStatus(_position);
-        return true;
+        ++_version;
+        return {};
     }
 
     void ChessGameModel::RegisterPiece(PieceHandle handle, Square startSquare) {

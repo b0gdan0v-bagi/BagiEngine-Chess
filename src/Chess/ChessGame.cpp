@@ -14,6 +14,12 @@ namespace BECore::Chess {
         return chess ? &chess->GetModel() : nullptr;
     }
 
+    ChessGame::ChessGame() : _control(_model) {}
+
+    IControllableGame* ChessGame::AsControllable() {
+        return &_control;
+    }
+
     PoolString ChessGame::GetName() const {
         return "Chess"_intern;
     }
