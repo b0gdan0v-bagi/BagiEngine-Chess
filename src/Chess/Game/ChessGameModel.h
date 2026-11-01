@@ -130,7 +130,8 @@ namespace BECore::Chess {
          */
         std::expected<void, MoveError> TryMove(Move move);
 
-        /// Register a visual identity that lives at @p startSquare. Idempotent.
+        /// Register a visual identity that lives at @p startSquare of the opening position. Idempotent. Registering into a game
+        /// that has moved on or began from a set position puts the piece where that position has one (see SetPosition()).
         void RegisterPiece(PieceHandle handle, Square startSquare);
         void UnregisterPiece(PieceHandle handle);
 
@@ -159,6 +160,9 @@ namespace BECore::Chess {
         PieceTrack* MoveHandle(Square from, Square to);
 
         void BeginGame(const Position& position);
+
+        /// Hands the pieces of the current position out to the registered handles; the handles left over go off the board
+        void DealPieces();
 
         Position _position = Position::Start();
         eastl::string _startFen;

@@ -28,13 +28,15 @@ namespace BECore::Chess::Tests {
             }
         }
 
-        /// A handle for each piece of the start position, registered at its start square.
+        /// A handle for each piece of the opening position, registered at its start square (as the scene does, whatever the
+        /// game has reached by then).
         class Handles {
         public:
             explicit Handles(ChessGameModel& model) {
+                const Position opening = Position::Start();
                 for (int sq = 0; sq < kSquareCount; ++sq) {
                     const Square square = Square::FromIndex(sq);
-                    if (!model.GetPieceAt(square).IsEmpty()) {
+                    if (!opening.GetPieceAt(square).IsEmpty()) {
                         model.RegisterPiece(&_slots[static_cast<size_t>(sq)], square);
                     }
                 }
@@ -52,6 +54,25 @@ namespace BECore::Chess::Tests {
             eastl::array<char, kSquareCount> _slots{};
         };
 
+        /// Each handle stands on a square that holds the piece it reports, and every piece of the position has exactly one handle
+        void ExpectEveryPieceHasOneHandle(const ChessGameModel& model, const Handles& handles) {
+            const Position opening = Position::Start();
+            eastl::array<int, kSquareCount> handlesOnSquare{};
+            for (int start = 0; start < kSquareCount; ++start) {
+                if (opening.GetPieceAt(Square::FromIndex(start)).IsEmpty()) {
+                    continue;
+                }
+                const void* handle = handles.AtIndex(start);
+                ASSERT_TRUE(model.IsActive(handle)) << "the handle that started on square " << start;
+                const Square at = model.GetSquareOf(handle);
+                ASSERT_TRUE(at.IsInside());
+                EXPECT_TRUE(model.GetPieceOf(handle) == model.GetPieceAt(at)) << "the handle that started on square " << start;
+                ++handlesOnSquare[static_cast<size_t>(at.Index())];
+            }
+            for (int sq = 0; sq < kSquareCount; ++sq) {
+                EXPECT_EQ(handlesOnSquare[static_cast<size_t>(sq)], model.GetPieceAt(Square::FromIndex(sq)).IsEmpty() ? 0 : 1) << "square " << sq;
+            }
+        }
     }  // namespace
 
     // ---- Click flow ----
@@ -357,25 +378,38 @@ namespace BECore::Chess::Tests {
     TEST(ChessGameModelTest, SetPositionDealsEveryPieceToAHandle) {
         ChessGameModel model;
         const Handles handles(model);
-        const Position opening = Position::Start();
         model.SetPosition(PositionFromFen(kKiwipeteFen));
+        ExpectEveryPieceHasOneHandle(model, handles);
+    }
 
-        // Each handle stands on a square that holds the piece it reports, and every piece ends up with exactly one handle
-        eastl::array<int, kSquareCount> handlesOnSquare{};
-        for (int start = 0; start < kSquareCount; ++start) {
-            if (opening.GetPieceAt(Square::FromIndex(start)).IsEmpty()) {
-                continue;
-            }
-            const void* handle = handles.AtIndex(start);
-            ASSERT_TRUE(model.IsActive(handle)) << "the handle that started on square " << start;
-            const Square at = model.GetSquareOf(handle);
-            ASSERT_TRUE(at.IsInside());
-            EXPECT_TRUE(model.GetPieceOf(handle) == model.GetPieceAt(at)) << "the handle that started on square " << start;
-            ++handlesOnSquare[static_cast<size_t>(at.Index())];
+    TEST(ChessGameModelTest, PiecesThatRegisterAfterTheGameMovedStandWhereThePositionHasThem) {
+        // A client that acts before the first frame: the scene registers its pieces after e2e4 e7e5 g1f3 were played
+        ChessGameModel model;
+        ASSERT_TRUE(Play(model, "e2e4"));
+        ASSERT_TRUE(Play(model, "e7e5"));
+        ASSERT_TRUE(Play(model, "g1f3"));
+        const Handles handles(model);
+
+        ExpectEveryPieceHasOneHandle(model, handles);
+        EXPECT_EQ(model.GetSquareOf(handles.At("a1")), Sq("a1"));
+        EXPECT_TRUE(model.GetPieceAt(Sq("e2")).IsEmpty()) << "e2 is empty after e2e4";
+        EXPECT_TRUE(model.GetPieceAt(Sq("f3")).type == PieceType::Knight);
+
+        // The game goes on from there and a reset brings every handle home
+        ASSERT_TRUE(Play(model, "b8c6"));
+        ExpectEveryPieceHasOneHandle(model, handles);
+        model.Reset();
+        for (int sq = 0; sq < 16; ++sq) {
+            EXPECT_EQ(model.GetSquareOf(handles.AtIndex(sq)), Square::FromIndex(sq)) << "white handle " << sq;
         }
-        for (int sq = 0; sq < kSquareCount; ++sq) {
-            EXPECT_EQ(handlesOnSquare[static_cast<size_t>(sq)], model.GetPieceAt(Square::FromIndex(sq)).IsEmpty() ? 0 : 1) << "square " << sq;
-        }
+        EXPECT_TRUE(model.GetPieceOf(handles.At("e2")) == model.GetPieceAt(Sq("e2")));
+    }
+
+    TEST(ChessGameModelTest, PiecesThatRegisterIntoASetPositionAreDealtToIt) {
+        ChessGameModel model;
+        model.SetPosition(PositionFromFen(kKiwipeteFen));
+        const Handles handles(model);
+        ExpectEveryPieceHasOneHandle(model, handles);
     }
 
     TEST(ChessGameModelTest, SetPositionTakesTheHandlesWithoutAPieceOffTheBoard) {

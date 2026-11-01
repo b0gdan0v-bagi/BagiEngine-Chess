@@ -31,7 +31,10 @@ namespace BECore::Chess {
 
     void ChessGameModel::SetPosition(const Position& position) {
         BeginGame(position);
+        DealPieces();
+    }
 
+    void ChessGameModel::DealPieces() {
         for (const PieceColor color : {PieceColor::White, PieceColor::Black}) {
             // The map has no order of its own; the order of the start squares makes the deal the same on every run.
             eastl::vector<PieceTrack*> tracks;
@@ -141,10 +144,16 @@ namespace BECore::Chess {
     void ChessGameModel::RegisterPiece(PieceHandle handle, Square startSquare) {
         auto& track = _pieces[handle];
         track.start = startSquare;
-        track.startPiece = _position.GetPieceAt(startSquare);
+        track.startPiece = Position::Start().GetPieceAt(startSquare);  // the scene is laid out for the opening, whatever the game has reached
         track.current = startSquare;
         track.piece = track.startPiece;
         track.active = true;
+
+        // The scene registers its pieces in its first frame, which a client that acts at once (the control API on the manual
+        // clock) can precede: a game that has moved on, or began from another position, is dealt again with this piece in it.
+        if (!_moves.empty() || _startFen != Position::kStartFen) {
+            DealPieces();
+        }
     }
 
     void ChessGameModel::UnregisterPiece(PieceHandle handle) {

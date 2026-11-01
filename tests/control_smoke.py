@@ -5,8 +5,8 @@
 
 ctest runs it as BagiChessControlSmoke (be_add_game_control_tests). It builds on the engine's tools/control/tests/smoke.py,
 which it finds through the environment variable BAGI_ENGINE_DIR (set by ctest), or next to this repository (engine/ when Chess
-sits in its own repository, the repository root when it sits in games/). The game is played twice, on the real clock and with
---manual-clock. Exit code: 0 passed, 1 failed, 77 skipped (the executable does not exist).
+sits in its own repository, the repository root when it sits in games/). The game is played on the real clock, with
+--manual-clock, and with moves before its first frame. Exit code: 0 passed, 1 failed, 77 skipped (the executable does not exist).
 """
 
 import os
@@ -174,9 +174,29 @@ def run_chess_scenario(client: BagiControlClient, headless: bool) -> None:
         check_screenshots(client)
 
 
+def run_moves_before_the_first_frame(client: BagiControlClient, headless: bool) -> None:
+    """A client that acts at once: the scene registers its pieces in the first frame, after these moves, and has to show them."""
+    if not headless:
+        return  # the check is made on screenshots
+    for uci in OPENING:
+        client.call("perform_action", move(uci))  # the manual clock has run no frame yet
+    client.call("step", {"frames": 2})
+    by_moves = take_screenshot(client)
+
+    # The same position set from outside is drawn the same way, and it is not the opening
+    client.call("set_state", {"fen": client.call("get_state")["state"]["fen"]})
+    client.call("step", {"frames": 2})
+    by_fen = take_screenshot(client)
+    check(by_moves.rows == by_fen.rows, "the scene after moves played before the first frame is not the scene of the same position")
+    client.call("reset")
+    client.call("step", {"frames": 2})
+    check(by_moves.rows != take_screenshot(client).rows, "the scene still shows the opening after four moves")
+
+
 SCENARIOS = [
     ("real clock", [], run_chess_scenario),
     ("manual clock", ["--manual-clock"], run_chess_scenario),
+    ("moves before the first frame", ["--manual-clock"], run_moves_before_the_first_frame),
 ]
 
 
