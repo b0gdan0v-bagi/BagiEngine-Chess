@@ -22,7 +22,7 @@ src/Chess/
 - State lives in `ChessGameModel`. Components never keep game state: they reach the model through `GameManager::GetInstance().GetActive()->Cast<ChessGame>()` and do nothing when Chess is not the active game.
 - A piece node in `ChessScene` is a `ChessPieceComponent` + `SpriteRendererComponent` (artwork from `TextureLibrary`, `games/Chess/config/TextureLibrary.xml`) + `TransformComponent`. `OnAttached` registers the piece with the model at its starting square; `Reset()` sends every handle back.
 - The piece atlas (`assets/chess_test.png`) must keep a real alpha channel: a sprite with an opaque background paints a box over its square and hides the square color and the highlights. A replacement atlas needs a transparent background.
-- Board geometry (`_originX`, `_originY`, `_squareSize`) is reflected so it can be tuned in the scene editor.
+- Board geometry (`_originX`, `_originY`, `_squareSize`) is reflected so it can be tuned in the scene editor. It is in scene units, not window pixels: `ChessScene` declares `viewWidth="840" viewHeight="760"` (the board 640x640 at (100, 60) with an equal margin on every side), so the engine scales the whole scene to the window and centers it. Change the view size together with the board geometry, and map mouse positions with `Scene::ScreenToSceneX/Y` (`OnMouseDown` does).
 - The `Board` node has `layer="-1"`, the pieces stay on layer 0, so the squares and highlights are drawn first and the sprites on top. The order comes from the layer, not from where the node sits in `SceneConfig.xml` (`Scene/CLAUDE.md`, "Draw order").
 
 ## Rules scope (MVP)

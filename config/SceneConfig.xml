@@ -3,7 +3,9 @@
   <scenes>
     <scene
       type="Scene"
-      name="ChessScene">
+      name="ChessScene"
+      viewWidth="840"
+      viewHeight="760">
       <nodes>
         <!-- Background layer: nodes with a lower layer are drawn first, the pieces (layer 0) on top. -->
         <node name="Board" layer="-1">
