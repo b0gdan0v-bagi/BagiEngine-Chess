@@ -16,7 +16,7 @@ src/Chess/
 │   ├── Attacks.*             AttackTables (SingletonAtomic): knight / king / pawn tables, rook and bishop magic bitboards, Between / Line, Zobrist keys
 │   ├── Position.*            pieces as bitboards + 64-cell array, side to move, castling rights, en passant, clocks, Zobrist key; FEN, DoMove / UndoMove, IsLegal, checkers and pins
 │   ├── MoveGenerator.*       GenerateLegal(position) -> MoveList; ParseUci(position, text)
-│   ├── GameStatus.*          EvaluateStatus(position): Ongoing, Checkmate, Stalemate, DrawInsufficientMaterial, DrawFivefold, DrawSeventyFiveMoves
+│   ├── GameStatus.*          EvaluateStatus(position): Ongoing, Checkmate, Stalemate, DrawInsufficientMaterial, DrawThreefold, DrawFiftyMoves
 │   └── ChessGameModel.*      selected square, legal moves of it, status, piece handles; OnSquareClicked drives select / move, TryMove(Move) is the one place a move is applied
 └── Components/               scene glue (IComponent)
     ├── ChessBoardComponent   draws the board, the check and the highlights, turns mouse clicks into OnSquareClicked (and restarts after the game ends)
@@ -32,7 +32,7 @@ src/Chess/
 
 ## Rules
 
-Standard chess, Chess960 excluded: legal moves only (pins, check, castling, en passant, promotion), checkmate, stalemate and the draws FIDE ends by itself (insufficient material, fivefold repetition, 75 moves without a capture or a pawn move). The shorter threefold and 50-move draws have to be claimed by a player, so they are not reported.
+Standard chess, Chess960 excluded: legal moves only (pins, check, castling, en passant, promotion), checkmate, stalemate and the draws that end the game by themselves: insufficient material, threefold repetition and 50 moves without a capture or a pawn move. FIDE makes a player claim the last two (it ends a game by itself only at fivefold and 75 moves), but the window has no way to claim, so they apply automatically. Both thresholds are named constants in `GameStatus.cpp`.
 
 - A move is a `Move` from `MoveGenerator::GenerateLegal()`; `ChessGameModel::TryMove()` accepts nothing else. `Position::IsLegal()` assumes a pseudo-legal move from the generator (while in check it relies on the generator having restricted the targets), so do not call it with a hand-made move: parse text with `MoveGenerator::ParseUci()`.
 - Castling is the king's move (`e1g1`), as in UCI. A promoting pawn has four moves per target, queen first; a click on the target plays the queen, the other pieces are available through `TryMove` / UCI (`e7e8n`) only.

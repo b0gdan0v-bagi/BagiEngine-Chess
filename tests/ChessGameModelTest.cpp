@@ -237,15 +237,15 @@ namespace BECore::Chess::Tests {
         EXPECT_TRUE(Play(model, "e2e4"));
     }
 
-    TEST(ChessGameModelTest, FivefoldRepetitionDrawsTheGame) {
+    TEST(ChessGameModelTest, ThreefoldRepetitionDrawsTheGame) {
         ChessGameModel model;
-        for (int cycle = 0; cycle < 4; ++cycle) {
+        for (int cycle = 0; cycle < 2; ++cycle) {
             ASSERT_FALSE(model.IsGameOver()) << "cycle " << cycle;
             for (const char* uci : {"g1f3", "g8f6", "f3g1", "f6g8"}) {
                 ASSERT_TRUE(Play(model, uci)) << uci;
             }
         }
-        EXPECT_EQ(model.GetStatus(), GameStatus::DrawFivefold);
+        EXPECT_EQ(model.GetStatus(), GameStatus::DrawThreefold);
         EXPECT_FALSE(model.GetWinner().has_value());
     }
 

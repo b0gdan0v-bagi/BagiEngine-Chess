@@ -51,8 +51,8 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(StatusOf("R5k1/5pp1/8/8/8/8/8/4K3 b - - 0 1"), GameStatus::Ongoing);
     }
 
-    TEST(RulesTest, MateOnTheLastPlyOfTheSeventyFiveMoveRuleStaysMate) {
-        EXPECT_EQ(StatusOf("R5k1/5ppp/8/8/8/8/8/4K3 b - - 150 80"), GameStatus::Checkmate);
+    TEST(RulesTest, MateOnTheLastPlyOfTheFiftyMoveRuleStaysMate) {
+        EXPECT_EQ(StatusOf("R5k1/5ppp/8/8/8/8/8/4K3 b - - 100 80"), GameStatus::Checkmate);
     }
 
     // ---- Stalemate ----
@@ -89,22 +89,22 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(StatusOf("2b1k3/8/8/8/8/8/8/2B1K3 w - - 0 1"), GameStatus::Ongoing);
     }
 
-    TEST(RulesTest, SeventyFiveMoveRuleEndsTheGame) {
-        EXPECT_EQ(StatusOf("4k3/8/8/8/8/8/8/R3K3 w - - 149 100"), GameStatus::Ongoing);
-        EXPECT_EQ(StatusOf("4k3/8/8/8/8/8/8/R3K3 w - - 150 100"), GameStatus::DrawSeventyFiveMoves);
+    TEST(RulesTest, FiftyMoveRuleEndsTheGame) {
+        EXPECT_EQ(StatusOf("4k3/8/8/8/8/8/8/R3K3 w - - 99 100"), GameStatus::Ongoing);
+        EXPECT_EQ(StatusOf("4k3/8/8/8/8/8/8/R3K3 w - - 100 100"), GameStatus::DrawFiftyMoves);
     }
 
-    TEST(RulesTest, FivefoldRepetitionEndsTheGame) {
+    TEST(RulesTest, ThreefoldRepetitionEndsTheGame) {
         Position position = Position::Start();
         const Move cycle[] = {Mv("g1f3"), Mv("g8f6"), Mv("f3g1"), Mv("f6g8")};
 
-        // Each full cycle brings the start position back once more: it has occurred 2, 3, 4 and then 5 times.
-        for (int occurrence = 2; occurrence <= 5; ++occurrence) {
+        // Each full cycle brings the start position back once more: it has occurred 2 and then 3 times.
+        for (int occurrence = 2; occurrence <= 3; ++occurrence) {
             for (const Move move : cycle) {
                 position.DoMove(move);
             }
             ASSERT_EQ(position.RepetitionCount(), occurrence);
-            EXPECT_EQ(EvaluateStatus(position), occurrence < 5 ? GameStatus::Ongoing : GameStatus::DrawFivefold) << "occurrence " << occurrence;
+            EXPECT_EQ(EvaluateStatus(position), occurrence < 3 ? GameStatus::Ongoing : GameStatus::DrawThreefold) << "occurrence " << occurrence;
         }
     }
 

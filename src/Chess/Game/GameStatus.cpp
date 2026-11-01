@@ -6,8 +6,8 @@ namespace BECore::Chess {
 
     namespace {
 
-        constexpr int kFivefoldRepetitions = 5;
-        constexpr int kSeventyFiveMovePlies = 150;
+        constexpr int kThreefoldRepetitions = 3;
+        constexpr int kFiftyMovePlies = 100;
 
     }  // namespace
 
@@ -18,11 +18,11 @@ namespace BECore::Chess {
         if (position.IsInsufficientMaterial()) {
             return GameStatus::DrawInsufficientMaterial;
         }
-        if (position.RepetitionCount() >= kFivefoldRepetitions) {
-            return GameStatus::DrawFivefold;
+        if (position.RepetitionCount() >= kThreefoldRepetitions) {
+            return GameStatus::DrawThreefold;
         }
-        if (position.HalfmoveClock() >= kSeventyFiveMovePlies) {
-            return GameStatus::DrawSeventyFiveMoves;
+        if (position.HalfmoveClock() >= kFiftyMovePlies) {
+            return GameStatus::DrawFiftyMoves;
         }
         return GameStatus::Ongoing;
     }
