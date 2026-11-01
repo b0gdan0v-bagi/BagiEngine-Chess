@@ -3,6 +3,7 @@
   Chess piece sprite atlas (assets/chess_test.png is 700x381, laid out as a
   6x2 uniform grid: columns King, Queen, Rook, Bishop, Knight, Pawn;
   top row White, bottom row Black). Cell width ≈ 116.67, cell height ≈ 190.5.
+  The background is transparent (alpha 0), so the square under a piece shows through.
 -->
 <root>
   <sprites>
