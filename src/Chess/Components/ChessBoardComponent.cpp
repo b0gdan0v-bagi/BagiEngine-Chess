@@ -4,7 +4,6 @@
 #include <BECore/Renderer/IRenderer.h>
 #include <Chess/ChessGame.h>
 #include <CoreSDL/SDLEvents.h>
-#include <Events/SceneEvents.h>
 #include <Games/GameManager.h>
 #include <Generated/ChessBoardComponent.gen.hpp>
 
@@ -43,7 +42,6 @@ namespace BECore::Chess {
 
     void ChessBoardComponent::OnAttached() {
         s_active = this;
-        SubscribeInScene<SceneEvents::SceneDrawEvent, &ChessBoardComponent::OnDraw>(this);
         SubscribeInScene<SDLEvents::MouseButtonDownEvent, &ChessBoardComponent::OnMouseDown>(this);
     }
 
@@ -53,7 +51,7 @@ namespace BECore::Chess {
         outY = _originY + static_cast<float>(7 - rank) * _squareSize;
     }
 
-    void ChessBoardComponent::OnDraw(const SceneEvents::SceneDrawEvent&) {
+    void ChessBoardComponent::OnDraw() {
         auto& renderer = *CoreManager::GetRenderer();
 
         // Checkered base.

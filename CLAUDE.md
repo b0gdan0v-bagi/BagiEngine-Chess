@@ -22,6 +22,7 @@ src/Chess/
 - State lives in `ChessGameModel`. Components never keep game state: they reach the model through `GameManager::GetInstance().GetActive()->Cast<ChessGame>()` and do nothing when Chess is not the active game.
 - A piece node in `ChessScene` is a `ChessPieceComponent` + `SpriteRendererComponent` (artwork from `TextureLibrary`, `games/Chess/config/TextureLibrary.xml`) + `TransformComponent`. `OnAttached` registers the piece with the model at its starting square; `Reset()` sends every handle back.
 - Board geometry (`_originX`, `_originY`, `_squareSize`) is reflected so it can be tuned in the scene editor.
+- The `Board` node has `layer="-1"`, the pieces stay on layer 0, so the squares and highlights are drawn first and the sprites on top. The order comes from the layer, not from where the node sits in `SceneConfig.xml` (`Scene/CLAUDE.md`, "Draw order").
 
 ## Rules scope (MVP)
 

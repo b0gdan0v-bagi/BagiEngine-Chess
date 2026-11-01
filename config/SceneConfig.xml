@@ -5,7 +5,8 @@
       type="Scene"
       name="ChessScene">
       <nodes>
-        <node name="Board">
+        <!-- Background layer: nodes with a lower layer are drawn first, the pieces (layer 0) on top. -->
+        <node name="Board" layer="-1">
           <components>
             <component type="ChessBoardComponent" originX="100" originY="60" squareSize="80" />
           </components>

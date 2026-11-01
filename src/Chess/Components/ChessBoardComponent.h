@@ -4,9 +4,6 @@
 
 namespace BECore {
 
-    namespace SceneEvents {
-        struct SceneDrawEvent;
-    }
     namespace SDLEvents {
         struct MouseButtonDownEvent;
     }
@@ -23,6 +20,9 @@ namespace BECore::Chess {
      * tweak placement in the editor. Owns no game state itself — all logic
      * lives in ChessGameModel and is shared with ChessPieceComponent through
      * GameManager::GetActive().
+     *
+     * Its node sits on a layer below the pieces (`layer` in SceneConfig.xml), so the
+     * squares and highlights are drawn first and the piece sprites on top.
      */
     class ChessBoardComponent : public IComponent {
         BE_CLASS(ChessBoardComponent)
@@ -35,6 +35,7 @@ namespace BECore::Chess {
         BE_REFLECT_FIELD float _squareSize = 80.0f;
 
         void OnAttached() override;
+        void OnDraw() override;
 
         /// World-space pixel position (top-left) of a board cell.
         void SquareToPixel(int file, int rank, float& outX, float& outY) const;
@@ -57,7 +58,6 @@ namespace BECore::Chess {
         }
 
     private:
-        void OnDraw(const SceneEvents::SceneDrawEvent&);
         void OnMouseDown(const SDLEvents::MouseButtonDownEvent&);
 
         static ChessBoardComponent* s_active;
