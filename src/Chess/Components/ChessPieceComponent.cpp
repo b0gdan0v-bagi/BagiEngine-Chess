@@ -1,11 +1,11 @@
 #include "ChessPieceComponent.h"
 
+#include <BECore/Scene/Components/SpriteRendererComponent.h>
 #include <BECore/Scene/Components/TransformComponent.h>
 #include <BECore/Scene/SceneNode.h>
 #include <Chess/ChessGame.h>
 #include <Chess/Components/ChessBoardComponent.h>
 #include <Events/SceneEvents.h>
-#include <Games/GameManager.h>
 #include <Generated/ChessPieceComponent.gen.hpp>
 
 namespace BECore::Chess {
@@ -16,16 +16,9 @@ namespace BECore::Chess {
         constexpr float kHiddenX = -10000.0f;
         constexpr float kHiddenY = -10000.0f;
 
-        ChessGameModel* GetActiveModel() {
-            auto* active = GameManager::GetInstance().GetActive();
-            if (!active) {
-                return nullptr;
-            }
-            auto* chess = active->Cast<ChessGame>();
-            if (!chess) {
-                return nullptr;
-            }
-            return &chess->GetModel();
+        // The sprite of a piece is named after its color and type in TextureLibrary.xml: "WhiteQueen", "BlackKnight", ...
+        PoolString SpriteIdOf(Piece piece) {
+            return PoolString::Intern(Format("{}{}", EnumUtils<PieceColor>::ToString(piece.color), EnumUtils<PieceType>::ToString(piece.type)));
         }
 
     }  // namespace
@@ -45,7 +38,7 @@ namespace BECore::Chess {
             RegisterWithModel();
         }
 
-        auto* model = GetActiveModel();
+        auto* model = ChessGame::GetActiveModel();
         auto* board = ChessBoardComponent::GetActive();
         auto transform = GetNode().GetComponent<TransformComponent>();
         if (!transform) {
@@ -73,10 +66,26 @@ namespace BECore::Chess {
         const float size = board->GetSquareSize();
         transform->_width = size;
         transform->_height = size;
+
+        ShowPieceType(model->GetPieceOf(this));
+    }
+
+    void ChessPieceComponent::ShowPieceType(Piece piece) {
+        if (piece.IsEmpty() || piece.type == _shownType) {
+            return;
+        }
+        auto sprite = GetNode().GetComponent<SpriteRendererComponent>();
+        if (!sprite) {
+            return;
+        }
+        // A promotion changes the pawn into another piece; a reset changes it back.
+        sprite->_spriteId = SpriteIdOf(piece);
+        sprite->ReloadTexture();
+        _shownType = piece.type;
     }
 
     void ChessPieceComponent::RegisterWithModel() {
-        auto* model = GetActiveModel();
+        auto* model = ChessGame::GetActiveModel();
         if (!model) {
             return;
         }
@@ -84,6 +93,7 @@ namespace BECore::Chess {
             return;
         }
         model->RegisterPiece(this, Square{static_cast<int8_t>(_file), static_cast<int8_t>(_rank)});
+        _shownType = model->GetPieceOf(this).type;  // the sprite in SceneConfig.xml already shows it
         _registered = true;
     }
 
@@ -91,7 +101,7 @@ namespace BECore::Chess {
         if (!_registered) {
             return;
         }
-        if (auto* model = GetActiveModel()) {
+        if (auto* model = ChessGame::GetActiveModel()) {
             model->UnregisterPiece(this);
         }
         _registered = false;

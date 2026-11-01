@@ -5,7 +5,6 @@
 #include <BECore/Scene/Scene.h>
 #include <Chess/ChessGame.h>
 #include <CoreSDL/SDLEvents.h>
-#include <Games/GameManager.h>
 #include <Generated/ChessBoardComponent.gen.hpp>
 
 namespace BECore::Chess {
@@ -17,18 +16,17 @@ namespace BECore::Chess {
         constexpr Color kSelectedSquare{120, 200, 120, 200};
         constexpr Color kLegalMoveSquare{120, 200, 120, 120};
         constexpr Color kLegalCaptureSquare{220, 90, 90, 160};
+        constexpr Color kCheckSquare{230, 60, 60, 210};
+        constexpr Color kMateSquare{150, 20, 20, 240};
 
-        // Returns the active ChessGame's model, or nullptr if no chess game is active.
-        ChessGameModel* GetActiveModel() {
-            auto* active = GameManager::GetInstance().GetActive();
-            if (!active) {
-                return nullptr;
+        // One line in the log when a game ends; the board has no text to show it in.
+        void LogResult(const ChessGameModel& model) {
+            const auto status = EnumUtils<GameStatus>::ToString(model.GetStatus());
+            if (const auto winner = model.GetWinner()) {
+                LOG_INFO("{}, {} wins"_format(status, EnumUtils<PieceColor>::ToString(*winner)));
+            } else {
+                LOG_INFO("Game over: {}"_format(status));
             }
-            auto* chess = active->Cast<ChessGame>();
-            if (!chess) {
-                return nullptr;
-            }
-            return &chess->GetModel();
         }
 
     }  // namespace
@@ -66,9 +64,18 @@ namespace BECore::Chess {
             }
         }
 
-        const ChessGameModel* model = GetActiveModel();
+        const ChessGameModel* model = ChessGame::GetActiveModel();
         if (!model) {
             return;
+        }
+
+        // The king that is attacked: bright red while the game goes on, dark red once it is mate.
+        if (model->IsInCheck()) {
+            const Square king = model->GetKingSquare(model->GetTurn());
+            float kx = 0.0f;
+            float ky = 0.0f;
+            SquareToPixel(king.file, king.rank, kx, ky);
+            renderer.DrawFilledRect(kx, ky, _squareSize, _squareSize, model->IsGameOver() ? kMateSquare : kCheckSquare);
         }
 
         if (model->HasSelection()) {
@@ -87,7 +94,7 @@ namespace BECore::Chess {
     }
 
     void ChessBoardComponent::OnMouseDown(const SDLEvents::MouseButtonDownEvent& e) {
-        ChessGameModel* model = GetActiveModel();
+        ChessGameModel* model = ChessGame::GetActiveModel();
         if (!model) {
             return;
         }
@@ -106,7 +113,15 @@ namespace BECore::Chess {
             return;
         }
 
-        model->OnSquareClicked(Square{static_cast<int8_t>(file), static_cast<int8_t>(rank)});
+        // After the game has ended a click on the board starts the next one.
+        if (model->IsGameOver()) {
+            model->Reset();
+            return;
+        }
+
+        if (model->OnSquareClicked(Square{static_cast<int8_t>(file), static_cast<int8_t>(rank)}) && model->IsGameOver()) {
+            LogResult(*model);
+        }
     }
 
 }  // namespace BECore::Chess

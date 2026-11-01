@@ -1,8 +1,18 @@
 #include "ChessGame.h"
 
+#include <Games/GameManager.h>
 #include <Generated/ChessGame.gen.hpp>
 
 namespace BECore::Chess {
+
+    ChessGameModel* ChessGame::GetActiveModel() {
+        auto* active = GameManager::GetInstance().GetActive();
+        if (!active) {
+            return nullptr;
+        }
+        auto* chess = active->Cast<ChessGame>();
+        return chess ? &chess->GetModel() : nullptr;
+    }
 
     PoolString ChessGame::GetName() const {
         return "Chess"_intern;

@@ -8,6 +8,12 @@ namespace BECore::Chess {
     /// Two players. White moves first.
     CORE_ENUM(PieceColor, uint8_t, White, Black)
 
+    [[nodiscard]] constexpr PieceColor Opposite(PieceColor color) noexcept {
+        return color == PieceColor::White ? PieceColor::Black : PieceColor::White;
+    }
+
+    constexpr int kSquareCount = 64;
+
     /**
      * @brief A board cell coordinate, in algebraic-axis style.
      *

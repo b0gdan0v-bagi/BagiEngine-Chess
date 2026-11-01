@@ -1,6 +1,7 @@
 #pragma once
 
 #include <BECore/Scene/IComponent.h>
+#include <Chess/Game/ChessTypes.h>
 
 namespace BECore {
 
@@ -27,6 +28,9 @@ namespace BECore::Chess {
      *     writes pixel coordinates into the sibling TransformComponent.
      *   - When captured (model reports inactive), the transform is moved
      *     off-screen so the sprite renderer draws nothing visible.
+     *   - When the model reports another piece type (a promotion, or the reset
+     *     that undoes it), the sibling SpriteRendererComponent switches to the
+     *     sprite of that piece.
      */
     class ChessPieceComponent : public IComponent {
         BE_CLASS(ChessPieceComponent)
@@ -43,8 +47,10 @@ namespace BECore::Chess {
         void OnUpdate(const SceneEvents::SceneUpdateEvent&);
         void RegisterWithModel();
         void UnregisterFromModel();
+        void ShowPieceType(Piece piece);
 
         bool _registered = false;
+        PieceType _shownType = PieceType::None;  ///< Type of the piece the sprite shows now.
     };
 
 }  // namespace BECore::Chess

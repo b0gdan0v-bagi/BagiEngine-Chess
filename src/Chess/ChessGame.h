@@ -34,6 +34,9 @@ namespace BECore::Chess {
             return _model;
         }
 
+        /// The model of the active game, or nullptr when no game is active or the active game is not Chess.
+        static ChessGameModel* GetActiveModel();
+
     private:
         ChessGameModel _model;
     };

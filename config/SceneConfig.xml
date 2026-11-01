@@ -14,6 +14,13 @@
           </components>
         </node>
 
+        <!-- Foreground layer: the end-of-game dim and result bar, drawn over the pieces (layer 0). -->
+        <node name="Result" layer="1">
+          <components>
+            <component type="ChessResultComponent" />
+          </components>
+        </node>
+
         <!-- White back rank (rank 0) -->
         <node name="WhiteRook_a1">
           <components>

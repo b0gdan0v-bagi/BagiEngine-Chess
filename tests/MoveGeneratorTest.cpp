@@ -1,163 +1,272 @@
-#include <Chess/Game/ChessBoard.h>
-#include <Chess/Game/ChessTypes.h>
+#include "ChessTestUtil.h"
+
 #include <Chess/Game/MoveGenerator.h>
-#include <Common/Printers.h>
 #include <EASTL/algorithm.h>
 
 /**
- * Pseudo-legal move generation coverage for ChessBoard + MoveGenerator.
- *
- * MVP scope, same restrictions as the gameplay layer: no castling, no
- * en-passant, no pawn promotion, no check/checkmate. We only verify that
- * each piece kind reaches the squares allowed by basic movement rules and
- * is correctly blocked by friendly / enemy pieces.
+ * Legal move generation: how each piece moves and is blocked, and what the rules of check, castling, en passant and
+ * promotion add. The reference counts of whole move trees are in PerftTest.cpp.
  */
 namespace BECore::Chess::Tests {
 
-    // Compile-time checks: a regression breaks the build.
-    static_assert(Square::IsInside(0, 0));
-    static_assert(Square::IsInside(7, 7));
-    static_assert(!Square::IsInside(-1, 0));
-    static_assert(!Square::IsInside(0, 8));
-    static_assert(Square{3, 4}.Index() == 4 * 8 + 3);
-    static_assert(Square::FromIndex(35) == (Square{3, 4}));
-
     namespace {
 
-        /// True if @p target appears anywhere in @p moves.
-        bool Contains(const eastl::vector<Square>& moves, Square target) {
-            return eastl::find(moves.begin(), moves.end(), target) != moves.end();
+        /// Number of legal moves of the piece standing on @p from.
+        size_t CountFrom(const Position& position, eastl::string_view from) {
+            size_t count = 0;
+            for (const Move move : MoveGenerator::GenerateLegal(position)) {
+                if (move.From() == Sq(from)) {
+                    ++count;
+                }
+            }
+            return count;
+        }
+
+        bool Has(const Position& position, eastl::string_view uci) {
+            return MoveGenerator::ParseUci(position, uci).has_value();
         }
 
     }  // namespace
 
-    TEST(MoveGeneratorTest, CompileTimeChecks) {
-        SUCCEED() << "The static_asserts above are the check";
+    // ---- Piece movement ----
+
+    TEST(MoveGeneratorTest, StartPositionHasTwentyMoves) {
+        EXPECT_EQ(MoveGenerator::GenerateLegal(Position::Start()).size(), 20u);
     }
 
     TEST(MoveGeneratorTest, PawnFromStart) {
-        ChessBoard board;
-        board.ResetToStart();
-        // e2 = file 4, rank 1.
-        const auto moves = MoveGenerator::Generate(board, Square{4, 1});
-        EXPECT_EQ(moves.size(), 2u);
-        EXPECT_TRUE(Contains(moves, Square{4, 2}));
-        EXPECT_TRUE(Contains(moves, Square{4, 3}));
+        const Position start = Position::Start();
+        EXPECT_EQ(CountFrom(start, "e2"), 2u);
+        EXPECT_TRUE(Has(start, "e2e3"));
+        EXPECT_TRUE(Has(start, "e2e4"));
     }
 
     TEST(MoveGeneratorTest, PawnBlocked) {
-        ChessBoard board;
-        board.Set(Square{4, 1}, Piece{PieceType::Pawn, PieceColor::White});
-        board.Set(Square{4, 2}, Piece{PieceType::Pawn, PieceColor::Black});
-        const auto moves = MoveGenerator::Generate(board, Square{4, 1});
-        EXPECT_TRUE(moves.empty());
+        const Position position = PositionFromFen("4k3/8/8/8/8/4p3/4P3/4K3 w - - 0 1");
+        EXPECT_EQ(CountFrom(position, "e2"), 0u);
+    }
+
+    TEST(MoveGeneratorTest, PawnCannotJumpOverAPiece) {
+        const Position position = PositionFromFen("4k3/8/8/8/4p3/8/4P3/4K3 w - - 0 1");
+        EXPECT_TRUE(Has(position, "e2e3"));
+        EXPECT_FALSE(Has(position, "e2e4"));
     }
 
     TEST(MoveGeneratorTest, PawnCapture) {
-        ChessBoard board;
-        board.Set(Square{4, 3}, Piece{PieceType::Pawn, PieceColor::White});
-        board.Set(Square{3, 4}, Piece{PieceType::Pawn, PieceColor::Black});
-        board.Set(Square{5, 4}, Piece{PieceType::Pawn, PieceColor::Black});
-        const auto moves = MoveGenerator::Generate(board, Square{4, 3});
-        EXPECT_TRUE(Contains(moves, Square{4, 4})) << "forward push";
-        EXPECT_TRUE(Contains(moves, Square{3, 4})) << "diagonal capture left";
-        EXPECT_TRUE(Contains(moves, Square{5, 4})) << "diagonal capture right";
-        EXPECT_EQ(moves.size(), 3u) << "not 4: not on starting rank, no double push";
+        const Position position = PositionFromFen("4k3/8/8/3p1p2/4P3/8/8/4K3 w - - 0 1");
+        EXPECT_TRUE(Has(position, "e4e5")) << "forward push";
+        EXPECT_TRUE(Has(position, "e4d5")) << "diagonal capture left";
+        EXPECT_TRUE(Has(position, "e4f5")) << "diagonal capture right";
+        EXPECT_EQ(CountFrom(position, "e4"), 3u) << "not 4: not on the starting rank, no double push";
+    }
+
+    TEST(MoveGeneratorTest, BlackPawnsMoveDown) {
+        const Position start = PositionFromFen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1");
+        EXPECT_TRUE(Has(start, "e7e6"));
+        EXPECT_TRUE(Has(start, "e7e5"));
+        EXPECT_FALSE(Has(start, "e7e8q"));
     }
 
     TEST(MoveGeneratorTest, KnightOpening) {
-        ChessBoard board;
-        board.ResetToStart();
-        // b1 knight = file 1, rank 0. Should reach a3 and c3 only (d2 blocked by pawn).
-        const auto moves = MoveGenerator::Generate(board, Square{1, 0});
-        EXPECT_EQ(moves.size(), 2u);
-        EXPECT_TRUE(Contains(moves, Square{0, 2}));
-        EXPECT_TRUE(Contains(moves, Square{2, 2}));
+        const Position start = Position::Start();
+        EXPECT_EQ(CountFrom(start, "b1"), 2u);
+        EXPECT_TRUE(Has(start, "b1a3"));
+        EXPECT_TRUE(Has(start, "b1c3"));
     }
 
     TEST(MoveGeneratorTest, RookOpenAndBlocked) {
-        ChessBoard board;
-        board.Set(Square{4, 4}, Piece{PieceType::Rook, PieceColor::White});
-        // Lone rook in the middle of an empty board reaches 14 squares (7 + 7).
-        const auto moves = MoveGenerator::Generate(board, Square{4, 4});
-        EXPECT_EQ(moves.size(), 14u);
-
-        // Block one direction with a friendly piece: that ray is fully cut.
-        board.Set(Square{4, 6}, Piece{PieceType::Pawn, PieceColor::White});
-        const auto blocked = MoveGenerator::Generate(board, Square{4, 4});
-        EXPECT_FALSE(Contains(blocked, Square{4, 6}));
-        EXPECT_FALSE(Contains(blocked, Square{4, 7}));
-        EXPECT_TRUE(Contains(blocked, Square{4, 5}));
-
-        // Replace with an enemy piece: rook can capture it but not pass through.
-        board.Set(Square{4, 6}, Piece{PieceType::Pawn, PieceColor::Black});
-        const auto enemyBlock = MoveGenerator::Generate(board, Square{4, 4});
-        EXPECT_TRUE(Contains(enemyBlock, Square{4, 6}));
-        EXPECT_FALSE(Contains(enemyBlock, Square{4, 7}));
+        EXPECT_EQ(CountFrom(PositionFromFen("7k/8/8/8/4R3/8/8/K7 w - - 0 1"), "e4"), 14u) << "lone rook";
+        EXPECT_EQ(CountFrom(PositionFromFen("7k/8/4P3/8/4R3/8/8/K7 w - - 0 1"), "e4"), 11u) << "friendly pawn cuts the ray";
+        EXPECT_EQ(CountFrom(PositionFromFen("7k/8/4p3/8/4R3/8/8/K7 w - - 0 1"), "e4"), 12u) << "enemy pawn can be taken, not passed";
     }
 
     TEST(MoveGeneratorTest, BishopDiagonals) {
-        ChessBoard board;
-        board.Set(Square{3, 3}, Piece{PieceType::Bishop, PieceColor::White});
-        const auto moves = MoveGenerator::Generate(board, Square{3, 3});
-        // From d4 a lone bishop reaches 13 squares.
-        EXPECT_EQ(moves.size(), 13u);
-        EXPECT_TRUE(Contains(moves, Square{0, 0}));
-        EXPECT_TRUE(Contains(moves, Square{6, 0}));
-        EXPECT_TRUE(Contains(moves, Square{0, 6}));
-        EXPECT_TRUE(Contains(moves, Square{7, 7}));
-        // No straight moves.
-        EXPECT_FALSE(Contains(moves, Square{3, 5}));
-        EXPECT_FALSE(Contains(moves, Square{5, 3}));
+        const Position position = PositionFromFen("k7/8/8/8/3B4/8/8/7K w - - 0 1");
+        EXPECT_EQ(CountFrom(position, "d4"), 13u);
+        EXPECT_TRUE(Has(position, "d4a1"));
+        EXPECT_TRUE(Has(position, "d4g7"));
+        EXPECT_FALSE(Has(position, "d4d5")) << "no straight moves";
     }
 
-    TEST(MoveGeneratorTest, QueenCombination) {
-        ChessBoard board;
-        board.Set(Square{3, 3}, Piece{PieceType::Queen, PieceColor::White});
-        const auto moves = MoveGenerator::Generate(board, Square{3, 3});
-        // Lone queen on d4 reaches 27 squares (rook 14 + bishop 13).
-        EXPECT_EQ(moves.size(), 27u);
+    TEST(MoveGeneratorTest, QueenCombinesRookAndBishop) {
+        EXPECT_EQ(CountFrom(PositionFromFen("k7/8/8/8/3Q4/8/8/7K w - - 0 1"), "d4"), 27u);
     }
 
     TEST(MoveGeneratorTest, KingNeighbors) {
-        ChessBoard board;
-        board.Set(Square{4, 4}, Piece{PieceType::King, PieceColor::White});
-        const auto moves = MoveGenerator::Generate(board, Square{4, 4});
-        EXPECT_EQ(moves.size(), 8u);
-
-        // Corner: king reaches 3 squares.
-        ChessBoard corner;
-        corner.Set(Square{0, 0}, Piece{PieceType::King, PieceColor::White});
-        const auto cornerMoves = MoveGenerator::Generate(corner, Square{0, 0});
-        EXPECT_EQ(cornerMoves.size(), 3u);
-        EXPECT_TRUE(Contains(cornerMoves, Square{1, 0}));
-        EXPECT_TRUE(Contains(cornerMoves, Square{0, 1}));
-        EXPECT_TRUE(Contains(cornerMoves, Square{1, 1}));
+        EXPECT_EQ(CountFrom(PositionFromFen("k7/8/8/8/4K3/8/8/8 w - - 0 1"), "e4"), 8u);
+        EXPECT_EQ(CountFrom(PositionFromFen("7k/8/8/8/8/8/8/K7 w - - 0 1"), "a1"), 3u) << "corner";
     }
 
-    TEST(MoveGeneratorTest, StartingPositionMoveCounts) {
-        ChessBoard board;
-        board.ResetToStart();
-        // Sum of all White pseudo-legal moves at the opening position is 20.
-        size_t total = 0;
-        for (int rank = 0; rank < 2; ++rank) {
-            for (int file = 0; file < 8; ++file) {
-                total += MoveGenerator::Generate(board, Square{static_cast<int8_t>(file), static_cast<int8_t>(rank)}).size();
+    // ---- Check ----
+
+    TEST(MoveGeneratorTest, InCheckOnlyEvasionsAreLegal) {
+        // The rook on e8 checks the king on e1 down the open e-file; the rook on a5 and the bishop on c3 can block it.
+        const Position position = PositionFromFen("4r1k1/8/8/R7/8/2B5/8/4K3 w - - 0 1");
+        ASSERT_TRUE(position.IsInCheck());
+        EXPECT_TRUE(Has(position, "c3e5")) << "block with the bishop";
+        EXPECT_TRUE(Has(position, "a5e5")) << "block with the rook";
+        EXPECT_TRUE(Has(position, "e1d1")) << "king steps aside";
+        EXPECT_FALSE(Has(position, "e1e2")) << "king stays on the checking file";
+        EXPECT_FALSE(Has(position, "a5a8")) << "does not answer the check";
+        EXPECT_FALSE(Has(position, "c3b4")) << "does not answer the check";
+    }
+
+    TEST(MoveGeneratorTest, CapturingTheCheckerIsAnEvasion) {
+        // The knight on f3 checks the king on e1 and cannot be blocked; the rook on f1 can take it.
+        const Position position = PositionFromFen("7k/8/8/8/8/5n2/8/4KR2 w - - 0 1");
+        ASSERT_TRUE(position.IsInCheck());
+        EXPECT_TRUE(Has(position, "f1f3")) << "take the knight";
+        EXPECT_TRUE(Has(position, "e1e2"));
+        EXPECT_FALSE(Has(position, "e1d2")) << "the knight covers d2";
+        EXPECT_FALSE(Has(position, "f1f2")) << "does not answer the check";
+    }
+
+    TEST(MoveGeneratorTest, DoubleCheckAllowsOnlyKingMoves) {
+        // Rook e8 and knight f3 both attack e1; the bishop on b4 could block the rook, but a double check leaves only the king.
+        const Position position = PositionFromFen("4r2k/8/8/8/1B6/5n2/8/R3K3 w - - 0 1");
+        ASSERT_EQ(PopCount(position.Checkers()), 2);
+        const MoveList moves = MoveGenerator::GenerateLegal(position);
+        EXPECT_FALSE(moves.empty());
+        for (const Move move : moves) {
+            EXPECT_EQ(move.FromIndex(), SqIdx("e1")) << move.ToUci().c_str();
+        }
+    }
+
+    TEST(MoveGeneratorTest, PinnedPieceCannotBlockASideCheck) {
+        // The rook on e8 checks along the e-file; the knight on c3 could block on e2 or e4, but the bishop on a5 pins it to the king.
+        const Position position = PositionFromFen("4r2k/8/8/b7/8/2N5/8/4K3 w - - 0 1");
+        ASSERT_TRUE(position.IsInCheck());
+        EXPECT_EQ(CountFrom(position, "c3"), 0u) << "pinned to the king by the bishop, so it cannot answer the check";
+    }
+
+    // ---- Special moves ----
+
+    TEST(MoveGeneratorTest, PromotionMakesFourMovesQueenFirst) {
+        const Position position = PositionFromFen("4k3/P7/8/8/8/8/8/4K3 w - - 0 1");
+        MoveList promotions;
+        for (const Move move : MoveGenerator::GenerateLegal(position)) {
+            if (move.From() == Sq("a7")) {
+                promotions.push_back(move);
             }
         }
-        EXPECT_EQ(total, 20u);
+        ASSERT_EQ(promotions.size(), 4u);
+        EXPECT_TRUE(promotions[0].PromotionType() == PieceType::Queen);
+        EXPECT_TRUE(promotions[1].PromotionType() == PieceType::Rook);
+        EXPECT_TRUE(promotions[2].PromotionType() == PieceType::Bishop);
+        EXPECT_TRUE(promotions[3].PromotionType() == PieceType::Knight);
+        for (const Move move : promotions) {
+            EXPECT_TRUE(move.IsPromotion());
+        }
     }
 
-    TEST(MoveGeneratorTest, CaptureRemovesPiece) {
-        ChessBoard board;
-        board.Set(Square{4, 3}, Piece{PieceType::Pawn, PieceColor::White});
-        board.Set(Square{3, 4}, Piece{PieceType::Pawn, PieceColor::Black});
-        ASSERT_FALSE(board.Get(Square{3, 4}).IsEmpty());
-        board.Move(Square{4, 3}, Square{3, 4});
-        EXPECT_TRUE(board.Get(Square{4, 3}).IsEmpty());
-        const Piece captured = board.Get(Square{3, 4});
-        EXPECT_TRUE(captured.type == PieceType::Pawn);
-        EXPECT_TRUE(captured.color == PieceColor::White);
+    TEST(MoveGeneratorTest, PromotionByCaptureAlsoMakesFourMoves) {
+        const Position position = PositionFromFen("1r2k3/P7/8/8/8/8/8/4K3 w - - 0 1");
+        EXPECT_EQ(CountFrom(position, "a7"), 8u) << "four pushes to a8 and four captures on b8";
+    }
+
+    TEST(MoveGeneratorTest, BlackPromotesOnTheFirstRank) {
+        const Position position = PositionFromFen("4k3/8/8/8/8/8/p7/4K3 b - - 0 1");
+        EXPECT_TRUE(Has(position, "a2a1q"));
+        EXPECT_TRUE(Has(position, "a2a1n"));
+    }
+
+    TEST(MoveGeneratorTest, EnPassantIsGenerated) {
+        const Position position = PositionFromFen("4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 2");
+        const auto move = MoveGenerator::ParseUci(position, "e5d6");
+        ASSERT_TRUE(move.has_value());
+        EXPECT_TRUE(move->Kind() == MoveKind::EnPassant);
+    }
+
+    TEST(MoveGeneratorTest, EnPassantCanAnswerACheckByTheDoubleSteppedPawn) {
+        // The pawn that just moved to d4 gives check to the king on c5; taking it en passant is a legal answer.
+        const Position position = PositionFromFen("8/8/8/2k5/3Pp3/8/8/4K3 b - d3 0 1");
+        ASSERT_TRUE(position.IsInCheck());
+        EXPECT_TRUE(Has(position, "e4d3"));
+    }
+
+    TEST(MoveGeneratorTest, EnPassantIsNotAnAnswerToAnotherPiecesCheck) {
+        // A knight checks the king; the double-stepped pawn is not the checker, so taking it would not help.
+        const Position position = PositionFromFen("4k3/8/8/3pP3/8/5n2/8/4K3 w - d6 0 2");
+        ASSERT_TRUE(position.IsInCheck());
+        EXPECT_EQ(position.EnPassantSquare(), SqIdx("d6"));
+        EXPECT_FALSE(Has(position, "e5d6"));
+    }
+
+    TEST(MoveGeneratorTest, CastlingBothWays) {
+        const Position position = PositionFromFen("r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1");
+        const auto kingSide = MoveGenerator::ParseUci(position, "e1g1");
+        const auto queenSide = MoveGenerator::ParseUci(position, "e1c1");
+        ASSERT_TRUE(kingSide.has_value());
+        ASSERT_TRUE(queenSide.has_value());
+        EXPECT_TRUE(kingSide->Kind() == MoveKind::Castling);
+        EXPECT_TRUE(queenSide->Kind() == MoveKind::Castling);
+    }
+
+    TEST(MoveGeneratorTest, CastlingNeedsTheRightsAndEmptySquares) {
+        EXPECT_FALSE(Has(PositionFromFen("r3k2r/8/8/8/8/8/8/R3K2R w kq - 0 1"), "e1g1")) << "no rights";
+        EXPECT_FALSE(Has(PositionFromFen("r3k2r/8/8/8/8/8/8/R3KB1R w KQkq - 0 1"), "e1g1")) << "bishop on f1";
+        EXPECT_FALSE(Has(PositionFromFen("r3k2r/8/8/8/8/8/8/RN2K2R w KQkq - 0 1"), "e1c1")) << "knight on b1 even though b1 is not crossed";
+        EXPECT_TRUE(Has(PositionFromFen("r3k2r/8/8/8/8/8/8/R3K2R b KQkq - 0 1"), "e8g8"));
+        EXPECT_TRUE(Has(PositionFromFen("r3k2r/8/8/8/8/8/8/R3K2R b KQkq - 0 1"), "e8c8"));
+    }
+
+    TEST(MoveGeneratorTest, CastlingIsNotAllowedOutOfCheckOrThroughCheck) {
+        EXPECT_FALSE(Has(PositionFromFen("2k1r3/8/8/8/8/8/8/R3K2R w KQ - 0 1"), "e1g1")) << "king in check";
+        EXPECT_FALSE(Has(PositionFromFen("2k2r2/8/8/8/8/8/8/R3K2R w KQ - 0 1"), "e1g1")) << "f1 attacked";
+        EXPECT_FALSE(Has(PositionFromFen("2kr4/8/8/8/8/8/8/R3K2R w KQ - 0 1"), "e1c1")) << "d1 attacked";
+        EXPECT_TRUE(Has(PositionFromFen("2kr4/8/8/8/8/8/8/R3K2R w KQ - 0 1"), "e1g1")) << "the other side is fine";
+    }
+
+    // ---- Checkmate and stalemate give no moves ----
+
+    TEST(MoveGeneratorTest, CheckmateAndStalemateHaveNoLegalMoves) {
+        const Position mate = PositionFromFen("rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3");
+        EXPECT_TRUE(mate.IsInCheck());
+        EXPECT_TRUE(MoveGenerator::GenerateLegal(mate).empty());
+
+        const Position stalemate = PositionFromFen("7k/5Q2/6K1/8/8/8/8/8 b - - 0 1");
+        EXPECT_FALSE(stalemate.IsInCheck());
+        EXPECT_TRUE(MoveGenerator::GenerateLegal(stalemate).empty());
+    }
+
+    // ---- UCI ----
+
+    TEST(MoveGeneratorTest, ParseUciFindsOnlyLegalMoves) {
+        const Position start = Position::Start();
+        const auto move = MoveGenerator::ParseUci(start, "g1f3");
+        ASSERT_TRUE(move.has_value());
+        EXPECT_EQ(move->ToUci(), "g1f3");
+
+        EXPECT_FALSE(MoveGenerator::ParseUci(start, "e2e5").has_value()) << "a pawn cannot advance three squares";
+        EXPECT_FALSE(MoveGenerator::ParseUci(start, "e7e5").has_value()) << "not black's turn";
+        EXPECT_FALSE(MoveGenerator::ParseUci(start, "").has_value());
+        EXPECT_FALSE(MoveGenerator::ParseUci(start, "nonsense").has_value());
+    }
+
+    TEST(MoveGeneratorTest, ParseUciDistinguishesPromotionPieces) {
+        const Position position = PositionFromFen("4k3/P7/8/8/8/8/8/4K3 w - - 0 1");
+        const auto knight = MoveGenerator::ParseUci(position, "a7a8n");
+        ASSERT_TRUE(knight.has_value());
+        EXPECT_TRUE(knight->PromotionType() == PieceType::Knight);
+        EXPECT_FALSE(MoveGenerator::ParseUci(position, "a7a8").has_value()) << "a promotion needs its piece letter";
+        EXPECT_FALSE(MoveGenerator::ParseUci(position, "a7a8k").has_value());
+    }
+
+    TEST(MoveGeneratorTest, EveryGeneratedMoveRoundTripsThroughUci) {
+        for (const auto fen : {Position::kStartFen, kKiwipeteFen, kPosition3Fen, kPosition4Fen}) {
+            const Position position = PositionFromFen(fen);
+            for (const Move move : MoveGenerator::GenerateLegal(position)) {
+                const auto parsed = MoveGenerator::ParseUci(position, eastl::string_view(move.ToUci().c_str()));
+                ASSERT_TRUE(parsed.has_value()) << move.ToUci().c_str();
+                EXPECT_TRUE(*parsed == move) << move.ToUci().c_str();
+            }
+        }
+    }
+
+    TEST(MoveGeneratorTest, NoGeneratedMoveIsNull) {
+        for (const Move move : MoveGenerator::GenerateLegal(PositionFromFen(kKiwipeteFen))) {
+            EXPECT_FALSE(move.IsNull());
+        }
     }
 
 }  // namespace BECore::Chess::Tests
