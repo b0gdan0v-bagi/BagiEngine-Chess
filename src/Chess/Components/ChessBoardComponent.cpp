@@ -2,6 +2,7 @@
 
 #include <BECore/GameManager/CoreManager.h>
 #include <BECore/Renderer/IRenderer.h>
+#include <BECore/Scene/Scene.h>
 #include <Chess/ChessGame.h>
 #include <CoreSDL/SDLEvents.h>
 #include <Games/GameManager.h>
@@ -92,8 +93,8 @@ namespace BECore::Chess {
         }
 
         const float boardSize = _squareSize * 8.0f;
-        const float localX = e.button.x - _originX;
-        const float localY = e.button.y - _originY;
+        const float localX = GetScene().ScreenToSceneX(e.button.x) - _originX;
+        const float localY = GetScene().ScreenToSceneY(e.button.y) - _originY;
         if (localX < 0.0f || localY < 0.0f || localX >= boardSize || localY >= boardSize) {
             return;
         }
