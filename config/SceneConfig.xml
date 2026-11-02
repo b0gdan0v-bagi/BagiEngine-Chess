@@ -36,60 +36,63 @@
           </components>
         </node>
 
+        <!-- A piece node is the whole square (ChessPieceComponent writes its position and size). fit="Contain" draws the sprite inside it with the aspect of its
+             atlas cell, centered, so the piece is not stretched and the highlights of the board, which are full squares, still sit around it. -->
+
         <!-- White back rank (rank 0) -->
         <node name="WhiteRook_a1">
           <components>
             <component type="TransformComponent" x="0" y="0" width="80" height="80" />
-            <component type="SpriteRendererComponent" spriteId="WhiteRook" />
+            <component type="SpriteRendererComponent" spriteId="WhiteRook" fit="Contain" />
             <component type="ChessPieceComponent" file="0" rank="0" />
           </components>
         </node>
         <node name="WhiteKnight_b1">
           <components>
             <component type="TransformComponent" x="0" y="0" width="80" height="80" />
-            <component type="SpriteRendererComponent" spriteId="WhiteKnight" />
+            <component type="SpriteRendererComponent" spriteId="WhiteKnight" fit="Contain" />
             <component type="ChessPieceComponent" file="1" rank="0" />
           </components>
         </node>
         <node name="WhiteBishop_c1">
           <components>
             <component type="TransformComponent" x="0" y="0" width="80" height="80" />
-            <component type="SpriteRendererComponent" spriteId="WhiteBishop" />
+            <component type="SpriteRendererComponent" spriteId="WhiteBishop" fit="Contain" />
             <component type="ChessPieceComponent" file="2" rank="0" />
           </components>
         </node>
         <node name="WhiteQueen_d1">
           <components>
             <component type="TransformComponent" x="0" y="0" width="80" height="80" />
-            <component type="SpriteRendererComponent" spriteId="WhiteQueen" />
+            <component type="SpriteRendererComponent" spriteId="WhiteQueen" fit="Contain" />
             <component type="ChessPieceComponent" file="3" rank="0" />
           </components>
         </node>
         <node name="WhiteKing_e1">
           <components>
             <component type="TransformComponent" x="0" y="0" width="80" height="80" />
-            <component type="SpriteRendererComponent" spriteId="WhiteKing" />
+            <component type="SpriteRendererComponent" spriteId="WhiteKing" fit="Contain" />
             <component type="ChessPieceComponent" file="4" rank="0" />
           </components>
         </node>
         <node name="WhiteBishop_f1">
           <components>
             <component type="TransformComponent" x="0" y="0" width="80" height="80" />
-            <component type="SpriteRendererComponent" spriteId="WhiteBishop" />
+            <component type="SpriteRendererComponent" spriteId="WhiteBishop" fit="Contain" />
             <component type="ChessPieceComponent" file="5" rank="0" />
           </components>
         </node>
         <node name="WhiteKnight_g1">
           <components>
             <component type="TransformComponent" x="0" y="0" width="80" height="80" />
-            <component type="SpriteRendererComponent" spriteId="WhiteKnight" />
+            <component type="SpriteRendererComponent" spriteId="WhiteKnight" fit="Contain" />
             <component type="ChessPieceComponent" file="6" rank="0" />
           </components>
         </node>
         <node name="WhiteRook_h1">
           <components>
             <component type="TransformComponent" x="0" y="0" width="80" height="80" />
-            <component type="SpriteRendererComponent" spriteId="WhiteRook" />
+            <component type="SpriteRendererComponent" spriteId="WhiteRook" fit="Contain" />
             <component type="ChessPieceComponent" file="7" rank="0" />
           </components>
         </node>
@@ -98,56 +101,56 @@
         <node name="WhitePawn_a2">
           <components>
             <component type="TransformComponent" x="0" y="0" width="80" height="80" />
-            <component type="SpriteRendererComponent" spriteId="WhitePawn" />
+            <component type="SpriteRendererComponent" spriteId="WhitePawn" fit="Contain" />
             <component type="ChessPieceComponent" file="0" rank="1" />
           </components>
         </node>
         <node name="WhitePawn_b2">
           <components>
             <component type="TransformComponent" x="0" y="0" width="80" height="80" />
-            <component type="SpriteRendererComponent" spriteId="WhitePawn" />
+            <component type="SpriteRendererComponent" spriteId="WhitePawn" fit="Contain" />
             <component type="ChessPieceComponent" file="1" rank="1" />
           </components>
         </node>
         <node name="WhitePawn_c2">
           <components>
             <component type="TransformComponent" x="0" y="0" width="80" height="80" />
-            <component type="SpriteRendererComponent" spriteId="WhitePawn" />
+            <component type="SpriteRendererComponent" spriteId="WhitePawn" fit="Contain" />
             <component type="ChessPieceComponent" file="2" rank="1" />
           </components>
         </node>
         <node name="WhitePawn_d2">
           <components>
             <component type="TransformComponent" x="0" y="0" width="80" height="80" />
-            <component type="SpriteRendererComponent" spriteId="WhitePawn" />
+            <component type="SpriteRendererComponent" spriteId="WhitePawn" fit="Contain" />
             <component type="ChessPieceComponent" file="3" rank="1" />
           </components>
         </node>
         <node name="WhitePawn_e2">
           <components>
             <component type="TransformComponent" x="0" y="0" width="80" height="80" />
-            <component type="SpriteRendererComponent" spriteId="WhitePawn" />
+            <component type="SpriteRendererComponent" spriteId="WhitePawn" fit="Contain" />
             <component type="ChessPieceComponent" file="4" rank="1" />
           </components>
         </node>
         <node name="WhitePawn_f2">
           <components>
             <component type="TransformComponent" x="0" y="0" width="80" height="80" />
-            <component type="SpriteRendererComponent" spriteId="WhitePawn" />
+            <component type="SpriteRendererComponent" spriteId="WhitePawn" fit="Contain" />
             <component type="ChessPieceComponent" file="5" rank="1" />
           </components>
         </node>
         <node name="WhitePawn_g2">
           <components>
             <component type="TransformComponent" x="0" y="0" width="80" height="80" />
-            <component type="SpriteRendererComponent" spriteId="WhitePawn" />
+            <component type="SpriteRendererComponent" spriteId="WhitePawn" fit="Contain" />
             <component type="ChessPieceComponent" file="6" rank="1" />
           </components>
         </node>
         <node name="WhitePawn_h2">
           <components>
             <component type="TransformComponent" x="0" y="0" width="80" height="80" />
-            <component type="SpriteRendererComponent" spriteId="WhitePawn" />
+            <component type="SpriteRendererComponent" spriteId="WhitePawn" fit="Contain" />
             <component type="ChessPieceComponent" file="7" rank="1" />
           </components>
         </node>
@@ -156,56 +159,56 @@
         <node name="BlackPawn_a7">
           <components>
             <component type="TransformComponent" x="0" y="0" width="80" height="80" />
-            <component type="SpriteRendererComponent" spriteId="BlackPawn" />
+            <component type="SpriteRendererComponent" spriteId="BlackPawn" fit="Contain" />
             <component type="ChessPieceComponent" file="0" rank="6" />
           </components>
         </node>
         <node name="BlackPawn_b7">
           <components>
             <component type="TransformComponent" x="0" y="0" width="80" height="80" />
-            <component type="SpriteRendererComponent" spriteId="BlackPawn" />
+            <component type="SpriteRendererComponent" spriteId="BlackPawn" fit="Contain" />
             <component type="ChessPieceComponent" file="1" rank="6" />
           </components>
         </node>
         <node name="BlackPawn_c7">
           <components>
             <component type="TransformComponent" x="0" y="0" width="80" height="80" />
-            <component type="SpriteRendererComponent" spriteId="BlackPawn" />
+            <component type="SpriteRendererComponent" spriteId="BlackPawn" fit="Contain" />
             <component type="ChessPieceComponent" file="2" rank="6" />
           </components>
         </node>
         <node name="BlackPawn_d7">
           <components>
             <component type="TransformComponent" x="0" y="0" width="80" height="80" />
-            <component type="SpriteRendererComponent" spriteId="BlackPawn" />
+            <component type="SpriteRendererComponent" spriteId="BlackPawn" fit="Contain" />
             <component type="ChessPieceComponent" file="3" rank="6" />
           </components>
         </node>
         <node name="BlackPawn_e7">
           <components>
             <component type="TransformComponent" x="0" y="0" width="80" height="80" />
-            <component type="SpriteRendererComponent" spriteId="BlackPawn" />
+            <component type="SpriteRendererComponent" spriteId="BlackPawn" fit="Contain" />
             <component type="ChessPieceComponent" file="4" rank="6" />
           </components>
         </node>
         <node name="BlackPawn_f7">
           <components>
             <component type="TransformComponent" x="0" y="0" width="80" height="80" />
-            <component type="SpriteRendererComponent" spriteId="BlackPawn" />
+            <component type="SpriteRendererComponent" spriteId="BlackPawn" fit="Contain" />
             <component type="ChessPieceComponent" file="5" rank="6" />
           </components>
         </node>
         <node name="BlackPawn_g7">
           <components>
             <component type="TransformComponent" x="0" y="0" width="80" height="80" />
-            <component type="SpriteRendererComponent" spriteId="BlackPawn" />
+            <component type="SpriteRendererComponent" spriteId="BlackPawn" fit="Contain" />
             <component type="ChessPieceComponent" file="6" rank="6" />
           </components>
         </node>
         <node name="BlackPawn_h7">
           <components>
             <component type="TransformComponent" x="0" y="0" width="80" height="80" />
-            <component type="SpriteRendererComponent" spriteId="BlackPawn" />
+            <component type="SpriteRendererComponent" spriteId="BlackPawn" fit="Contain" />
             <component type="ChessPieceComponent" file="7" rank="6" />
           </components>
         </node>
@@ -214,56 +217,56 @@
         <node name="BlackRook_a8">
           <components>
             <component type="TransformComponent" x="0" y="0" width="80" height="80" />
-            <component type="SpriteRendererComponent" spriteId="BlackRook" />
+            <component type="SpriteRendererComponent" spriteId="BlackRook" fit="Contain" />
             <component type="ChessPieceComponent" file="0" rank="7" />
           </components>
         </node>
         <node name="BlackKnight_b8">
           <components>
             <component type="TransformComponent" x="0" y="0" width="80" height="80" />
-            <component type="SpriteRendererComponent" spriteId="BlackKnight" />
+            <component type="SpriteRendererComponent" spriteId="BlackKnight" fit="Contain" />
             <component type="ChessPieceComponent" file="1" rank="7" />
           </components>
         </node>
         <node name="BlackBishop_c8">
           <components>
             <component type="TransformComponent" x="0" y="0" width="80" height="80" />
-            <component type="SpriteRendererComponent" spriteId="BlackBishop" />
+            <component type="SpriteRendererComponent" spriteId="BlackBishop" fit="Contain" />
             <component type="ChessPieceComponent" file="2" rank="7" />
           </components>
         </node>
         <node name="BlackQueen_d8">
           <components>
             <component type="TransformComponent" x="0" y="0" width="80" height="80" />
-            <component type="SpriteRendererComponent" spriteId="BlackQueen" />
+            <component type="SpriteRendererComponent" spriteId="BlackQueen" fit="Contain" />
             <component type="ChessPieceComponent" file="3" rank="7" />
           </components>
         </node>
         <node name="BlackKing_e8">
           <components>
             <component type="TransformComponent" x="0" y="0" width="80" height="80" />
-            <component type="SpriteRendererComponent" spriteId="BlackKing" />
+            <component type="SpriteRendererComponent" spriteId="BlackKing" fit="Contain" />
             <component type="ChessPieceComponent" file="4" rank="7" />
           </components>
         </node>
         <node name="BlackBishop_f8">
           <components>
             <component type="TransformComponent" x="0" y="0" width="80" height="80" />
-            <component type="SpriteRendererComponent" spriteId="BlackBishop" />
+            <component type="SpriteRendererComponent" spriteId="BlackBishop" fit="Contain" />
             <component type="ChessPieceComponent" file="5" rank="7" />
           </components>
         </node>
         <node name="BlackKnight_g8">
           <components>
             <component type="TransformComponent" x="0" y="0" width="80" height="80" />
-            <component type="SpriteRendererComponent" spriteId="BlackKnight" />
+            <component type="SpriteRendererComponent" spriteId="BlackKnight" fit="Contain" />
             <component type="ChessPieceComponent" file="6" rank="7" />
           </components>
         </node>
         <node name="BlackRook_h8">
           <components>
             <component type="TransformComponent" x="0" y="0" width="80" height="80" />
-            <component type="SpriteRendererComponent" spriteId="BlackRook" />
+            <component type="SpriteRendererComponent" spriteId="BlackRook" fit="Contain" />
             <component type="ChessPieceComponent" file="7" rank="7" />
           </components>
         </node>

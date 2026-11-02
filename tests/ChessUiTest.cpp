@@ -3,12 +3,15 @@
 #include <BECore/GameManager/CoreManager.h>
 #include <BECore/Reflection/XmlDeserializer.h>
 #include <BECore/Renderer/ViewTransform.h>
+#include <BECore/Scene/Components/SpriteRendererComponent.h>
 #include <BECore/Scene/Scene.h>
 #include <BECore/Scene/SceneManager.h>
+#include <BECore/Scene/SceneNode.h>
 #include <BECore/Text/FontAtlasLibrary.h>
 #include <BECore/UI/UICanvasComponent.h>
 #include <BECore/UI/UILabel.h>
 #include <Chess/ChessGame.h>
+#include <Chess/Components/ChessPieceComponent.h>
 #include <Chess/Game/MoveGenerator.h>
 #include <Common/EngineEnvironment.h>
 #include <Common/RecordingRenderer.h>
@@ -33,6 +36,21 @@ namespace BECore::Chess::Tests {
         constexpr float kBoardBottom = 720.0f;  // 80 + 8 * 80
         const Color kResetColor{40, 90, 60, 255};
 
+        // The colors the board fills a full square with (ChessBoardComponent.cpp)
+        const Color kSelectedColor{120, 200, 120, 200};
+        const Color kLegalMoveColor{120, 200, 120, 120};
+        const Color kCheckColor{230, 60, 60, 210};
+
+        // The tall cell of a pawn in the piece atlas (TextureLibrary.xml, assets/chess_test.png is 700 x 381).
+        // The library is empty in the test environment, so the test gives a sprite its cell.
+        constexpr uint32_t kAtlasWidth = 700;
+        constexpr uint32_t kAtlasHeight = 381;
+        constexpr float kCellX = 583.33f;
+        constexpr float kCellWidth = 116.67f;
+        constexpr float kCellHeight = 190.5f;
+        constexpr size_t kPieceCount = 32;
+        constexpr float kPixelTolerance = 0.01f;
+
         std::filesystem::path ShippedSceneConfig() {
             return std::filesystem::path(__FILE__).parent_path().parent_path() / "config" / "SceneConfig.xml";
         }
@@ -50,6 +68,28 @@ namespace BECore::Chess::Tests {
         bool Play(ChessGameModel& model, eastl::string_view uci) {
             const auto move = MoveGenerator::ParseUci(model.GetPosition(), uci);
             return move.has_value() && model.TryMove(*move).has_value();
+        }
+
+        bool SameColor(const Color& left, const Color& right) {
+            return left.r == right.r && left.g == right.g && left.b == right.b && left.a == right.a;
+        }
+
+        bool SameRect(const Rect& left, const Rect& right) {
+            return std::abs(left.x - right.x) <= kPixelTolerance && std::abs(left.y - right.y) <= kPixelTolerance && std::abs(left.w - right.w) <= kPixelTolerance &&
+                   std::abs(left.h - right.h) <= kPixelTolerance;
+        }
+
+        /// The rect lies inside the other one and both have the same middle
+        ::testing::AssertionResult IsCenteredIn(const Rect& inner, const Rect& outer) {
+            const bool inside = inner.x >= outer.x - kPixelTolerance && inner.y >= outer.y - kPixelTolerance && inner.x + inner.w <= outer.x + outer.w + kPixelTolerance &&
+                                inner.y + inner.h <= outer.y + outer.h + kPixelTolerance;
+            const float offsetX = (inner.x + inner.w * 0.5f) - (outer.x + outer.w * 0.5f);
+            const float offsetY = (inner.y + inner.h * 0.5f) - (outer.y + outer.h * 0.5f);
+            if (inside && std::abs(offsetX) <= kPixelTolerance && std::abs(offsetY) <= kPixelTolerance) {
+                return ::testing::AssertionSuccess();
+            }
+            return ::testing::AssertionFailure() << "rect (" << inner.x << ", " << inner.y << ", " << inner.w << ", " << inner.h << ") is not centered in (" << outer.x << ", " << outer.y << ", "
+                                                 << outer.w << ", " << outer.h << ")";
         }
 
     }  // namespace
@@ -127,12 +167,61 @@ namespace BECore::Chess::Tests {
             Draw();
         }
 
-        /// The middle of a square of the board in output pixels, for the fit of the view into the current output
-        std::pair<float, float> SquareCenter(const char* square) const {
+        /// A square of the board in output pixels, for the fit of the view into the current output
+        Rect SquareRect(const char* square) const {
             const Square s = Sq(square);
             const ViewTransform fit = ViewTransform::Fit(kViewWidth, kViewHeight, _renderer->width, _renderer->height);
-            const Rect cell = fit.ToOutput(100.0f + static_cast<float>(s.file) * 80.0f, kBoardTop + static_cast<float>(7 - s.rank) * 80.0f, 80.0f, 80.0f);
+            return fit.ToOutput(100.0f + static_cast<float>(s.file) * 80.0f, kBoardTop + static_cast<float>(7 - s.rank) * 80.0f, 80.0f, 80.0f);
+        }
+
+        /// The middle of a square of the board in output pixels
+        std::pair<float, float> SquareCenter(const char* square) const {
+            const Rect cell = SquareRect(square);
             return {cell.x + cell.w * 0.5f, cell.y + cell.h * 0.5f};
+        }
+
+        /// The sprite of a piece node by the node's name ("WhitePawn_e2"), null when the scene has no such piece
+        IntrusivePtr<SpriteRendererComponent> PieceSprite(const char* nodeName) const {
+            for (const auto& node : GetScene().GetRootNode().GetChildren()) {
+                if (node->GetName() == PoolString::Intern(nodeName)) {
+                    return node->GetComponent<SpriteRendererComponent>();
+                }
+            }
+            return {};
+        }
+
+        /// Gives the sprite of a piece the texture and the cell of the atlas that the library gives it in the game (the library is empty here), and returns the texture
+        IntrusivePtr<ITexture> GiveAtlasCell(const char* nodeName) const {
+            auto sprite = PieceSprite(nodeName);
+            EXPECT_TRUE(sprite) << nodeName;
+            const eastl::vector<uint8_t> pixels(static_cast<size_t>(kAtlasWidth) * kAtlasHeight * 4, 0);
+            IntrusivePtr<ITexture> texture = _renderer->CreateTexture(pixels.data(), kAtlasWidth, kAtlasHeight);
+            if (sprite) {
+                sprite->SetTexture(texture);
+                sprite->_srcRect = Rect{kCellX, 0.0f, kCellWidth, kCellHeight};
+            }
+            return texture;
+        }
+
+        /// The recorded call that drew the texture, null when none did
+        const DrawCall* TextureCall(const ITexture& texture) const {
+            for (const DrawCall& call : _renderer->calls) {
+                if (call.kind == DrawKind::Texture && call.texture == &texture) {
+                    return &call;
+                }
+            }
+            return nullptr;
+        }
+
+        /// The recorded rect fills of one color, in drawing order
+        eastl::vector<const DrawCall*> RectCalls(const Color& color) const {
+            eastl::vector<const DrawCall*> found;
+            for (const DrawCall& call : _renderer->calls) {
+                if (call.kind == DrawKind::Rect && SameColor(call.color, color)) {
+                    found.push_back(&call);
+                }
+            }
+            return found;
         }
 
         IntrusivePtr<RecordingRenderer> _renderer;
@@ -216,6 +305,90 @@ namespace BECore::Chess::Tests {
             }
         }
         EXPECT_GE(glyphsInTurn, 10u) << "'White to move' has twelve letters with ink";
+    }
+
+    // ---- the pieces -------------------------------------------------------------------------------------------------------
+
+    TEST_F(ChessUiTest, EveryPieceIsFittedIntoItsSquare) {
+        size_t pieces = 0;
+        for (const auto& node : GetScene().GetRootNode().GetChildren()) {
+            if (!node->GetComponent<ChessPieceComponent>()) {
+                continue;
+            }
+            ++pieces;
+            const auto sprite = node->GetComponent<SpriteRendererComponent>();
+            ASSERT_TRUE(sprite) << node->GetName().CStr();
+            EXPECT_EQ(sprite->_fit, SpriteFit::Contain) << node->GetName().CStr() << ": the atlas cell is not square, Stretch would draw the piece squat";
+        }
+        EXPECT_EQ(pieces, kPieceCount);
+    }
+
+    TEST_F(ChessUiTest, APieceKeepsTheAspectOfItsCellInsideItsSquare) {
+        const auto texture = GiveAtlasCell("WhitePawn_e2");
+        _manager->UpdateAll();  // ChessPieceComponent writes the transform of the piece in an update: the node starts at 0, 0
+        Draw();
+
+        const DrawCall* piece = TextureCall(*texture);
+        ASSERT_NE(piece, nullptr);
+        const Rect square = SquareRect("e2");
+        EXPECT_NEAR(piece->rect.w / piece->rect.h, kCellWidth / kCellHeight, 1e-4f);
+        EXPECT_NEAR(piece->rect.h, square.h, kPixelTolerance) << "as tall as the square, the cell is the taller side";
+        EXPECT_LT(piece->rect.w, square.w);
+        EXPECT_TRUE(IsCenteredIn(piece->rect, square));
+        ASSERT_TRUE(piece->source.has_value());
+        EXPECT_TRUE(SameRect(*piece->source, Rect{kCellX, 0.0f, kCellWidth, kCellHeight})) << "the fit changes the destination, not the part of the atlas";
+    }
+
+    TEST_F(ChessUiTest, TheSelectionAndTheLegalMovesSitAroundThePiece) {
+        const auto texture = GiveAtlasCell("WhitePawn_e2");
+        _manager->UpdateAll();
+        Model().OnSquareClicked(Sq("e2"));
+        ASSERT_TRUE(Model().HasSelection());
+
+        // The view is 840 x 800: 1280 x 720 and 720 x 1280 are not its shape, so the view transform is a scale and a move
+        for (const auto& size : {std::pair{1280.0f, 720.0f}, std::pair{720.0f, 1280.0f}, std::pair{2560.0f, 1080.0f}}) {
+            SCOPED_TRACE(Format("output {}x{}", size.first, size.second).c_str());
+            DrawAt(size.first, size.second);
+
+            const DrawCall* piece = TextureCall(*texture);
+            ASSERT_NE(piece, nullptr);
+            const auto selected = RectCalls(kSelectedColor);
+            ASSERT_EQ(selected.size(), 1u);
+            EXPECT_TRUE(SameRect(selected[0]->rect, SquareRect("e2"))) << "the selection is the whole square of the piece";
+            EXPECT_TRUE(IsCenteredIn(piece->rect, selected[0]->rect));
+            EXPECT_NEAR(piece->rect.w / piece->rect.h, kCellWidth / kCellHeight, 1e-4f) << "not stretched to the highlight";
+
+            const auto moves = RectCalls(kLegalMoveColor);
+            ASSERT_EQ(moves.size(), 2u) << "e3 and e4";
+            for (const char* target : {"e3", "e4"}) {
+                const Rect square = SquareRect(target);
+                const bool drawn = std::any_of(moves.begin(), moves.end(), [&](const DrawCall* call) { return SameRect(call->rect, square); });
+                EXPECT_TRUE(drawn) << target;
+            }
+        }
+    }
+
+    TEST_F(ChessUiTest, TheCheckSitsAroundTheKing) {
+        const auto texture = GiveAtlasCell("BlackKing_e8");
+        _manager->UpdateAll();  // the pieces register with the model in the first update; moves played before it would be dealt to them by square, not by identity
+        for (const char* uci : {"e2e4", "f7f6", "d1h5"}) {
+            ASSERT_TRUE(Play(Model(), uci)) << uci;
+        }
+        ASSERT_TRUE(Model().IsInCheck());
+        _manager->UpdateAll();
+
+        for (const auto& size : {std::pair{1280.0f, 720.0f}, std::pair{720.0f, 1280.0f}}) {
+            SCOPED_TRACE(Format("output {}x{}", size.first, size.second).c_str());
+            DrawAt(size.first, size.second);
+
+            const DrawCall* king = TextureCall(*texture);
+            ASSERT_NE(king, nullptr);
+            const auto check = RectCalls(kCheckColor);
+            ASSERT_EQ(check.size(), 1u);
+            EXPECT_TRUE(SameRect(check[0]->rect, SquareRect("e8")));
+            EXPECT_TRUE(IsCenteredIn(king->rect, check[0]->rect));
+            EXPECT_NEAR(king->rect.w / king->rect.h, kCellWidth / kCellHeight, 1e-4f) << "not stretched to the highlight";
+        }
     }
 
     // ---- the Reset button -------------------------------------------------------------------------------------------------
