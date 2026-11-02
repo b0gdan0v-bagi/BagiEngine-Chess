@@ -24,9 +24,10 @@ be_add_game_executable(BagiChess
 
 if(ENGINE_BUILD_TESTS)
     file(GLOB CHESS_TEST_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/tests/*.cpp")
+    # WHOLE_ARCHIVE: ChessUiTest loads the shipped SceneConfig.xml, which names components no test references
     be_add_game_tests(ChessTests
         SOURCES ${CHESS_TEST_SOURCES}
-        LINK ChessModule
+        WHOLE_ARCHIVE ChessModule
     )
 
     # Starts BagiChess with the control API and plays a few moves, a mate and a promotion over WebSocket

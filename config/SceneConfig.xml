@@ -5,12 +5,27 @@
       type="Scene"
       name="ChessScene"
       viewWidth="840"
-      viewHeight="760">
+      viewHeight="800">
       <nodes>
         <!-- Background layer: nodes with a lower layer are drawn first, the pieces (layer 0) on top. -->
         <node name="Board" layer="-1">
           <components>
-            <component type="ChessBoardComponent" originX="100" originY="60" squareSize="80" />
+            <component type="ChessBoardComponent" originX="100" originY="80" squareSize="80" />
+          </components>
+        </node>
+
+        <!-- The HUD is in the margins of the view (space="SceneView"): it scales and moves with the board and never covers it, whatever the shape of the window.
+             The board is 640 x 640 at (100, 80); the margin is 80 units above and below, so a row of 56-unit controls fits, and a 56-unit button is still a
+             32 px touch target at the smallest fit scale of the size matrix (0.57, the 840 units of the width in a 480 px window). -->
+        <node name="Hud" layer="10">
+          <components>
+            <component type="UICanvasComponent" space="SceneView" useSafeArea="true">
+              <elements>
+                <element type="UILabel" name="Turn" x="100" y="12" width="420" height="56" text="{turn}" fontSize="32" verticalAlign="Center" />
+                <element type="UIButton" name="Reset" anchor="TopRight" x="-100" y="12" width="150" height="56" text="Reset" fontSize="26" action="ChessReset" color="40,90,60,255" />
+                <element type="UILabel" name="Status" anchor="Bottom" y="-12" width="76%" height="56" text="{status}" fontSize="28" align="Center" verticalAlign="Center" />
+              </elements>
+            </component>
           </components>
         </node>
 

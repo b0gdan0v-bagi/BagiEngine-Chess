@@ -4,7 +4,9 @@
 #include <BECore/Renderer/IRenderer.h>
 #include <BECore/Scene/Scene.h>
 #include <Chess/ChessGame.h>
+#include <Chess/Game/StatusText.h>
 #include <CoreSDL/SDLEvents.h>
+#include <Events/InputEvents.h>
 #include <Generated/ChessBoardComponent.gen.hpp>
 
 namespace BECore::Chess {
@@ -42,6 +44,32 @@ namespace BECore::Chess {
     void ChessBoardComponent::OnAttached() {
         s_active = this;
         SubscribeInScene<SDLEvents::MouseButtonDownEvent, &ChessBoardComponent::OnMouseDown>(this);
+        SubscribeInScene<InputEvents::ActionEvent, &ChessBoardComponent::OnAction>(this);
+    }
+
+    void ChessBoardComponent::PublishUiVars() {
+        const ChessGameModel* model = ChessGame::GetActiveModel();
+        if (!model || (model == _publishedModel && model->GetVersion() == _publishedVersion)) {
+            return;
+        }
+        _publishedModel = model;
+        _publishedVersion = model->GetVersion();
+        UIVars& vars = CoreManager::GetUIVars();
+        const eastl::string turn = StatusText::Turn(*model);
+        const eastl::string status = StatusText::Status(*model);
+        vars.Set("turn"_intern, eastl::string_view(turn.data(), turn.size()));
+        vars.Set("status"_intern, eastl::string_view(status.data(), status.size()));
+    }
+
+    void ChessBoardComponent::OnAction(const InputEvents::ActionEvent& event) {
+        // The action of the Reset button in config/SceneConfig.xml
+        const PoolString resetAction = "ChessReset"_intern;
+        if (event.action != resetAction) {
+            return;
+        }
+        if (ChessGameModel* model = ChessGame::GetActiveModel()) {
+            model->Reset();
+        }
     }
 
     void ChessBoardComponent::SquareToPixel(int file, int rank, float& outX, float& outY) const {
@@ -51,6 +79,7 @@ namespace BECore::Chess {
     }
 
     void ChessBoardComponent::OnDraw() {
+        PublishUiVars();
         auto& renderer = *CoreManager::GetRenderer();
 
         // Checkered base.
