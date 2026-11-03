@@ -1,4 +1,5 @@
 #include "ChessTestUtil.h"
+#include "TestEngines.h"
 
 #include <BECore/GameManager/CoreManager.h>
 #include <BECore/Reflection/XmlDeserializer.h>
@@ -19,6 +20,7 @@
 #include <CoreSDL/SDLEvents.h>
 #include <Events/InputEvents.h>
 #include <Games/GameManager.h>
+#include <chrono>
 
 /**
  * The shipped scene of Chess with its HUD: the file is read from the source tree (a game's content is not mounted in the test environment), the game is started
@@ -50,6 +52,9 @@ namespace BECore::Chess::Tests {
         constexpr float kCellHeight = 190.5f;
         constexpr size_t kPieceCount = 32;
         constexpr float kPixelTolerance = 0.01f;
+
+        constexpr int kManyFrames = 200;                            // frames that must pass with nothing happening
+        constexpr std::chrono::milliseconds kShutdownBudget{3000};  // a gated engine gives up after 10 s (kGateGiveUp): a shutdown that waited for it would not fit
 
         std::filesystem::path ShippedSceneConfig() {
             return std::filesystem::path(__FILE__).parent_path().parent_path() / "config" / "SceneConfig.xml";
@@ -154,6 +159,53 @@ namespace BECore::Chess::Tests {
             UILabel* label = element ? element->Cast<UILabel>() : nullptr;
             EXPECT_NE(label, nullptr) << name;
             return *label;
+        }
+
+        /// The opponent of the game that is running
+        OpponentController& Opponent() const {
+            OpponentController* opponent = ChessGame::GetActiveOpponent();
+            EXPECT_NE(opponent, nullptr);
+            return *opponent;
+        }
+
+        /// A press of the mouse on the middle of a square, where it is drawn: the way a click reaches the board (the output size it is mapped back from is the one of the last draw)
+        void Click(const char* square) {
+            Draw();
+            const auto at = SquareCenter(square);
+            CoreManager::GetUIInput().DispatchMouseButtonDown(Button(at.first, at.second, true));
+        }
+
+        /// A move of the person: a click on the piece, a click on the target
+        void ClickMove(const char* from, const char* to) {
+            Click(from);
+            Click(to);
+        }
+
+        /// What a game loop does: one frame (the update of every scene) after the other until @p done, or until the time limit; false when it ran out
+        template <typename Condition>
+        bool FramesUntil(Condition done) {
+            return WaitUntil([&] {
+                _manager->UpdateAll();
+                return done();
+            });
+        }
+
+        /// Frames in which nothing is meant to happen
+        void IdleFrames(int count = kManyFrames) {
+            for (int frame = 0; frame < count; ++frame) {
+                _manager->UpdateAll();
+            }
+        }
+
+        /// The program plays Black with an engine that fails (the factory made it, so the pick succeeds), the person moves e2e4, and the failure of the first search stands
+        void ProvokeAnEngineError(CountingFactory& factory) {
+            Opponent().SetEngineFactory(factory.AsFactory());
+            _manager->UpdateAll();
+            ASSERT_TRUE(Opponent().SetSide(PieceColor::Black).has_value());
+            ClickMove("e2", "e4");
+            ASSERT_EQ(Model().GetMoves().size(), 1u);
+            ASSERT_TRUE(FramesUntil([&] { return Opponent().GetError().has_value(); })) << "the engine was asked and failed";
+            ASSERT_EQ(Opponent().GetError()->kind, EngineErrorKind::LaunchFailed);
         }
 
         void Draw() {
@@ -434,6 +486,277 @@ namespace BECore::Chess::Tests {
         EXPECT_FALSE(CoreManager::GetUIInput().DispatchMouseButtonDown(Button(to.first, to.second, true)));
 
         EXPECT_EQ(Model().GetPosition().ToFen(), eastl::string("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1"));
+    }
+
+    // ---- the opponent -----------------------------------------------------------------------------------------------------
+    // The engines are the doubles of TestEngines.h, given to the controller of the running game by SetEngineFactory: no child process, and a Stockfish on the PATH of
+    // this machine is never looked for. The scene is the shipped one, so a click is a click on the board and a frame is the update of every component
+
+    TEST_F(ChessUiTest, WithNobodyAsTheOpponentTheGamePlaysAsTwoPeople) {
+        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+
+        ClickMove("e2", "e4");
+        IdleFrames();
+        EXPECT_EQ(Model().GetMoves().size(), 1u) << "black is a person: nothing answers";
+        ClickMove("e7", "e5");
+        IdleFrames();
+
+        EXPECT_EQ(Model().GetMoves().size(), 2u);
+        EXPECT_EQ(Model().GetTurn(), PieceColor::White);
+        EXPECT_FALSE(Opponent().GetPlays().has_value());
+        EXPECT_FALSE(Opponent().IsThinking());
+        EXPECT_FALSE(Opponent().GetError().has_value());
+        EXPECT_EQ(Opponent().GetRevision(), 0u) << "the start of the game picked nobody and changed nothing";
+        EXPECT_EQ(factory.Calls(), 0) << "nothing is looked up until a side is picked";
+    }
+
+    TEST_F(ChessUiTest, TheProgramAnswersAPersonsMoveWithinAFewFrames) {
+        const auto engine = eastl::make_shared<InstantEngine>();
+        CountingFactory factory({engine});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        ASSERT_TRUE(Opponent().SetSide(PieceColor::Black).has_value());
+
+        IdleFrames();
+        EXPECT_EQ(engine->Calls(), 0) << "white is the person's: the program waits";
+
+        ClickMove("e2", "e4");
+        ASSERT_TRUE(FramesUntil([&] { return Model().GetMoves().size() == 2; }));
+        EXPECT_EQ(Model().GetMoves()[0].ToUci(), "e2e4");
+        EXPECT_EQ(Model().GetPieceAt(Model().GetMoves()[1].To()).color, PieceColor::Black) << "the program's move is a black one";
+        EXPECT_EQ(Model().GetTurn(), PieceColor::White);
+        EXPECT_FALSE(Opponent().IsThinking());
+
+        ClickMove("d2", "d4");
+        ASSERT_TRUE(FramesUntil([&] { return Model().GetMoves().size() == 4; }));
+        EXPECT_EQ(engine->Calls(), 2) << "one search per move of the person";
+        EXPECT_EQ(factory.Calls(), 1);
+        EXPECT_FALSE(Opponent().GetError().has_value());
+    }
+
+    TEST_F(ChessUiTest, WhileTheProgramThinksAClickOnTheBoardDoesNothing) {
+        const auto engine = eastl::make_shared<GatedEngine>(true);
+        CountingFactory factory({engine});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        ASSERT_TRUE(Opponent().SetSide(PieceColor::Black).has_value());
+        ClickMove("e2", "e4");
+        ASSERT_TRUE(FramesUntil([&] { return engine->Calls() == 1; })) << "the program has the search and waits at its gate";
+        ASSERT_TRUE(Opponent().IsThinking());
+        const uint64_t version = Model().GetVersion();
+
+        Click("e7");  // a black piece, and it is black's turn: the model would select it for a person
+        EXPECT_FALSE(Model().HasSelection());
+        Click("e5");
+        Click("d2");
+        Click("a4");
+        IdleFrames();
+
+        EXPECT_FALSE(Model().HasSelection());
+        EXPECT_EQ(Model().GetMoves().size(), 1u);
+        EXPECT_EQ(Model().GetVersion(), version) << "the clicks did not move the game, so the search is not stale";
+        EXPECT_TRUE(Opponent().IsThinking());
+        EXPECT_FALSE(engine->WasCancelled());
+
+        engine->Open();
+        ASSERT_TRUE(FramesUntil([&] { return Model().GetMoves().size() == 2; })) << "the answer to the search the clicks left alone";
+        Click("d2");
+        EXPECT_TRUE(Model().HasSelection()) << "white is the person's again: the board takes clicks";
+    }
+
+    TEST_F(ChessUiTest, AfterTheProgramsMateAClickStartsANewGameAndTheProgramMovesAgain) {
+        CountingFactory factory({eastl::make_shared<MatingEngine>()});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        Model().SetPosition(PositionFromFen("6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1"));
+        ASSERT_TRUE(Opponent().SetSide(PieceColor::White).has_value());
+
+        ASSERT_TRUE(FramesUntil([&] { return Model().IsGameOver(); }));
+        EXPECT_EQ(Model().GetStatus(), GameStatus::Checkmate);
+        EXPECT_EQ(Model().GetWinner(), std::optional<PieceColor>(PieceColor::White));
+        ASSERT_EQ(Model().GetMoves().size(), 1u);
+        EXPECT_EQ(Model().GetMoves()[0].ToUci(), "a1a8") << "the program's move";
+        EXPECT_FALSE(Opponent().GetError().has_value());
+        Draw();
+        EXPECT_EQ(Label("Turn").GetDisplayText(), "White wins") << "the HUD says it, whoever played the mate";
+
+        const uint64_t version = Model().GetVersion();
+        Click("e4");  // the game is over, so this click is the "next game" one even though White is the program
+
+        EXPECT_FALSE(Model().IsGameOver());
+        EXPECT_GT(Model().GetVersion(), version);
+        EXPECT_EQ(Model().GetPosition().ToFen(), eastl::string(Position::kStartFen));
+        EXPECT_FALSE(Model().HasSelection());
+        ASSERT_TRUE(FramesUntil([&] { return Model().GetMoves().size() == 1; })) << "the new game opens with the move of the program, which plays White";
+        EXPECT_EQ(Model().GetTurn(), PieceColor::Black);
+        EXPECT_FALSE(Model().IsGameOver());
+    }
+
+    TEST_F(ChessUiTest, AResetWhileTheProgramThinksDropsItsAnswerAndANewSearchFollowsOnItsTurn) {
+        const auto engine = eastl::make_shared<GatedEngine>(false);  // ignores its token: its answer comes late and must still be thrown away
+        CountingFactory factory({engine});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        ASSERT_TRUE(Opponent().SetSide(PieceColor::Black).has_value());
+        ClickMove("e2", "e4");
+        ASSERT_TRUE(FramesUntil([&] { return engine->Calls() == 1; }));
+        ASSERT_TRUE(Opponent().IsThinking());
+
+        InputEvents::ActionEvent::Emit(PoolString::Intern("ChessReset"));  // the Reset button
+        _manager->UpdateAll();
+
+        EXPECT_FALSE(Opponent().IsThinking()) << "the version moved: the search is not wanted any more";
+        engine->Open();
+        ASSERT_TRUE(WaitUntil([&] { return engine->Answered() == 1; })) << "the stale search returns its move";
+        IdleFrames();
+        EXPECT_TRUE(Model().GetMoves().empty()) << "and the move is never played";
+        EXPECT_EQ(Model().GetPosition().ToFen(), eastl::string(Position::kStartFen));
+        EXPECT_FALSE(Opponent().GetError().has_value());
+        EXPECT_EQ(engine->Calls(), 1) << "it was white's turn after the reset: nothing to search";
+
+        ClickMove("e2", "e4");
+        ASSERT_TRUE(FramesUntil([&] { return Model().GetMoves().size() == 2; })) << "it is the program's turn again: a new search, and its answer is played";
+        EXPECT_EQ(engine->Calls(), 2);
+        EXPECT_EQ(factory.Calls(), 1) << "the same opponent: a reset does not remake it";
+    }
+
+    TEST_F(ChessUiTest, ARefusedPickLocksNobodyOut) {
+        CountingFactory factory(EngineError{EngineErrorKind::LaunchFailed, "no Stockfish in the test"});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+
+        const auto picked = Opponent().SetSide(PieceColor::Black);
+
+        ASSERT_FALSE(picked.has_value());
+        EXPECT_FALSE(Opponent().PlaysFor(PieceColor::Black));
+        ClickMove("e2", "e4");
+        ClickMove("e7", "e5");
+        IdleFrames();
+        EXPECT_EQ(Model().GetMoves().size(), 2u) << "both colors are people's";
+        EXPECT_EQ(factory.Calls(), 1);
+        EXPECT_FALSE(Opponent().GetError().has_value()) << "the move of the game is the person having seen it";
+    }
+
+    TEST_F(ChessUiTest, AnEngineThatFailedLocksTheProgramsSideButNotTheGameAndNothingIsRetried) {
+        const auto engine = eastl::make_shared<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
+        CountingFactory factory({engine});
+        ASSERT_NO_FATAL_FAILURE(ProvokeAnEngineError(factory));
+
+        IdleFrames();
+        EXPECT_TRUE(Opponent().PlaysFor(PieceColor::Black)) << "the error does not take the seat away";
+        EXPECT_EQ(engine->Calls(), 1) << "no search per frame";
+        Click("e7");
+        EXPECT_FALSE(Model().HasSelection()) << "black is the program's: the click does nothing, the game waits for the person to act";
+        Click("e5");
+
+        EXPECT_EQ(Model().GetMoves().size(), 1u);
+        EXPECT_TRUE(Opponent().GetError().has_value());
+        EXPECT_EQ(engine->Calls(), 1);
+    }
+
+    TEST_F(ChessUiTest, TheResetButtonLetsThePersonOutOfAnEngineError) {
+        const auto engine = eastl::make_shared<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
+        CountingFactory factory({engine});
+        ASSERT_NO_FATAL_FAILURE(ProvokeAnEngineError(factory));
+
+        InputEvents::ActionEvent::Emit(PoolString::Intern("ChessReset"));
+        _manager->UpdateAll();
+
+        EXPECT_FALSE(Opponent().GetError().has_value());
+        EXPECT_TRUE(Model().GetMoves().empty());
+        ClickMove("e2", "e4");
+        EXPECT_EQ(Model().GetMoves().size(), 1u) << "the person plays again";
+        ASSERT_TRUE(FramesUntil([&] { return Opponent().GetError().has_value(); })) << "the program is still Black and fails again: the person acted, so it was asked again";
+        EXPECT_EQ(engine->Calls(), 2);
+    }
+
+    TEST_F(ChessUiTest, ChangingTheSideLetsThePersonOutOfAnEngineErrorAndNobodyIsTheWayOutForGood) {
+        const auto engine = eastl::make_shared<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
+        CountingFactory factory({engine});
+        ASSERT_NO_FATAL_FAILURE(ProvokeAnEngineError(factory));
+        const uint64_t revision = Opponent().GetRevision();
+
+        ASSERT_TRUE(Opponent().CycleSide().has_value());  // the program plays White now, the person Black
+
+        EXPECT_FALSE(Opponent().GetError().has_value());
+        EXPECT_GT(Opponent().GetRevision(), revision);
+        EXPECT_TRUE(Opponent().PlaysFor(PieceColor::White));
+        ClickMove("e7", "e5");
+        EXPECT_EQ(Model().GetMoves().size(), 2u) << "black is the person's after the change";
+        ASSERT_TRUE(FramesUntil([&] { return Opponent().GetError().has_value(); })) << "white is the program's, its engine fails again";
+        Click("d2");
+        EXPECT_FALSE(Model().HasSelection());
+
+        ASSERT_TRUE(Opponent().CycleSide().has_value());  // nobody
+
+        EXPECT_FALSE(Opponent().GetError().has_value());
+        EXPECT_FALSE(Opponent().GetPlays().has_value());
+        ClickMove("d2", "d4");
+        ClickMove("d7", "d5");
+        IdleFrames();
+        EXPECT_EQ(Model().GetMoves().size(), 4u) << "two people on one screen again";
+        EXPECT_EQ(engine->Calls(), 2);
+    }
+
+    TEST_F(ChessUiTest, ChangingTheLevelLetsThePersonOutOfAnEngineErrorAndAsksTheNewEngineOnce) {
+        const auto engine = eastl::make_shared<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
+        CountingFactory factory({engine});
+        ASSERT_NO_FATAL_FAILURE(ProvokeAnEngineError(factory));
+
+        ASSERT_TRUE(Opponent().CycleLevel().has_value());
+
+        EXPECT_FALSE(Opponent().GetError().has_value());
+        ASSERT_EQ(factory.Calls(), 2);
+        EXPECT_EQ(factory.Levels()[1], GetOpponentLevels()[(kDefaultOpponentLevel + 1) % GetOpponentLevels().size()].id);
+        ASSERT_TRUE(FramesUntil([&] { return Opponent().GetError().has_value(); })) << "black is still the program's and to move: the new engine is asked, and fails";
+        IdleFrames();
+        EXPECT_EQ(engine->Calls(), 2) << "once per act of the person, not per frame";
+    }
+
+    TEST_F(ChessUiTest, StoppingTheGameDestroysTheOpponentAndCancelsItsSearch) {
+        const auto engine = eastl::make_shared<GatedEngine>(true);
+        CountingFactory factory({engine});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        ASSERT_TRUE(Opponent().SetSide(PieceColor::Black).has_value());
+        ClickMove("e2", "e4");
+        ASSERT_TRUE(FramesUntil([&] { return engine->Calls() == 1; }));
+
+        ChessGame::GetActive()->Stop();  // what GameManager does when it switches away from a game or shuts down; the game itself is still there
+
+        EXPECT_FALSE(Opponent().GetPlays().has_value());
+        EXPECT_FALSE(Opponent().IsThinking());
+        EXPECT_TRUE(WaitUntil([&] { return engine->WasCancelled(); })) << "the search was told to stop";
+        IdleFrames();
+        EXPECT_EQ(engine->Calls(), 1) << "nobody plays any more, so nothing is asked";
+        EXPECT_EQ(Model().GetMoves().size(), 1u);
+    }
+
+    TEST_F(ChessUiTest, ShuttingTheGameDownWithASearchInFlightReturnsAtOnce) {
+        const auto engine = eastl::make_shared<GatedEngine>(false);  // never looks at its token: only the gate can end its search
+        CountingFactory factory({engine});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        ASSERT_TRUE(Opponent().SetSide(PieceColor::Black).has_value());
+        ClickMove("e2", "e4");
+        ASSERT_TRUE(FramesUntil([&] { return engine->Calls() == 1; }));
+        ASSERT_TRUE(Opponent().IsThinking());
+
+        const std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+        GameManager::GetInstance().Shutdown();  // Stop() destroys the opponent, as Application::Cleanup() does before the task system goes down
+        const std::chrono::steady_clock::duration elapsed = std::chrono::steady_clock::now() - start;
+
+        EXPECT_LT(elapsed, kShutdownBudget);
+        EXPECT_EQ(ChessGame::GetActive(), nullptr);
+        EXPECT_EQ(engine->Answered(), 0) << "the search is still at its gate: nothing waited for it";
+        EXPECT_EQ(engine->Calls(), 1);
+        _manager->UpdateAll();  // a frame after the game is gone asks nothing
+        EXPECT_EQ(engine->Calls(), 1);
+
+        engine->Open();  // frees the worker: the engine is alive as long as the search needs it, and the test does not leave a thread behind
+        EXPECT_TRUE(WaitUntil([&] { return engine->Answered() == 1; }));
     }
 
 }  // namespace BECore::Chess::Tests

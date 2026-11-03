@@ -1,3 +1,4 @@
+#include <BECore/GameManager/CoreManager.h>
 #include <Chess/Engine/OpponentSettings.h>
 #include <Common/EngineEnvironment.h>
 #include <Common/Printers.h>
@@ -122,7 +123,12 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(OpponentSettingsLoadTest, ConfigsThatAreNotLoadedMeanNoPath) {
-        // The game's own config/ is not mounted in the test environment, so neither of the two files is there
+        // The game's own config/ is not mounted in the test environment, so neither of the two files is there; a machine where it is says nothing about this case
+        const ConfigManager& configs = CoreManager::GetConfigManager();
+        if (configs.HasConfig(OpponentSettings::kSharedConfigName) || configs.HasConfig(OpponentSettings::kLocalConfigName)) {
+            GTEST_SKIP() << "the test environment has a ChessSettings config mounted: Load() would read its path";
+        }
+
         EXPECT_EQ(OpponentSettings::Load().stockfishPath, "");
     }
 

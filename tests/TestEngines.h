@@ -4,6 +4,7 @@
 
 #include <Chess/Engine/OpponentController.h>
 #include <Chess/Engine/SearchRequest.h>
+#include <Chess/Game/GameStatus.h>
 #include <Chess/Game/MoveGenerator.h>
 #include <chrono>
 #include <thread>
@@ -95,6 +96,31 @@ namespace BECore::Chess::Tests {
     protected:
         std::expected<Move, EngineError> Answer(const SearchRequest& request, const CancellationToken&) override {
             return FirstLegalMove(request);
+        }
+    };
+
+    /// An engine that mates when it can (the first move that leaves the other side checkmated) and otherwise plays the first legal move, at once: it lets a test
+    /// end a game with the program's move from a position set up for it
+    class MatingEngine final : public RecordingEngine {
+    protected:
+        std::expected<Move, EngineError> Answer(const SearchRequest& request, const CancellationToken&) override {
+            std::expected<Position, EngineError> position = request.FinalPosition();
+            if (!position) {
+                return std::unexpected(position.error());
+            }
+            const MoveList moves = MoveGenerator::GenerateLegal(*position);
+            if (moves.empty()) {
+                return std::unexpected(EngineError{EngineErrorKind::NoMove, "the game is over"});
+            }
+            for (const Move move : moves) {
+                position->DoMove(move);
+                const bool mates = EvaluateStatus(*position) == GameStatus::Checkmate;
+                position->UndoMove();
+                if (mates) {
+                    return move;
+                }
+            }
+            return moves.front();
         }
     };
 

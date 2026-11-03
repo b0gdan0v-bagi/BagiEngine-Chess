@@ -263,6 +263,23 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(factory.Calls(), 1);
     }
 
+    TEST_F(OpponentControllerTest, AFactoryThatMakesNoEngineIsLaunchFailedToo) {
+        ChessGameModel model;
+        OpponentController controller(model);
+        controller.SetEngineFactory([](const OpponentLevel&) -> MadeEngine { return MadeEngine(eastl::shared_ptr<IChessEngine>{}); });
+
+        const auto picked = controller.SetSide(PieceColor::Black);
+
+        ASSERT_FALSE(picked.has_value());
+        EXPECT_EQ(picked.error().kind, EngineErrorKind::LaunchFailed);
+        EXPECT_FALSE(controller.GetPlays().has_value());
+        ASSERT_TRUE(controller.GetError().has_value());
+        EXPECT_EQ(controller.GetError()->kind, EngineErrorKind::LaunchFailed);
+        EXPECT_TRUE(Play(model, "e2e4"));
+        controller.Update();
+        EXPECT_FALSE(controller.IsThinking());
+    }
+
     TEST_F(OpponentControllerTest, ANewPickClearsTheErrorAndCanSucceedAfterTheFailure) {
         ChessGameModel model;
         CountingFactory failing(LaunchFailed());

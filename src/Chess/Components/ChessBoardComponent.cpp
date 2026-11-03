@@ -7,6 +7,7 @@
 #include <Chess/Game/StatusText.h>
 #include <CoreSDL/SDLEvents.h>
 #include <Events/InputEvents.h>
+#include <Events/SceneEvents.h>
 #include <Generated/ChessBoardComponent.gen.hpp>
 
 namespace BECore::Chess {
@@ -45,6 +46,26 @@ namespace BECore::Chess {
         s_active = this;
         SubscribeInScene<SDLEvents::MouseButtonDownEvent, &ChessBoardComponent::OnMouseDown>(this);
         SubscribeInScene<InputEvents::ActionEvent, &ChessBoardComponent::OnAction>(this);
+        SubscribeInScene<SceneEvents::SceneUpdateEvent, &ChessBoardComponent::OnUpdate>(this);
+    }
+
+    void ChessBoardComponent::OnUpdate(const SceneEvents::SceneUpdateEvent&) {
+        ChessGame* game = ChessGame::GetActive();
+        if (!game) {
+            return;
+        }
+        // The opponent plays here, on the main thread, and not in OnDraw(): it changes the model
+        game->GetOpponent().Update();
+        LogResultOnce(game->GetModel());
+    }
+
+    void ChessBoardComponent::LogResultOnce(const ChessGameModel& model) {
+        if (!model.IsGameOver() || (&model == _loggedModel && model.GetVersion() == _loggedVersion)) {
+            return;
+        }
+        _loggedModel = &model;
+        _loggedVersion = model.GetVersion();
+        LogResult(model);
     }
 
     void ChessBoardComponent::PublishUiVars() {
@@ -148,8 +169,14 @@ namespace BECore::Chess {
             return;
         }
 
-        if (model->OnSquareClicked(Square{static_cast<int8_t>(file), static_cast<int8_t>(rank)}) && model->IsGameOver()) {
-            LogResult(*model);
+        // The program's turn: the person has nothing to move, and a selection would only fight the search that is under way
+        const OpponentController* opponent = ChessGame::GetActiveOpponent();
+        if (opponent && opponent->PlaysFor(model->GetTurn())) {
+            return;
+        }
+
+        if (model->OnSquareClicked(Square{static_cast<int8_t>(file), static_cast<int8_t>(rank)})) {
+            LogResultOnce(*model);
         }
     }
 
