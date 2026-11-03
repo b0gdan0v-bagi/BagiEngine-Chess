@@ -103,6 +103,9 @@ namespace BECore::Chess {
         /// Helper for tests / UI: legal target squares for the piece on an arbitrary square.
         [[nodiscard]] eastl::vector<Square> GetLegalMovesFor(Square from) const;
 
+        /// Drops the selection and its legal targets, for an owner that takes over the turn (the computer opponent); the version does not move.
+        void ClearSelection();
+
         /**
          * @brief Click handler. Drives the two-step selection / move flow:
          *
@@ -153,7 +156,6 @@ namespace BECore::Chess {
             bool active = false;
         };
 
-        void ClearSelection();
         void RecomputeLegalMoves();
         void RelocatePieces(Move move);
         void Capture(Square at);
