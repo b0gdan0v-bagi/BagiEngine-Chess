@@ -28,8 +28,9 @@ namespace BECore::Chess {
      * The constructor starts nothing, so the thread that makes the object never waits for a program to start. The process starts on
      * the first FindMove() and again on the first one after an error closed it (a hung or dead engine is replaced, not waited for).
      * FindMove() blocks the calling thread for the whole search, so a caller that must not wait (the main thread) runs it on a worker.
-     * Calls are serialized by a mutex: one search at a time, the others wait for their turn. The object must not be destroyed while
-     * a call is running on another thread.
+     * Calls are serialized by a mutex: one search at a time, the others wait for their turn. A call takes the mutex before it looks at its
+     * token, so a thread waiting for its turn sees its own cancellation only after the lock is taken, which includes the closing of a process
+     * by the search that holds it. The object must not be destroyed while a call is running on another thread.
      *
      * A call goes: the request is checked (BadRequest, and NoMove when the game is over, both before any process is started); the
      * process is started and shaken hands with when there is none (`uci` -> `uciok`, the options, `isready` -> `readyok`); a new game
@@ -39,8 +40,10 @@ namespace BECore::Chess {
      *
      * What closes the process (`quit`, then `quitGraceMs`, then the signals of UciProcess::Close()): Timeout (no `uciok`, `readyok`
      * or `bestmove` in time), ProcessDied, ProtocolError, a cancelled search whose engine does not answer `stop` within `stopGraceMs`
-     * (the call still answers Cancelled), and the destructor. What keeps it: NoMove and IllegalMove (the engine is alive and in
-     * step), and a cancelled search the engine did answer (its `bestmove` is dropped). The object logs nothing.
+     * (the call still answers Cancelled), a cancel during the setup (the waits for `uciok` and `readyok`, `ucinewgame` and `isready`: no
+     * search is running yet, so no `stop` is sent, the process is closed and Cancelled comes back only after the `quitGraceMs`), and the
+     * destructor. What keeps it: NoMove and IllegalMove (the engine is alive and in step), and a cancelled search the engine did answer
+     * (its `bestmove` is dropped). The object logs nothing.
      */
     class UciEngine final : public IChessEngine {
     public:

@@ -300,6 +300,14 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(CountLines(lines, "ucinewgame"), 2u) << "and a new process starts a game";
     }
 
+    TEST(UciEngineTest, AHugeMoveTimeKeepsADeadlineThatIsInTheFuture) {
+        SKIP_WITHOUT_FAKE_ENGINE();
+        // movetime + answerSlackMs does not fit in an int; it used to wrap round to a negative deadline and give Timeout at once
+        UciEngine engine(FakeSettings({"--think-ms", "100", "--moves", "e2e4"}));
+
+        ExpectMove(engine.FindMove(MakeRequest({}, SearchLimits{std::numeric_limits<int>::max(), 0}), CancellationToken()), "e2e4");
+    }
+
     TEST(UciEngineTest, AnEngineThatDiesOnGoIsProcessDiedEachTime) {
         SKIP_WITHOUT_FAKE_ENGINE();
         const TempDirectory directory;
@@ -350,7 +358,9 @@ namespace BECore::Chess::Tests {
         const TempDirectory directory;
         const eastl::string log = directory.FileText(kLogName);
         UciEngineSettings settings = FakeSettings({"--log", log, "--long-line", kTooLong});
-        settings.quitGraceMs = kShortTimeoutMs;  // the child is blocked writing the rest of the line and leaves by a signal
+        // The rest of the line (about 50 KB) stays unread in the pipe: the child finishes writing it and leaves on `quit`. That relies on a pipe that holds this much;
+        // the short grace keeps one that does not from costing seconds
+        settings.quitGraceMs = kShortTimeoutMs;
         UciEngine engine(std::move(settings));
 
         ExpectError(engine.FindMove(MakeRequest({}), CancellationToken()), EngineErrorKind::ProtocolError);

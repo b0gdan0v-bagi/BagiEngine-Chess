@@ -76,6 +76,12 @@ namespace BECore::Chess {
             }
         }
 
+        /// `movetime + slack`, which for a huge `movetime` (Validate() accepts any positive int) is more than an int holds: it stops at the largest
+        int AnswerDeadlineMs(int moveTimeMs, int slackMs) {
+            const int64_t total = int64_t{moveTimeMs} + int64_t{slackMs};
+            return static_cast<int>(std::min<int64_t>(total, std::numeric_limits<int>::max()));
+        }
+
         /// The first of the explicit path and $STOCKFISH that is set decides (see FindStockfish); nothing when it is not a file
         std::optional<eastl::string> ExistingFile(const std::string& path) {
             std::error_code error;
@@ -85,7 +91,7 @@ namespace BECore::Chess {
             return eastl::string(path.c_str(), path.size());
         }
 
-        /// Not an empty string for a variable that is not set
+        /// The value of an environment variable; an empty string for one that is not set
         std::string EnvironmentValue(const char* name) {
 #if defined(_WIN32)
             std::string text;
@@ -161,7 +167,7 @@ namespace BECore::Chess {
             return CloseAndFail(std::move(begun.error()));
         }
         const SearchLimits& limits = request.limits;
-        const int timeoutMs = limits.moveTimeMs > 0 ? limits.moveTimeMs + _settings.answerSlackMs : _settings.depthOnlyTimeoutMs;
+        const int timeoutMs = limits.moveTimeMs > 0 ? AnswerDeadlineMs(limits.moveTimeMs, _settings.answerSlackMs) : _settings.depthOnlyTimeoutMs;
         const auto answer = ReadUntil(*_process, IsBestMove, kBestMoveReply, timeoutMs, token);
         if (!answer) {
             if (answer.error().kind == EngineErrorKind::Cancelled) {
