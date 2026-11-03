@@ -1,0 +1,26 @@
+# CMake and build output
+/build/
+/out/
+/.cmake/
+
+# IDE
+.vs/
+.vscode/
+.cache/
+*.user
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Per-machine files
+.env
+CMakeUserPresets.json
+.claude/settings.local.json
+config/imgui.ini
+engine.log
+
+# macOS
+.DS_Store
+._*

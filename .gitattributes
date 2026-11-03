@@ -1,0 +1,62 @@
+# Default: auto-detect text, normalize to LF in repo and in working tree.
+* text=auto eol=lf
+
+# C/C++ sources
+*.cpp    text eol=lf
+*.cxx    text eol=lf
+*.cc     text eol=lf
+*.c      text eol=lf
+*.h      text eol=lf
+*.hpp    text eol=lf
+*.hxx    text eol=lf
+*.inl    text eol=lf
+
+# Build system
+CMakeLists.txt text eol=lf
+*.cmake        text eol=lf
+
+# Scripts / configs / docs
+*.py     text eol=lf
+*.sh     text eol=lf
+*.md     text eol=lf
+*.txt    text eol=lf
+*.json   text eol=lf
+*.xml    text eol=lf
+*.yml    text eol=lf
+*.yaml   text eol=lf
+*.toml   text eol=lf
+*.natvis text eol=lf
+
+# Shaders
+*.glsl text eol=lf
+*.vert text eol=lf
+*.frag text eol=lf
+*.comp text eol=lf
+*.hlsl text eol=lf
+
+# Windows-only scripts: must stay CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary assets — never touch
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.bmp  binary
+*.ico  binary
+*.tga  binary
+*.dds  binary
+*.ttf  binary
+*.otf  binary
+*.ttc  binary
+*.wav  binary
+*.mp3  binary
+*.ogg  binary
+*.exe  binary
+*.dll  binary
+*.lib  binary
+*.pdb  binary
+*.spv  binary
+*.zip  binary
+*.7z   binary
