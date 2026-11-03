@@ -1,5 +1,5 @@
 ---
-status: open since 2026-11-01. Asked for by the project owner after the control API work: play a real person against Stockfish in the game itself, and then go deeper (analysis and the rest). It needs text and in-game UI first (the entries `in-game-ui` and `ui-authoring`), so it waits for stage 3 of the engine roadmap.
+status: in progress 2026-11-03 branch todo/chess-vs-engine
 ---
 # Chess: no game of a person against an engine and no analysis; Stockfish exists only in an external script
 
