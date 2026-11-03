@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Chess/Engine/ChessEngine.h>
 #include <Chess/Game/GameStatus.h>
 #include <Chess/Game/Move.h>
 #include <Chess/Game/Position.h>
@@ -10,6 +11,11 @@ namespace BECore::Chess {
 
     inline void PrintTo(GameStatus status, std::ostream* os) {
         const auto name = EnumUtils<GameStatus>::ToString(status);
+        os->write(name.data(), static_cast<std::streamsize>(name.size()));
+    }
+
+    inline void PrintTo(EngineErrorKind kind, std::ostream* os) {
+        const auto name = EnumUtils<EngineErrorKind>::ToString(kind);
         os->write(name.data(), static_cast<std::streamsize>(name.size()));
     }
 

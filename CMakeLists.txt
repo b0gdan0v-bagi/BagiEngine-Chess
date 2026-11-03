@@ -29,6 +29,13 @@ if(ENGINE_BUILD_TESTS)
         SOURCES ${CHESS_TEST_SOURCES}
         WHOLE_ARCHIVE ChessModule
     )
+    # The interpreter that runs tests/fake_uci_engine.py, the stand-in for a UCI engine (the Python3 of BagiEngine.cmake, the one that
+    # runs the smoke test below); an empty string makes the tests that start it skip themselves
+    if(Python3_FOUND)
+        target_compile_definitions(ChessTests PRIVATE "CHESS_TEST_PYTHON=\"${Python3_EXECUTABLE}\"")
+    else()
+        target_compile_definitions(ChessTests PRIVATE "CHESS_TEST_PYTHON=\"\"")
+    endif()
 
     # Starts BagiChess with the control API and plays a few moves, a mate and a promotion over WebSocket
     be_add_game_control_tests(BagiChess SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/tests/control_smoke.py)
