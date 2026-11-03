@@ -1,5 +1,5 @@
 ---
-status: in progress 2026-11-03 branch todo/chess-vs-engine
+status: review 2026-11-03 branch todo/chess-vs-engine: the opponent core in src/Chess/Engine/ (IChessEngine, UCI client over a POSIX child process, asynchronous EngineOpponent), not wired into the game; 4 work packages each reviewed plus an integration review, ctest 328 tests with 324 passed and 4 Stockfish tests skipped, slice 1 of 6, after the merge set the status back to open
 ---
 # Chess: no game of a person against an engine and no analysis; the engine opponent exists in `src/Chess/Engine/` but nothing in the game uses it
 
