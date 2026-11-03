@@ -33,7 +33,7 @@ build/ClangmacOS/BagiChess                    # the game; the executable folder 
 | `tests/` | gtest cases and `control_smoke.py` |
 | `tools/` | the Stockfish bridge and its pytest tests (`engine/.venv/bin/python -m pytest tools/tests`) |
 | `todo/`, `TODO.md` | known problems, worked by the `todo-loop` skill (`todo/README.md`) |
-| `CI/` | environment setup |
+| `CI/` | environment setup (`setup_venv.*`) and the VS Code workspace `BagiChess.code-workspace` (CMake Tools on the engine's presets, CodeLLDB / MSVC launch, build tasks) |
 | `engine/` | the engine (submodule); not edited from here |
 
 ## The engine
