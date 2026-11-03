@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """Smoke test of the control API for Chess: starts BagiChess with --control and plays over WebSocket.
 
-    python games/Chess/tests/control_smoke.py --exe build/ClangmacOS/BagiChess
+    python tests/control_smoke.py --exe build/macos-debug/BagiChess
 
 ctest runs it as BagiChessControlSmoke (be_add_game_control_tests). It builds on the engine's tools/control/tests/smoke.py,
-which it finds through the environment variable BAGI_ENGINE_DIR (set by ctest), or next to this repository (engine/ when Chess
-sits in its own repository, the repository root when it sits in games/). The game is played on the real clock, with
+which it finds through the environment variable BAGI_ENGINE_DIR (set by ctest), or in the submodule engine/. The game is played on the real clock, with
 --manual-clock, and with moves before its first frame. Exit code: 0 passed, 1 failed, 77 skipped (the executable does not exist).
 """
 
@@ -20,8 +19,7 @@ def find_engine_tests_dir() -> Path:
     candidates = []
     if os.environ.get("BAGI_ENGINE_DIR"):
         candidates.append(Path(os.environ["BAGI_ENGINE_DIR"]))
-    candidates.append(here.parents[3])  # games/Chess/tests -> the engine repository
-    candidates.append(here.parents[1] / "engine")  # Chess in its own repository, the engine as a submodule
+    candidates.append(here.parents[1] / "engine")  # the engine as a submodule
     for engine in candidates:
         tests_dir = engine / "tools" / "control" / "tests"
         if (tests_dir / "smoke.py").is_file():
