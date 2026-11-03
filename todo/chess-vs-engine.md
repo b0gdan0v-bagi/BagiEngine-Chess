@@ -17,6 +17,9 @@ status: review 2026-11-03 branch todo/chess-vs-engine: the opponent core in src/
 1. An abstract engine interface in the game (`src/`) ("a move for this `Position` within this time or strength") that runs the search off the main thread through `TaskManager` and plays the answer with `TryMove` on the main thread, so the model and the scene stay as they are.
 2. First implementation: Stockfish as a separate child process over UCI (the logic of `UciEngine` in `tools/stockfish_bridge.py` ported to C++), the path chosen by the user, nothing shipped. This keeps GPL-3.0 code out of the game and out of `engine/` (other games of the engine may be sold; GPL code must never enter `engine/`). It works on desktop only: the web target cannot start a process and Android only in ways an app should not rely on.
 3. Later, behind the same interface: an engine of our own in `src/` (alpha-beta over the existing `MoveGenerator`), in the game's process on every target and deterministic for a fixed depth (the manual clock and the smoke tests need that). Linking Stockfish in is not planned.
+4. Confirmed by the owner (2026-11-03, after the first slice): Stockfish is never shipped or linked, because the repository has no license file; the user downloads and installs it. No Stockfish binary, source, network file or copied text goes into the repository.
+
+**Still open (not decided):** where the engine path is configured. Proposed direction, to confirm with the owner: a line in the game's config as the main way, then the environment variable `STOCKFISH`, then `PATH` (the last two already work in `FindStockfish`), and a file picker later, when the in-game UI exists (engine entries `in-game-ui` and `ui-authoring`).
 
 **A fix has to cover** (the rest is a direction to confirm with the owner, not a decision):
 
