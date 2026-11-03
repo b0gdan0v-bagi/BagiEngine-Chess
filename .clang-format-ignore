@@ -1,0 +1,4 @@
+# Never formatted by engine/CI/scripts/format_sources.py --root .
+engine/
+build/
+.venv/
