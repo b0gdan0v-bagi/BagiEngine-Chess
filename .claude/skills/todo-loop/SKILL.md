@@ -38,7 +38,7 @@ Start agents with the Agent tool and `subagent_type` set to the agent's name, on
 Stop with a message when any of these fails (for `list` and `close` only the first, the venv and the plan store are checked, not the build):
 
 - `git status --porcelain` is empty (the loop works in this checkout; the owner must not edit files while it runs).
-- `engine/.venv/bin/python` exists (`engine/CI/setup_venv.*`), `engine/external/googletest` is initialized, the preset of this OS is in `cmake --list-presets=build`.
+- `engine/.venv/bin/python` exists (`CI/setup_venv.*`), `engine/external/googletest` is initialized, the preset of this OS is in `cmake --list-presets=build`.
 - `~/.claude/plans/` exists and can be written.
 - `engine/` is initialized (`git submodule update --init --recursive`). The engine is another repository: no agent edits anything inside `engine/`. An entry that needs a change there is skipped (`needs engine change`) or `BLOCKED`; the engine has its own todo-loop, and the owner moves the pointer of `engine/`.
 

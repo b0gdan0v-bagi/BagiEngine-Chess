@@ -20,7 +20,7 @@ Wraps `engine/tools/todo_sync/todo_sync.py`. Format of the entries, Vikunja sett
 
 ## Workflow
 
-Run from the project root. The Python is the repo venv (`engine/.venv/bin/python`, on Windows `engine\.venv\Scripts\python`); if it is missing, point the user at `engine/CI/setup_venv.*` and stop.
+Run from the project root. The Python is the repo venv (`engine/.venv/bin/python`, on Windows `engine\.venv\Scripts\python`); if it is missing, point the user at `CI/setup_venv.*` and stop.
 
 1. Run `check` first. A format error is a mistake in an entry file: show the message and fix the entry only if asked.
 2. Order: `pull`, then `push`. `pull --apply` deletes files, so run the report-only `pull` first, show it, and apply only when the user asked for it.
