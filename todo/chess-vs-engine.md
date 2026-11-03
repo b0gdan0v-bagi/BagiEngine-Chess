@@ -1,6 +1,3 @@
----
-status: review 2026-11-03 branch todo/chess-vs-engine: the opponent core in src/Chess/Engine/ (IChessEngine, UCI client over a POSIX child process, asynchronous EngineOpponent), not wired into the game; 4 work packages each reviewed plus an integration review, ctest 328 tests with 324 passed and 4 Stockfish tests skipped, slice 1 of 6, after the merge set the status back to open
----
 # Chess: no game of a person against an engine and no analysis; the engine opponent exists in `src/Chess/Engine/` but nothing in the game uses it
 
 **Where:** `src/Chess/Game/ChessGameModel.h` (`OnSquareClicked` is the path of a person, `TryMove` the path of anything else; the model has no notion of a side played by a program), `src/Chess/Components/` (the board, the pieces and the result bar), `src/Chess/Game/Position.h` (`DoMove` / `UndoMove` exist), `src/Chess/Engine/` (the opponent core, see item 2: nothing calls it), `tools/stockfish_bridge.py` (the only way a whole game is played against Stockfish today), `engine/src/Modules/TaskSystem/` (a search runs off the main thread).
