@@ -1,3 +1,4 @@
 [submodule "engine"]
 	path = engine
 	url = https://github.com/b0gdan0v-bagi/BagiEngine.git
+	branch = games/chess
