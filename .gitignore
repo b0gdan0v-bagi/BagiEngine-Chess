@@ -19,6 +19,7 @@ __pycache__/
 CMakeUserPresets.json
 .claude/settings.local.json
 config/imgui.ini
+config/ChessSettings.local.xml
 engine.log
 
 # macOS
