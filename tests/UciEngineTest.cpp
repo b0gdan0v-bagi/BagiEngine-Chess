@@ -302,7 +302,7 @@ namespace BECore::Chess::Tests {
 
     TEST(UciEngineTest, AHugeMoveTimeKeepsADeadlineThatIsInTheFuture) {
         SKIP_WITHOUT_FAKE_ENGINE();
-        // movetime + answerSlackMs does not fit in an int; it used to wrap round to a negative deadline and give Timeout at once
+        // movetime + answerSlackMs does not fit in an int; wrapping round would give a negative deadline and a Timeout at once
         UciEngine engine(FakeSettings({"--think-ms", "100", "--moves", "e2e4"}));
 
         ExpectMove(engine.FindMove(MakeRequest({}, SearchLimits{std::numeric_limits<int>::max(), 0}), CancellationToken()), "e2e4");

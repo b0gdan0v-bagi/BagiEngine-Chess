@@ -41,7 +41,8 @@ namespace BECore::Chess {
      * What closes the process (`quit`, then `quitGraceMs`, then the signals of UciProcess::Close()): Timeout (no `uciok`, `readyok`
      * or `bestmove` in time), ProcessDied, ProtocolError, a cancelled search whose engine does not answer `stop` within `stopGraceMs`
      * (the call still answers Cancelled), a cancel during the setup (the waits for `uciok` and `readyok`, `ucinewgame` and `isready`: no
-     * search is running yet, so no `stop` is sent, the process is closed and Cancelled comes back only after the `quitGraceMs`), and the
+     * search is running yet, so no `stop` is sent, the process is closed and Cancelled comes back once the process has gone: at once for an engine that obeys `quit`, after the
+     * `quitGraceMs` and the signals for one that does not), and the
      * destructor. What keeps it: NoMove and IllegalMove (the engine is alive and in step), and a cancelled search the engine did answer
      * (its `bestmove` is dropped). The object logs nothing.
      */
@@ -49,7 +50,7 @@ namespace BECore::Chess {
     public:
         explicit UciEngine(UciEngineSettings settings);
 
-        /// Closes the process on the thread that destroys the object; it can take up to the quit grace of the settings
+        /// Closes the process on the thread that destroys the object; it can take up to the quit grace of the settings plus 0.5 s for the signals
         ~UciEngine() override;
 
         UciEngine(const UciEngine&) = delete;

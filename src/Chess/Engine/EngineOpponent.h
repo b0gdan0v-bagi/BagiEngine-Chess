@@ -11,7 +11,13 @@ namespace BECore::Chess {
      * The owner of the model calls Update() once per frame on the main thread. When it is the opponent's turn, Update() copies the game into a
      * SearchRequest and hands IChessEngine::FindMove() to TaskManager (the Background pool, which is where a call that blocks for seconds belongs);
      * a later Update() finds the answer and plays it with ChessGameModel::TryMove(). One search runs at a time. TaskManager must be running
-     * (CoreManager starts it), and the opponent must be destroyed before it shuts down.
+     * (CoreManager starts it).
+     *
+     * Shutdown: destroy the opponent (or Cancel() it) before TaskManager::Shutdown(), and do not call Update() after it. Shutdown() joins the pool, so
+     * a running search whose token nobody cancelled holds the join until the engine's own deadline (for UciEngine movetime + answerSlackMs, 15 s or more
+     * by default); a search still queued is run before the join too (the workers drain their queues), with the same wait. An Update() after the shutdown
+     * would start a search that the scheduler drops: its `done` never rises and IsThinking() stays true. The destructor does not touch TaskManager,
+     * so destroying the opponent after the shutdown is safe.
      *
      * Threads: the model is read and written in Update() only, on the thread that calls it; the worker sees a copy of the request and a state
      * of its own (the engine, a CancellationToken, the answer), which it shares with the opponent through a shared pointer, so nothing dangles when
@@ -53,7 +59,8 @@ namespace BECore::Chess {
         /// Cancels the search in flight and drops its answer; the next Update() asks again if it is still the opponent's turn. Returns at once
         void Cancel();
 
-        /// Why the last search failed (any EngineError but Cancelled, or a move the model refused); empty when none did, or after ClearError()
+        /// Why the last search failed (any EngineError, or a move the model refused); empty when none did, or after ClearError(). A Cancelled of a search the opponent
+        /// itself cancelled is dropped, not an error; an engine that answers Cancelled without the opponent having cancelled is recorded as one (and no retry loop follows)
         [[nodiscard]] const std::optional<EngineError>& GetLastError() const noexcept {
             return _lastError;
         }
@@ -63,6 +70,7 @@ namespace BECore::Chess {
             _lastError.reset();
         }
 
+        /// The side it plays, fixed by the constructor: to play the other one, destroy the opponent and make another
         [[nodiscard]] PieceColor GetSide() const noexcept {
             return _side;
         }
