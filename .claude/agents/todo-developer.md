@@ -20,10 +20,10 @@ The conductor gives you the text of the WP, the plan path (`~/.claude/plans/todo
 3. Build and test through the presets of `CMakePresets.json` (`cmake --list-presets=build`; `cmake --preset <p>` after a new source file or a change to `BE_CLASS` / `BE_REFLECT_FIELD`; `cmake --build --preset <p> --target BagiChess ChessTests`; `ctest --preset <p>`). A new test goes next to the code it tests, in `tests/` (`engine/.claude/rules/tests-module.md`). The WP ends green: the build passes and the tests that were green on `main` are green.
 4. Update the docs the change makes false (nested `CLAUDE.md`, `todo/` text). The entry's front matter is not yours: the conductor sets the status.
 5. Format. `clang-format` is not on `PATH` on this machine, and `format_sources.py --changed` skips untracked files:
-   - tracked files: `PATH=/opt/homebrew/opt/llvm/bin:$PATH python3 engine/CI/scripts/format_sources.py --changed`;
+   - tracked files: `PATH=/opt/homebrew/opt/llvm/bin:$PATH python3 engine/CI/scripts/format_sources.py --changed --root .`;
    - new files: `git ls-files --others --exclude-standard -- '<dir>/*.h' '<dir>/*.cpp' | xargs /opt/homebrew/opt/llvm/bin/clang-format -i --style=file`.
-   Put the `PATH=` prefix on that one command only. **Never** put Homebrew LLVM on `PATH` for `cmake --preset` (it switches the compiler and the build then fails).
-   If includes changed, run `python3 engine/CI/scripts/strip_pch_includes.py --all --dir <dir>` on the touched directory.
+   `--root .` makes the scripts work on this repository (its `.clang-format` and `.clang-format-ignore`) and not on the engine. Put the `PATH=` prefix on that one command only. **Never** put Homebrew LLVM on `PATH` for `cmake --preset` (it switches the compiler and the build then fails).
+   If includes changed, run `python3 engine/CI/scripts/strip_pch_includes.py --all --root . --dir <dir>` on the touched directory.
 6. Tick the WP's boxes in the plan file as you finish them (the plan store is outside the repository).
 7. Commit only what belongs to this WP, with `git add <paths>` and `git commit`, message `WP k/M: <what>` and the Co-Authored-By line the conversation gives. No `git add -A`.
 
