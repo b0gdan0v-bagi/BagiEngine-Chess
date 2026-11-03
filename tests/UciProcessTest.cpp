@@ -92,14 +92,6 @@ namespace BECore::Chess::Tests {
             EXPECT_EQ(error, ESRCH) << "process " << processId << " was not collected";
         }
 
-        eastl::vector<eastl::string> Lines(std::initializer_list<const char*> texts) {
-            eastl::vector<eastl::string> lines;
-            for (const char* text : texts) {
-                lines.push_back(text);
-            }
-            return lines;
-        }
-
     }  // namespace
 
     TEST(UciProcessTest, AMissingProgramIsLaunchFailed) {
@@ -384,6 +376,7 @@ namespace BECore::Chess::Tests {
         Handshake(*process);
         const int processId = process->GetProcessId();
         Write(*process, "quit");
+        ASSERT_TRUE(WaitForLogLine(directory.File("fake.log"), "quit"));  // read by the child before Close: a loaded machine may be slower than the short grace
 
         const Clock::time_point begin = Clock::now();
         process->Close(kShortGrace);
@@ -403,6 +396,7 @@ namespace BECore::Chess::Tests {
         Handshake(*process);  // the signal handler is installed before the first line is read
         const int processId = process->GetProcessId();
         Write(*process, "quit");
+        ASSERT_TRUE(WaitForLogLine(directory.File("fake.log"), "quit"));
 
         const Clock::time_point begin = Clock::now();
         process->Close(kShortGrace);

@@ -16,7 +16,8 @@ namespace BECore::Chess {
             [[nodiscard]] bool IsNone() const noexcept;
         };
 
-        /// `position fen <startFen>`, and ` moves m1 m2 ...` when the request has moves. The same text as `position_command` of tools/stockfish_bridge.py
+        /// `position fen <startFen>`, and ` moves m1 m2 ...` when the request has moves. The same text as `position_command` of tools/stockfish_bridge.py.
+        /// The request is expected to have passed SearchRequest::Validate() and FinalPosition() (UciEngine does both first): the start FEN goes into the text as it is
         [[nodiscard]] eastl::string PositionCommand(const SearchRequest& request);
 
         /// `go movetime 100`, `go depth 8`, or both (`go depth 8 movetime 100`). The limits are expected to be valid (SearchRequest::Validate()):

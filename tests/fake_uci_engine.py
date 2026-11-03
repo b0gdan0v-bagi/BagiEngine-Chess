@@ -12,6 +12,7 @@ It answers `uci` with `id name`, `id author`, one option (`Skill Level`) and `uc
     --log FILE           append every line received to FILE, flushed at once (the file is created when the program starts)
     --moves m1,m2,...    the moves answered to the 1st, 2nd, ... `go` (default: e2e4)
     --think-ms N         wait N milliseconds before answering `go`; a `stop` line ends the wait at once (an `isready` is answered meanwhile)
+    --think-first-only   --think-ms applies to the 1st `go` only (a search that is stopped, then one that answers at once)
     --ignore-stop        a `stop` line does not end the wait
     --hang-on-go         never answer `go`
     --die-on-go          exit with code 9 on `go`
@@ -25,6 +26,8 @@ It answers `uci` with `id name`, `id author`, one option (`Skill Level`) and `uc
     --ignore-quit        do not leave on `quit` or at the end of the input
     --ignore-term        ignore SIGTERM, and note `<SIGTERM ignored>` in the log (with --ignore-quit only SIGKILL ends the program)
 """
+
+from __future__ import annotations
 
 import argparse
 import os
@@ -61,6 +64,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--log", metavar="FILE")
     parser.add_argument("--moves", default=DEFAULT_MOVES)
     parser.add_argument("--think-ms", type=int, default=0)
+    parser.add_argument("--think-first-only", action="store_true")
     parser.add_argument("--ignore-stop", action="store_true")
     parser.add_argument("--hang-on-go", action="store_true")
     parser.add_argument("--die-on-go", action="store_true")
@@ -163,7 +167,7 @@ class FakeEngine:
             return
         move = self._moves[index] if index < len(self._moves) else NO_MOVE
 
-        self.think()
+        self.think(index)
         if self._options.garbage:
             for line in GARBAGE_LINES:
                 self.say(line)
@@ -186,9 +190,9 @@ class FakeEngine:
             pass
         return True
 
-    def think(self) -> None:
-        """Waits out --think-ms; a `stop` ends the wait (unless --ignore-stop), `isready` is answered, `quit` is honored."""
-        if self._options.think_ms <= 0:
+    def think(self, index: int) -> None:
+        """Waits out --think-ms before the answer to the `go` number `index`; a `stop` ends the wait (unless --ignore-stop), `isready` is answered, `quit` is honored."""
+        if self._options.think_ms <= 0 or (self._options.think_first_only and index > 0):
             return
         deadline = time.monotonic() + self._options.think_ms / 1000
         while True:

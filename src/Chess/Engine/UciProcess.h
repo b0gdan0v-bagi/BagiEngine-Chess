@@ -14,18 +14,21 @@ namespace BECore::Chess {
     /**
      * @brief A child process that is talked to in lines of text: one line in on its stdin, one line out of its stdout.
      *
-     * The transport under a UCI engine (UciEngine of a later step); it knows nothing of UCI and logs nothing. Every failure is an
-     * EngineError: LaunchFailed (the program did not start), Timeout (no line in time; the process stays usable), ProcessDied (it ended
-     * or closed a pipe), ProtocolError (a line longer than kMaxLineBytes), BadRequest (a line with an end of line inside),
-     * Unsupported (Windows, below).
+     * The transport under UciEngine; it knows nothing of UCI and logs nothing. Every failure is an EngineError: LaunchFailed (the program did not start), Timeout (no line in time; the process stays
+     * usable), ProcessDied (it ended or closed a pipe), ProtocolError (a line longer than kMaxLineBytes), BadRequest (a line with an end of line inside), Unsupported (Windows, below). After a
+     * ProtocolError the stream is out of step (the rest of the long line comes later as lines): the caller must Close() the process.
      *
-     * One thread at a time: the class has no lock (UciEngine serializes its searches). The child gets the pipes as stdin and stdout, /dev/null as
-     * stderr, and no other descriptor of the game: a control socket or the pipe of another engine would stay open in it otherwise
-     * (the pipes here are close-on-exec; on macOS the child closes everything else, with glibc 2.34 or later too).
+     * One thread at a time: the class has no lock. UciEngine owns its process and touches it only while it holds its mutex (one search at a time,
+     * on whatever thread it runs); any other user of a UciProcess keeps to one thread or locks it.
+     *
+     * The child gets the pipes as stdin and stdout, /dev/null as stderr, and no other descriptor of the game: a control socket or the pipe of
+     * another engine would stay open in it otherwise (the pipes here are close-on-exec; on macOS the child closes everything else, with glibc 2.34 or later too).
      *
      * SIGPIPE: a write to a child that is gone must come back as ProcessDied, not kill the game. On macOS the write end carries F_SETNOSIGPIPE,
-     * which touches nothing else. Elsewhere every Start() sets the disposition of SIGPIPE for the whole process to "ignore", a side effect
-     * of the process class (a host that wants its own handler installs it after the last Start()); the child gets the default back.
+     * set per descriptor, which touches nothing else in the process. Elsewhere (and on macOS if that fcntl fails) every Start() sets the disposition of
+     * SIGPIPE for the whole process to "ignore", overwriting a handler the host installed earlier. A host cannot get its own handler back by installing
+     * it after the last Start(), because UciEngine starts the process again after an error: a host that needs its own SIGPIPE handler off Apple
+     * cannot share its process with this class. The child gets the default disposition back.
      *
      * POSIX only (macOS, Linux). On Windows Start() answers Unsupported and no Windows header is included; the process code for it is a later step.
      */

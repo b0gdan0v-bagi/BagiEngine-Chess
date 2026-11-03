@@ -1,12 +1,19 @@
 #pragma once
 
 #include <Chess/Engine/UciProcess.h>
+#include <chrono>
 #include <gtest/gtest.h>
+#include <thread>
 
 // The interpreter that runs tests/fake_uci_engine.py, given by the root CMakeLists.txt (an empty string when CMake found no Python)
 #if !defined(CHESS_TEST_PYTHON)
 #define CHESS_TEST_PYTHON ""
 #endif
+
+#define SKIP_WITHOUT_FAKE_ENGINE()                                                                                                                                                                     \
+    if (!::BECore::Chess::Tests::FakeEngineAvailable()) {                                                                                                                                              \
+        GTEST_SKIP() << "no Python interpreter, or the process code is POSIX only here";                                                                                                               \
+    }
 
 /// The fake UCI engine (tests/fake_uci_engine.py) and the files its tests leave behind. A test that starts it begins with SKIP_WITHOUT_FAKE_ENGINE()
 namespace BECore::Chess::Tests {
@@ -16,13 +23,8 @@ namespace BECore::Chess::Tests {
 #if defined(_WIN32)
         return false;
 #else
-        return std::string_view(CHESS_TEST_PYTHON).size() > 0;
+        return !std::string_view(CHESS_TEST_PYTHON).empty();
 #endif
-    }
-
-#define SKIP_WITHOUT_FAKE_ENGINE()                                                                                                                                                                     \
-    if (!::BECore::Chess::Tests::FakeEngineAvailable()) {                                                                                                                                              \
-        GTEST_SKIP() << "no Python interpreter, or the process code is POSIX only here";                                                                                                               \
     }
 
     /// The script, found from this file like the shipped SceneConfig.xml is found from ChessUiTest.cpp (the source tree is not mounted in the test environment)
@@ -45,8 +47,8 @@ namespace BECore::Chess::Tests {
     /// A directory of the running test under the system's temporary one, removed with the object
     class TempDirectory {
     public:
-        // One directory per test: ctest runs them in parallel processes, and the constructor clears the directory
-        TempDirectory() : _path(std::filesystem::temp_directory_path() / Format("BagiChessTests_{}", ::testing::UnitTest::GetInstance()->current_test_info()->name()).c_str()) {
+        // One directory per test, named after the suite too: ctest runs the tests in parallel processes, tests of two suites may share a name, and the constructor clears the directory
+        TempDirectory() : _path(std::filesystem::temp_directory_path() / DirectoryName().c_str()) {
             std::filesystem::remove_all(_path);
             std::filesystem::create_directories(_path);
         }
@@ -69,6 +71,11 @@ namespace BECore::Chess::Tests {
         }
 
     private:
+        static eastl::string DirectoryName() {
+            const ::testing::TestInfo* info = ::testing::UnitTest::GetInstance()->current_test_info();
+            return Format("BagiChessTests_{}_{}", info->test_suite_name(), info->name());
+        }
+
         std::filesystem::path _path;
     };
 
@@ -81,6 +88,33 @@ namespace BECore::Chess::Tests {
             lines.emplace_back(line.c_str(), line.size());
         }
         return lines;
+    }
+
+    /// A list of lines to compare with ReadFileLines()
+    inline eastl::vector<eastl::string> Lines(std::initializer_list<eastl::string_view> texts) {
+        eastl::vector<eastl::string> lines;
+        for (const eastl::string_view text : texts) {
+            lines.emplace_back(text.data(), text.size());
+        }
+        return lines;
+    }
+
+    /// Waits until the log file has the line @p text (a whole line), polling; false when it has not within @p timeout. The fake engine writes its log as it receives
+    /// the lines, so a line the test sent is there a moment later, not when the call that sent it returns: a test that looks for one under load polls
+    inline bool WaitForLogLine(const std::filesystem::path& file, eastl::string_view text, std::chrono::milliseconds timeout = std::chrono::seconds(15)) {
+        constexpr std::chrono::milliseconds kPollInterval{5};
+        const auto deadline = std::chrono::steady_clock::now() + timeout;
+        for (;;) {
+            for (const eastl::string& line : ReadFileLines(file)) {
+                if (eastl::string_view(line.data(), line.size()) == text) {
+                    return true;
+                }
+            }
+            if (std::chrono::steady_clock::now() >= deadline) {
+                return false;
+            }
+            std::this_thread::sleep_for(kPollInterval);
+        }
     }
 
 }  // namespace BECore::Chess::Tests
