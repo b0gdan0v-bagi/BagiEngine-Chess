@@ -110,7 +110,8 @@ namespace BECore::Chess {
             return endgame ? kKingEndgameTable : kKingMiddlegameTable;
         }
 
-        /// The pieces of @p color as White would see them: material and tables, in centipawns
+        /// The score of the pieces of @p color alone: material and tables, in centipawns (good for @p color when high). The king has
+        /// no material value: each side has exactly one, so it would cancel out
         int ScoreOf(const Position& position, PieceColor color, bool endgame) noexcept {
             int score = 0;
             for (const PieceType type : {PieceType::Pawn, PieceType::Knight, PieceType::Bishop, PieceType::Rook, PieceType::Queen, PieceType::King}) {

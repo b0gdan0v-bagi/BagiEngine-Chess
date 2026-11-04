@@ -4,7 +4,7 @@
 
 namespace BECore::Chess {
 
-    // Values of the pieces in centipawns (a pawn is 100). Evaluate() counts the pieces of each side with them.
+    /// Values of the pieces in centipawns (a pawn is 100). Evaluate() counts the pieces of each side with them.
     inline constexpr int kPawnValue = 100;
     inline constexpr int kKnightValue = 320;
     inline constexpr int kBishopValue = 330;
