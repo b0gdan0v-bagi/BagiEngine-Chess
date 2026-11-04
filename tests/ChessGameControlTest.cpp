@@ -693,6 +693,34 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(asked[1], "own");
     }
 
+    TEST_F(ChessGameControlTest, AFailedSwitchFromTheOwnEngineToStockfishLeavesStockfishPickedAndNobodyPlaying) {
+        eastl::vector<eastl::string> asked;
+        opponent.SetEngineFactory([&asked](OpponentEngine engine, const OpponentLevel&) -> MadeEngine {
+            const eastl::string_view id = OpponentEngineId(engine);
+            asked.emplace_back(id.data(), id.size());
+            if (engine == OpponentEngine::Stockfish) {
+                return std::unexpected(EngineError{EngineErrorKind::LaunchFailed, "no Stockfish in the test"});
+            }
+            return eastl::make_shared<InstantEngine>();
+        });
+        SetOpponent(OpponentRequest("black", "easy", "own"));
+        ASSERT_EQ(StringMember(OpponentOfState(), "plays"), "black");
+        Perform("e2e4");
+        const std::string fenBefore = StringMember(State(), "fen");
+
+        Json request = OpponentRequest("black", nullptr, "stockfish");
+        request["fen"] = MakeJsonString(kMateInOneFen);
+        EXPECT_EQ(SetStateError(request), "engine_unavailable");
+
+        EXPECT_EQ(StringMember(State(), "fen"), fenBefore) << "the position is not replaced";
+        EXPECT_EQ(StringMember(OpponentOfState(), "engine"), "stockfish") << "the pick of the engine stays, nothing falls back to the other one";
+        EXPECT_TRUE(OpponentMember("plays").is_null()) << "the program that played before plays nobody now";
+        EXPECT_EQ(StringMember(OpponentMember("error"), "kind"), "launch_failed");
+        ASSERT_EQ(asked.size(), 2u);
+        EXPECT_EQ(asked[0], "own");
+        EXPECT_EQ(asked[1], "stockfish") << "the own engine is not asked for on its own";
+    }
+
     TEST_F(ChessGameControlTest, TheSameEnginePickAgainDoesNothing) {
         CountingFactory factory({eastl::make_shared<InstantEngine>()});
         opponent.SetEngineFactory(factory.AsFactory());
