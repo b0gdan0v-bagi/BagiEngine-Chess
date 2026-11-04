@@ -20,7 +20,7 @@ namespace BECore::Chess {
         return chess ? &chess->GetOpponent() : nullptr;
     }
 
-    ChessGame::ChessGame() : _opponent(_model), _control(_model) {}
+    ChessGame::ChessGame() : _opponent(_model), _control(_model, _opponent) {}
 
     IControllableGame* ChessGame::AsControllable() {
         return &_control;

@@ -70,6 +70,9 @@ namespace BECore::Chess {
         /// Nobody, then the program plays Black (the person has White), then the program plays White, then nobody again
         std::expected<void, EngineError> CycleSide();
 
+        /// Side and strength in one pick: one engine is made, not two. The same rules as SetSide() and SetLevel(); BadRequest, with nothing changed, for a level outside GetOpponentLevels()
+        std::expected<void, EngineError> Choose(std::optional<PieceColor> computer, size_t level);
+
         /// The next level, the first one after the last
         std::expected<void, EngineError> CycleLevel();
 

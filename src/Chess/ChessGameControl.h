@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Chess/Engine/OpponentController.h>
 #include <Chess/Game/ChessGameModel.h>
 #include <Games/IControllableGame.h>
 
@@ -11,29 +12,49 @@ namespace BECore::Chess {
         inline constexpr eastl::string_view kGameOver = "game_over";
         /// The move is a pawn move onto the last rank and does not say what to promote to: "e7e8" instead of "e7e8q"
         inline constexpr eastl::string_view kPromotionRequired = "promotion_required";
+        /// set_state asked for a computer opponent and there is no engine to make it (no Stockfish found): nothing was changed but the opponent, who is nobody now
+        inline constexpr eastl::string_view kEngineUnavailable = "engine_unavailable";
     }  // namespace ChessControlErrors
 
     /**
-     * @brief The external control API of Chess: the position, the legal moves, a way to play one and to load a position.
+     * @brief The external control API of Chess: the position, the legal moves, a way to play one, to load a position and to pick the computer opponent.
      *
-     * State: {"fen", "board", "turn", "status", "winner", "inCheck", "legalMoveCount", "startFen", "moves"}.
+     * State: {"fen", "board", "turn", "status", "winner", "inCheck", "legalMoveCount", "startFen", "moves", "opponent"}.
      * board is 8 strings, rank 8 first, file a first: white pieces are upper case (PNBRQK), black ones lower case, '.' is an
      * empty square. turn and winner are "white" or "black" (winner is null until a side has won). status is one of
      * "ongoing", "checkmate", "stalemate", "draw_insufficient_material", "draw_threefold", "draw_fifty_moves"; everything but
      * "ongoing" ends the game. startFen is the position the game began from and moves the UCI moves played since, so the pair
      * rebuilds the game (and its repetitions).
      *
-     * Actions: {"type": "move", "uci": "e2e4"}, every legal move once; none once the game is over. Castling is the king's move
+     * opponent is {"plays", "level", "thinking", "error"}: plays is the color the PROGRAM plays ("white" or "black"; null for two people, the start of every
+     * game), level the id of the strength ("easy", "medium", "hard", "max"; the one that would be used, also while plays is null), thinking whether the
+     * program is searching for its move, error null or {"kind", "detail"} (kind in snake_case: "launch_failed", "timeout", "process_died", "protocol_error",
+     * "illegal_move", "no_move", "bad_request", "cancelled", "unsupported"; detail is the sentence of the log). While an error stands the program does not play
+     * and waits for the version of the game to move (a reset, set_state, a move of someone else) or for another pick. A pick succeeds whenever a Stockfish file
+     * is found; a launch that fails shows only at the first search, as error "launch_failed".
+     *
+     * Actions: {"type": "move", "uci": "e2e4"}, every legal move once; none once the game is over. The list does not change with the opponent: the program's
+     * side is listed and accepted like the other (a controller may play for it; a search that the move makes stale is dropped). Castling is the king's move
      * ("e1g1") and a promotion has the piece in lower case ("e7e8q", "e7e8n"). PerformAction answers {"move", "status",
      * "turn", "winner", "inCheck"} and fails with game_over, promotion_required, illegal_action (well-formed, not legal) or
-     * invalid_params (not a UCI move). Reset takes no options. SetState takes {"fen": ".."}: any position that
-     * Position::FromFen() accepts, which may be a finished game.
+     * invalid_params (not a UCI move). Reset takes no options and keeps the opponent.
      *
-     * The model belongs to ChessGame, which owns this adapter, so the model is always there.
+     * SetState takes {"fen": ".."} (any position that Position::FromFen() accepts, which may be a finished game), {"opponent": {"plays": .., "level": ..}}
+     * (inside it a missing member means unchanged; plays is "white", "black" or null; level an id) or both; neither is invalid_params. Everything is checked
+     * before anything changes, so a refused call (invalid_params) changes nothing. The opponent is applied first, then the position. A pick that finds no engine
+     * is engine_unavailable (with the sentence of the engine's error): the position is not replaced, and the program plays nobody (the level stays picked). A pick
+     * that changes nothing (the same side and level, no error standing) does nothing: a running Stockfish is not restarted. With an error standing, the same
+     * "plays" asks for an engine again, and plays null clears it.
+     *
+     * The state version is the version of the game plus the revision of the opponent (a pick, an error that appears or goes), so a push reports a change of the
+     * opponent as well; it never goes back.
+     *
+     * The model and the opponent belong to ChessGame, which owns this adapter, so both are always there.
      */
     class ChessGameControl : public IControllableGame {
     public:
-        explicit ChessGameControl(ChessGameModel& model);
+        /// Both must outlive the adapter (ChessGame declares them before it)
+        ChessGameControl(ChessGameModel& model, OpponentController& opponent);
 
         [[nodiscard]] std::expected<Json, ControlError> GetState() const override;
         [[nodiscard]] std::expected<Json, ControlError> GetActions() const override;
@@ -46,7 +67,10 @@ namespace BECore::Chess {
         /// The legal moves of the side to move; empty once the game is over
         [[nodiscard]] MoveList LegalMoves() const;
 
+        [[nodiscard]] Json OpponentJson() const;
+
         ChessGameModel& _model;
+        OpponentController& _opponent;
     };
 
 }  // namespace BECore::Chess

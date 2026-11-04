@@ -36,6 +36,31 @@ namespace BECore::Chess {
             return color == PieceColor::White ? "white" : "black";
         }
 
+        /// The kind of an engine error as it goes on the wire
+        eastl::string_view ErrorKindName(EngineErrorKind kind) {
+            switch (kind) {
+                case EngineErrorKind::BadRequest:
+                    return "bad_request";
+                case EngineErrorKind::LaunchFailed:
+                    return "launch_failed";
+                case EngineErrorKind::Timeout:
+                    return "timeout";
+                case EngineErrorKind::ProcessDied:
+                    return "process_died";
+                case EngineErrorKind::ProtocolError:
+                    return "protocol_error";
+                case EngineErrorKind::NoMove:
+                    return "no_move";
+                case EngineErrorKind::IllegalMove:
+                    return "illegal_move";
+                case EngineErrorKind::Cancelled:
+                    return "cancelled";
+                case EngineErrorKind::Unsupported:
+                    return "unsupported";
+            }
+            return "bad_request";
+        }
+
         Json TextJson(const eastl::string& text) {
             return MakeJsonString(eastl::string_view(text.data(), text.size()));
         }
@@ -72,9 +97,58 @@ namespace BECore::Chess {
             json["inCheck"] = model.IsInCheck();
         }
 
+        /// "easy, medium, hard, max" for a message
+        eastl::string LevelIds() {
+            eastl::string ids;
+            for (const OpponentLevel& level : GetOpponentLevels()) {
+                ids += Format("{}{}", ids.empty() ? "" : ", ", level.id);
+            }
+            return ids;
+        }
+
+        /// The opponent as set_state asks for it, checked
+        struct OpponentPick {
+            std::optional<PieceColor> plays;
+            size_t level = kDefaultOpponentLevel;
+        };
+
+        ControlError BadOpponent(eastl::string message) {
+            return MakeControlError(ControlErrors::kInvalidParams, message);
+        }
+
+        /// Reads {"plays", "level"}; a member that is missing keeps what @p current says. Nothing is changed: the pick is applied by the caller once everything is valid
+        std::expected<OpponentPick, ControlError> ParseOpponent(const Json& opponent, OpponentPick current) {
+            if (!opponent.is_object()) {
+                return std::unexpected(BadOpponent("'opponent' has to be an object like {\"plays\": \"black\", \"level\": \"easy\"}"));
+            }
+            if (const Json* plays = FindJsonMember(opponent, "plays")) {
+                if (plays->is_null()) {
+                    current.plays = std::nullopt;
+                } else {
+                    const auto side = GetJsonString(opponent, "plays");
+                    if (side && *side == "white") {
+                        current.plays = PieceColor::White;
+                    } else if (side && *side == "black") {
+                        current.plays = PieceColor::Black;
+                    } else {
+                        return std::unexpected(BadOpponent("opponent 'plays' has to be \"white\", \"black\" or null (two people): the color the program plays"));
+                    }
+                }
+            }
+            if (FindJsonMember(opponent, "level")) {
+                const auto id = GetJsonString(opponent, "level");
+                const std::optional<size_t> level = id ? FindOpponentLevel(eastl::string_view(id->data(), id->size())) : std::nullopt;
+                if (!level) {
+                    return std::unexpected(BadOpponent(Format("opponent 'level' has to be the id of a level: {}", LevelIds())));
+                }
+                current.level = *level;
+            }
+            return current;
+        }
+
     }  // namespace
 
-    ChessGameControl::ChessGameControl(ChessGameModel& model) : _model(model) {}
+    ChessGameControl::ChessGameControl(ChessGameModel& model, OpponentController& opponent) : _model(model), _opponent(opponent) {}
 
     MoveList ChessGameControl::LegalMoves() const {
         return _model.IsGameOver() ? MoveList() : MoveGenerator::GenerateLegal(_model.GetPosition());
@@ -104,7 +178,27 @@ namespace BECore::Chess {
         state["legalMoveCount"] = LegalMoves().size();
         state["startFen"] = TextJson(_model.GetStartFen());
         state["moves"] = std::move(moves);
+        state["opponent"] = OpponentJson();
         return state;
+    }
+
+    Json ChessGameControl::OpponentJson() const {
+        const std::optional<PieceColor> plays = _opponent.GetPlays();
+        const std::optional<EngineError>& error = _opponent.GetError();
+
+        Json opponent = Json::object();
+        opponent["plays"] = plays ? MakeJsonString(ColorName(*plays)) : Json();
+        opponent["level"] = MakeJsonString(GetOpponentLevels()[_opponent.GetLevel()].id);
+        opponent["thinking"] = _opponent.IsThinking();
+        if (error) {
+            Json described = Json::object();
+            described["kind"] = MakeJsonString(ErrorKindName(error->kind));
+            described["detail"] = TextJson(error->detail);
+            opponent["error"] = std::move(described);
+        } else {
+            opponent["error"] = Json();
+        }
+        return opponent;
     }
 
     std::expected<Json, ControlError> ChessGameControl::GetActions() const {
@@ -156,20 +250,50 @@ namespace BECore::Chess {
     }
 
     std::expected<void, ControlError> ChessGameControl::SetState(const Json& state) {
-        const auto fen = GetJsonString(state, "fen");
-        if (!fen) {
-            return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, "'fen' has to be a FEN string"));
+        const Json* fenMember = FindJsonMember(state, "fen");
+        const Json* opponentMember = FindJsonMember(state, "opponent");
+        if (!fenMember && !opponentMember) {
+            return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, "'fen' (a FEN string), 'opponent' ({\"plays\", \"level\"}) or both are needed"));
         }
-        const auto position = Position::FromFen(eastl::string_view(fen->data(), fen->size()));
-        if (!position) {
-            return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, Format("not a position this game can play: {}", EnumUtils<FenError>::ToString(position.error()))));
+
+        // Check everything first: a refused call changes nothing
+        std::optional<Position> position;
+        if (fenMember) {
+            const auto fen = GetJsonString(state, "fen");
+            if (!fen) {
+                return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, "'fen' has to be a FEN string"));
+            }
+            const auto parsed = Position::FromFen(eastl::string_view(fen->data(), fen->size()));
+            if (!parsed) {
+                return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, Format("not a position this game can play: {}", EnumUtils<FenError>::ToString(parsed.error()))));
+            }
+            position = *parsed;
         }
-        _model.SetPosition(*position);
+        std::optional<OpponentPick> pick;
+        if (opponentMember) {
+            auto parsed = ParseOpponent(*opponentMember, OpponentPick{_opponent.GetPlays(), _opponent.GetLevel()});
+            if (!parsed) {
+                return std::unexpected(std::move(parsed.error()));
+            }
+            pick = *parsed;
+        }
+
+        // The opponent first: it is the one step that can fail later (no engine), and then the position stays as it is
+        if (pick) {
+            const auto chosen = _opponent.Choose(pick->plays, pick->level);
+            if (!chosen) {
+                return std::unexpected(
+                    MakeControlError(ChessControlErrors::kEngineUnavailable, Format("no engine for the opponent ({}): {}", ErrorKindName(chosen.error().kind), chosen.error().detail)));
+            }
+        }
+        if (position) {
+            _model.SetPosition(*position);
+        }
         return {};
     }
 
     uint64_t ChessGameControl::GetStateVersion() const {
-        return _model.GetVersion();
+        return _model.GetVersion() + _opponent.GetRevision();
     }
 
 }  // namespace BECore::Chess

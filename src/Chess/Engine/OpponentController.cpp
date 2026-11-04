@@ -55,6 +55,10 @@ namespace BECore::Chess {
         return Remake(GetPlays(), level);
     }
 
+    std::expected<void, EngineError> OpponentController::Choose(std::optional<PieceColor> computer, size_t level) {
+        return Remake(computer, level);
+    }
+
     std::expected<void, EngineError> OpponentController::CycleSide() {
         const std::optional<PieceColor> plays = GetPlays();
         if (!plays) {

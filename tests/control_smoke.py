@@ -5,11 +5,18 @@
 
 ctest runs it as BagiChessControlSmoke (be_add_game_control_tests). It builds on the engine's tools/control/tests/smoke.py,
 which it finds through the environment variable BAGI_ENGINE_DIR (set by ctest), or in the submodule engine/. The game is played on the real clock, with
---manual-clock, and with moves before its first frame. Exit code: 0 passed, 1 failed, 77 skipped (the executable does not exist).
+--manual-clock, and with moves before its first frame. The computer opponent is played on both clocks against tests/fake_uci_engine.py: main() writes a
+wrapper script that starts it into a temporary directory and puts the script in STOCKFISH of the environment, which the game inherits. STOCKFISH comes
+before PATH in the game's search for an engine and the committed config has no path, so a Stockfish installed on this machine is never used. A
+config/ChessSettings.local.xml (a person's own path, which would win over STOCKFISH) leaves the opponent scenarios out, as does Windows; the smoke never
+edits a person's files. Exit code: 0 passed, 1 failed, 77 skipped (the executable does not exist).
 """
 
 import os
+import stat
 import sys
+import tempfile
+import time
 from pathlib import Path
 
 
@@ -41,6 +48,14 @@ START_MOVE_COUNT = 20
 OPENING = ["e2e4", "e7e5", "g1f3", "b8c6"]
 MATE_IN_ONE_FEN = "6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1"  # Ra8#
 PROMOTION_FEN = "8/P6k/8/8/8/8/8/K7 w - - 0 1"
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+FAKE_ENGINE = Path(__file__).resolve().with_name("fake_uci_engine.py")
+LOCAL_SETTINGS = REPO_ROOT / "config" / "ChessSettings.local.xml"
+FAKE_ENGINE_MOVES = "e7e5,b8c6,g8f6"  # what the fake answers to its 1st, 2nd and 3rd search
+OPPONENT_WAIT_SECONDS = 30.0  # a stall of the machine is not a failure; a program that never answers is
+POLL_SECONDS = 0.01
+FRAMES_WITHOUT_AN_ANSWER = 10
 
 
 def move(uci: str) -> dict:
@@ -191,12 +206,109 @@ def run_moves_before_the_first_frame(client: BagiControlClient, headless: bool) 
     check(by_moves.rows != take_screenshot(client).rows, "the scene still shows the opening after four moves")
 
 
-SCENARIOS = [
+def get_opponent(client: BagiControlClient) -> dict:
+    return client.call("get_state")["state"]["opponent"]
+
+
+def get_moves(client: BagiControlClient) -> list:
+    return client.call("get_state")["state"]["moves"]
+
+
+def let_frames_pass(client: BagiControlClient, frames: int) -> None:
+    """The game runs this many frames: a step on the manual clock, a wait for the frame counter on the real one."""
+    if client.call("status")["manualClock"]:
+        client.call("step", {"frames": frames})
+        return
+    target = client.call("status")["frame"] + frames
+    deadline = time.monotonic() + OPPONENT_WAIT_SECONDS
+    while client.call("status")["frame"] < target:
+        check(time.monotonic() < deadline, f"the game did not run {frames} frames in {OPPONENT_WAIT_SECONDS} s")
+        time.sleep(POLL_SECONDS)
+
+
+def wait_for_the_program(client: BagiControlClient, expected_moves: list) -> None:
+    """Until the program has played and is not thinking. Real clock: poll; manual clock: step a frame per poll. Limited by time, never a fixed sleep."""
+    deadline = time.monotonic() + OPPONENT_WAIT_SECONDS
+    manual = client.call("status")["manualClock"]
+    while True:
+        state = client.call("get_state")["state"]
+        opponent = state["opponent"]
+        check(opponent["error"] is None, f"the opponent failed: {opponent['error']}")
+        if state["moves"] == expected_moves and not opponent["thinking"]:
+            return
+        check(time.monotonic() < deadline, f"the program did not play in {OPPONENT_WAIT_SECONDS} s: moves {state['moves']}, opponent {opponent}")
+        if manual:
+            client.call("step")
+        time.sleep(POLL_SECONDS)
+
+
+def run_opponent_scenario(client: BagiControlClient, headless: bool) -> None:
+    """Two people, then the program plays Black against the fake engine, then two people again."""
+    if client.call("status")["manualClock"]:
+        client.call("step")  # the scene registers its pieces and the board starts updating the opponent in the first frame
+    client.call("reset")
+
+    opponent = get_opponent(client)
+    check(opponent["plays"] is None and opponent["level"] == "medium" and opponent["thinking"] is False and opponent["error"] is None, f"unexpected default opponent {opponent}")
+
+    version = client.call("get_state")["version"]
+    picked = client.call("set_state", {"opponent": {"plays": "black", "level": "easy"}})
+    check(picked["version"] > version, "picking the opponent did not move the state version")
+    opponent = get_opponent(client)
+    check(opponent["plays"] == "black" and opponent["level"] == "easy" and opponent["error"] is None, f"the pick was not read back: {opponent}")
+    check(get_moves(client) == [], "picking the opponent played a move")
+
+    client.call("perform_action", move("e2e4"))
+    wait_for_the_program(client, ["e2e4", "e7e5"])
+    check(get_opponent(client)["error"] is None, f"the opponent has an error: {get_opponent(client)['error']}")
+    check(client.call("get_state")["state"]["turn"] == "white", "it is not the person's turn after the program's move")
+
+    # Two people again: white and black both move by hand, and the program stays out of it
+    client.call("set_state", {"opponent": {"plays": None}})
+    check(get_opponent(client)["plays"] is None, "the opponent is still picked after plays: null")
+    client.call("perform_action", move("g1f3"))
+    client.call("perform_action", move("d7d6"))  # the fake would have answered b8c6
+    let_frames_pass(client, FRAMES_WITHOUT_AN_ANSWER)
+    check(get_moves(client) == ["e2e4", "e7e5", "g1f3", "d7d6"], f"the game is not played by two people: {get_moves(client)}")
+    check(get_opponent(client)["thinking"] is False, "the opponent thinks with nobody picked")
+
+
+def local_settings_exist() -> bool:
+    return LOCAL_SETTINGS.exists()
+
+
+def write_stockfish_wrapper(directory: Path) -> Path:
+    """A script that starts the fake UCI engine, for STOCKFISH: the game takes it for a Stockfish."""
+    wrapper = directory / "stockfish"
+    wrapper.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{FAKE_ENGINE}" --moves {FAKE_ENGINE_MOVES}\n')
+    wrapper.chmod(wrapper.stat().st_mode | stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
+    return wrapper
+
+
+BASE_SCENARIOS = [
     ("real clock", [], run_chess_scenario),
     ("manual clock", ["--manual-clock"], run_chess_scenario),
     ("moves before the first frame", ["--manual-clock"], run_moves_before_the_first_frame),
 ]
 
+OPPONENT_SCENARIOS = [
+    ("opponent, real clock", [], run_opponent_scenario),
+    ("opponent, manual clock", ["--manual-clock"], run_opponent_scenario),
+]
+
+
+def main() -> int:
+    scenarios = list(BASE_SCENARIOS)
+    with tempfile.TemporaryDirectory() as temp_dir:
+        if sys.platform == "win32":
+            print("NOTICE: the opponent scenarios are left out on Windows (UciProcess is POSIX only)", flush=True)
+        elif local_settings_exist():
+            print(f"NOTICE: the opponent scenarios are left out: {LOCAL_SETTINGS} exists and its path would win over STOCKFISH (the smoke does not edit your files)", flush=True)
+        else:
+            os.environ["STOCKFISH"] = str(write_stockfish_wrapper(Path(temp_dir)))  # the game inherits the environment
+            scenarios += OPPONENT_SCENARIOS
+        return run_smoke(__doc__, scenarios)
+
 
 if __name__ == "__main__":
-    sys.exit(run_smoke(__doc__, SCENARIOS))
+    sys.exit(main())

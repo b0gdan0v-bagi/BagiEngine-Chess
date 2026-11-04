@@ -178,20 +178,6 @@ namespace BECore::Chess::Tests {
         EngineError _error;
     };
 
-    /// Counts how often the engine inside it is asked and passes every request on; for an engine that is not a RecordingEngine
-    class CountingEngine final : public RecordingEngine {
-    public:
-        explicit CountingEngine(eastl::shared_ptr<IChessEngine> inner) : _inner(std::move(inner)) {}
-
-    protected:
-        std::expected<Move, EngineError> Answer(const SearchRequest& request, const CancellationToken& token) override {
-            return _inner->FindMove(request, token);
-        }
-
-    private:
-        eastl::shared_ptr<IChessEngine> _inner;
-    };
-
     /**
      * @brief The EngineFactory of a test: counts how often it is asked and for which levels, and hands out what the test decided.
      *
