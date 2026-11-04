@@ -46,13 +46,23 @@ namespace BECore::Chess::Tests {
             return state;
         }
 
-        /// {"opponent": {"plays": .., "level": ..}}; a null @p plays is "two people", an empty @p level leaves it out
-        Json OpponentRequest(const char* plays, const char* level = nullptr) {
+        /// {"opponent": {"plays": .., "level": .., "engine": ..}}; a null @p plays is "two people", an empty @p level or @p engine leaves it out
+        Json OpponentRequest(const char* plays, const char* level = nullptr, const char* engine = nullptr) {
             Json opponent = Json::object();
             opponent["plays"] = plays ? Json(plays) : Json();
             if (level) {
                 opponent["level"] = level;
             }
+            if (engine) {
+                opponent["engine"] = engine;
+            }
+            return OpponentState(opponent);
+        }
+
+        /// {"opponent": {"engine": ..}} and nothing else
+        Json EngineRequest(const Json& engine) {
+            Json opponent = Json::object();
+            opponent["engine"] = engine;
             return OpponentState(opponent);
         }
 
@@ -543,6 +553,7 @@ namespace BECore::Chess::Tests {
         ASSERT_NE(plays, nullptr);
         EXPECT_TRUE(plays->is_null()) << "two people";
         EXPECT_EQ(StringMember(computer, "level"), "medium");
+        EXPECT_EQ(StringMember(computer, "engine"), "stockfish") << "the engine a game starts with: the own one is a pick of the person";
         EXPECT_EQ(GetJsonBool(computer, "thinking"), false);
         const Json* error = FindJsonMember(computer, "error");
         ASSERT_NE(error, nullptr);
@@ -562,6 +573,158 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(factory.Levels()[0], "easy");
         EXPECT_TRUE(opponent.PlaysFor(PieceColor::Black));
         EXPECT_EQ(model.GetMoves().size(), 0u) << "the position is not touched by a pick";
+    }
+
+    TEST_F(ChessGameControlTest, AnEngineAloneIsReadBackAsksNoFactoryAndMovesTheVersion) {
+        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        opponent.SetEngineFactory(factory.AsFactory());
+        const uint64_t version = control.GetStateVersion();
+
+        SetOpponent(EngineRequest(Json("own")));
+
+        const Json computer = OpponentOfState();
+        EXPECT_EQ(StringMember(computer, "engine"), "own");
+        EXPECT_TRUE(FindJsonMember(computer, "plays")->is_null()) << "the side is untouched";
+        EXPECT_EQ(StringMember(computer, "level"), "medium");
+        EXPECT_EQ(factory.Calls(), 0) << "nobody plays, so no engine is made";
+        EXPECT_GT(control.GetStateVersion(), version);
+    }
+
+    TEST_F(ChessGameControlTest, ASideAndTheOwnEngineMakeOneEngineForTheOwnEngine) {
+        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        opponent.SetEngineFactory(factory.AsFactory());
+
+        SetOpponent(OpponentRequest("black", "easy", "own"));
+
+        const Json computer = OpponentOfState();
+        EXPECT_EQ(StringMember(computer, "plays"), "black");
+        EXPECT_EQ(StringMember(computer, "level"), "easy");
+        EXPECT_EQ(StringMember(computer, "engine"), "own");
+        ASSERT_EQ(factory.Calls(), 1) << "one pick makes one engine";
+        EXPECT_EQ(factory.Engines()[0], "own");
+        EXPECT_EQ(factory.Levels()[0], "easy");
+    }
+
+    TEST_F(ChessGameControlTest, ALevelOrASideKeepsTheEngine) {
+        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        opponent.SetEngineFactory(factory.AsFactory());
+        SetOpponent(EngineRequest(Json("own")));
+
+        Json onlyLevel = Json::object();
+        onlyLevel["level"] = "hard";
+        SetOpponent(OpponentState(onlyLevel));
+        EXPECT_EQ(StringMember(OpponentOfState(), "engine"), "own") << "a member that is missing is unchanged";
+
+        SetOpponent(OpponentRequest("white"));
+        EXPECT_EQ(StringMember(OpponentOfState(), "engine"), "own");
+        ASSERT_EQ(factory.Calls(), 1);
+        EXPECT_EQ(factory.Engines()[0], "own");
+        EXPECT_EQ(factory.Levels()[0], "hard");
+
+        SetOpponent(EngineRequest(Json("stockfish")));
+        EXPECT_EQ(StringMember(OpponentOfState(), "engine"), "stockfish");
+        EXPECT_EQ(StringMember(OpponentOfState(), "plays"), "white") << "the side is kept through an engine change";
+        ASSERT_EQ(factory.Calls(), 2) << "the program plays, so the engine change makes a new one";
+        EXPECT_EQ(factory.Engines()[1], "stockfish");
+    }
+
+    TEST_F(ChessGameControlTest, ABadEngineIsRefusedAndChangesNothing) {
+        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        opponent.SetEngineFactory(factory.AsFactory());
+        SetOpponent(OpponentRequest("black", "easy", "own"));
+        Perform("e2e4");
+        const int calls = factory.Calls();
+        const Json before = State();
+        const uint64_t version = control.GetStateVersion();
+
+        const Json refused[] = {EngineRequest(Json("Own")), EngineRequest(Json("Stockfish")), EngineRequest(Json("")),   EngineRequest(Json("own ")),  EngineRequest(Json("other")),
+                                EngineRequest(Json()),      EngineRequest(Json(1)),           EngineRequest(Json(true)), EngineRequest(Json::array()), OpponentRequest("white", "hard", "other")};
+        for (const Json& request : refused) {
+            const auto result = control.SetState(request);
+            ASSERT_FALSE(result.has_value()) << DumpJson(request).c_str();
+            EXPECT_EQ(ErrorCodeOf(result.error()), "invalid_params") << DumpJson(request).c_str();
+            EXPECT_NE(std::string(result.error().message.c_str()).find("stockfish, own"), std::string::npos) << "the message names the ids: " << result.error().message.c_str();
+        }
+
+        // A valid position next to a bad engine: neither half is applied
+        Json fenAndBadEngine = EngineRequest(Json("other"));
+        fenAndBadEngine["fen"] = MakeJsonString(kMateInOneFen);
+        EXPECT_EQ(SetStateError(fenAndBadEngine), "invalid_params");
+
+        EXPECT_EQ(State(), before);
+        EXPECT_EQ(control.GetStateVersion(), version);
+        EXPECT_EQ(factory.Calls(), calls) << "no engine was asked for by a refused call";
+    }
+
+    TEST_F(ChessGameControlTest, AClientThatGetsEngineUnavailableForStockfishCanSwitchToTheOwnEngine) {
+        // Stockfish is missing, the own engine is not: the factory fails only for the first
+        eastl::vector<eastl::string> asked;
+        opponent.SetEngineFactory([&asked](OpponentEngine engine, const OpponentLevel&) -> MadeEngine {
+            const eastl::string_view id = OpponentEngineId(engine);
+            asked.emplace_back(id.data(), id.size());
+            if (engine == OpponentEngine::Stockfish) {
+                return std::unexpected(EngineError{EngineErrorKind::LaunchFailed, "no Stockfish in the test"});
+            }
+            return eastl::make_shared<InstantEngine>();
+        });
+        Perform("e2e4");
+        const std::string fenBefore = StringMember(State(), "fen");
+
+        Json request = OpponentRequest("black", nullptr, "stockfish");
+        request["fen"] = MakeJsonString(kMateInOneFen);
+        EXPECT_EQ(SetStateError(request), "engine_unavailable");
+        EXPECT_EQ(StringMember(State(), "fen"), fenBefore) << "the position is not replaced";
+        EXPECT_TRUE(OpponentMember("plays").is_null());
+        EXPECT_EQ(StringMember(OpponentOfState(), "engine"), "stockfish");
+        EXPECT_EQ(StringMember(OpponentMember("error"), "kind"), "launch_failed");
+        ASSERT_EQ(asked.size(), 1u);
+        EXPECT_EQ(asked[0], "stockfish") << "nothing asked for the own engine on its own";
+
+        // The client switches: the same call with the other engine succeeds, the error goes with the pick
+        request = OpponentRequest("black", nullptr, "own");
+        request["fen"] = MakeJsonString(kMateInOneFen);
+        SetOpponent(request);
+        EXPECT_EQ(StringMember(State(), "fen"), std::string(kMateInOneFen.data(), kMateInOneFen.size()));
+        const Json computer = OpponentOfState();
+        EXPECT_EQ(StringMember(computer, "plays"), "black");
+        EXPECT_EQ(StringMember(computer, "engine"), "own");
+        EXPECT_TRUE(FindJsonMember(computer, "error")->is_null());
+        ASSERT_EQ(asked.size(), 2u);
+        EXPECT_EQ(asked[1], "own");
+    }
+
+    TEST_F(ChessGameControlTest, TheSameEnginePickAgainDoesNothing) {
+        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        opponent.SetEngineFactory(factory.AsFactory());
+        SetOpponent(OpponentRequest("black", "easy", "own"));
+        const uint64_t version = control.GetStateVersion();
+
+        SetOpponent(OpponentRequest("black", "easy", "own"));
+        SetOpponent(EngineRequest(Json("own")));
+
+        EXPECT_EQ(factory.Calls(), 1);
+        EXPECT_EQ(control.GetStateVersion(), version);
+    }
+
+    TEST_F(ChessGameControlTest, AnEnginePickOfNobodyMovesTheVersionBothWays) {
+        uint64_t version = control.GetStateVersion();
+        SetOpponent(EngineRequest(Json("own")));
+        EXPECT_GT(control.GetStateVersion(), version);
+        version = control.GetStateVersion();
+        SetOpponent(EngineRequest(Json("stockfish")));
+        EXPECT_GT(control.GetStateVersion(), version);
+    }
+
+    TEST_F(ChessGameControlTest, ResetKeepsTheEngine) {
+        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        opponent.SetEngineFactory(factory.AsFactory());
+        SetOpponent(OpponentRequest("white", "hard", "own"));
+        Perform("e2e4");
+
+        ASSERT_TRUE(control.Reset(Json::object()).has_value());
+
+        EXPECT_EQ(StringMember(OpponentOfState(), "engine"), "own");
+        EXPECT_EQ(factory.Calls(), 1);
     }
 
     TEST_F(ChessGameControlTest, NullPutsTwoPeopleBack) {
