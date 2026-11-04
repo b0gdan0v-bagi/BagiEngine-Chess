@@ -1,3 +1,7 @@
+---
+status: in progress 2026-11-04 branch todo/shared-build-skills-in-chess
+---
+
 # Chess: the build, clang-format and strip-pch-includes skills are still copies; switch to the shared text in `engine/`
 
 **Where:** `.claude/skills/{build,clang-format,strip-pch-includes}/` (real folders, the old copies), `.claude/rules/engine-and-todo.md` (the bullet "Skills and agents are one copy"), `README.md` ("Build and test"), `CLAUDE.md`, `engine/.claude/rules/build-project.md` (the template to copy), `.clang-format-ignore`.
