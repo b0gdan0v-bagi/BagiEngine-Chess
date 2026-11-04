@@ -1,4 +1,5 @@
 #include <Chess/Engine/OpponentLevels.h>
+#include <Chess/Engine/Search.h>
 #include <Common/Printers.h>
 
 /// The table of strengths of the computer opponent: pure data, nothing to start
@@ -98,14 +99,47 @@ namespace BECore::Chess::Tests {
         EXPECT_FALSE(FindOpponentLevel("med").has_value());
     }
 
-    TEST(OpponentLevelsTest, LimitsAreTheMoveTimeAndNoDepth) {
+    TEST(OpponentLevelsTest, TheOwnDepthIsPositiveAndNeverFallsWithStrength) {
+        const auto levels = GetOpponentLevels();
+
+        for (size_t i = 0; i < levels.size(); ++i) {
+            EXPECT_GT(levels[i].ownDepth, 0) << Text(levels[i].id);
+            EXPECT_LE(levels[i].ownDepth, kMaxSearchDepth) << Text(levels[i].id);
+            if (i + 1 < levels.size()) {
+                EXPECT_LE(levels[i].ownDepth, levels[i + 1].ownDepth) << Text(levels[i + 1].id);
+            }
+        }
+        EXPECT_LT(levels.front().ownDepth, levels.back().ownDepth);
+    }
+
+    TEST(OpponentLevelsTest, StockfishGetsTheMoveTimeAndNoDepth) {
         for (const OpponentLevel& level : GetOpponentLevels()) {
-            const SearchLimits limits = LimitsOf(level);
+            const SearchLimits limits = LimitsOf(OpponentEngine::Stockfish, level);
             EXPECT_EQ(limits.moveTimeMs, level.moveTimeMs) << Text(level.id);
             EXPECT_EQ(limits.depth, 0) << Text(level.id);
         }
         const OpponentLevel custom{"custom", "Custom", 7, 1234};
-        EXPECT_EQ(LimitsOf(custom).moveTimeMs, 1234);
+        EXPECT_EQ(LimitsOf(OpponentEngine::Stockfish, custom).moveTimeMs, 1234);
+    }
+
+    TEST(OpponentLevelsTest, TheOwnEngineGetsTheDepthAndTheCap) {
+        for (const OpponentLevel& level : GetOpponentLevels()) {
+            const SearchLimits limits = LimitsOf(OpponentEngine::Own, level);
+            EXPECT_EQ(limits.depth, level.ownDepth) << Text(level.id);
+            EXPECT_EQ(limits.moveTimeMs, kOwnMoveTimeCapMs) << Text(level.id);
+            EXPECT_GT(limits.depth, 0) << Text(level.id);
+            EXPECT_GT(limits.moveTimeMs, 0) << Text(level.id);
+        }
+    }
+
+    TEST(OpponentLevelsTest, ALevelWithoutAnOwnDepthGivesTheOwnEngineNone) {
+        const OpponentLevel custom{"custom", "Custom", 7, 1234};
+
+        const SearchLimits limits = LimitsOf(OpponentEngine::Own, custom);
+
+        EXPECT_EQ(custom.ownDepth, 0);
+        EXPECT_EQ(limits.depth, 0);  // the cap alone is still a valid limit, but the level did not say how deep: the table must give every level a depth
+        EXPECT_EQ(limits.moveTimeMs, kOwnMoveTimeCapMs);
     }
 
     TEST(OpponentLevelsTest, TheEngineIsToldTheSkillLevelAndNothingElse) {

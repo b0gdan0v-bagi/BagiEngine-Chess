@@ -115,7 +115,7 @@ namespace BECore::Chess {
             FailPick(std::move(engine.error()), *computer, chosen);
             return std::unexpected(*_pickError);
         }
-        _opponent = eastl::make_unique<EngineOpponent>(std::move(*engine), *computer, LimitsOf(chosen));
+        _opponent = eastl::make_unique<EngineOpponent>(std::move(*engine), *computer, LimitsOf(OpponentEngine::Stockfish, chosen));
         if (_model.GetTurn() == *computer) {
             _model.ClearSelection();
         }

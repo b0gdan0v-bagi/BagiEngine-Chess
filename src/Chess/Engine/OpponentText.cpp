@@ -16,6 +16,11 @@ namespace BECore::Chess {
             return Format("Level: {}", level.name);
         }
 
+        eastl::string EngineLabel(OpponentEngine engine) {
+            const eastl::string_view name = OpponentEngineName(engine);
+            return eastl::string(name.data(), name.size());
+        }
+
         eastl::string Error(const EngineError& error) {
             switch (error.kind) {
                 case EngineErrorKind::LaunchFailed:
@@ -27,7 +32,7 @@ namespace BECore::Chess {
                 case EngineErrorKind::ProtocolError:
                     return "Not a UCI engine";
                 case EngineErrorKind::IllegalMove:
-                    return "Engine made an illegal move";
+                    return "Illegal engine move";
                 case EngineErrorKind::NoMove:
                     return "Engine has no move";
                 case EngineErrorKind::BadRequest:

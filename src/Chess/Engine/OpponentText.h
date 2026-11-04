@@ -10,7 +10,7 @@ namespace BECore::Chess {
     namespace OpponentText {
 
         /// The longest sentence Error() makes, in characters. The Status label shows one text at a time, the error sentence or the status of the game, so it has to hold the
-        /// widest of both: "Draw: insufficient material" (27 characters) is the longest status
+        /// widest of both: "Draw: insufficient material" (27 characters) is the longest status of the game
         inline constexpr size_t kMaxErrorLength = 28;
 
         /// What Error() says for a kind it has no sentence for (a kind added to EngineErrorKind and not to the switch, which the compiler warns about). A test fails when any
@@ -23,6 +23,9 @@ namespace BECore::Chess {
 
         /// What the Level button says: "Level: Medium"
         [[nodiscard]] eastl::string LevelLabel(const OpponentLevel& level);
+
+        /// What the Engine button says: the name of the engine ("Stockfish", "Own engine")
+        [[nodiscard]] eastl::string EngineLabel(OpponentEngine engine);
 
         /// A short sentence for a failure of the engine, at most kMaxErrorLength characters ("Engine not found", "Engine did not answer"). It is what the Status label shows while
         /// the error stands; the detail of the error (paths, the engine's own words) is for the log and the control API

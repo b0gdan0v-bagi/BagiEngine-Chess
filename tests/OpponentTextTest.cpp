@@ -41,9 +41,19 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(OpponentText::LevelLabel(levels.back()), "Level: Max");
     }
 
+    TEST(OpponentTextTest, TheEngineIsNamedAfterItsWord) {
+        EXPECT_EQ(OpponentText::EngineLabel(OpponentEngine::Stockfish), "Stockfish");
+        EXPECT_EQ(OpponentText::EngineLabel(OpponentEngine::Own), "Own engine");
+    }
+
     TEST(OpponentTextTest, ALaunchFailureSaysTheEngineIsNotFound) {
         // The commonest failure and the one a person can fix, so its wording is pinned; the detail with the paths is for the log
         EXPECT_EQ(OpponentText::Error(EngineError{EngineErrorKind::LaunchFailed, "no Stockfish found: put its path in config/ChessSettings.local.xml"}), "Engine not found");
+    }
+
+    TEST(OpponentTextTest, AnIllegalMoveIsSaidInTheWidthOfTheLongestStatus) {
+        // The Status label is laid out for "Draw: insufficient material"; the sentence was longer once and did not fit beside the Engine button
+        EXPECT_EQ(OpponentText::Error(EngineError{EngineErrorKind::IllegalMove, "e2e5"}), "Illegal engine move");
     }
 
     TEST(OpponentTextTest, EveryKindOfErrorHasItsOwnShortSentence) {
