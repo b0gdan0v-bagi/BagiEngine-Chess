@@ -492,7 +492,7 @@ namespace BECore::Chess::Tests {
         layout.Invalidate();
     }
 
-    TEST_F(ChessUiTest, TheHudStaysOutsideTheBoardInEveryShape) {
+    TEST_F(ChessUiTest, TheHudStaysOutsideTheBoardWithoutInsets) {
         auto canvas = Hud();
         ASSERT_TRUE(canvas);
         CountingFactory factory({eastl::make_shared<InstantEngine>()});

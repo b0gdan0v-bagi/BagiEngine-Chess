@@ -7,6 +7,8 @@
 #include <Chess/Game/ChessGameModel.h>
 #include <Chess/Game/MoveGenerator.h>
 #include <Chess/Game/StatusText.h>
+#include <EASTL/algorithm.h>
+#include <gtest/gtest.h>
 
 /// Every word the HUD of Chess can show, taken from the code that makes them (StatusText, OpponentText and its tables), never typed again here: a new word, level or kind
 /// of error reaches the tests of the layout by itself. The font is proportional, so the longest word by characters is not always the widest: the layout tests walk all of them
@@ -53,8 +55,11 @@ namespace BECore::Chess::Tests {
             EXPECT_TRUE(move.has_value() && model.TryMove(*move).has_value()) << "a move of the scratch game: " << std::string(uci.data(), uci.size());
         }
 
-        /// What the HUD says about the model as it stands
-        inline void Collect(HudWords& words, const ChessGameModel& model) {
+        /// What the HUD says about the model as it stands; @p seen gets the status of the game, so AllHudWords() can tell that every status was reached
+        inline void Collect(HudWords& words, eastl::vector<GameStatus>& seen, const ChessGameModel& model) {
+            if (eastl::find(seen.begin(), seen.end(), model.GetStatus()) == seen.end()) {
+                seen.push_back(model.GetStatus());
+            }
             Add(words.turn, StatusText::Turn(model, false));
             Add(words.status, StatusText::Status(model));
         }
@@ -66,36 +71,42 @@ namespace BECore::Chess::Tests {
     inline HudWords AllHudWords() {
         using namespace HudWordsDetail;
         HudWords words;
+        eastl::vector<GameStatus> seen;
 
         ChessGameModel model;
-        Collect(words, model);
+        Collect(words, seen, model);
         Play(model, "e2e4");
-        Collect(words, model);
+        Collect(words, seen, model);
 
         model.SetPosition(PositionFromFen("4k3/4r3/8/8/8/8/8/4K3 w - - 0 1"));
-        Collect(words, model);
+        Collect(words, seen, model);
 
         model.SetPosition(PositionFromFen("6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1"));
         Play(model, "a1a8");
-        Collect(words, model);
+        Collect(words, seen, model);
 
         model.SetPosition(PositionFromFen("r5k1/5ppp/8/8/8/8/5PPP/6K1 b - - 0 1"));
         Play(model, "a8a1");
-        Collect(words, model);
+        Collect(words, seen, model);
 
         model.SetPosition(PositionFromFen("7k/5Q2/6K1/8/8/8/8/8 b - - 0 1"));
-        Collect(words, model);
+        Collect(words, seen, model);
         model.SetPosition(PositionFromFen("8/8/4k3/8/8/4K3/8/8 w - - 0 1"));
-        Collect(words, model);
+        Collect(words, seen, model);
         model.SetPosition(PositionFromFen("4k3/8/8/8/8/8/8/R3K3 w - - 100 80"));
-        Collect(words, model);
+        Collect(words, seen, model);
         model.Reset();
         for (int cycle = 0; cycle < 2; ++cycle) {
             for (const char* uci : {"g1f3", "g8f6", "f3g1", "f6g8"}) {
                 Play(model, uci);
             }
         }
-        Collect(words, model);
+        Collect(words, seen, model);
+
+        // A new status of the game must get a position above, or its words would stay out of the matrix
+        for (const GameStatus status : EnumUtils<GameStatus>::Values()) {
+            EXPECT_NE(eastl::find(seen.begin(), seen.end(), status), seen.end()) << "no position of the scratch game reaches " << static_cast<int>(status);
+        }
 
         model.Reset();
         Add(words.turn, StatusText::Turn(model, true));

@@ -72,42 +72,4 @@ namespace BECore::Chess::Tests {
         }
     }
 
-    TEST(OpponentTextTest, TheLongestSideLabelIsOneOfTheLabelsAndNoneIsLonger) {
-        const eastl::string longest = OpponentText::LongestSideLabel();
-        const std::optional<PieceColor> sides[] = {kNobody, PieceColor::White, PieceColor::Black};
-
-        bool isOne = false;
-        for (const std::optional<PieceColor> side : sides) {
-            const eastl::string label = OpponentText::SideLabel(side);
-            EXPECT_LE(label.size(), longest.size()) << label.c_str();
-            isOne = isOne || label == longest;
-        }
-        EXPECT_TRUE(isOne) << longest.c_str();
-    }
-
-    TEST(OpponentTextTest, TheLongestLevelLabelIsOneOfTheLabelsAndNoneIsLonger) {
-        const eastl::string longest = OpponentText::LongestLevelLabel();
-
-        bool isOne = false;
-        for (const OpponentLevel& level : GetOpponentLevels()) {
-            const eastl::string label = OpponentText::LevelLabel(level);
-            EXPECT_LE(label.size(), longest.size()) << label.c_str();
-            isOne = isOne || label == longest;
-        }
-        EXPECT_TRUE(isOne) << longest.c_str();
-    }
-
-    TEST(OpponentTextTest, TheLongestErrorIsOneOfTheSentencesAndNoneIsLonger) {
-        const eastl::string longest = OpponentText::LongestError();
-
-        bool isOne = false;
-        for (const EngineErrorKind kind : EnumUtils<EngineErrorKind>::Values()) {
-            const eastl::string sentence = ErrorWords(kind);
-            EXPECT_LE(sentence.size(), longest.size()) << sentence.c_str();
-            isOne = isOne || sentence == longest;
-        }
-        EXPECT_TRUE(isOne) << longest.c_str();
-        EXPECT_LE(longest.size(), OpponentText::kMaxErrorLength);
-    }
-
 }  // namespace BECore::Chess::Tests

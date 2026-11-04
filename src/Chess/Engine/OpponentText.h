@@ -28,16 +28,6 @@ namespace BECore::Chess {
         /// the error stands; the detail of the error (paths, the engine's own words) is for the log and the control API
         [[nodiscard]] eastl::string Error(const EngineError& error);
 
-        /// The longest word of SideLabel() over the three states of the opponent, by characters. The font is proportional, so another word can be wider by a little: a test that
-        /// has to be sure goes through the words one by one
-        [[nodiscard]] eastl::string LongestSideLabel();
-
-        /// The longest LevelLabel() over GetOpponentLevels(), by characters
-        [[nodiscard]] eastl::string LongestLevelLabel();
-
-        /// The longest Error() over every EngineErrorKind, by characters
-        [[nodiscard]] eastl::string LongestError();
-
     }  // namespace OpponentText
 
 }  // namespace BECore::Chess
