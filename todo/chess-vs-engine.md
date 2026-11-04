@@ -1,5 +1,5 @@
 ---
-status: in progress 2026-11-04 branch todo/chess-vs-engine-3
+status: review 2026-11-04 branch todo/chess-vs-engine-3: own engine core behind IChessEngine (evaluation, alpha-beta search, OwnEngine; not wired into the game), 62 new gtests, 492 of 492 pass on macos-debug, reviewed WP by WP and as a whole, slice 3 of 4, after the merge set the status back to open
 ---
 
 # Chess: the computer opponent works in the window; no analysis, resign, takeback or promotion choice, and no engine of our own
