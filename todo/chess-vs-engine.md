@@ -1,5 +1,5 @@
 ---
-status: in progress 2026-11-04 branch todo/chess-vs-engine-4
+status: review 2026-11-04 branch todo/chess-vs-engine-4: the user picks the engine in the window (Engine button: Stockfish or the own engine, default Stockfish, no fallback; levels of the own engine by depth), opponent.engine in the control API, own-engine smoke scenario on both clocks, 36 new gtests, 528 of 528 pass on macos-debug, reviewed WP by WP and as a whole, slice 4 of 4, after the merge set the status back to open
 ---
 
 # Chess: the computer opponent works in the window; no analysis, resign, takeback or promotion choice, and no engine of our own
