@@ -62,8 +62,9 @@ namespace BECore::Chess {
      *
      * Scores are from the side to move. Being mated at a ply p from the root scores -MateIn(p), so a shorter mate is
      * preferred and a longer defense. Inside the tree, a stalemate, insufficient material, 50 moves without progress and a
-     * position that has occurred before (the game's history counts, not only the search's) all score kDrawScore. The root is
-     * never judged this way: it always has a move to return (unless the game is over: then @ref SearchResult::best is null,
+     * position that has occurred before (the game's history counts, not only the search's) all score kDrawScore. Quiescence
+     * applies no draw rule (captures and promotions only: the static score, and mate when in check). The root is never judged
+     * this way: it always has a move to return (unless the game is over: then @ref SearchResult::best is null,
      * @ref SearchResult::complete is true and the score tells mate or draw).
      *
      * Deterministic: the same position with the same history, SearchSettings and no stop gives the same best move, score

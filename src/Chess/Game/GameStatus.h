@@ -4,6 +4,9 @@
 
 namespace BECore::Chess {
 
+    /// Plies (half moves) without a capture or a pawn move after which a game is drawn: 50 moves by each side. Position::HalfmoveClock() counts them
+    inline constexpr int kFiftyMovePlies = 100;
+
     /// How a game stands. Everything but Ongoing ends it.
     CORE_ENUM(GameStatus, uint8_t, Ongoing, Checkmate, Stalemate, DrawInsufficientMaterial, DrawThreefold, DrawFiftyMoves)
 

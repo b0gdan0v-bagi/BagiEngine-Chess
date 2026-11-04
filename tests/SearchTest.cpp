@@ -1,6 +1,7 @@
 #include "ChessTestUtil.h"
 
 #include <Chess/Engine/Search.h>
+#include <Chess/Game/GameStatus.h>
 #include <Chess/Game/MoveGenerator.h>
 #include <thread>
 
@@ -112,7 +113,7 @@ namespace BECore::Chess::Tests {
             if (moves.empty()) {
                 return position.IsInCheck() ? -MateIn(ply) : kDrawScore;
             }
-            if (position.HalfmoveClock() >= 100) {
+            if (position.HalfmoveClock() >= kFiftyMovePlies) {
                 return kDrawScore;
             }
             int best = -2 * kMateScore;

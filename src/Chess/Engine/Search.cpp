@@ -1,5 +1,6 @@
 #include "Search.h"
 
+#include <Chess/Game/GameStatus.h>
 #include <Chess/Game/MoveGenerator.h>
 
 namespace BECore::Chess {
@@ -9,15 +10,16 @@ namespace BECore::Chess {
         /// Larger than any score, so that the first move of a node always beats "nothing found yet"
         constexpr int kInfinity = kMateScore + 1000;
 
-        /// No line is searched further from the root than this many plies, quiescence included: the arrays of a node live on the stack
-        constexpr int kMaxPly = 128;
         /// A check is searched one ply deeper only up to this ply, so a perpetual check cannot grow the tree without end
         constexpr int kMaxExtensionPly = 32;
+        /// No line is searched further from the root than this many plies, quiescence included: the deepest full-width line is
+        /// kMaxSearchDepth plus the extensions, and what is left at that ply is judged by the static score. The move lists of a node
+        /// live on the stack: a Negamax or Quiescence frame takes about 3 KB in a Debug build (measured, macOS), so 96 plies are
+        /// about 300 KB, which fits the 512 KB that a std::thread of the Background pool gets on macOS (Linux gives 8 MB, Windows 1 MB)
+        constexpr int kMaxPly = kMaxSearchDepth + kMaxExtensionPly;
 
         /// A position that has occurred this many times (itself counted) scores as a draw inside the tree: once before is enough
         constexpr int kRepetitionDrawCount = 2;
-        /// Plies without a capture or a pawn move that make a draw, as in EvaluateStatus()
-        constexpr int kFiftyMovePlies = 100;
 
         // Move ordering: bigger is tried first. The bands do not overlap: a capture is worth kCaptureScore plus up to
         // kVictimWeight * 5 (a queen taken) and a quiet promotion kPromotionScore plus the piece
