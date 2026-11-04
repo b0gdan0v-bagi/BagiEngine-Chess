@@ -179,7 +179,7 @@ namespace BECore::Chess::Tests {
     };
 
     /**
-     * @brief The EngineFactory of a test: counts how often it is asked and for which levels, and hands out what the test decided.
+     * @brief The EngineFactory of a test: counts how often it is asked and for which engines and levels, and hands out what the test decided.
      *
      * The first call gets the first engine, the second the second, and so on, the last engine repeating; or every call fails with one error. It is asked on
      * the main thread only (that is where OpponentController calls its factory), so it keeps its log without a lock. AsFactory() captures `this`: keep the
@@ -193,7 +193,7 @@ namespace BECore::Chess::Tests {
         CountingFactory& operator=(const CountingFactory&) = delete;
 
         [[nodiscard]] EngineFactory AsFactory() {
-            return [this](const OpponentLevel& level) { return Make(level); };
+            return [this](OpponentEngine engine, const OpponentLevel& level) { return Make(engine, level); };
         }
 
         /// How often the factory was asked
@@ -206,9 +206,16 @@ namespace BECore::Chess::Tests {
             return _levels;
         }
 
+        /// The id of the engine ("stockfish", "own") of each call, in order
+        [[nodiscard]] const eastl::vector<eastl::string>& Engines() const {
+            return _engineIds;
+        }
+
     private:
-        MadeEngine Make(const OpponentLevel& level) {
+        MadeEngine Make(OpponentEngine engine, const OpponentLevel& level) {
             const size_t call = _levels.size();
+            const eastl::string_view engineId = OpponentEngineId(engine);
+            _engineIds.emplace_back(engineId.data(), engineId.size());
             _levels.emplace_back(level.id.data(), level.id.size());
             if (_error) {
                 return std::unexpected(*_error);
@@ -219,6 +226,7 @@ namespace BECore::Chess::Tests {
         eastl::vector<eastl::shared_ptr<IChessEngine>> _engines;
         std::optional<EngineError> _error;
         eastl::vector<eastl::string> _levels;
+        eastl::vector<eastl::string> _engineIds;
     };
 
 }  // namespace BECore::Chess::Tests

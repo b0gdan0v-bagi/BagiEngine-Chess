@@ -40,6 +40,7 @@ namespace BECore::Chess {
         // Two people: nothing is looked up or started until a side is picked. Neither call can fail without a side
         _opponent.SetSide(std::nullopt);
         _opponent.SetLevel(kDefaultOpponentLevel);
+        _opponent.SetEngine(kDefaultOpponentEngine);
     }
 
     void ChessGame::Stop() {
