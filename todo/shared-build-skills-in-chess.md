@@ -1,5 +1,5 @@
 ---
-status: in progress 2026-11-04 branch todo/shared-build-skills-in-chess
+status: review 2026-11-04 branch todo/shared-build-skills-in-chess: added .claude/rules/build-project.md and replaced the build, clang-format and strip-pch-includes copies by symlinks into engine/; dry runs, build and ctest 430/430 green, reviewer APPROVE
 ---
 
 # Chess: the build, clang-format and strip-pch-includes skills are still copies; switch to the shared text in `engine/`
