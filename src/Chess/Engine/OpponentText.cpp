@@ -6,8 +6,8 @@ namespace BECore::Chess {
 
         namespace {
 
-            // The sides in the order of the button: nobody, then the program plays White, then Black
-            constexpr eastl::array<std::optional<PieceColor>, 3> kComputerSides{std::nullopt, PieceColor::White, PieceColor::Black};
+            // The sides in the order of the button (OpponentController::CycleSide): nobody, then the program plays Black ("You: White"), then White ("You: Black")
+            constexpr eastl::array<std::optional<PieceColor>, 3> kComputerSides{std::nullopt, PieceColor::Black, PieceColor::White};
 
             /// Replaces @p longest by @p candidate when the candidate has more characters (the first of equals stays)
             void KeepLonger(eastl::string& longest, eastl::string candidate) {
@@ -51,7 +51,7 @@ namespace BECore::Chess {
                 case EngineErrorKind::Unsupported:
                     return "Engine not supported here";
             }
-            return "Engine failed";
+            return eastl::string(kUnknownErrorSentence.data(), kUnknownErrorSentence.size());
         }
 
         eastl::string LongestSideLabel() {

@@ -9,8 +9,13 @@ namespace BECore::Chess {
     /// They live in Engine/ and not in Game/ because Game/ must not know the engine
     namespace OpponentText {
 
-        /// The longest sentence Error() makes, in characters: the Status label of the HUD has room for about this much beside the longest word of the game
+        /// The longest sentence Error() makes, in characters. The Status label shows one text at a time, the error sentence or the status of the game, so it has to hold the
+        /// widest of both: "Draw: insufficient material" (27 characters) is the longest status
         inline constexpr size_t kMaxErrorLength = 28;
+
+        /// What Error() says for a kind it has no sentence for (a kind added to EngineErrorKind and not to the switch, which the compiler warns about). A test fails when any
+        /// kind that exists gets it
+        inline constexpr eastl::string_view kUnknownErrorSentence = "Engine failed";
 
         /// What the Side button says, from the person's point of view: @p computerPlays is the side the program plays, so the program as Black is "You: White".
         /// Nobody is "Two players"

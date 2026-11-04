@@ -53,7 +53,9 @@ namespace BECore::Chess::Tests {
             const std::string name = KindName(kind);
 
             EXPECT_FALSE(sentence.empty()) << name;
-            EXPECT_LE(sentence.size(), OpponentText::kMaxErrorLength) << name << ": '" << sentence.c_str() << "' does not fit beside the longest word of the game";
+            EXPECT_LE(sentence.size(), OpponentText::kMaxErrorLength) << name << ": '" << sentence.c_str() << "' is longer than the Status label is laid out for";
+            EXPECT_NE(sentence, eastl::string(OpponentText::kUnknownErrorSentence.data(), OpponentText::kUnknownErrorSentence.size()))
+                << name << " has no sentence of its own: it reached the fallback of Error()";
             for (const eastl::string& other : sentences) {
                 EXPECT_NE(sentence, other) << name << ": two kinds of error with the same words";
             }
