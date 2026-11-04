@@ -31,9 +31,11 @@ namespace BECore::Chess {
      * lives in ChessGameModel and is shared with ChessPieceComponent through
      * GameManager::GetActive().
      *
-     * The HUD is not drawn here: it is a UI canvas of the scene (`config/SceneConfig.xml`) whose labels follow the variables `turn` and `status`, which this
-     * component publishes to `CoreManager::GetUIVars()` whenever the model changed (StatusText). Its Reset button emits the action `ChessReset`, which this
-     * component answers by starting a new game.
+     * The HUD is not drawn here: it is a UI canvas of the scene (`config/SceneConfig.xml`) whose labels and buttons follow the variables `turn`, `status`, `side` and
+     * `level`, which this component publishes to `CoreManager::GetUIVars()` whenever the game or the opponent changed (StatusText, OpponentText): `turn` says
+     * "Computer is thinking" while the program searches, `status` is the sentence of the opponent's error while one stands and the status of the game otherwise.
+     * It also shows the element `Level` of the HUD while a computer opponent plays and hides it for two people. Its buttons emit the actions `ChessReset`
+     * (a new game), `ChessCycleSide` and `ChessCycleLevel` (OpponentController::CycleSide() and CycleLevel()), which this component answers.
      *
      * It is also the frame of the computer opponent: IGame has no per-frame hook, so on every SceneUpdateEvent it runs
      * ChessGame::GetOpponent().Update() (the one place that does; it changes the model, so it cannot be done in OnDraw()). While the program plays the side to move,
@@ -84,11 +86,14 @@ namespace BECore::Chess {
         /// One line in the log when a game has ended, the first time it is seen: whether the person, the program or the control API played the last move
         void LogResultOnce(const ChessGameModel& model);
 
-        /// Gives the UI labels the words for the state of the game; only when the model changed, since a label checks the version of the variables every frame
+        /// Gives the UI labels the words for the state of the game and of the opponent; only when something they say changed, since a label checks the version of the
+        /// variables every frame
         void PublishUiVars();
 
         uint64_t _publishedVersion = 0;         // the model version PublishUiVars() last published, 0 for none
         const void* _publishedModel = nullptr;  // the model it was published for: another game starts the count again
+        uint64_t _publishedRevision = 0;        // the OpponentController::GetRevision() it was published for
+        bool _publishedThinking = false;        // whether the program was searching then: a search starts and ends without a move of the game
 
         uint64_t _loggedVersion = 0;         // the model version of the ended game that LogResultOnce() last logged, 0 for none
         const void* _loggedModel = nullptr;  // the model it was logged for

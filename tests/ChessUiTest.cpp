@@ -10,9 +10,11 @@
 #include <BECore/Scene/SceneNode.h>
 #include <BECore/Text/FontAtlasLibrary.h>
 #include <BECore/UI/UICanvasComponent.h>
+#include <BECore/UI/UIElement.h>
 #include <BECore/UI/UILabel.h>
 #include <Chess/ChessGame.h>
 #include <Chess/Components/ChessPieceComponent.h>
+#include <Chess/Engine/OpponentText.h>
 #include <Chess/Game/MoveGenerator.h>
 #include <Common/EngineEnvironment.h>
 #include <Common/RecordingRenderer.h>
@@ -166,6 +168,18 @@ namespace BECore::Chess::Tests {
             OpponentController* opponent = ChessGame::GetActiveOpponent();
             EXPECT_NE(opponent, nullptr);
             return *opponent;
+        }
+
+        /// The text of a UI variable after a frame was drawn: the board publishes the words of the HUD when it draws
+        eastl::string Var(const char* name) {
+            Draw();
+            const eastl::string_view value = CoreManager::GetUIVars().Get(PoolString::Intern(name));
+            return eastl::string(value.data(), value.size());
+        }
+
+        /// What a button of the HUD does when it is clicked: the action it emits
+        static void Press(const char* action) {
+            InputEvents::ActionEvent::Emit(PoolString::Intern(action));
         }
 
         /// A press of the mouse on the middle of a square, where it is drawn: the way a click reaches the board (the output size it is mapped back from is the one of the last draw)
@@ -757,6 +771,188 @@ namespace BECore::Chess::Tests {
 
         engine->Open();  // frees the worker: the engine is alive as long as the search needs it, and the test does not leave a thread behind
         EXPECT_TRUE(WaitUntil([&] { return engine->Answered() == 1; }));
+    }
+
+    // ---- the words and the actions of the opponent ------------------------------------------------------------------------
+    // The HUD shows `side`, `level`, `turn` and `status`; the layout of its buttons is another matter, so these tests press the actions the buttons emit and read the
+    // variables the board publishes. The engines are the doubles of TestEngines.h
+
+    TEST_F(ChessUiTest, TheOpponentWordsStartWithTwoPlayersAtTheMediumLevel) {
+        EXPECT_EQ(Var("side"), "Two players");
+        EXPECT_EQ(Var("level"), "Level: Medium");
+        EXPECT_EQ(Var("turn"), "White to move");
+        EXPECT_EQ(Var("status"), "");
+    }
+
+    TEST_F(ChessUiTest, TheSideActionWalksThreeWordsAndBackAndTheProgramPlaysTheSideTheWordSays) {
+        const auto engine = eastl::make_shared<InstantEngine>();
+        CountingFactory factory({engine});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+
+        Press("ChessCycleSide");
+        EXPECT_EQ(Var("side"), "You: White");
+        EXPECT_TRUE(Opponent().PlaysFor(PieceColor::Black));
+        ClickMove("e2", "e4");
+        ASSERT_TRUE(FramesUntil([&] { return Model().GetMoves().size() == 2; }));
+        EXPECT_EQ(Model().GetPieceAt(Model().GetMoves()[1].To()).color, PieceColor::Black) << "the person has White, the program answers with a black piece";
+
+        Press("ChessCycleSide");
+        EXPECT_EQ(Var("side"), "You: Black");
+        EXPECT_TRUE(Opponent().PlaysFor(PieceColor::White));
+        ASSERT_TRUE(FramesUntil([&] { return Model().GetMoves().size() == 3; })) << "it is White's turn and White is the program's now";
+        EXPECT_EQ(Model().GetPieceAt(Model().GetMoves()[2].To()).color, PieceColor::White);
+
+        Press("ChessCycleSide");
+        EXPECT_EQ(Var("side"), "Two players");
+        EXPECT_FALSE(Opponent().PlaysFor(PieceColor::White));
+        EXPECT_FALSE(Opponent().PlaysFor(PieceColor::Black));
+        const MoveList legal = MoveGenerator::GenerateLegal(Model().GetPosition());
+        ASSERT_FALSE(legal.empty());
+        ASSERT_TRUE(Model().TryMove(legal.front()).has_value()) << "Black's move, made by a person";
+        IdleFrames();
+        EXPECT_EQ(Model().GetMoves().size(), 4u) << "nobody answers it";
+        EXPECT_EQ(engine->Calls(), 2) << "one search for each of the two sides, none for two people";
+
+        Press("ChessCycleSide");
+        EXPECT_EQ(Var("side"), "You: White") << "and round again";
+        EXPECT_EQ(factory.Calls(), 3) << "a pick for each side, and none for nobody";
+    }
+
+    TEST_F(ChessUiTest, TheLevelActionWalksTheLevelsAndWraps) {
+        const auto levels = GetOpponentLevels();
+        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+
+        for (size_t step = 1; step <= levels.size(); ++step) {
+            Press("ChessCycleLevel");
+            EXPECT_EQ(Var("level"), OpponentText::LevelLabel(levels[(kDefaultOpponentLevel + step) % levels.size()])) << "step " << step;
+        }
+        EXPECT_EQ(Var("level"), "Level: Medium") << "after the last level comes the first of the walk again";
+        EXPECT_EQ(Opponent().GetLevel(), kDefaultOpponentLevel);
+        EXPECT_EQ(factory.Calls(), 0) << "with nobody as the opponent a level is only a choice: no engine is asked for";
+
+        Press("ChessCycleSide");
+        Press("ChessCycleLevel");
+        EXPECT_EQ(Var("level"), OpponentText::LevelLabel(levels[(kDefaultOpponentLevel + 1) % levels.size()]));
+        ASSERT_EQ(factory.Calls(), 2) << "one engine for the pick, another for the level";
+        EXPECT_EQ(factory.Levels()[0], levels[kDefaultOpponentLevel].id);
+        EXPECT_EQ(factory.Levels()[1], levels[(kDefaultOpponentLevel + 1) % levels.size()].id);
+    }
+
+    TEST_F(ChessUiTest, WhileTheProgramThinksTheTurnSaysSoAndTheAnswerBringsTheUsualWordsBack) {
+        const auto engine = eastl::make_shared<GatedEngine>(true);
+        CountingFactory factory({engine});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        Press("ChessCycleSide");
+        ASSERT_TRUE(Opponent().PlaysFor(PieceColor::Black));
+
+        ClickMove("e2", "e4");
+        EXPECT_EQ(Var("turn"), "Black to move") << "the person has moved, the search has not started yet";
+        ASSERT_TRUE(FramesUntil([&] { return engine->Calls() == 1; }));
+        ASSERT_TRUE(Opponent().IsThinking());
+        const uint64_t version = Model().GetVersion();
+
+        EXPECT_EQ(Var("turn"), "Computer is thinking") << "the search began without a move of the game: the words follow the search, not only the version";
+        EXPECT_EQ(Model().GetVersion(), version);
+
+        engine->Open();
+        ASSERT_TRUE(FramesUntil([&] { return Model().GetMoves().size() == 2; }));
+        EXPECT_FALSE(Opponent().IsThinking());
+        EXPECT_EQ(Var("turn"), "White to move");
+    }
+
+    TEST_F(ChessUiTest, ThePickOfAnEngineThatIsNotFoundIsSaidInTheStatusAndTheNextMoveTakesItAway) {
+        CountingFactory factory(EngineError{EngineErrorKind::LaunchFailed, "no Stockfish in the test"});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+
+        Press("ChessCycleSide");
+
+        EXPECT_EQ(Var("status"), "Engine not found");
+        EXPECT_EQ(Var("side"), "Two players") << "a pick that found nothing leaves two people on the screen";
+        EXPECT_EQ(Var("turn"), "White to move");
+
+        ClickMove("e2", "e4");
+        _manager->UpdateAll();
+
+        EXPECT_EQ(Var("status"), "") << "the person has played on: the sentence has been seen";
+        EXPECT_EQ(Var("side"), "Two players");
+        EXPECT_EQ(factory.Calls(), 1);
+    }
+
+    TEST_F(ChessUiTest, TheSentenceOfASearchErrorIsInTheStatusUntilSomeoneMovesTheGame) {
+        const auto engine = eastl::make_shared<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
+        CountingFactory factory({engine});
+        ASSERT_NO_FATAL_FAILURE(ProvokeAnEngineError(factory));
+
+        EXPECT_EQ(Var("status"), "Engine not found");
+        EXPECT_EQ(Var("side"), "You: White") << "the program is still Black, only the game waits";
+        IdleFrames();
+        EXPECT_EQ(Var("status"), "Engine not found") << "frames do not take it away";
+
+        ASSERT_TRUE(Play(Model(), "e7e5")) << "a move of someone else, the way the control API plays";
+        _manager->UpdateAll();
+
+        EXPECT_EQ(Var("status"), "");
+        EXPECT_EQ(Var("turn"), "White to move");
+    }
+
+    TEST_F(ChessUiTest, TheSentenceOfASearchErrorWinsOverCheckAndTheResetButtonTakesItAway) {
+        const auto engine = eastl::make_shared<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
+        CountingFactory factory({engine});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        ASSERT_TRUE(Opponent().SetSide(PieceColor::Black).has_value());
+        Model().SetPosition(PositionFromFen("4k3/8/8/8/8/8/4R3/4K3 b - - 0 1"));  // Black, the program's side, is in check
+        ASSERT_TRUE(Model().IsInCheck());
+        ASSERT_TRUE(FramesUntil([&] { return Opponent().GetError().has_value(); }));
+
+        EXPECT_EQ(Var("status"), "Engine not found") << "the game is stalled by the error: it is what the person has to read, not 'Check'";
+        EXPECT_TRUE(Model().IsInCheck());
+
+        Press("ChessReset");
+        _manager->UpdateAll();
+
+        EXPECT_EQ(Var("status"), "");
+        EXPECT_EQ(Var("turn"), "White to move");
+    }
+
+    TEST_F(ChessUiTest, TheLevelElementIsShownOnlyWhileTheProgramPlays) {
+        const auto canvas = Hud();
+        ASSERT_TRUE(canvas);
+        // A scene without an element of that name is fine too (the board has nothing to show or hide); here the HUD gets one
+        const PoolString levelName = PoolString::Intern("Level");
+        if (canvas->GetRoot().FindByName(levelName) == nullptr) {
+            canvas->GetRoot().AddChild(levelName);
+            canvas->Invalidate();
+        }
+        const UIElement* level = canvas->GetRoot().FindByName(levelName);
+        ASSERT_NE(level, nullptr);
+        CountingFactory failing(EngineError{EngineErrorKind::LaunchFailed, "no Stockfish in the test"});
+        CountingFactory working({eastl::make_shared<InstantEngine>()});
+        _manager->UpdateAll();
+
+        Draw();
+        EXPECT_FALSE(level->style.visible) << "the first publication: nobody plays";
+
+        Opponent().SetEngineFactory(working.AsFactory());
+        Press("ChessCycleSide");
+        Draw();
+        EXPECT_TRUE(level->style.visible) << "the program plays Black";
+        Press("ChessCycleSide");
+        Draw();
+        EXPECT_TRUE(level->style.visible) << "the program plays White";
+        Press("ChessCycleSide");
+        Draw();
+        EXPECT_FALSE(level->style.visible) << "two people again";
+
+        Opponent().SetEngineFactory(failing.AsFactory());
+        Press("ChessCycleSide");
+        Draw();
+        EXPECT_FALSE(level->style.visible) << "a pick that found no engine leaves nobody: no strength to choose";
     }
 
 }  // namespace BECore::Chess::Tests

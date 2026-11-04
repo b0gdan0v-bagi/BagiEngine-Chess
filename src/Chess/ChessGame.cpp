@@ -38,8 +38,8 @@ namespace BECore::Chess {
         _model.Reset();
         _opponent.SetSettings(OpponentSettings::Load());
         // Two people: nothing is looked up or started until a side is picked. Neither call can fail without a side
-        (void)_opponent.SetSide(std::nullopt);
-        (void)_opponent.SetLevel(kDefaultOpponentLevel);
+        _opponent.SetSide(std::nullopt);
+        _opponent.SetLevel(kDefaultOpponentLevel);
     }
 
     void ChessGame::Stop() {

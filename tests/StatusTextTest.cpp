@@ -76,6 +76,26 @@ namespace BECore::Chess::Tests {
         ExpectWords(model, "Draw", "Draw: threefold repetition");
     }
 
+    TEST(StatusTextTest, WhileTheComputerThinksTheTurnSaysSoInsteadOfWhoseMoveItIs) {
+        ChessGameModel model;
+        EXPECT_EQ(StatusText::Turn(model, true), "Computer is thinking");
+        EXPECT_EQ(StatusText::Turn(model, false), "White to move");
+        EXPECT_EQ(StatusText::Turn(model), StatusText::Turn(model, false)) << "without the argument the program is not thinking";
+        ASSERT_TRUE(Play(model, "e2e4"));
+        EXPECT_EQ(StatusText::Turn(model, true), "Computer is thinking") << "for either side";
+        EXPECT_EQ(StatusText::Status(model), "") << "the status of the game says nothing about the search";
+    }
+
+    TEST(StatusTextTest, AFinishedGameIsNeverThinking) {
+        ChessGameModel model;
+        model.SetPosition(PositionFromFen("6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1"));
+        ASSERT_TRUE(Play(model, "a1a8"));
+        EXPECT_EQ(StatusText::Turn(model, true), "White wins");
+
+        model.SetPosition(PositionFromFen("7k/5Q2/6K1/8/8/8/8/8 b - - 0 1"));
+        EXPECT_EQ(StatusText::Turn(model, true), "Draw");
+    }
+
     TEST(StatusTextTest, AResetStartsOverInWords) {
         ChessGameModel model;
         model.SetPosition(PositionFromFen("7k/5Q2/6K1/8/8/8/8/8 b - - 0 1"));
