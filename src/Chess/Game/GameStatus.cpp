@@ -7,7 +7,6 @@ namespace BECore::Chess {
     namespace {
 
         constexpr int kThreefoldRepetitions = 3;
-        constexpr int kFiftyMovePlies = 100;
 
     }  // namespace
 
