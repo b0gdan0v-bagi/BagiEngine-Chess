@@ -320,10 +320,15 @@ def run_own_engine_scenario(client: BagiControlClient, headless: bool) -> None:
     client.call("set_state", {"opponent": {"engine": "stockfish", "plays": None}})
     opponent = get_opponent(client)
     check(opponent["engine"] == "stockfish" and opponent["plays"] is None and opponent["error"] is None, f"the switch back was not read: {opponent}")
-    client.call("perform_action", move("g1f3"))
-    client.call("perform_action", move("d7d6"))
+    # The moves are taken from the list, not typed: which reply the own engine gave is not this scenario's business
+    by_hand = []
+    for _ in range(2):
+        legal = [action["uci"] for action in client.call("list_actions")["actions"]]
+        check(bool(legal), "no legal move to play by hand")
+        by_hand.append(legal[0])
+        client.call("perform_action", move(legal[0]))
     let_frames_pass(client, FRAMES_WITHOUT_AN_ANSWER)
-    check(get_moves(client) == ["e2e4", second, "g1f3", "d7d6"], f"the game is not played by two people: {get_moves(client)}")
+    check(get_moves(client) == ["e2e4", second] + by_hand, f"the game is not played by two people: {get_moves(client)}")
     check(get_opponent(client)["thinking"] is False, "the opponent thinks with nobody picked")
 
 

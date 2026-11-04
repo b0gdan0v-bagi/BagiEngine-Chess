@@ -29,11 +29,11 @@ namespace BECore::Chess {
      * opponent is {"plays", "level", "engine", "thinking", "error"}: plays is the color the PROGRAM plays ("white" or "black"; null for two people, the start of
      * every game), level the id of the strength ("easy", "medium", "hard", "max"; the one that would be used, also while plays is null), engine the id of the
      * program that plays ("stockfish", the start of every game, or "own", the engine of the game itself; also the one that would be used while plays is null;
-     * one never stands in for the other), thinking whether the
-     * program is searching for its move, error null or {"kind", "detail"} (kind in snake_case: "launch_failed", "timeout", "process_died", "protocol_error",
-     * "illegal_move", "no_move", "bad_request", "cancelled", "unsupported"; detail is the sentence of the log). While an error stands the program does not play
-     * and waits for the version of the game to move (a reset, set_state, a move of someone else) or for another pick. A pick of Stockfish succeeds
-     * whenever a Stockfish file is found (a launch that fails shows only at the first search, as error "launch_failed"); a pick of "own" always succeeds.
+     * one never stands in for the other), thinking whether the program is searching for its move, error null or {"kind", "detail"} (kind in snake_case:
+     * "launch_failed", "timeout", "process_died", "protocol_error", "illegal_move", "no_move", "bad_request", "cancelled", "unsupported"; detail is the sentence
+     * of the log). While an error stands the program does not play and waits for the version of the game to move (a reset, set_state, a move of someone else) or
+     * for another pick. A pick of Stockfish succeeds whenever a Stockfish file is found (a launch that fails shows only at the first search, as error
+     * "launch_failed"); a pick of "own" always succeeds.
      *
      * Actions: {"type": "move", "uci": "e2e4"}, every legal move once; none once the game is over. The list does not change with the opponent: the program's
      * side is listed and accepted like the other (a controller may play for it; a search that the move makes stale is dropped). Castling is the king's move
@@ -41,12 +41,13 @@ namespace BECore::Chess {
      * "turn", "winner", "inCheck"} and fails with game_over, promotion_required, illegal_action (well-formed, not legal) or
      * invalid_params (not a UCI move). Reset takes no options and keeps the opponent.
      *
-     * SetState takes {"fen": ".."} (any position that Position::FromFen() accepts, which may be a finished game), {"opponent": {"plays": .., "level": .., "engine": ..}}
-     * (inside it a missing member means unchanged; plays is "white", "black" or null; level and engine an id: "stockfish" or "own", exactly as written) or both; neither is invalid_params. Everything
-     * is checked before anything changes, so a refused call (invalid_params) changes nothing. The opponent is applied first, then the position. A pick that finds no engine (only Stockfish can fail)
-     * is engine_unavailable (with the sentence of the engine's error): the position is not replaced, and the program plays nobody (the level and the engine stay picked, so a client can ask again with
-     * "engine": "own"). A pick that changes nothing (the same side, level and engine, no error standing) does nothing: a running Stockfish is not restarted. With an error standing, the same "plays"
-     * asks for an engine again, and plays null clears it.
+     * SetState takes {"fen": ".."} (any position that Position::FromFen() accepts, which may be a finished game), {"opponent": {"plays": .., "level": ..,
+     * "engine": ..}} (inside it a missing member means unchanged; plays is "white", "black" or null; level and engine an id, "stockfish" or "own" for the engine,
+     * exactly as written) or both; neither is invalid_params. Everything is checked before anything changes, so a refused call (invalid_params) changes nothing.
+     * The opponent is applied first, then the position. A pick that finds no engine (only Stockfish can fail) is engine_unavailable (with the sentence of the
+     * engine's error): the position is not replaced, and the program plays nobody (the level and the engine stay picked, so a client can ask again with
+     * "engine": "own"). A pick that changes nothing (the same side, level and engine, no error standing) does nothing: a running Stockfish is not restarted. With
+     * an error standing, the same "plays" asks for an engine again, and plays null clears it.
      *
      * The state version is the version of the game plus the revision of the opponent (a pick, an error that appears or goes), so a push reports a change of the
      * opponent as well; it never goes back.
