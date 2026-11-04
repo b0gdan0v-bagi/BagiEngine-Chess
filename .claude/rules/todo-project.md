@@ -17,7 +17,7 @@ An engine entry's branch `todo/<id>` is cut in `engine/` from `games/chess`; its
 
 - Build with a preset of `CMakePresets.json` (it includes the engine's presets): `cmake --build --preset <p> --target BagiChess ChessTests`, then `ctest --preset <p>` (the smoke test needs the game). This build contains the engine as the game uses it; the engine's own `BagiEngineTests` is **not** a target here. For an engine entry the reviewer also configures and builds the engine on its own, in `engine/` (`cd engine && cmake --preset <p> && cmake --build --preset <p> --target BagiEngineTests Match3Tests`, then `ctest --preset <p>` there), and compares its failures with the baseline taken on `games/chess`.
 - Read first: `CLAUDE.md` of this repository (the game) and `engine/CLAUDE.md` (style, DO and DON'T, the engine's contract), the nested `CLAUDE.md` of the touched directories, the matching `.claude/rules/` file of `<R>`.
-- Format: `python3 engine/CI/scripts/format_sources.py --changed --root <R>` and `strip_pch_includes.py --root <R>` (`<R>` is `.` for the game, `engine` for the engine); see the developer agent.
+- Format: `python3 engine/CI/scripts/format_sources.py --changed --root <R>` and `strip_pch_includes.py --root <R>` (`<R>` is `.` for the game, `engine` for the engine); see the developer agent; the full commands and the facts of this repository are in `.claude/rules/build-project.md`.
 
 ## Zones nobody edits
 
