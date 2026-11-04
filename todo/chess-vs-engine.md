@@ -1,5 +1,5 @@
 ---
-status: in progress 2026-11-03 branch todo/chess-vs-engine-2
+status: review 2026-11-04 branch todo/chess-vs-engine-2: the computer opponent in the window (Side and Level buttons in the HUD margins, Stockfish path from config/ChessSettings.local.xml then $STOCKFISH then PATH, OpponentController, 'Computer is thinking' and the engine's error sentence in the HUD, get_state.opponent / set_state opponent / engine_unavailable in the control API, smoke against the fake UCI engine on both clocks); 6 work packages each reviewed plus an integration review, ctest 430 tests with 426 passed and 4 skipped (no Stockfish installed), real headless run without an engine checked; not checked: the real window, a game against a real Stockfish, tuning of the level table; slice 2 of 5, after the merge set the status back to open
 ---
 # Chess: the computer opponent works in the window; no analysis, resign, takeback or promotion choice, and no engine of our own
 
