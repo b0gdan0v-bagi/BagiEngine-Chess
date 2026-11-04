@@ -17,11 +17,13 @@
         <!-- The HUD is in the margins of the view (space="SceneView"): it scales and moves with the board and never covers it, whatever the shape of the window.
              The board is 640 x 640 at (100, 80); the margin is 80 units above and below, so one row of 56-unit controls fits in each (12 units from the edge of the
              safe area), and a 56-unit button is still a 32 px touch target at the smallest fit scale of the size matrix (0.57, the 840 units of the width in a 480 px window).
-             The top row is Turn (left), Level and Reset (right); the bottom row is Side (left) and Status (right). Every element is anchored to a corner, so the row is
-             as wide as the safe area, which is about 689 units in the narrowest window of the matrix (480 px with side insets): the widths below add up to less than that
-             with gaps, and ChessUiTest lays every word the game can show into them. Side and Level are cycle buttons: the engine has no selector widget, so each press
-             emits an action (ChessCycleSide, ChessCycleLevel) and the text is a variable that the board publishes ({side}, {level}). Level is hidden by the board
-             while nobody is the opponent. The two have colors of their own, so they do not read as Reset. -->
+             The top row is Turn (left), Level and Reset (right); the bottom row is Side and Engine (left, side by side) and Status (right). Every element is anchored to a
+             corner, so the row is as wide as the safe area, which is about 689 units in the narrowest window of the matrix (480 px with side insets): the widths below add up
+             to less than that with gaps, and ChessUiTest lays every word the game can show into them. Side, Engine and Level are cycle buttons: the engine has no selector
+             widget, so each press emits an action (ChessCycleSide, ChessCycleEngine, ChessCycleLevel) and the text is a variable that the board publishes ({side}, {engine},
+             {level}). Level is hidden by the board while nobody is the opponent; Engine is always shown, because the person needs it exactly when the Stockfish pick failed
+             and nobody plays (its font is 22: "Own engine" does not fit 138 units at 24, and the rest of the row is Status at 48%). The three have colors of their own, so they
+             do not read as Reset. -->
         <node name="Hud" layer="10">
           <components>
             <component type="UICanvasComponent" space="SceneView" useSafeArea="true">
@@ -30,7 +32,8 @@
                 <element type="UIButton" name="Level" anchor="TopRight" x="-134" y="12" width="190" height="56" text="{level}" fontSize="24" action="ChessCycleLevel" color="45,75,120,255" />
                 <element type="UIButton" name="Reset" anchor="TopRight" x="-12" y="12" width="110" height="56" text="Reset" fontSize="26" action="ChessReset" color="40,90,60,255" />
                 <element type="UIButton" name="Side" anchor="BottomLeft" x="12" y="-12" width="170" height="56" text="{side}" fontSize="24" action="ChessCycleSide" color="110,75,40,255" />
-                <element type="UILabel" name="Status" anchor="BottomRight" x="-12" y="-12" width="60%" height="56" text="{status}" fontSize="28" align="Right" verticalAlign="Center" />
+                <element type="UIButton" name="Engine" anchor="BottomLeft" x="192" y="-12" width="138" height="56" text="{engine}" fontSize="22" action="ChessCycleEngine" color="80,60,115,255" />
+                <element type="UILabel" name="Status" anchor="BottomRight" x="-12" y="-12" width="48%" height="56" text="{status}" fontSize="28" align="Right" verticalAlign="Center" />
               </elements>
             </component>
           </components>

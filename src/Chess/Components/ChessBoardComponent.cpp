@@ -94,13 +94,16 @@ namespace BECore::Chess {
         const eastl::string status = error ? OpponentText::Error(*error) : StatusText::Status(model);
         const eastl::string side = OpponentText::SideLabel(opponent.GetPlays());
         const eastl::string level = OpponentText::LevelLabel(GetOpponentLevels()[opponent.GetLevel()]);
+        const eastl::string engine = OpponentText::EngineLabel(opponent.GetEngine());
         UIVars& vars = CoreManager::GetUIVars();
         vars.Set("turn"_intern, eastl::string_view(turn.data(), turn.size()));
         vars.Set("status"_intern, eastl::string_view(status.data(), status.size()));
         vars.Set("side"_intern, eastl::string_view(side.data(), side.size()));
         vars.Set("level"_intern, eastl::string_view(level.data(), level.size()));
+        vars.Set("engine"_intern, eastl::string_view(engine.data(), engine.size()));
 
-        // The strength means something only when the program plays. A scene without an element of that name has nothing to show or hide
+        // The strength means something only when the program plays; the engine button has no such rule (a failed Stockfish pick leaves nobody, and the person needs it then).
+        // A scene without an element of that name has nothing to show or hide
         if (opponentChanged) {
             UICanvasComponent::SetElementVisibleByName(GetScene(), "Level"_intern, opponent.GetPlays().has_value());
         }
@@ -110,6 +113,7 @@ namespace BECore::Chess {
         // The actions of the buttons of the HUD in config/SceneConfig.xml
         const PoolString resetAction = "ChessReset"_intern;
         const PoolString cycleSideAction = "ChessCycleSide"_intern;
+        const PoolString cycleEngineAction = "ChessCycleEngine"_intern;
         const PoolString cycleLevelAction = "ChessCycleLevel"_intern;
         if (event.action == resetAction) {
             if (ChessGameModel* model = ChessGame::GetActiveModel()) {
@@ -124,6 +128,8 @@ namespace BECore::Chess {
         // A pick that finds no engine returns its error and keeps it in the controller; the Status label shows it, so there is nothing to handle here
         if (event.action == cycleSideAction) {
             opponent->CycleSide();
+        } else if (event.action == cycleEngineAction) {
+            opponent->CycleEngine();
         } else if (event.action == cycleLevelAction) {
             opponent->CycleLevel();
         }
