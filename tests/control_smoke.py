@@ -5,11 +5,13 @@
 
 ctest runs it as BagiChessControlSmoke (be_add_game_control_tests). It builds on the engine's tools/control/tests/smoke.py,
 which it finds through the environment variable BAGI_ENGINE_DIR (set by ctest), or in the submodule engine/. The game is played on the real clock, with
---manual-clock, and with moves before its first frame. The computer opponent is played on both clocks against tests/fake_uci_engine.py: main() writes a
-wrapper script that starts it into a temporary directory and puts the script in STOCKFISH of the environment, which the game inherits. STOCKFISH comes
-before PATH in the game's search for an engine and the committed config has no path, so a Stockfish installed on this machine is never used. A
-config/ChessSettings.local.xml (a person's own path, which would win over STOCKFISH) leaves the opponent scenarios out, as does Windows; the smoke never
-edits a person's files. Exit code: 0 passed, 1 failed, 77 skipped (the executable does not exist).
+--manual-clock, and with moves before its first frame. The computer opponent is played on both clocks in two ways. The engine of our own ("own
+engine" scenarios, base ones) needs nothing from the environment: it runs inside the game, with no process, so it also runs where the next kind is left out;
+it answers the same move to the same position (a fixed depth), which the scenario checks after a reset. Stockfish ("opponent" scenarios) is replaced by
+tests/fake_uci_engine.py: main() writes a wrapper script that starts it into a temporary directory and puts the script in STOCKFISH of the environment,
+which the game inherits. STOCKFISH comes before PATH in the game's search for an engine and the committed config has no path, so a Stockfish installed on
+this machine is never used. A config/ChessSettings.local.xml (a person's own path, which would win over STOCKFISH) leaves the Stockfish scenarios out, as
+does Windows; the smoke never edits a person's files. Exit code: 0 passed, 1 failed, 77 skipped (the executable does not exist).
 """
 
 import os
@@ -227,16 +229,21 @@ def let_frames_pass(client: BagiControlClient, frames: int) -> None:
 
 
 def wait_for_the_program(client: BagiControlClient, expected_moves: list) -> None:
-    """Until the program has played and is not thinking. Real clock: poll; manual clock: step a frame per poll. Limited by time, never a fixed sleep."""
+    """Until the moves are exactly these and the program is not thinking."""
+    wait_until_the_program_played(client, lambda moves: moves == expected_moves, f"moves {expected_moves}")
+
+
+def wait_until_the_program_played(client: BagiControlClient, accept, what: str) -> None:
+    """Until accept(moves) holds and the program is not thinking. Real clock: poll; manual clock: step a frame per poll. Limited by time, never a fixed sleep."""
     deadline = time.monotonic() + OPPONENT_WAIT_SECONDS
     manual = client.call("status")["manualClock"]
     while True:
         state = client.call("get_state")["state"]
         opponent = state["opponent"]
         check(opponent["error"] is None, f"the opponent failed: {opponent['error']}")
-        if state["moves"] == expected_moves and not opponent["thinking"]:
+        if accept(state["moves"]) and not opponent["thinking"]:
             return
-        check(time.monotonic() < deadline, f"the program did not play in {OPPONENT_WAIT_SECONDS} s: moves {state['moves']}, opponent {opponent}")
+        check(time.monotonic() < deadline, f"the program did not play ({what}) in {OPPONENT_WAIT_SECONDS} s: moves {state['moves']}, opponent {opponent}")
         if manual:
             client.call("step")
         time.sleep(POLL_SECONDS)
@@ -250,6 +257,7 @@ def run_opponent_scenario(client: BagiControlClient, headless: bool) -> None:
 
     opponent = get_opponent(client)
     check(opponent["plays"] is None and opponent["level"] == "medium" and opponent["thinking"] is False and opponent["error"] is None, f"unexpected default opponent {opponent}")
+    check(opponent["engine"] == "stockfish", f"the default engine is not stockfish: {opponent}")
 
     version = client.call("get_state")["version"]
     picked = client.call("set_state", {"opponent": {"plays": "black", "level": "easy"}})
@@ -273,6 +281,57 @@ def run_opponent_scenario(client: BagiControlClient, headless: bool) -> None:
     check(get_opponent(client)["thinking"] is False, "the opponent thinks with nobody picked")
 
 
+def play_against_the_own_engine(client: BagiControlClient) -> str:
+    """The person plays e2e4 against the program as Black; gives the program's reply, after checking the standing."""
+    client.call("perform_action", move("e2e4"))
+    wait_until_the_program_played(client, lambda moves: len(moves) == 2, "two moves")
+    state = client.call("get_state")["state"]
+    reply = state["moves"][1]
+    check(state["moves"][0] == "e2e4" and state["status"] == "ongoing" and state["turn"] == "white", f"unexpected standing after the reply {reply}: {state}")
+    check(state["opponent"]["error"] is None, f"the own engine has an error: {state['opponent']['error']}")
+    # The model plays only what the generator allows (TryMove), so a reply in the history is legal; here it must also be a move of a black piece
+    check(reply[1] in "78", f"the reply {reply} does not start on Black's side of the board")
+    return reply
+
+
+def run_own_engine_scenario(client: BagiControlClient, headless: bool) -> None:
+    """The program is the engine of our own: no process, no environment. It answers, answers the same way after a reset, and lets go of the game."""
+    if client.call("status")["manualClock"]:
+        client.call("step")
+    client.call("reset")
+    check(get_opponent(client)["engine"] == "stockfish", f"the default engine is not stockfish: {get_opponent(client)}")
+
+    version = client.call("get_state")["version"]
+    picked = client.call("set_state", {"opponent": {"engine": "own", "plays": "black", "level": "easy"}})
+    check(picked["version"] > version, "picking the own engine did not move the state version")
+    opponent = get_opponent(client)
+    check(opponent["engine"] == "own" and opponent["plays"] == "black" and opponent["level"] == "easy" and opponent["error"] is None, f"the pick was not read back: {opponent}")
+    check(get_moves(client) == [], "picking the opponent played a move")
+
+    first = play_against_the_own_engine(client)
+
+    # A fixed depth is deterministic: the same game after a reset gets the same reply, and the reset keeps the engine
+    client.call("reset")
+    check(get_opponent(client)["engine"] == "own" and get_opponent(client)["plays"] == "black", f"a reset lost the pick: {get_opponent(client)}")
+    second = play_against_the_own_engine(client)
+    check(first == second, f"the own engine answered e2e4 with {first}, then with {second}")
+
+    # Back to Stockfish and to two people: the program stays out of the game
+    client.call("set_state", {"opponent": {"engine": "stockfish", "plays": None}})
+    opponent = get_opponent(client)
+    check(opponent["engine"] == "stockfish" and opponent["plays"] is None and opponent["error"] is None, f"the switch back was not read: {opponent}")
+    # The moves are taken from the list, not typed: which reply the own engine gave is not this scenario's business
+    by_hand = []
+    for _ in range(2):
+        legal = [action["uci"] for action in client.call("list_actions")["actions"]]
+        check(bool(legal), "no legal move to play by hand")
+        by_hand.append(legal[0])
+        client.call("perform_action", move(legal[0]))
+    let_frames_pass(client, FRAMES_WITHOUT_AN_ANSWER)
+    check(get_moves(client) == ["e2e4", second] + by_hand, f"the game is not played by two people: {get_moves(client)}")
+    check(get_opponent(client)["thinking"] is False, "the opponent thinks with nobody picked")
+
+
 def local_settings_exist() -> bool:
     return LOCAL_SETTINGS.exists()
 
@@ -289,6 +348,8 @@ BASE_SCENARIOS = [
     ("real clock", [], run_chess_scenario),
     ("manual clock", ["--manual-clock"], run_chess_scenario),
     ("moves before the first frame", ["--manual-clock"], run_moves_before_the_first_frame),
+    ("own engine, real clock", [], run_own_engine_scenario),
+    ("own engine, manual clock", ["--manual-clock"], run_own_engine_scenario),
 ]
 
 OPPONENT_SCENARIOS = [

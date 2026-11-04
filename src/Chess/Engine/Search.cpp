@@ -17,6 +17,11 @@ namespace BECore::Chess {
         /// live on the stack: a Negamax or Quiescence frame takes about 3 KB in a Debug build (measured, macOS), so 96 plies are
         /// about 300 KB, which fits the 512 KB that a std::thread of the Background pool gets on macOS (Linux gives 8 MB, Windows 1 MB)
         constexpr int kMaxPly = kMaxSearchDepth + kMaxExtensionPly;
+        /// The size of a Negamax or Quiescence frame in a Debug build (measured on macOS) and the stack of a Background pool thread there (a std::thread with the default
+        /// 512 KB); the assert keeps the comment above honest if kMaxSearchDepth or the extension grows
+        constexpr size_t kApproxFrameBytes = 3072;
+        constexpr size_t kBackgroundStackBytes = 512 * 1024;
+        static_assert(static_cast<size_t>(kMaxPly) * kApproxFrameBytes < kBackgroundStackBytes, "the deepest line must fit the stack of a Background thread");
 
         /// A position that has occurred this many times (itself counted) scores as a draw inside the tree: once before is enough
         constexpr int kRepetitionDrawCount = 2;

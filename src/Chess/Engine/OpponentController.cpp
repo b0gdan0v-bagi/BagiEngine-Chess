@@ -1,5 +1,6 @@
 #include "OpponentController.h"
 
+#include <Chess/Engine/OwnEngine.h>
 #include <Chess/Engine/UciEngine.h>
 
 namespace BECore::Chess {
@@ -48,15 +49,27 @@ namespace BECore::Chess {
     }
 
     std::expected<void, EngineError> OpponentController::SetSide(std::optional<PieceColor> computer) {
-        return Remake(computer, _level);
+        return Remake(computer, _level, _engine);
     }
 
     std::expected<void, EngineError> OpponentController::SetLevel(size_t level) {
-        return Remake(GetPlays(), level);
+        return Remake(GetPlays(), level, _engine);
     }
 
     std::expected<void, EngineError> OpponentController::Choose(std::optional<PieceColor> computer, size_t level) {
-        return Remake(computer, level);
+        return Remake(computer, level, _engine);
+    }
+
+    std::expected<void, EngineError> OpponentController::Choose(std::optional<PieceColor> computer, size_t level, OpponentEngine engine) {
+        return Remake(computer, level, engine);
+    }
+
+    std::expected<void, EngineError> OpponentController::SetEngine(OpponentEngine engine) {
+        return Remake(GetPlays(), _level, engine);
+    }
+
+    std::expected<void, EngineError> OpponentController::CycleEngine() {
+        return SetEngine(NextOpponentEngine(_engine));
     }
 
     std::expected<void, EngineError> OpponentController::CycleSide() {
@@ -88,12 +101,12 @@ namespace BECore::Chess {
         _opponentErrorNoted = false;
     }
 
-    std::expected<void, EngineError> OpponentController::Remake(std::optional<PieceColor> computer, size_t level) {
+    std::expected<void, EngineError> OpponentController::Remake(std::optional<PieceColor> computer, size_t level, OpponentEngine engine) {
         const eastl::span<const OpponentLevel> levels = GetOpponentLevels();
         if (level >= levels.size()) {
             return std::unexpected(EngineError{EngineErrorKind::BadRequest, Format("there is no level {}, the levels are 0 to {}", level, levels.size() - 1)});
         }
-        if (computer == GetPlays() && level == _level && !GetError().has_value()) {
+        if (computer == GetPlays() && level == _level && engine == _engine && !GetError().has_value()) {
             return {};
         }
 
@@ -101,34 +114,44 @@ namespace BECore::Chess {
         _pickError.reset();
         _opponentErrorNoted = false;
         _level = level;
+        _engine = engine;
         ++_revision;
         if (!computer) {
             return {};
         }
 
         const OpponentLevel& chosen = levels[level];
-        std::expected<eastl::shared_ptr<IChessEngine>, EngineError> engine = MakeEngine(chosen);
-        if (engine && !*engine) {
-            engine = std::unexpected(EngineError{EngineErrorKind::LaunchFailed, "the engine factory made no engine"});
+        std::expected<eastl::shared_ptr<IChessEngine>, EngineError> made = MakeEngine(engine, chosen);
+        if (made && !*made) {
+            made = std::unexpected(EngineError{EngineErrorKind::LaunchFailed, "the engine factory made no engine"});
         }
-        if (!engine) {
-            FailPick(std::move(engine.error()), *computer, chosen);
+        if (!made) {
+            FailPick(std::move(made.error()), *computer, engine, chosen);
             return std::unexpected(*_pickError);
         }
-        _opponent = eastl::make_unique<EngineOpponent>(std::move(*engine), *computer, LimitsOf(chosen));
+        _opponent = eastl::make_unique<EngineOpponent>(std::move(*made), *computer, LimitsOf(engine, chosen));
         if (_model.GetTurn() == *computer) {
             _model.ClearSelection();
         }
         return {};
     }
 
-    std::expected<eastl::shared_ptr<IChessEngine>, EngineError> OpponentController::MakeEngine(const OpponentLevel& level) const {
-        return _factory ? _factory(level) : MakeStockfishEngine(_settings, level);
+    std::expected<eastl::shared_ptr<IChessEngine>, EngineError> OpponentController::MakeEngine(OpponentEngine engine, const OpponentLevel& level) const {
+        if (_factory) {
+            return _factory(engine, level);
+        }
+        switch (engine) {
+            case OpponentEngine::Stockfish:
+                return MakeStockfishEngine(_settings, level);
+            case OpponentEngine::Own:
+                return eastl::make_shared<OwnEngine>();
+        }
+        return std::unexpected(EngineError{EngineErrorKind::BadRequest, "unknown engine"});
     }
 
-    void OpponentController::FailPick(EngineError error, PieceColor computer, const OpponentLevel& level) {
-        LOG_WARNING("Opponent: no engine to play {} at level {}, the game stays with two players, {}: {}"_format(EnumUtils<PieceColor>::ToString(computer), level.id,
-                                                                                                                 EnumUtils<EngineErrorKind>::ToString(error.kind), error.detail));
+    void OpponentController::FailPick(EngineError error, PieceColor computer, OpponentEngine engine, const OpponentLevel& level) {
+        LOG_WARNING("Opponent: no {} engine to play {} at level {}, the game stays with two players, {}: {}"_format(OpponentEngineId(engine), EnumUtils<PieceColor>::ToString(computer), level.id,
+                                                                                                                    EnumUtils<EngineErrorKind>::ToString(error.kind), error.detail));
         _pickError = std::move(error);
         _errorVersion = _model.GetVersion();
     }

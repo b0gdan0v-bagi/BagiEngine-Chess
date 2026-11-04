@@ -9,7 +9,7 @@
 #include <thread>
 
 /// OwnEngine through IChessEngine: the contract of UciEngine::FindMove without a process, a whole game against itself and against a random mover, and
-/// the engine inside a running OpponentController (the real TaskManager). The fixture starts the core services (TaskManager) for the last of these.
+/// the engine inside a running OpponentController (the real TaskManager). The fixture starts the core services (TaskManager) for the last one.
 namespace BECore::Chess::Tests {
 
     namespace {
@@ -328,7 +328,7 @@ namespace BECore::Chess::Tests {
         ChessGameModel model;
         const auto engine = eastl::make_shared<LimitedEngine>(eastl::make_shared<OwnEngine>(), Depth(kFloorDepth));
         OpponentController controller(model);
-        controller.SetEngineFactory([engine](const OpponentLevel&) -> MadeEngine { return engine; });
+        controller.SetEngineFactory([engine](OpponentEngine, const OpponentLevel&) -> MadeEngine { return engine; });
         ASSERT_TRUE(controller.SetSide(PieceColor::Black).has_value());
         ASSERT_TRUE(Play(model, "e2e4"));
 
@@ -349,7 +349,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(Play(model, "e2e4"));
         const auto engine = eastl::make_shared<LimitedEngine>(eastl::make_shared<OwnEngine>(), Depth(kDepthThatNeverEnds));
         OpponentController controller(model);
-        controller.SetEngineFactory([engine](const OpponentLevel&) -> MadeEngine { return engine; });
+        controller.SetEngineFactory([engine](OpponentEngine, const OpponentLevel&) -> MadeEngine { return engine; });
         ASSERT_TRUE(controller.SetSide(PieceColor::Black).has_value());
         controller.Update();
         ASSERT_TRUE(WaitUntil([&] { return engine->Calls() == 1; })) << "the search runs on the pool";

@@ -13,12 +13,19 @@ namespace BECore::Chess {
         constexpr int kHardMoveTimeMs = 800;
         constexpr int kMaxSkillLevel = 20;
         constexpr int kMaxMoveTimeMs = 2000;
+        // The depth of the own engine at each level, first guesses too (tuned by hand like the Stockfish ones). Measured in a Debug build on macOS, one search with no
+        // clock: the deepest level (depth 5) takes 0.18 s from the start position and 0.63 s from Kiwipete, 0.44 s at worst of the other perft positions; depth 6 would take
+        // 1.4 s, 2.5 s and 3.2 s, so 5 leaves room for a slower machine
+        constexpr int kEasyOwnDepth = 1;
+        constexpr int kMediumOwnDepth = 3;
+        constexpr int kHardOwnDepth = 4;
+        constexpr int kMaxOwnDepth = 5;
 
         constexpr eastl::array<OpponentLevel, 4> kLevels{
-            OpponentLevel{"easy", "Easy", kEasySkillLevel, kEasyMoveTimeMs},
-            OpponentLevel{"medium", "Medium", kMediumSkillLevel, kMediumMoveTimeMs},
-            OpponentLevel{"hard", "Hard", kHardSkillLevel, kHardMoveTimeMs},
-            OpponentLevel{"max", "Max", kMaxSkillLevel, kMaxMoveTimeMs},
+            OpponentLevel{"easy", "Easy", kEasySkillLevel, kEasyMoveTimeMs, kEasyOwnDepth},
+            OpponentLevel{"medium", "Medium", kMediumSkillLevel, kMediumMoveTimeMs, kMediumOwnDepth},
+            OpponentLevel{"hard", "Hard", kHardSkillLevel, kHardMoveTimeMs, kHardOwnDepth},
+            OpponentLevel{"max", "Max", kMaxSkillLevel, kMaxMoveTimeMs, kMaxOwnDepth},
         };
         static_assert(!kLevels.empty());
         static_assert(kDefaultOpponentLevel < kLevels.size());
@@ -40,8 +47,14 @@ namespace BECore::Chess {
         return std::nullopt;
     }
 
-    SearchLimits LimitsOf(const OpponentLevel& level) {
-        return SearchLimits{level.moveTimeMs, 0};
+    SearchLimits LimitsOf(OpponentEngine engine, const OpponentLevel& level) {
+        switch (engine) {
+            case OpponentEngine::Stockfish:
+                return SearchLimits{level.moveTimeMs, 0};
+            case OpponentEngine::Own:
+                return SearchLimits{kOwnMoveTimeCapMs, level.ownDepth};
+        }
+        return SearchLimits{};
     }
 
     eastl::vector<eastl::pair<eastl::string, eastl::string>> EngineOptionsOf(const OpponentLevel& level) {

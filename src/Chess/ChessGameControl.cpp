@@ -110,13 +110,23 @@ namespace BECore::Chess {
         struct OpponentPick {
             std::optional<PieceColor> plays;
             size_t level = kDefaultOpponentLevel;
+            OpponentEngine engine = kDefaultOpponentEngine;
         };
+
+        /// "stockfish, own" for a message
+        eastl::string EngineIds() {
+            eastl::string ids;
+            for (const OpponentEngine engine : EnumUtils<OpponentEngine>::Values()) {
+                ids += Format("{}{}", ids.empty() ? "" : ", ", OpponentEngineId(engine));
+            }
+            return ids;
+        }
 
         ControlError BadOpponent(eastl::string message) {
             return MakeControlError(ControlErrors::kInvalidParams, message);
         }
 
-        /// Reads {"plays", "level"}; a member that is missing keeps what @p current says. Nothing is changed: the pick is applied by the caller once everything is valid
+        /// Reads {"plays", "level", "engine"}; a member that is missing keeps what @p current says. Nothing is changed: the pick is applied by the caller once everything is valid
         std::expected<OpponentPick, ControlError> ParseOpponent(const Json& opponent, OpponentPick current) {
             if (!opponent.is_object()) {
                 return std::unexpected(BadOpponent("'opponent' has to be an object like {\"plays\": \"black\", \"level\": \"easy\"}"));
@@ -142,6 +152,14 @@ namespace BECore::Chess {
                     return std::unexpected(BadOpponent(Format("opponent 'level' has to be the id of a level: {}", LevelIds())));
                 }
                 current.level = *level;
+            }
+            if (FindJsonMember(opponent, "engine")) {
+                const auto id = GetJsonString(opponent, "engine");
+                const std::optional<OpponentEngine> engine = id ? FindOpponentEngine(eastl::string_view(id->data(), id->size())) : std::nullopt;
+                if (!engine) {
+                    return std::unexpected(BadOpponent(Format("opponent 'engine' has to be the id of an engine: {}", EngineIds())));
+                }
+                current.engine = *engine;
             }
             return current;
         }
@@ -189,6 +207,7 @@ namespace BECore::Chess {
         Json opponent = Json::object();
         opponent["plays"] = plays ? MakeJsonString(ColorName(*plays)) : Json();
         opponent["level"] = MakeJsonString(GetOpponentLevels()[_opponent.GetLevel()].id);
+        opponent["engine"] = MakeJsonString(OpponentEngineId(_opponent.GetEngine()));
         opponent["thinking"] = _opponent.IsThinking();
         if (error) {
             Json described = Json::object();
@@ -253,7 +272,7 @@ namespace BECore::Chess {
         const Json* fenMember = FindJsonMember(state, "fen");
         const Json* opponentMember = FindJsonMember(state, "opponent");
         if (!fenMember && !opponentMember) {
-            return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, "'fen' (a FEN string), 'opponent' ({\"plays\", \"level\"}) or both are needed"));
+            return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, "'fen' (a FEN string), 'opponent' ({\"plays\", \"level\", \"engine\"}) or both are needed"));
         }
 
         // Check everything first: a refused call changes nothing
@@ -271,7 +290,7 @@ namespace BECore::Chess {
         }
         std::optional<OpponentPick> pick;
         if (opponentMember) {
-            auto parsed = ParseOpponent(*opponentMember, OpponentPick{_opponent.GetPlays(), _opponent.GetLevel()});
+            auto parsed = ParseOpponent(*opponentMember, OpponentPick{_opponent.GetPlays(), _opponent.GetLevel(), _opponent.GetEngine()});
             if (!parsed) {
                 return std::unexpected(std::move(parsed.error()));
             }
@@ -280,7 +299,7 @@ namespace BECore::Chess {
 
         // The opponent first: it is the one step that can fail later (no engine), and then the position stays as it is
         if (pick) {
-            const auto chosen = _opponent.Choose(pick->plays, pick->level);
+            const auto chosen = _opponent.Choose(pick->plays, pick->level, pick->engine);
             if (!chosen) {
                 return std::unexpected(
                     MakeControlError(ChessControlErrors::kEngineUnavailable, Format("no engine for the opponent ({}): {}", ErrorKindName(chosen.error().kind), chosen.error().detail)));

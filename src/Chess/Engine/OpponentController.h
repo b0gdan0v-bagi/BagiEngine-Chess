@@ -6,24 +6,29 @@
 
 namespace BECore::Chess {
 
-    /// Makes the engine for one level, or says why there is none. The default makes a UciEngine over the Stockfish the settings point at; a test gives a double
-    using EngineFactory = eastl::function<std::expected<eastl::shared_ptr<IChessEngine>, EngineError>(const OpponentLevel&)>;
+    /// Makes the engine for one kind and level, or says why there is none. The default makes a UciEngine over the Stockfish the settings point at for Stockfish and an OwnEngine
+    /// for Own (which cannot fail); a test gives a double
+    using EngineFactory = eastl::function<std::expected<eastl::shared_ptr<IChessEngine>, EngineError>(OpponentEngine, const OpponentLevel&)>;
 
     /**
-     * @brief The seat of the computer opponent: which side the program plays (or none), at which strength, and the EngineOpponent behind that choice.
+     * @brief The seat of the computer opponent: which side the program plays (or none), which engine, at which strength, and the EngineOpponent behind that choice.
      *
      * A game starts with nobody as the opponent: two people on one screen, and nothing is looked up or started. SetSide() picks the side the program plays
      * (the side of the program, not of the person: the HUD turns it around), asks the engine factory for an engine and makes an EngineOpponent for it; a pick
      * that finds no engine leaves nobody as the opponent, keeps the error in GetError() and logs one warning, so a missing Stockfish locks no one out. SetLevel()
-     * picks the strength. A change of side or level destroys the old EngineOpponent first (it cancels its search and returns at once, and a late answer of
-     * that search is never played) and makes another, because the side is fixed by the EngineOpponent constructor and the Skill Level option is sent at the
-     * handshake. A pick that changes nothing (the same side and level, no error) does nothing.
+     * picks the strength, SetEngine() the engine (Stockfish or the own one; a game starts with kDefaultOpponentEngine). A change of side, level or engine destroys the old EngineOpponent first (it
+     * cancels its search and returns at once, and a late answer of that search is never played) and makes another, because the side is fixed by the EngineOpponent constructor and the Skill Level
+     * option is sent at the handshake. A pick that changes nothing (the same side, level and engine, no error) does nothing.
+     *
+     * The engine is part of the choice and nothing else picks it: there is no fallback from one engine to the other. A failed Stockfish pick leaves nobody as the opponent
+     * and the error in GetError(); the person picks the other engine (SetEngine()), which clears the error, and then a side. While nobody plays, SetEngine() only changes the
+     * choice: no factory call, nothing is looked up or started.
      *
      * The error rule: an error belongs to the version of the game it came from (ChessGameModel::GetVersion()). When the version moves (a reset, a position set from
      * outside, a move of someone else) Update() clears the error, the opponent's too, and a new pick clears it as well: the person has acted, so they have seen it.
      * Until then the game waits and no search starts, so a broken engine is one error and not a try per frame. A person who does not want to wait picks nobody.
      *
-     * GetRevision() grows whenever something a display shows changes: the side, the level, an error that appears or goes. It does not grow with a search that
+     * GetRevision() grows whenever something a display shows changes: the side, the level, the engine, an error that appears or goes. It does not grow with a search that
      * starts or ends (IsThinking()) or with a move of the game (GetVersion() of the model); a display that publishes these watches the three.
      *
      * Threads: main thread only (every call, Update() included). The engine is searched on the Background pool by EngineOpponent, which says more of stale answers
@@ -53,7 +58,7 @@ namespace BECore::Chess {
         /// Where the default factory looks for Stockfish; read at the next pick, an opponent that already plays keeps its engine
         void SetSettings(OpponentSettings settings);
 
-        /// The factory that makes the engine at a pick; an empty one puts the default back (the Stockfish of the settings)
+        /// The factory that makes the engine at a pick, asked for (engine, level); an empty one puts the default back (the Stockfish of the settings, the OwnEngine)
         void SetEngineFactory(EngineFactory factory);
 
         /**
@@ -70,8 +75,18 @@ namespace BECore::Chess {
         /// Nobody, then the program plays Black (the person has White), then the program plays White, then nobody again
         std::expected<void, EngineError> CycleSide();
 
-        /// Side and strength in one pick: one engine is made, not two. The same rules as SetSide() and SetLevel(); BadRequest, with nothing changed, for a level outside GetOpponentLevels()
+        /// Side and strength in one pick, the engine kept: one engine is made, not two. The same rules as SetSide() and SetLevel(); BadRequest, with nothing changed, for a level outside
+        /// GetOpponentLevels()
         std::expected<void, EngineError> Choose(std::optional<PieceColor> computer, size_t level);
+
+        /// Side, strength and engine in one pick: one engine is made, not three. BadRequest, with nothing changed, for a level outside GetOpponentLevels()
+        std::expected<void, EngineError> Choose(std::optional<PieceColor> computer, size_t level, OpponentEngine engine);
+
+        /// The engine; remakes the opponent when the program plays (the factory is asked once for (engine, level)), else only changes the choice and clears a standing pick error
+        std::expected<void, EngineError> SetEngine(OpponentEngine engine);
+
+        /// The next engine: Stockfish, Own, and back to Stockfish
+        std::expected<void, EngineError> CycleEngine();
 
         /// The next level, the first one after the last
         std::expected<void, EngineError> CycleLevel();
@@ -97,6 +112,11 @@ namespace BECore::Chess {
             return _level;
         }
 
+        /// The picked engine; the one that would be used when a side is picked, also while nobody plays
+        [[nodiscard]] OpponentEngine GetEngine() const noexcept {
+            return _engine;
+        }
+
         /// The program is searching for its move
         [[nodiscard]] bool IsThinking() const {
             return _opponent && _opponent->IsThinking();
@@ -107,21 +127,22 @@ namespace BECore::Chess {
             return _opponent ? _opponent->GetLastError() : _pickError;
         }
 
-        /// Grows with every change of the side, the level or the error that a display shows; never goes back
+        /// Grows with every change of the side, the level, the engine or the error that a display shows; never goes back
         [[nodiscard]] uint64_t GetRevision() const noexcept {
             return _revision;
         }
 
     private:
-        std::expected<void, EngineError> Remake(std::optional<PieceColor> computer, size_t level);
-        [[nodiscard]] std::expected<eastl::shared_ptr<IChessEngine>, EngineError> MakeEngine(const OpponentLevel& level) const;
-        void FailPick(EngineError error, PieceColor computer, const OpponentLevel& level);
+        std::expected<void, EngineError> Remake(std::optional<PieceColor> computer, size_t level, OpponentEngine engine);
+        [[nodiscard]] std::expected<eastl::shared_ptr<IChessEngine>, EngineError> MakeEngine(OpponentEngine engine, const OpponentLevel& level) const;
+        void FailPick(EngineError error, PieceColor computer, OpponentEngine engine, const OpponentLevel& level);
         void DropStaleError();
         void NoteOpponentError();
 
         ChessGameModel& _model;
         OpponentSettings _settings;
-        EngineFactory _factory;                       ///< empty: the Stockfish of _settings
+        EngineFactory _factory;  ///< empty: the Stockfish of _settings, the OwnEngine
+        OpponentEngine _engine = kDefaultOpponentEngine;
         size_t _level = kDefaultOpponentLevel;        ///< an index of GetOpponentLevels()
         eastl::unique_ptr<EngineOpponent> _opponent;  ///< null: nobody, two people
         std::optional<EngineError> _pickError;        ///< the factory's failure; the opponent is null while it stands
