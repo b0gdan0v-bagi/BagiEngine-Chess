@@ -12,8 +12,11 @@ namespace BECore::Chess {
 
         }  // namespace
 
-        eastl::string Turn(const ChessGameModel& model) {
+        eastl::string Turn(const ChessGameModel& model, bool opponentThinking) {
             if (!model.IsGameOver()) {
+                if (opponentThinking) {
+                    return "Computer is thinking";
+                }
                 return Format("{} to move", ColorName(model.GetTurn()));
             }
             if (const auto winner = model.GetWinner()) {

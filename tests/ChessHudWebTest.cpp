@@ -1,3 +1,5 @@
+#include "HudWords.h"
+
 #include <BECore/GameManager/CoreManager.h>
 #include <BECore/Reflection/XmlDeserializer.h>
 #include <BECore/UI/UICanvasComponent.h>
@@ -7,11 +9,8 @@
 #include <Common/EngineEnvironment.h>
 #include <Common/Printers.h>
 #include <Common/UILayoutMatrix.h>
-#include <filesystem>
 #include <gtest/gtest.h>
 #include <memory>
-#include <sstream>
-#include <string>
 
 namespace BECore::Tests {
 
@@ -25,13 +24,17 @@ namespace BECore::Tests {
         // that it lays out like the HUD in config/SceneConfig.xml, the one the game ships.
         constexpr const char* kChessHudHtml = R"(
 <span id="Turn">{turn}</span>
+<button id="Level" data-action="ChessCycleLevel">{level}</button>
 <button id="Reset" data-action="ChessReset">Reset</button>
+<button id="Side" data-action="ChessCycleSide">{side}</button>
 <span id="Status">{status}</span>)";
 
         constexpr const char* kChessHudCss = R"(
-#Turn   { left: 100px; top: 12px; width: 420px; height: 56px; font-size: 32px; vertical-align: middle; }
-#Reset  { anchor: top-right; right: 100px; top: 12px; width: 150px; height: 56px; font-size: 26px; background: rgb(40, 90, 60); }
-#Status { anchor: bottom; bottom: 12px; width: 76%; height: 56px; font-size: 28px; text-align: center; vertical-align: middle; }
+#Turn   { left: 12px; top: 12px; width: 320px; height: 56px; font-size: 28px; vertical-align: middle; }
+#Level  { anchor: top-right; right: 134px; top: 12px; width: 190px; height: 56px; font-size: 24px; background: rgb(45, 75, 120); }
+#Reset  { anchor: top-right; right: 12px; top: 12px; width: 110px; height: 56px; font-size: 26px; background: rgb(40, 90, 60); }
+#Side   { anchor: bottom-left; left: 12px; bottom: 12px; width: 170px; height: 56px; font-size: 24px; background: rgb(110, 75, 40); }
+#Status { anchor: bottom-right; right: 12px; bottom: 12px; width: 60%; height: 56px; font-size: 28px; text-align: right; vertical-align: middle; }
 )";
 
         std::filesystem::path ShippedSceneConfig() {
@@ -150,7 +153,7 @@ namespace BECore::Tests {
         for (const auto& [width, height] : {std::pair{1280.0f, 720.0f}, {480.0f, 480.0f}, {720.0f, 1280.0f}, {2560.0f, 1080.0f}}) {
             web.At(width, height);
             xml.At(width, height);
-            for (const char* name : {"Turn", "Reset", "Status"}) {
+            for (const char* name : {"Turn", "Level", "Reset", "Side", "Status"}) {
                 SCOPED_TRACE(Format("{} at {}x{}", name, width, height).c_str());
                 ExpectSameRect(xml.Find(name), web.Find(name), name);
             }
@@ -160,16 +163,18 @@ namespace BECore::Tests {
     TEST_F(ChessHudWebTest, TheHudInHtmlPassesTheSizeMatrixInTheMarginsOfTheView) {
         const auto compiled = Compile(kChessHudHtml, kChessHudCss);
         LaidOut web(compiled->content);
-        // The longest words the game can show
-        CoreManager::GetUIVars().Set("turn"_intern, "White to move");
-        CoreManager::GetUIVars().Set("status"_intern, "Draw: threefold repetition");
+        // Every word the game can show (the tables of the game, not a copy of them): round i sets the word i of each variable
+        const Chess::Tests::HudWords words = Chess::Tests::AllHudWords();
         UILayoutValidatorOptions options;
         options.minTouchSize = CoreManager::GetUIEnvironment().GetSettings().minTouchSize;
         UILayoutContext base;
         base.sceneViewWidth = kViewWidth;
         base.sceneViewHeight = kViewHeight;
-        const auto failures = ValidateOnMatrix(web.layout, options, base);
-        EXPECT_TRUE(failures.empty()) << DescribeMatrixFailures(failures).c_str();
+        for (size_t round = 0; round < words.Rounds(); ++round) {
+            words.Publish(round);
+            const auto failures = ValidateOnMatrix(web.layout, options, base);
+            EXPECT_TRUE(failures.empty()) << "round " << round << ": " << DescribeMatrixFailures(failures).c_str();
+        }
     }
 
 }  // namespace BECore::Tests

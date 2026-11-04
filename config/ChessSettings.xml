@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<!--
+  Settings of the computer opponent.
+
+  stockfishPath: the full path of a Stockfish you installed (the game does not ship one).
+    Leave it empty to use the environment variable STOCKFISH and then "stockfish" on PATH.
+    Put your own path in config/ChessSettings.local.xml, which git ignores, not here:
+    this file is committed and has to stay empty.
+-->
+<ChessSettings stockfishPath=""/>

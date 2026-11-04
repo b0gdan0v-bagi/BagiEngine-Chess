@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Chess/ChessGameControl.h>
+#include <Chess/Engine/OpponentController.h>
 #include <Chess/Game/ChessGameModel.h>
 #include <Games/IGame.h>
 
@@ -15,7 +16,10 @@ namespace BECore::Chess {
      * Auto-registered into AbstractFactory<IGame> via the BE_CLASS reflection
      * machinery — no extra hand-written registrar required.
      *
-     * Owns the adapter of the external control API (ChessGameControl) next to the model it drives.
+     * Owns the adapter of the external control API (ChessGameControl) next to the model it drives, and the seat of the computer opponent
+     * (OpponentController). A game starts with nobody as the opponent: Start() loads the settings (where Stockfish is) and nothing else; the opponent
+     * is made when a side is picked on GetOpponent(). IGame has no per-frame hook, so ChessBoardComponent runs GetOpponent().Update() every frame. Stop()
+     * destroys the opponent, which happens before the task system goes down (Application::Cleanup()): a search that nobody cancelled would hold the join of the pool.
      */
     class ChessGame : public IGame {
         BE_CLASS(ChessGame)
@@ -39,11 +43,25 @@ namespace BECore::Chess {
             return _model;
         }
 
+        OpponentController& GetOpponent() noexcept {
+            return _opponent;
+        }
+        const OpponentController& GetOpponent() const noexcept {
+            return _opponent;
+        }
+
+        /// The active game, or nullptr when no game is active or the active game is not Chess.
+        static ChessGame* GetActive();
+
         /// The model of the active game, or nullptr when no game is active or the active game is not Chess.
         static ChessGameModel* GetActiveModel();
 
+        /// The opponent of the active game, or nullptr when no game is active or the active game is not Chess.
+        static OpponentController* GetActiveOpponent();
+
     private:
         ChessGameModel _model;
+        OpponentController _opponent;  ///< after the model (it holds a reference to it) and before the adapter
         ChessGameControl _control;
     };
 

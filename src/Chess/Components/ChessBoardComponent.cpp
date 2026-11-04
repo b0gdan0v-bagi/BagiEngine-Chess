@@ -3,10 +3,13 @@
 #include <BECore/GameManager/CoreManager.h>
 #include <BECore/Renderer/IRenderer.h>
 #include <BECore/Scene/Scene.h>
+#include <BECore/UI/UICanvasComponent.h>
 #include <Chess/ChessGame.h>
+#include <Chess/Engine/OpponentText.h>
 #include <Chess/Game/StatusText.h>
 #include <CoreSDL/SDLEvents.h>
 #include <Events/InputEvents.h>
+#include <Events/SceneEvents.h>
 #include <Generated/ChessBoardComponent.gen.hpp>
 
 namespace BECore::Chess {
@@ -45,30 +48,84 @@ namespace BECore::Chess {
         s_active = this;
         SubscribeInScene<SDLEvents::MouseButtonDownEvent, &ChessBoardComponent::OnMouseDown>(this);
         SubscribeInScene<InputEvents::ActionEvent, &ChessBoardComponent::OnAction>(this);
+        SubscribeInScene<SceneEvents::SceneUpdateEvent, &ChessBoardComponent::OnUpdate>(this);
+    }
+
+    void ChessBoardComponent::OnUpdate(const SceneEvents::SceneUpdateEvent&) {
+        ChessGame* game = ChessGame::GetActive();
+        if (!game) {
+            return;
+        }
+        // The opponent plays here, on the main thread, and not in OnDraw(): it changes the model
+        game->GetOpponent().Update();
+        LogResultOnce(game->GetModel());
+    }
+
+    void ChessBoardComponent::LogResultOnce(const ChessGameModel& model) {
+        if (!model.IsGameOver() || (&model == _loggedModel && model.GetVersion() == _loggedVersion)) {
+            return;
+        }
+        _loggedModel = &model;
+        _loggedVersion = model.GetVersion();
+        LogResult(model);
     }
 
     void ChessBoardComponent::PublishUiVars() {
-        const ChessGameModel* model = ChessGame::GetActiveModel();
-        if (!model || (model == _publishedModel && model->GetVersion() == _publishedVersion)) {
+        const ChessGame* game = ChessGame::GetActive();
+        if (!game) {
             return;
         }
-        _publishedModel = model;
-        _publishedVersion = model->GetVersion();
+        const ChessGameModel& model = game->GetModel();
+        const OpponentController& opponent = game->GetOpponent();
+        // A search starts and ends without a move of the game, and a side or a level changes without one: all of it is a reason to say the words again
+        const bool thinking = opponent.IsThinking();
+        const bool opponentChanged = &model != _publishedModel || opponent.GetRevision() != _publishedRevision;
+        if (!opponentChanged && model.GetVersion() == _publishedVersion && thinking == _publishedThinking) {
+            return;
+        }
+        _publishedModel = &model;
+        _publishedVersion = model.GetVersion();
+        _publishedRevision = opponent.GetRevision();
+        _publishedThinking = thinking;
+
+        // While an error of the opponent stands the game is stalled by it, so its sentence wins over "Check"
+        const std::optional<EngineError>& error = opponent.GetError();
+        const eastl::string turn = StatusText::Turn(model, thinking);
+        const eastl::string status = error ? OpponentText::Error(*error) : StatusText::Status(model);
+        const eastl::string side = OpponentText::SideLabel(opponent.GetPlays());
+        const eastl::string level = OpponentText::LevelLabel(GetOpponentLevels()[opponent.GetLevel()]);
         UIVars& vars = CoreManager::GetUIVars();
-        const eastl::string turn = StatusText::Turn(*model);
-        const eastl::string status = StatusText::Status(*model);
         vars.Set("turn"_intern, eastl::string_view(turn.data(), turn.size()));
         vars.Set("status"_intern, eastl::string_view(status.data(), status.size()));
+        vars.Set("side"_intern, eastl::string_view(side.data(), side.size()));
+        vars.Set("level"_intern, eastl::string_view(level.data(), level.size()));
+
+        // The strength means something only when the program plays. A scene without an element of that name has nothing to show or hide
+        if (opponentChanged) {
+            UICanvasComponent::SetElementVisibleByName(GetScene(), "Level"_intern, opponent.GetPlays().has_value());
+        }
     }
 
     void ChessBoardComponent::OnAction(const InputEvents::ActionEvent& event) {
-        // The action of the Reset button in config/SceneConfig.xml
+        // The actions of the buttons of the HUD in config/SceneConfig.xml
         const PoolString resetAction = "ChessReset"_intern;
-        if (event.action != resetAction) {
+        const PoolString cycleSideAction = "ChessCycleSide"_intern;
+        const PoolString cycleLevelAction = "ChessCycleLevel"_intern;
+        if (event.action == resetAction) {
+            if (ChessGameModel* model = ChessGame::GetActiveModel()) {
+                model->Reset();
+            }
             return;
         }
-        if (ChessGameModel* model = ChessGame::GetActiveModel()) {
-            model->Reset();
+        OpponentController* opponent = ChessGame::GetActiveOpponent();
+        if (!opponent) {
+            return;
+        }
+        // A pick that finds no engine returns its error and keeps it in the controller; the Status label shows it, so there is nothing to handle here
+        if (event.action == cycleSideAction) {
+            opponent->CycleSide();
+        } else if (event.action == cycleLevelAction) {
+            opponent->CycleLevel();
         }
     }
 
@@ -148,8 +205,14 @@ namespace BECore::Chess {
             return;
         }
 
-        if (model->OnSquareClicked(Square{static_cast<int8_t>(file), static_cast<int8_t>(rank)}) && model->IsGameOver()) {
-            LogResult(*model);
+        // The program's turn: the person has nothing to move, and a selection would only fight the search that is under way
+        const OpponentController* opponent = ChessGame::GetActiveOpponent();
+        if (opponent && opponent->PlaysFor(model->GetTurn())) {
+            return;
+        }
+
+        if (model->OnSquareClicked(Square{static_cast<int8_t>(file), static_cast<int8_t>(rank)})) {
+            LogResultOnce(*model);
         }
     }
 

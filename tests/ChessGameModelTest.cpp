@@ -195,6 +195,24 @@ namespace BECore::Chess::Tests {
         EXPECT_TRUE(model.GetLegalMoves().empty());
     }
 
+    TEST(ChessGameModelTest, ClearSelectionDropsTheSelectionAndItsTargetsWithoutMovingTheVersion) {
+        ChessGameModel model;
+        Click(model, "g1");
+        ASSERT_TRUE(model.HasSelection());
+        ASSERT_FALSE(model.GetLegalMoves().empty());
+        const uint64_t version = model.GetVersion();
+
+        model.ClearSelection();
+
+        EXPECT_FALSE(model.HasSelection());
+        EXPECT_TRUE(model.GetLegalMoves().empty());
+        EXPECT_EQ(model.GetVersion(), version);
+        model.ClearSelection();  // nothing selected: nothing to do
+        EXPECT_FALSE(model.HasSelection());
+        Click(model, "g1");
+        EXPECT_TRUE(model.HasSelection()) << "a click selects again";
+    }
+
     TEST(ChessGameModelTest, PawnReachingTheLastRankBecomesAQueenOnClick) {
         ChessGameModel model;
         for (const char* uci : {"h2h4", "g7g5", "h4g5", "h7h6", "g5h6", "a7a6", "h6h7", "b7b6"}) {

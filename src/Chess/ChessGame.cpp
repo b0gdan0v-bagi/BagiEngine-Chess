@@ -5,16 +5,22 @@
 
 namespace BECore::Chess {
 
-    ChessGameModel* ChessGame::GetActiveModel() {
+    ChessGame* ChessGame::GetActive() {
         auto* active = GameManager::GetInstance().GetActive();
-        if (!active) {
-            return nullptr;
-        }
-        auto* chess = active->Cast<ChessGame>();
+        return active ? active->Cast<ChessGame>() : nullptr;
+    }
+
+    ChessGameModel* ChessGame::GetActiveModel() {
+        ChessGame* chess = GetActive();
         return chess ? &chess->GetModel() : nullptr;
     }
 
-    ChessGame::ChessGame() : _control(_model) {}
+    OpponentController* ChessGame::GetActiveOpponent() {
+        ChessGame* chess = GetActive();
+        return chess ? &chess->GetOpponent() : nullptr;
+    }
+
+    ChessGame::ChessGame() : _opponent(_model), _control(_model, _opponent) {}
 
     IControllableGame* ChessGame::AsControllable() {
         return &_control;
@@ -30,10 +36,15 @@ namespace BECore::Chess {
 
     void ChessGame::Start() {
         _model.Reset();
+        _opponent.SetSettings(OpponentSettings::Load());
+        // Two people: nothing is looked up or started until a side is picked. Neither call can fail without a side
+        _opponent.SetSide(std::nullopt);
+        _opponent.SetLevel(kDefaultOpponentLevel);
     }
 
     void ChessGame::Stop() {
-        // Nothing scene-specific yet — components own their own subscriptions.
+        // Components own their own subscriptions. The opponent goes now, before TaskManager::Shutdown(): a search nobody cancelled would hold the join of the pool
+        _opponent.Shutdown();
     }
 
     void ChessGame::Reset() {
