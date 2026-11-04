@@ -9,7 +9,7 @@
 #include <thread>
 
 /// OwnEngine through IChessEngine: the contract of UciEngine::FindMove without a process, a whole game against itself and against a random mover, and
-/// the engine inside a running OpponentController (the real TaskManager). The fixture starts the core services for the last
+/// the engine inside a running OpponentController (the real TaskManager). The fixture starts the core services (TaskManager) for the last of these.
 namespace BECore::Chess::Tests {
 
     namespace {
