@@ -253,7 +253,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(Play(model, "e2e4"));
         controller.Update();
         ASSERT_TRUE(controller.IsThinking());
-        // The proof that a search runs: the program was told to go. Shutdown() before this line would be the cancel during the handshake, which other tests have
+        // The proof that a search runs: the program was told to go. Shutdown() before this line would be a cancel during the handshake, which no test covers with a process yet
         ASSERT_TRUE(WaitForLogLine(directory.File(kStdinLogName), kMaxGoCommand)) << "the program never got `" << kMaxGoCommand.data() << "`";
         ASSERT_TRUE(WaitUntil([&] { return ProcessIdAt(directory.File(kPidLogName), 1).has_value(); })) << "the program's process id";
         const int scriptId = *ProcessIdAt(directory.File(kPidLogName), 0);
