@@ -724,15 +724,18 @@ namespace BECore::Chess::Tests {
         const std::filesystem::path wrapper = WriteWrapper(directory, Format("--log \"{}\" --moves e7e5", log));  // every process answers e7e5 to its first search
         ChessGameModel model;
         OpponentController controller(model, SettingsFor(wrapper));
-        ASSERT_TRUE(controller.SetSide(PieceColor::Black).has_value());
+        // Hard and max: neither blunders (the handicap would answer e2e4 with a random move of its own and the fake would not be asked), and their skills differ
+        // (easy and medium share Skill Level 0 now)
+        const size_t hard = LevelIndex(kHardLevelId);
+        const size_t max = LevelIndex("max");
+        ASSERT_TRUE(controller.Choose(PieceColor::Black, hard).has_value());
         ASSERT_TRUE(Play(model, "e2e4"));
         ASSERT_TRUE(UpdateUntil(controller, [&] { return model.GetMoves().size() == 2; })) << DescribeError(controller.GetError()).c_str();
-        const OpponentLevel& before = GetOpponentLevels()[kDefaultOpponentLevel];
-        const size_t next = (kDefaultOpponentLevel + 1) % GetOpponentLevels().size();
-        const OpponentLevel& after = GetOpponentLevels()[next];
+        const OpponentLevel& before = GetOpponentLevels()[hard];
+        const OpponentLevel& after = GetOpponentLevels()[max];
         ASSERT_NE(before.skillLevel, after.skillLevel);
 
-        ASSERT_TRUE(controller.SetLevel(next).has_value());
+        ASSERT_TRUE(controller.SetLevel(max).has_value());
         model.Reset();
         ASSERT_TRUE(Play(model, "e2e4"));
         ASSERT_TRUE(UpdateUntil(controller, [&] { return model.GetMoves().size() == 2; })) << DescribeError(controller.GetError()).c_str();
@@ -752,7 +755,7 @@ namespace BECore::Chess::Tests {
         const std::filesystem::path wrapper = WriteWrapper(directory, "--ignore-quit --moves e7e5");
         ChessGameModel model;
         OpponentController controller(model, SettingsFor(wrapper));
-        ASSERT_TRUE(controller.SetSide(PieceColor::Black).has_value());
+        ASSERT_TRUE(controller.Choose(PieceColor::Black, LevelIndex(kHardLevelId)).has_value());  // hard never blunders: the child is asked, so there is a child to close
         ASSERT_TRUE(Play(model, "e2e4"));
         ASSERT_TRUE(UpdateUntil(controller, [&] { return model.GetMoves().size() == 2; })) << DescribeError(controller.GetError()).c_str();
 
@@ -941,8 +944,24 @@ namespace BECore::Chess::Tests {
         EXPECT_FALSE(controller.GetError().has_value());
         const eastl::string reply = model.GetMoves()[1].ToUci();
 
-        // A fixed depth is deterministic: another controller on another model answers the same
+        // A fixed depth is deterministic: another controller on another model answers the same (at easy this goes through the handicap, a pure function of the position)
         EXPECT_EQ(OwnReplyToE2e4(LevelIndex("easy")), reply);
+    }
+
+    TEST_F(OpponentControllerTest, AtMaxTheDefaultFactoryOwnEngineIsThePlainOwnEngineWithNoHandicap) {
+        const size_t max = LevelIndex("max");
+        ASSERT_EQ(GetOpponentLevels()[max].blunderPercent, 0);
+        const SearchRequest request = [] {
+            ChessGameModel model;
+            EXPECT_TRUE(Play(model, "e2e4"));
+            return SearchRequest::FromModel(model, LimitsOf(OpponentEngine::Own, GetOpponentLevels()[LevelIndex("max")]));
+        }();
+        const auto plain = OwnEngine().FindMove(request, CancellationToken::Create());
+        ASSERT_TRUE(plain.has_value());
+
+        const eastl::string reply = OwnReplyToE2e4(max);
+
+        EXPECT_EQ(reply, plain->ToUci()) << "depth 5, no wrapper at 0 percent: the reply is the one of an OwnEngine given the request of the level";
     }
 
     TEST_F(OpponentControllerTest, TheOwnEngineIsMadeWhateverTheStockfishPathIsAndTheStockfishPickStillNamesThePath) {

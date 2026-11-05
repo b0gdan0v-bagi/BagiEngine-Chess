@@ -13,10 +13,11 @@ namespace BECore::Chess {
      *
      * For a request it decides whether this move is a blunder and, if so, answers a random legal move of the position; otherwise it
      * delegates to the wrapped engine with the request and the token as they came. **Both the decision and the move are a pure
-     * function of the position (its key and the number of moves played) and the percent**: no clock, no random device, no state, so the
-     * answer is the same on every run and platform, the manual-clock smoke test stays reproducible and a test can pin it. The same
-     * position (reached by the same number of moves) therefore blunders the same way every time, and a position that blunders at
-     * 15 percent also blunders at 40. A blunder does not start the wrapped engine (no process for a blunder, no search).
+     * function of the position (its key and the number of moves in the request, counted from its start FEN; a FromPosition request
+     * counts 0) and the percent**: no clock, no random device, no state, so the answer is the same on every run and platform, the
+     * manual-clock smoke test stays reproducible and a test can pin it. The same position (reached by the same number of moves in the
+     * request) therefore blunders the same way every time, and a position that blunders at 15 percent also blunders at 40.
+     * A blunder does not start the wrapped engine (no process for a blunder, no search).
      *
      * The contract of IChessEngine stays: BadRequest (limits, start FEN or a move wrong), NoMove (no legal move) and Cancelled (the
      * token is cancelled before the call) are answered by this class on the blunder path, in the order of OwnEngine, and by the wrapped

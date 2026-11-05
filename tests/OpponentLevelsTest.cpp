@@ -1,3 +1,5 @@
+#include "TestEngines.h"
+
 #include <Chess/Engine/OpponentLevels.h>
 #include <Chess/Engine/Search.h>
 #include <Common/Printers.h>
@@ -65,6 +67,99 @@ namespace BECore::Chess::Tests {
         for (size_t i = 0; i + 1 < levels.size(); ++i) {
             EXPECT_LE(levels[i].skillLevel, levels[i + 1].skillLevel) << Text(levels[i + 1].id);
             EXPECT_LT(levels[i].moveTimeMs, levels[i + 1].moveTimeMs) << Text(levels[i + 1].id);
+        }
+    }
+
+    TEST(OpponentLevelsTest, TheShippedLadderIsPinned) {
+        // The numbers as the owner reads them: first guesses, tuned by playing. A change here is a decision, so it is a change of this test too
+        struct Row {
+            const char* id;
+            int skillLevel;
+            int moveTimeMs;
+            int blunderPercent;
+            int ownDepth;
+        };
+        const Row expected[] = {
+            {"easy", 0, 50, 40, 1},
+            {"medium", 0, 100, 15, 2},
+            {"hard", 5, 300, 0, 3},
+            {"max", 20, 2000, 0, 5},
+        };
+        const auto levels = GetOpponentLevels();
+
+        ASSERT_EQ(levels.size(), std::size(expected));
+        for (size_t i = 0; i < levels.size(); ++i) {
+            EXPECT_EQ(Text(levels[i].id), expected[i].id);
+            EXPECT_EQ(levels[i].skillLevel, expected[i].skillLevel) << expected[i].id;
+            EXPECT_EQ(levels[i].moveTimeMs, expected[i].moveTimeMs) << expected[i].id;
+            EXPECT_EQ(levels[i].blunderPercent, expected[i].blunderPercent) << expected[i].id;
+            EXPECT_EQ(levels[i].ownDepth, expected[i].ownDepth) << expected[i].id;
+        }
+    }
+
+    TEST(OpponentLevelsTest, BlunderPercentsAreInTheRangeAndOnlyTheLowLevelsHaveOne) {
+        const auto levels = GetOpponentLevels();
+
+        for (const OpponentLevel& level : levels) {
+            EXPECT_GE(level.blunderPercent, 0) << Text(level.id);
+            EXPECT_LE(level.blunderPercent, 100) << Text(level.id);
+        }
+        EXPECT_GT(levels[*FindOpponentLevel("easy")].blunderPercent, 0);
+        EXPECT_GT(levels[*FindOpponentLevel("medium")].blunderPercent, 0);
+        EXPECT_EQ(levels[*FindOpponentLevel("hard")].blunderPercent, 0);
+        EXPECT_EQ(levels[*FindOpponentLevel("max")].blunderPercent, 0);
+    }
+
+    TEST(OpponentLevelsTest, NoKnobMakesAStrongerLevelWeaker) {
+        const auto levels = GetOpponentLevels();
+
+        for (size_t i = 0; i + 1 < levels.size(); ++i) {
+            const std::string at = Text(levels[i + 1].id);
+            EXPECT_LE(levels[i].skillLevel, levels[i + 1].skillLevel) << at;
+            EXPECT_LT(levels[i].moveTimeMs, levels[i + 1].moveTimeMs) << at;
+            EXPECT_GE(levels[i].blunderPercent, levels[i + 1].blunderPercent) << at;
+            EXPECT_LE(levels[i].ownDepth, levels[i + 1].ownDepth) << at;
+        }
+    }
+
+    TEST(OpponentLevelsTest, MaxIsTheFullStrengthOfTheEngine) {
+        const OpponentLevel& max = GetOpponentLevels().back();
+
+        EXPECT_EQ(Text(max.id), "max");
+        EXPECT_EQ(max.skillLevel, kHighestSkillLevel);
+        EXPECT_EQ(max.blunderPercent, 0);
+    }
+
+    TEST(OpponentLevelsTest, WithHandicapKeepsTheEngineWhenThereIsNoBlunderPercent) {
+        const auto engine = eastl::make_shared<InstantEngine>();
+        const OpponentLevel plain{"plain", "Plain", 5, 100, 2, 0};
+
+        EXPECT_EQ(WithHandicap(engine, plain), engine);
+        EXPECT_EQ(WithHandicap(engine, OpponentLevel{"short", "Short", 5, 100, 2}), engine) << "the default of the field is none";
+        for (const OpponentLevel& level : GetOpponentLevels()) {
+            if (level.blunderPercent == 0) {
+                EXPECT_EQ(WithHandicap(engine, level), engine) << Text(level.id);
+            }
+        }
+    }
+
+    TEST(OpponentLevelsTest, WithHandicapWrapsTheEngineInABlunderEngineOfTheLevelsPercent) {
+        const auto engine = eastl::make_shared<InstantEngine>();
+        const OpponentLevel custom{"custom", "Custom", 5, 100, 2, 50};
+
+        const eastl::shared_ptr<IChessEngine> wrapped = WithHandicap(engine, custom);
+
+        ASSERT_NE(wrapped, nullptr);
+        EXPECT_NE(wrapped, eastl::shared_ptr<IChessEngine>(engine));
+        const auto blunder = eastl::dynamic_pointer_cast<BlunderEngine>(wrapped);
+        ASSERT_NE(blunder, nullptr);
+        EXPECT_EQ(blunder->Percent(), 50);
+        for (const OpponentLevel& level : GetOpponentLevels()) {
+            if (level.blunderPercent > 0) {
+                const auto shipped = eastl::dynamic_pointer_cast<BlunderEngine>(WithHandicap(engine, level));
+                ASSERT_NE(shipped, nullptr) << Text(level.id);
+                EXPECT_EQ(shipped->Percent(), level.blunderPercent) << Text(level.id);
+            }
         }
     }
 
@@ -162,7 +257,7 @@ namespace BECore::Chess::Tests {
             EXPECT_EQ(options[0].second, Format("{}", level.skillLevel));
         }
         const auto medium = EngineOptionsOf(levels[kDefaultOpponentLevel]);
-        EXPECT_EQ(medium[0].second, "10");
+        EXPECT_EQ(medium[0].second, "0") << "Skill Level 0 is the floor of Stockfish; the handicap does the rest of the way down";
     }
 
 }  // namespace BECore::Chess::Tests

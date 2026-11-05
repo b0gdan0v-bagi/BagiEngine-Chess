@@ -78,6 +78,20 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(BlunderEngine(inner, 40).Percent(), 40);
     }
 
+    TEST(BlunderEngineTest, AClampedPercentBehavesAsTheLimit) {
+        const SearchRequest request = SearchRequest::FromPosition(Position::Start(), kLimits);
+        const auto over = eastl::make_shared<InstantEngine>();
+        const auto under = eastl::make_shared<InstantEngine>();
+        BlunderEngine overEngine(over, 150);
+        BlunderEngine underEngine(under, -5);
+
+        EXPECT_TRUE(Ask(overEngine, request).has_value());
+        EXPECT_TRUE(Ask(underEngine, request).has_value());
+
+        EXPECT_EQ(over->Calls(), 0) << "150 acts as 100: the wrapped engine is never asked";
+        EXPECT_EQ(under->Calls(), 1) << "-5 acts as 0: it answers everything";
+    }
+
     TEST(BlunderEngineTest, ZeroPercentNeverAltersTheAnswerAndAsksOncePerRequest) {
         const auto inner = eastl::make_shared<InstantEngine>();
         BlunderEngine engine(inner, 0);

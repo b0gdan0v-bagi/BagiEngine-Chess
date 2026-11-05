@@ -28,7 +28,9 @@ namespace BECore::Chess {
 
     }  // namespace
 
-    BlunderEngine::BlunderEngine(eastl::shared_ptr<IChessEngine> inner, int percent) : _inner(std::move(inner)), _percent(eastl::clamp(percent, 0, kMaxPercent)) {}
+    BlunderEngine::BlunderEngine(eastl::shared_ptr<IChessEngine> inner, int percent) : _inner(std::move(inner)), _percent(eastl::clamp(percent, 0, kMaxPercent)) {
+        ASSERT(_inner, "BlunderEngine: no engine to wrap");
+    }
 
     std::expected<Move, EngineError> BlunderEngine::FindMove(const SearchRequest& request, const CancellationToken& token) {
         if (_percent == 0) {

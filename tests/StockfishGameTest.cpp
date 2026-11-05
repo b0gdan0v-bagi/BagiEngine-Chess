@@ -39,7 +39,7 @@ namespace BECore::Chess::Tests {
         constexpr std::chrono::milliseconds kChildEndBudget{3000};  ///< the child leaves after the cancel: the search answers `stop`, then the engine is closed
         constexpr eastl::string_view kMissingPath = "/no/such/file";
         constexpr eastl::string_view kEasyLevelId = "easy";
-        constexpr eastl::string_view kMediumLevelId = "medium";
+        constexpr eastl::string_view kHardLevelId = "hard";
         constexpr eastl::string_view kMaxLevelId = "max";
         constexpr const char* kLaunchLogName = "launches.log";
         constexpr const char* kPidLogName = "pids.log";
@@ -200,22 +200,35 @@ namespace BECore::Chess::Tests {
         }
     }
 
+    namespace {
+
+        /// A person's e2e4 answered through the default factory (no SetEngineFactory: the controller starts the Stockfish at the path itself, under the handicap of the level)
+        void ExpectALegalAnswerAtLevel(eastl::string_view level) {
+            SKIP_WITHOUT_STOCKFISH(path);
+            ChessGameModel model;
+            OpponentController controller(model, SettingsFor(*path));
+            ASSERT_TRUE(controller.SetLevel(LevelIndex(level)).has_value());
+
+            const auto picked = controller.SetSide(PieceColor::Black);
+            ASSERT_TRUE(picked.has_value()) << Describe(picked.error()).c_str();
+            ASSERT_TRUE(Play(model, "e2e4"));
+            const bool answered = UpdateUntil(controller, [&] { return model.GetMoves().size() == 2; });
+
+            ASSERT_TRUE(answered) << DescribeError(controller.GetError()).c_str();
+            EXPECT_EQ(model.GetTurn(), PieceColor::White);  // the model accepted the reply, so it is legal; which move it is, is not asserted (Stockfish, or the handicap)
+            EXPECT_FALSE(controller.GetError().has_value());
+            EXPECT_FALSE(controller.IsThinking());
+            EXPECT_FALSE(model.IsGameOver());
+        }
+
+    }  // namespace
+
     TEST_F(StockfishGameTest, ThePersonsMoveIsAnsweredByTheRealStockfishThroughTheDefaultFactory) {
-        SKIP_WITHOUT_STOCKFISH(path);
-        ChessGameModel model;
-        OpponentController controller(model, SettingsFor(*path));  // no SetEngineFactory: the controller starts the Stockfish at the path itself
-        ASSERT_TRUE(controller.SetLevel(LevelIndex(kEasyLevelId)).has_value());
+        ExpectALegalAnswerAtLevel(kHardLevelId);  // hard has no handicap: the move is Stockfish's
+    }
 
-        const auto picked = controller.SetSide(PieceColor::Black);
-        ASSERT_TRUE(picked.has_value()) << Describe(picked.error()).c_str();
-        ASSERT_TRUE(Play(model, "e2e4"));
-        const bool answered = UpdateUntil(controller, [&] { return model.GetMoves().size() == 2; });
-
-        ASSERT_TRUE(answered) << DescribeError(controller.GetError()).c_str();
-        EXPECT_EQ(model.GetTurn(), PieceColor::White);
-        EXPECT_FALSE(controller.GetError().has_value());
-        EXPECT_FALSE(controller.IsThinking());
-        EXPECT_FALSE(model.IsGameOver());
+    TEST_F(StockfishGameTest, ThePersonsMoveIsAnsweredAtEasyThroughTheDefaultFactoryWithTheHandicap) {
+        ExpectALegalAnswerAtLevel(kEasyLevelId);
     }
 
 #if !defined(_WIN32)
@@ -226,13 +239,14 @@ namespace BECore::Chess::Tests {
         const std::filesystem::path wrapper = WriteWrapper(directory, *path, kPidLogName);  // the real Stockfish behind a script that counts its starts
         ChessGameModel model;
         OpponentController controller(model, SettingsFor(wrapper));
-        ASSERT_TRUE(controller.SetLevel(LevelIndex(kEasyLevelId)).has_value());
+        // Hard and max never blunder, so the real program is asked at both (the handicap of easy and medium would answer some moves without starting it)
+        ASSERT_TRUE(controller.SetLevel(LevelIndex(kHardLevelId)).has_value());
         ASSERT_TRUE(controller.SetSide(PieceColor::Black).has_value());
         ASSERT_TRUE(Play(model, "e2e4"));
         ASSERT_TRUE(UpdateUntil(controller, [&] { return model.GetMoves().size() == 2; })) << DescribeError(controller.GetError()).c_str();
         EXPECT_EQ(ReadFileLines(directory.File(kLaunchLogName)).size(), 1u) << "one process for the first level";
 
-        ASSERT_TRUE(controller.SetLevel(LevelIndex(kMediumLevelId)).has_value());
+        ASSERT_TRUE(controller.SetLevel(LevelIndex(kMaxLevelId)).has_value());
         ASSERT_TRUE(Play(model, "d2d4")) << "Black's answer to e2e4 cannot take this away";
         const bool answered = UpdateUntil(controller, [&] { return model.GetMoves().size() == 4; });
 
@@ -289,7 +303,7 @@ namespace BECore::Chess::Tests {
 
         // The person fixes the line and picks again: the Stockfish at the right path plays
         controller.SetSettings(SettingsFor(*path));
-        ASSERT_TRUE(controller.SetLevel(LevelIndex(kEasyLevelId)).has_value());
+        ASSERT_TRUE(controller.SetLevel(LevelIndex(kHardLevelId)).has_value());
         const auto picked = controller.SetSide(PieceColor::Black);
         ASSERT_TRUE(picked.has_value()) << Describe(picked.error()).c_str();
         EXPECT_FALSE(controller.GetError().has_value());
