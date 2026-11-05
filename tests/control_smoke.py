@@ -435,7 +435,7 @@ def run_opponent_panel_scenario(client: BagiControlClient, headless: bool) -> No
     check_selected(tree, ["ColorBlack"], ["ColorWhite"])
     wait_until_the_program_played(client, lambda moves: len(moves) == 1, "the opening move")
     state = client.call("get_state")["state"]
-    check(state["opponent"]["plays"] == "white" and state["turn"] == "black" and state["moves"][0][1] in "12", f"the program did not open as White: {state}")
+    check(state["opponent"]["plays"] == "white" and state["turn"] == "black" and state["moves"][0][1] in ("1", "2"), f"the program did not open as White: {state}")
     hud_button = find_ui_element({"canvases": [canvas for canvas in client.call("ui_tree")["canvases"] if canvas["node"] == "Hud"]}, "Opponent")
     check(hud_button["text"] == "You: Black", f"the Opponent button does not say the pick: {hud_button['text']}")
 
