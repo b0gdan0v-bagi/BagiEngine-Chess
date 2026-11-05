@@ -23,6 +23,7 @@
 #include <Chess/Engine/OpponentChoice.h>
 #include <Chess/Engine/OpponentText.h>
 #include <Chess/Game/MoveGenerator.h>
+#include <Chess/Game/PromotionChoices.h>
 #include <Common/EngineEnvironment.h>
 #include <Common/RecordingRenderer.h>
 #include <Common/UILayoutMatrix.h>
@@ -46,12 +47,13 @@ namespace BECore::Chess::Tests {
         constexpr float kBoardTop = 80.0f;      // in view units
         constexpr float kBoardBottom = 720.0f;  // 80 + 8 * 80
         const Color kResetColor{40, 90, 60, 255};
-        const Color kOpponentColor{45, 75, 120, 255};  // the fills of the buttons of the HUD (SceneConfig.xml): a color each, so a test can tell where each one is drawn
-        const Color kPlateColor{36, 40, 52, 255};      // the plate of the opponent panel
-        constexpr float kMinGap = 8.0f;                // two controls of the HUD keep this much between them, in view units
-        constexpr float kButtonAir = 8.0f;             // the text of a button keeps this much from each edge of its fill
-        constexpr float kNarrowestWidth = 480.0f;      // the narrowest window of the size matrix, in pixels
-        constexpr float kNarrowestHeight = 853.0f;     // 9:16 at that width
+        const Color kOpponentColor{45, 75, 120, 255};       // the fills of the buttons of the HUD (SceneConfig.xml): a color each, so a test can tell where each one is drawn
+        const Color kPlateColor{36, 40, 52, 255};           // the plate of the opponent panel
+        const Color kPromotionPlateColor{44, 38, 52, 255};  // the plate of the promotion panel
+        constexpr float kMinGap = 8.0f;                     // two controls of the HUD keep this much between them, in view units
+        constexpr float kButtonAir = 8.0f;                  // the text of a button keeps this much from each edge of its fill
+        constexpr float kNarrowestWidth = 480.0f;           // the narrowest window of the size matrix, in pixels
+        constexpr float kNarrowestHeight = 853.0f;          // 9:16 at that width
 
         // The colors the board fills a full square with (ChessBoardComponent.cpp)
         const Color kSelectedColor{120, 200, 120, 200};
@@ -139,6 +141,8 @@ namespace BECore::Chess::Tests {
         constexpr const char* kSetColorAction = "ChessSetColor";
         constexpr const char* kSetEngineAction = "ChessSetEngine";
         constexpr const char* kSetLevelAction = "ChessSetLevel";
+        constexpr const char* kPromoteAction = "ChessPromote";  // the actions of the promotion panel
+        constexpr const char* kCancelPromotionAction = "ChessCancelPromotion";
 
         /// Replaces the first @p what in @p text and fails the test when it is not there (a broken copy that changed nothing would prove nothing)
         void Replace(std::string& text, const std::string& what, const std::string& with) {
@@ -455,6 +459,55 @@ namespace BECore::Chess::Tests {
         /// The Ok button of the panel, clicked where it is laid out; whether the panel is hidden afterwards
         bool CloseThePanel() {
             return ClickPanel("Ok").Both() && Panel() && !Panel()->_visible;
+        }
+
+        /// The canvas of the promotion panel: the node `PromotionPanel`, a modal canvas that starts hidden
+        IntrusivePtr<UICanvasComponent> Promotion() const {
+            for (const auto& node : GetScene().GetRootNode().GetChildren()) {
+                if (node->GetName() == PoolString::Intern("PromotionPanel")) {
+                    return node->GetComponent<UICanvasComponent>();
+                }
+            }
+            return {};
+        }
+
+        /// Whether the promotion panel is shown (false when the scene has none)
+        bool PromotionShown() const {
+            const auto panel = Promotion();
+            return panel && panel->_visible;
+        }
+
+        /// A control of the promotion panel by name (the test fails when it is not there)
+        UIElement& PromotionElement(const char* name) const {
+            const auto panel = Promotion();
+            UIElement* element = panel ? panel->GetRoot().FindByName(PoolString::Intern(name)) : nullptr;
+            if (element == nullptr) {
+                ADD_FAILURE() << name << " is not in the promotion panel";
+                std::abort();  // a reference to nothing cannot be returned; the failure above is printed first
+            }
+            return *element;
+        }
+
+        /// A click on a control of the promotion panel where it is laid out
+        Taken ClickPromotion(const char* name) {
+            return ClickControl(PromotionElement(name));
+        }
+
+        /// Starts a game from @p fen and lets the scene deal the pieces out
+        void StartFrom(const char* fen) {
+            Model().SetPosition(PositionFromFen(fen));
+            _manager->UpdateAll();
+        }
+
+        /// The piece node whose handle stands on @p square in the model, null when none does
+        const ChessPieceComponent* PieceNodeAt(const char* square) const {
+            for (const auto& node : GetScene().GetRootNode().GetChildren()) {
+                const auto piece = node->GetComponent<ChessPieceComponent>();
+                if (piece && Model().GetSquareOf(piece.Get()) == Sq(square)) {
+                    return piece.Get();
+                }
+            }
+            return nullptr;
         }
 
         /// The text a label or a button of the panel shows after a frame
@@ -2622,7 +2675,7 @@ namespace BECore::Chess::Tests {
             const std::string_view action = found.node().attribute("action").value();
             EXPECT_EQ(action.find(kRemovedActions), std::string_view::npos) << found.node().attribute("name").value() << " emits " << action;
             const bool known = action == "ChessReset" || action == "ChessOpenOpponent" || action == "ChessCloseOpponent" || action == kSetModeAction || action == kSetColorAction ||
-                               action == kSetEngineAction || action == kSetLevelAction;
+                               action == kSetEngineAction || action == kSetLevelAction || action == kPromoteAction || action == kCancelPromotionAction;
             EXPECT_TRUE(known) << found.node().attribute("name").value() << " emits " << action << ", which the board does not answer";
         }
         for (const pugi::xpath_node found : document.select_nodes("//element[@text]")) {
@@ -2690,6 +2743,292 @@ namespace BECore::Chess::Tests {
         ASSERT_LT(plate, _renderer->calls.size());
         EXPECT_LT(bar, plate) << "the plate is over the result bar";
         EXPECT_LT(reset, plate) << "and over the HUD";
+    }
+
+    // ---- the promotion panel -------------------------------------------------------------------------------------------------------
+    // A click on a promotion target leaves the promotion pending in the model; the board shows the modal PromotionPanel for as long as it is. The buttons are clicked where
+    // they are drawn (CoreManager::GetUIInput()), the board by a press on its square
+
+    namespace {
+
+        constexpr const char* kPromotionFen = "8/P6k/8/8/8/8/8/K7 w - - 0 1";  // a white pawn on a7, the way to a8 is free
+        constexpr const char* kBlackPromotionFen = "k7/8/8/8/8/8/p6K/8 b - - 0 1";
+        constexpr const char* kMatingPromotionFen = "7k/P7/6K1/8/8/8/8/8 w - - 0 1";  // a8 gives mate with a queen or a rook
+
+        /// The name of the button of a promotion piece in the scene: PromoteQueen, PromoteRook, ...
+        eastl::string PromoteButton(PieceType piece) {
+            return Format("Promote{}", PromotionLabel(piece));
+        }
+
+    }  // namespace
+
+    TEST_F(ChessUiTest, ThePromotionPanelIsHiddenAtTheStartAndDrawsNothing) {
+        auto panel = Promotion();
+        ASSERT_TRUE(panel);
+        EXPECT_FALSE(panel->_visible);
+        EXPECT_TRUE(panel->_modal);
+        Draw();
+        EXPECT_TRUE(RectCalls(kPromotionPlateColor).empty());
+        _manager->UpdateAll();
+        EXPECT_FALSE(PromotionShown()) << "an update with nothing pending shows nothing";
+    }
+
+    TEST_F(ChessUiTest, AClickOnAPromotionTargetOpensThePanelAndPlaysNothing) {
+        StartFrom(kPromotionFen);
+        const uint64_t version = Model().GetVersion();
+        const eastl::string fen = Model().GetPosition().ToFen();
+
+        Click("a7");
+        EXPECT_FALSE(PromotionShown()) << "selecting the pawn is not a promotion";
+        Click("a8");
+
+        EXPECT_TRUE(PromotionShown());
+        EXPECT_TRUE(Model().HasPendingPromotion());
+        EXPECT_EQ(Model().GetVersion(), version);
+        EXPECT_EQ(Model().GetPosition().ToFen(), fen) << "nothing has moved";
+        Draw();
+        EXPECT_FALSE(RectCalls(kPromotionPlateColor).empty()) << "shown: the plate is drawn";
+        EXPECT_TRUE(RectCalls(kPlateColor).empty()) << "and it is not the opponent panel";
+        EXPECT_FALSE(Panel()->_visible);
+    }
+
+    TEST_F(ChessUiTest, EachPieceButtonPlaysItsPromotionClosesThePanelAndTheHandleReportsThePiece) {
+        for (const PieceType piece : PromotionPieces()) {
+            SCOPED_TRACE(eastl::string(PromotionLabel(piece)).c_str());
+            StartFrom(kPromotionFen);
+            const uint64_t version = Model().GetVersion();
+            const ChessGameModel::PieceHandle pawn = PieceNodeAt("a7");
+            ASSERT_NE(pawn, nullptr);
+            ClickMove("a7", "a8");
+            ASSERT_TRUE(PromotionShown());
+
+            const Taken taken = ClickPromotion(PromoteButton(piece).c_str());
+            EXPECT_TRUE(taken.Both());
+
+            ASSERT_EQ(Model().GetMoves().size(), 1u);
+            EXPECT_EQ(Model().GetMoves().back().ToUci().substr(0, 4), eastl::string("a7a8"));
+            EXPECT_TRUE(Model().GetMoves().back().IsPromotion());
+            EXPECT_EQ(Model().GetPieceAt(Sq("a8")).type, piece);
+            EXPECT_EQ(Model().GetPieceAt(Sq("a8")).color, PieceColor::White);
+            EXPECT_GT(Model().GetVersion(), version);
+            EXPECT_FALSE(PromotionShown());
+            EXPECT_FALSE(Model().HasPendingPromotion());
+            EXPECT_EQ(Model().GetSquareOf(pawn), Sq("a8"));
+            EXPECT_EQ(Model().GetPieceOf(pawn).type, piece) << "the handle of the pawn reports the piece";
+            EXPECT_EQ(Model().GetTurn(), PieceColor::Black);
+        }
+    }
+
+    TEST_F(ChessUiTest, TheLetterOfEachPromotionIsTheOneOfItsButton) {
+        const std::pair<PieceType, const char*> letters[] = {{PieceType::Queen, "a7a8q"}, {PieceType::Rook, "a7a8r"}, {PieceType::Bishop, "a7a8b"}, {PieceType::Knight, "a7a8n"}};
+        for (const auto& [piece, uci] : letters) {
+            SCOPED_TRACE(uci);
+            StartFrom(kPromotionFen);
+            ClickMove("a7", "a8");
+            ASSERT_TRUE(ClickPromotion(PromoteButton(piece).c_str()).Both());
+            ASSERT_EQ(Model().GetMoves().size(), 1u);
+            EXPECT_EQ(Model().GetMoves().back().ToUci(), eastl::string(uci));
+        }
+    }
+
+    TEST_F(ChessUiTest, CancelClosesThePanelKeepsThePawnSelectedAndTheSameTargetOpensItAgain) {
+        StartFrom(kPromotionFen);
+        const uint64_t version = Model().GetVersion();
+        ClickMove("a7", "a8");
+        ASSERT_TRUE(PromotionShown());
+        ActionLog log;
+
+        EXPECT_TRUE(ClickPromotion("PromotionCancel").Both());
+
+        EXPECT_EQ(log.LastAction(), PoolString::Intern("ChessCancelPromotion"));
+        EXPECT_FALSE(PromotionShown());
+        EXPECT_FALSE(Model().HasPendingPromotion());
+        EXPECT_EQ(Model().GetVersion(), version);
+        EXPECT_TRUE(Model().HasSelection());
+        EXPECT_EQ(Model().GetSelected(), Sq("a7"));
+        EXPECT_EQ(Model().GetPieceAt(Sq("a7")).type, PieceType::Pawn);
+        Draw();
+        EXPECT_TRUE(RectCalls(kPromotionPlateColor).empty());
+
+        Click("a8");
+        EXPECT_TRUE(PromotionShown()) << "the pawn is still selected, so the same target asks again";
+        ASSERT_TRUE(ClickPromotion("PromoteKnight").Both());
+        EXPECT_EQ(Model().GetPieceAt(Sq("a8")).type, PieceType::Knight);
+    }
+
+    TEST_F(ChessUiTest, WhileThePromotionPanelIsShownEveryPressIsItsAndNothingUnderItSeesOne) {
+        StartFrom(kPromotionFen);
+        ClickMove("a7", "a8");
+        ASSERT_TRUE(PromotionShown());
+        Draw();
+        ActionLog log;
+        const uint64_t version = Model().GetVersion();
+
+        // The board (two corners and the target), the dim, the Reset and the Opponent button of the HUD: the panel takes all of them
+        const std::pair<float, float> points[] = {
+            SquareCenter("a1"), SquareCenter("h8"), SquareCenter("a8"), ScreenCenter(*HudElement("Reset")), ScreenCenter(*HudElement("Opponent")), ScreenCenter(PromotionElement("PromotionTitle"))};
+        for (const auto& [x, y] : points) {
+            EXPECT_TRUE(ClickAtPixel(x, y).Both()) << x << "," << y;
+        }
+
+        EXPECT_EQ(log.Total(), 0u) << "no action was emitted: Reset and Opponent got no press";
+        EXPECT_EQ(Model().GetVersion(), version);
+        EXPECT_TRUE(Model().HasSelection());
+        EXPECT_EQ(Model().GetSelected(), Sq("a7"));
+        EXPECT_TRUE(Model().HasPendingPromotion());
+        EXPECT_TRUE(PromotionShown());
+        EXPECT_FALSE(Panel()->_visible) << "the opponent panel stays closed";
+    }
+
+    TEST_F(ChessUiTest, AResetASetPositionOrAMoveOfSomeoneElseClosesThePanelAtTheNextFrame) {
+        const auto open = [&] {
+            StartFrom(kPromotionFen);
+            ClickMove("a7", "a8");
+            ASSERT_TRUE(PromotionShown());
+        };
+
+        open();
+        Model().Reset();
+        _manager->UpdateAll();
+        EXPECT_FALSE(PromotionShown()) << "Reset";
+        EXPECT_FALSE(Model().HasPendingPromotion());
+
+        open();
+        Model().SetPosition(PositionFromFen("4k3/8/8/8/8/8/4P3/4K3 w - - 0 1"));
+        _manager->UpdateAll();
+        EXPECT_FALSE(PromotionShown()) << "SetPosition";
+
+        open();
+        ASSERT_TRUE(Play(Model(), "a1b1"));  // the control API plays a move of its own
+        _manager->UpdateAll();
+        EXPECT_FALSE(PromotionShown()) << "a move of someone else";
+        EXPECT_FALSE(Model().HasPendingPromotion());
+
+        // The Reset button cannot be pressed under the panel, but the action can be emitted (the control API's reset does the same to the model)
+        open();
+        Press("ChessReset");
+        _manager->UpdateAll();
+        EXPECT_FALSE(PromotionShown()) << "the action ChessReset";
+    }
+
+    TEST_F(ChessUiTest, APromotionThatMatesEndsTheGameAndClosesThePanel) {
+        StartFrom(kMatingPromotionFen);
+        ClickMove("a7", "a8");
+        ASSERT_TRUE(PromotionShown());
+
+        ASSERT_TRUE(ClickPromotion("PromoteQueen").Both());
+
+        EXPECT_FALSE(PromotionShown());
+        EXPECT_EQ(Model().GetStatus(), GameStatus::Checkmate);
+        EXPECT_EQ(Model().GetWinner(), std::optional<PieceColor>(PieceColor::White));
+        EXPECT_EQ(Var("turn"), "White wins");
+        EXPECT_EQ(Var("status"), "Checkmate");
+
+        // The knight does not mate (king and knight against a king is a draw): the same position, the other choice, ends the game another way
+        StartFrom(kMatingPromotionFen);
+        ClickMove("a7", "a8");
+        ASSERT_TRUE(ClickPromotion("PromoteKnight").Both());
+        EXPECT_EQ(Model().GetStatus(), GameStatus::DrawInsufficientMaterial);
+        EXPECT_FALSE(PromotionShown());
+    }
+
+    TEST_F(ChessUiTest, AnIdThatIsInNoTableChangesNothingAndLeavesThePanelOpen) {
+        StartFrom(kPromotionFen);
+        ClickMove("a7", "a8");
+        ASSERT_TRUE(PromotionShown());
+        const uint64_t version = Model().GetVersion();
+
+        for (const char* value : {"", "Queen", "QUEEN", "queen ", "pawn", "king", "que", "nonsense"}) {
+            PressWith("ChessPromote", value);
+        }
+        Press("ChessPromote");  // no value at all
+        _manager->UpdateAll();
+
+        EXPECT_EQ(Model().GetVersion(), version);
+        EXPECT_TRUE(Model().GetMoves().empty());
+        EXPECT_TRUE(Model().HasPendingPromotion());
+        EXPECT_TRUE(PromotionShown());
+        EXPECT_EQ(Model().GetPieceAt(Sq("a7")).type, PieceType::Pawn);
+    }
+
+    TEST_F(ChessUiTest, APromotionPressWithNothingPendingChangesNothing) {
+        StartFrom(kPromotionFen);
+        const uint64_t version = Model().GetVersion();
+        Press("ChessCancelPromotion");
+        PressWith("ChessPromote", "queen");
+        _manager->UpdateAll();
+        EXPECT_EQ(Model().GetVersion(), version);
+        EXPECT_FALSE(PromotionShown());
+        EXPECT_EQ(Model().GetPieceAt(Sq("a7")).type, PieceType::Pawn);
+    }
+
+    TEST_F(ChessUiTest, AwayFromTheLastRankAClickNeverOpensThePanel) {
+        ClickMove("e2", "e4");
+        EXPECT_FALSE(PromotionShown());
+        EXPECT_EQ(Model().GetMoves().size(), 1u);
+    }
+
+    TEST_F(ChessUiTest, WhileTheProgramPlaysTheOtherColorThePersonsPromotionWorksAndTheProgramAnswersIt) {
+        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        ASSERT_TRUE(Opponent().SetSide(PieceColor::Black).has_value());
+        StartFrom(kPromotionFen);
+        ClickMove("a7", "a8");
+        ASSERT_TRUE(PromotionShown());
+
+        ASSERT_TRUE(ClickPromotion("PromoteRook").Both());
+
+        ASSERT_EQ(Model().GetMoves().size(), 1u);
+        EXPECT_EQ(Model().GetMoves().front().ToUci(), eastl::string("a7a8r"));
+        EXPECT_FALSE(PromotionShown());
+        ASSERT_TRUE(FramesUntil([&] { return Model().GetMoves().size() == 2; })) << "the program answers the promotion";
+        EXPECT_EQ(Model().GetTurn(), PieceColor::White);
+        EXPECT_FALSE(PromotionShown());
+    }
+
+    TEST_F(ChessUiTest, TheProgramsMoveWhileThePanelIsOpenClosesIt) {
+        // The person selected the pawn and asked for the promotion; the program (switched on in the meantime) takes the turn and drops the half-made move
+        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        StartFrom(kPromotionFen);
+        ClickMove("a7", "a8");
+        ASSERT_TRUE(PromotionShown());
+
+        ASSERT_TRUE(Opponent().SetSide(PieceColor::White).has_value());
+        _manager->UpdateAll();
+
+        EXPECT_FALSE(Model().HasPendingPromotion());
+        EXPECT_FALSE(PromotionShown());
+    }
+
+    TEST_F(ChessUiTest, ABlackPromotionWorks) {
+        StartFrom(kBlackPromotionFen);
+        ClickMove("a2", "a1");
+        ASSERT_TRUE(PromotionShown());
+
+        ASSERT_TRUE(ClickPromotion("PromoteKnight").Both());
+
+        ASSERT_EQ(Model().GetMoves().size(), 1u);
+        EXPECT_EQ(Model().GetMoves().back().ToUci(), eastl::string("a2a1n"));
+        EXPECT_EQ(Model().GetPieceAt(Sq("a1")).type, PieceType::Knight);
+        EXPECT_EQ(Model().GetPieceAt(Sq("a1")).color, PieceColor::Black);
+        EXPECT_FALSE(PromotionShown());
+        EXPECT_EQ(Model().GetTurn(), PieceColor::White);
+    }
+
+    TEST_F(ChessUiTest, ThePromotedPieceIsDrawnWithItsSprite) {
+        StartFrom(kPromotionFen);
+        const auto* node = PieceNodeAt("a7");
+        ASSERT_NE(node, nullptr);
+        ClickMove("a7", "a8");
+        ASSERT_TRUE(ClickPromotion("PromoteBishop").Both());
+        _manager->UpdateAll();  // ChessPieceComponent switches the sprite in an update
+
+        const auto sprite = node->GetNode().GetComponent<SpriteRendererComponent>();
+        ASSERT_TRUE(sprite);
+        EXPECT_EQ(sprite->_spriteId, PoolString::Intern("WhiteBishop"));
     }
 
 }  // namespace BECore::Chess::Tests

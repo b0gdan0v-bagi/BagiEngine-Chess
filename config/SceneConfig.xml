@@ -109,6 +109,39 @@
           </components>
         </node>
 
+        <!-- The promotion panel: a modal canvas over everything (layer 20, like the opponent panel), started hidden. A click on a promotion target does not move the pawn: the model
+             leaves the promotion pending (ChessGameModel::HasPendingPromotion) and ChessBoardComponent shows this canvas for as long as it is, on every update, so a reset, a set_state or
+             a move of the program or of the control API closes a panel that has become stale. A piece button emits ChessPromote with the id of the piece as the value ("queen", "rook",
+             "bishop", "knight": the table of PromotionChoices) and plays the move; Cancel emits ChessCancelPromotion and the pawn stays selected. While it is shown the dim takes every
+             click, so the board and the buttons of the HUD under it get none; there is no Escape and no click outside to cancel. Plain text buttons, no pieces drawn in them. The names
+             start with Promotion or Promote because elements are found by name in every canvas of the scene (the opponent panel has Dim, Plate and Title). The four piece buttons share
+             one row: the plate is at most 640 units wide, 608 inside the padding, so a button is about 146 units wide in the widest case and still 8 units of air around "Knight" at
+             font 26 in the narrowest window (the plate is 94% of about 689 units). The plate is 16 + 44 (title) + 56 (pieces) + 56 (Cancel) + 3 x 12 (spacing) + 16 = 224 units high.
+             The view is a fixed 840 x 800, so there is no portrait variant. -->
+        <node name="PromotionPanel" layer="20">
+          <components>
+            <component type="UICanvasComponent" space="SceneView" useSafeArea="true" modal="true" visible="false">
+              <elements>
+                <element type="UIElement" name="PromotionDim" anchor="Stretch" ignoreSafeArea="true" color="0,0,0,150" blocksInput="true" />
+                <element type="UIStack" name="PromotionPlate" anchor="Center" width="94%" maxWidth="640" height="224" direction="Vertical" spacing="12" padding="16" crossAlign="Stretch" color="44,38,52,255" blocksInput="true">
+                  <children>
+                    <element type="UILabel" name="PromotionTitle" height="44" text="Promote to" fontSize="30" align="Center" />
+                    <element type="UIStack" name="PromotionPieces" height="56" direction="Horizontal" spacing="8" crossAlign="Stretch">
+                      <children>
+                        <element type="UIButton" name="PromoteQueen" flex="1" height="56" text="Queen" fontSize="26" value="queen" action="ChessPromote" color="70,70,100,255" />
+                        <element type="UIButton" name="PromoteRook" flex="1" height="56" text="Rook" fontSize="26" value="rook" action="ChessPromote" color="70,70,100,255" />
+                        <element type="UIButton" name="PromoteBishop" flex="1" height="56" text="Bishop" fontSize="26" value="bishop" action="ChessPromote" color="70,70,100,255" />
+                        <element type="UIButton" name="PromoteKnight" flex="1" height="56" text="Knight" fontSize="26" value="knight" action="ChessPromote" color="70,70,100,255" />
+                      </children>
+                    </element>
+                    <element type="UIButton" name="PromotionCancel" height="56" text="Cancel" fontSize="26" action="ChessCancelPromotion" color="110,60,60,255" />
+                  </children>
+                </element>
+              </elements>
+            </component>
+          </components>
+        </node>
+
         <!-- Foreground layer: the end-of-game dim and result bar, drawn over the pieces (layer 0). -->
         <node name="Result" layer="1">
           <components>
