@@ -12,7 +12,8 @@ namespace BECore::Chess {
         inline constexpr eastl::string_view kGameOver = "game_over";
         /// The move is a pawn move onto the last rank and does not say what to promote to: "e7e8" instead of "e7e8q"
         inline constexpr eastl::string_view kPromotionRequired = "promotion_required";
-        /// set_state asked for a computer opponent and there is no engine to make it (no Stockfish found; the own engine cannot fail): nothing was changed but the opponent, who is nobody now
+        /// set_state asked for a computer opponent and there is no engine to make it (no Stockfish found; the own engine cannot fail): the pick is refused as a whole, so the position and the opponent
+        /// stay as they were and the error is in the state
         inline constexpr eastl::string_view kEngineUnavailable = "engine_unavailable";
     }  // namespace ChessControlErrors
 

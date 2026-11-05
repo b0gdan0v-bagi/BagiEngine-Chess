@@ -1743,7 +1743,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheEngineGroupTakesClicksWhetherOrNotTheProgramPlays) {
-        // Was TheEngineButtonIsShownWhetherOrNotTheProgramPlays: the Engine button was never hidden; the EngineGroup of the panel is never greyed, and it works in every state
+        // Was TheEngineButtonIsShownWhetherOrNotTheProgramPlays: the Engine button was never hidden; no group of the panel is greyed, and the EngineGroup works in every state
         CountingFactory working({eastl::make_shared<InstantEngine>()});
         Opponent().SetEngineFactory(working.AsFactory());
         _manager->UpdateAll();
@@ -1771,7 +1771,7 @@ namespace BECore::Chess::Tests {
         Opponent().SetEngineFactory(failing.AsFactory());
         ASSERT_TRUE(ClickPanel("ModeComputer").Both());
         EXPECT_EQ(Var("status"), "Engine not found");
-        engineGroupWorks("a failed pick leaves nobody, and the group is what the person needs then");
+        engineGroupWorks("after a refused pick (nobody was playing, and nothing changed): the group is what the person needs then");
     }
 
     // ---- the buttons of the opponent, clicked where they are drawn ---------------------------------------------------------------
