@@ -213,14 +213,18 @@ namespace BECore::Chess::Tests {
         EXPECT_TRUE(model.HasSelection()) << "a click selects again";
     }
 
-    TEST(ChessGameModelTest, PawnReachingTheLastRankBecomesAQueenOnClick) {
+    TEST(ChessGameModelTest, PawnReachingTheLastRankWaitsForAPieceOnClick) {
         ChessGameModel model;
         for (const char* uci : {"h2h4", "g7g5", "h4g5", "h7h6", "g5h6", "a7a6", "h6h7", "b7b6"}) {
             ASSERT_TRUE(Play(model, uci)) << uci;
         }
         ClickMoves(model, {"h7", "g8"});
+        EXPECT_TRUE(model.HasPendingPromotion());
+        EXPECT_TRUE(model.GetPieceAt(Sq("g8")).type == PieceType::Knight) << "nothing has moved";
+        ASSERT_TRUE(model.ChoosePromotion(PieceType::Queen).has_value());
         EXPECT_TRUE(model.GetPieceAt(Sq("g8")).type == PieceType::Queen);
         EXPECT_TRUE(model.GetPieceAt(Sq("g8")).color == PieceColor::White);
+        EXPECT_FALSE(model.HasPendingPromotion());
     }
 
     TEST(ChessGameModelTest, UnderPromotionIsAvailableThroughTryMove) {
@@ -230,6 +234,300 @@ namespace BECore::Chess::Tests {
         }
         ASSERT_TRUE(Play(model, "h7g8n"));
         EXPECT_TRUE(model.GetPieceAt(Sq("g8")).type == PieceType::Knight);
+    }
+
+    // ---- The promotion picker ----
+
+    namespace {
+
+        constexpr eastl::string_view kPromotionFen = "8/P6k/8/8/8/8/8/K7 w - - 0 1";
+        constexpr eastl::string_view kPromotingCaptureFen = "1r5k/P7/8/8/8/8/8/K7 w - - 0 1";
+        constexpr eastl::string_view kMatingPromotionFen = "7k/P5pp/8/8/8/8/8/K7 w - - 0 1";
+        constexpr eastl::string_view kBlackPromotionFen = "k7/8/8/8/8/8/p6K/8 b - - 0 1";
+
+        /// A model on @p fen with the pawn selected and its promotion target clicked
+        void StartPromotion(ChessGameModel& model, eastl::string_view fen, eastl::string_view from, eastl::string_view to) {
+            model.SetPosition(PositionFromFen(fen));
+            Click(model, from);
+            Click(model, to);
+        }
+
+        /// The handle that stands on @p square now, or null
+        const void* HandleOn(const ChessGameModel& model, const Handles& handles, eastl::string_view square) {
+            for (int sq = 0; sq < kSquareCount; ++sq) {
+                if (model.IsActive(handles.AtIndex(sq)) && model.GetSquareOf(handles.AtIndex(sq)) == Sq(square)) {
+                    return handles.AtIndex(sq);
+                }
+            }
+            return nullptr;
+        }
+
+    }  // namespace
+
+    TEST(ChessGameModelTest, ClickOnAPromotionTargetIsPendingAndMovesNothing) {
+        ChessGameModel model;
+        model.SetPosition(PositionFromFen(kPromotionFen));
+        const uint64_t version = model.GetVersion();
+        const eastl::string fen = model.GetPosition().ToFen();
+        EXPECT_FALSE(model.HasPendingPromotion());
+
+        EXPECT_FALSE(Click(model, "a7"));
+        EXPECT_FALSE(model.HasPendingPromotion()) << "a selection alone is not a promotion";
+        EXPECT_FALSE(Click(model, "a8"));
+
+        EXPECT_TRUE(model.HasPendingPromotion());
+        EXPECT_EQ(model.GetPromotionTarget(), Sq("a8"));
+        EXPECT_EQ(model.GetVersion(), version);
+        EXPECT_EQ(model.GetPosition().ToFen(), fen);
+        EXPECT_TRUE(model.GetMoves().empty());
+        EXPECT_TRUE(model.HasSelection());
+        EXPECT_EQ(model.GetSelected(), Sq("a7"));
+        EXPECT_TRUE(model.GetPieceAt(Sq("a7")).type == PieceType::Pawn);
+    }
+
+    TEST(ChessGameModelTest, EachChoiceOfThePickerPlaysItsPiece) {
+        const eastl::array<std::pair<PieceType, const char*>, 4> choices{{
+            {PieceType::Queen, "a7a8q"},
+            {PieceType::Rook, "a7a8r"},
+            {PieceType::Bishop, "a7a8b"},
+            {PieceType::Knight, "a7a8n"},
+        }};
+        for (const auto& [piece, uci] : choices) {
+            ChessGameModel model;
+            const Handles handles(model);
+            StartPromotion(model, kPromotionFen, "a7", "a8");
+            const uint64_t version = model.GetVersion();
+            ASSERT_TRUE(model.HasPendingPromotion()) << uci;
+
+            const auto result = model.ChoosePromotion(piece);
+
+            ASSERT_TRUE(result.has_value()) << uci;
+            ASSERT_EQ(model.GetMoves().size(), 1u) << uci;
+            EXPECT_EQ(model.GetMoves().back().ToUci(), uci);
+            EXPECT_EQ(model.GetVersion(), version + 1) << uci;
+            EXPECT_TRUE(model.GetPieceAt(Sq("a8")).type == piece) << uci;
+            EXPECT_TRUE(model.GetPieceAt(Sq("a8")).color == PieceColor::White) << uci;
+            EXPECT_TRUE(model.GetPieceAt(Sq("a7")).IsEmpty()) << uci;
+            EXPECT_FALSE(model.HasPendingPromotion()) << uci;
+            EXPECT_FALSE(model.HasSelection()) << uci;
+            EXPECT_TRUE(model.GetTurn() == PieceColor::Black) << uci;
+
+            const void* pawn = HandleOn(model, handles, "a8");
+            ASSERT_NE(pawn, nullptr) << uci;
+            EXPECT_TRUE(model.GetPieceOf(pawn).type == piece) << "the handle of the pawn reports the piece: " << uci;
+        }
+    }
+
+    TEST(ChessGameModelTest, PromotingCaptureWaitsForAPieceToo) {
+        const eastl::array<std::pair<PieceType, const char*>, 4> choices{{
+            {PieceType::Queen, "a7b8q"},
+            {PieceType::Rook, "a7b8r"},
+            {PieceType::Bishop, "a7b8b"},
+            {PieceType::Knight, "a7b8n"},
+        }};
+        for (const auto& [piece, uci] : choices) {
+            ChessGameModel model;
+            const Handles handles(model);
+            StartPromotion(model, kPromotingCaptureFen, "a7", "b8");
+            ASSERT_TRUE(model.HasPendingPromotion()) << uci;
+            EXPECT_EQ(model.GetPromotionTarget(), Sq("b8"));
+            EXPECT_TRUE(model.GetPieceAt(Sq("b8")).type == PieceType::Rook) << "the rook is still there";
+
+            ASSERT_TRUE(model.ChoosePromotion(piece).has_value()) << uci;
+
+            EXPECT_EQ(model.GetMoves().back().ToUci(), uci);
+            EXPECT_TRUE(model.GetPieceAt(Sq("b8")).type == piece) << uci;
+            EXPECT_TRUE(model.GetPieceAt(Sq("b8")).color == PieceColor::White) << uci;
+        }
+    }
+
+    TEST(ChessGameModelTest, ChoiceWithNothingPendingIsIllegalAndChangesNothing) {
+        ChessGameModel model;
+        model.SetPosition(PositionFromFen(kPromotionFen));
+        const uint64_t version = model.GetVersion();
+        const eastl::string fen = model.GetPosition().ToFen();
+
+        for (const PieceType piece : {PieceType::Queen, PieceType::Knight, PieceType::Pawn}) {
+            const auto result = model.ChoosePromotion(piece);
+            ASSERT_FALSE(result.has_value());
+            EXPECT_EQ(result.error(), MoveError::IllegalMove);
+        }
+        Click(model, "a7");  // selected, no target yet
+        const auto selected = model.ChoosePromotion(PieceType::Queen);
+        ASSERT_FALSE(selected.has_value());
+        EXPECT_EQ(selected.error(), MoveError::IllegalMove);
+        EXPECT_TRUE(model.HasSelection());
+
+        EXPECT_EQ(model.GetVersion(), version);
+        EXPECT_EQ(model.GetPosition().ToFen(), fen);
+    }
+
+    TEST(ChessGameModelTest, ChoiceOfAPieceThatIsNotAPromotionIsIllegalAndKeepsThePending) {
+        ChessGameModel model;
+        StartPromotion(model, kPromotionFen, "a7", "a8");
+        const uint64_t version = model.GetVersion();
+
+        for (const PieceType piece : {PieceType::None, PieceType::Pawn, PieceType::King}) {
+            const auto result = model.ChoosePromotion(piece);
+            ASSERT_FALSE(result.has_value());
+            EXPECT_EQ(result.error(), MoveError::IllegalMove);
+        }
+
+        EXPECT_TRUE(model.HasPendingPromotion());
+        EXPECT_EQ(model.GetVersion(), version);
+        EXPECT_TRUE(model.GetMoves().empty());
+        EXPECT_TRUE(model.ChoosePromotion(PieceType::Queen).has_value()) << "the choice still stands";
+    }
+
+    TEST(ChessGameModelTest, ClickOnAnotherSquareCancelsThePromotion) {
+        for (const char* other : {"a7", "h7", "e4", "a1"}) {
+            ChessGameModel model;
+            StartPromotion(model, kPromotionFen, "a7", "a8");
+            ASSERT_TRUE(model.HasPendingPromotion());
+            const uint64_t version = model.GetVersion();
+
+            EXPECT_FALSE(Click(model, other));
+
+            EXPECT_FALSE(model.HasPendingPromotion()) << other;
+            EXPECT_TRUE(model.HasSelection()) << "the selection stays: " << other;
+            EXPECT_EQ(model.GetSelected(), Sq("a7")) << other;
+            EXPECT_EQ(model.GetVersion(), version) << other;
+            const auto result = model.ChoosePromotion(PieceType::Queen);
+            ASSERT_FALSE(result.has_value()) << other;
+            EXPECT_EQ(result.error(), MoveError::IllegalMove);
+            EXPECT_TRUE(model.GetMoves().empty());
+        }
+    }
+
+    TEST(ChessGameModelTest, ClickOnTheTargetAgainCancelsAndAnotherOpensIt) {
+        ChessGameModel model;
+        StartPromotion(model, kPromotionFen, "a7", "a8");
+        Click(model, "a8");
+        EXPECT_FALSE(model.HasPendingPromotion()) << "the second click on the target is a click on a square";
+        Click(model, "a8");
+        EXPECT_TRUE(model.HasPendingPromotion()) << "the pawn is still selected, so the target opens the choice again";
+    }
+
+    TEST(ChessGameModelTest, CancelPromotionKeepsTheSelection) {
+        ChessGameModel model;
+        StartPromotion(model, kPromotionFen, "a7", "a8");
+        const uint64_t version = model.GetVersion();
+
+        model.CancelPromotion();
+
+        EXPECT_FALSE(model.HasPendingPromotion());
+        EXPECT_TRUE(model.HasSelection());
+        EXPECT_EQ(model.GetSelected(), Sq("a7"));
+        EXPECT_FALSE(model.GetLegalMoves().empty());
+        EXPECT_EQ(model.GetVersion(), version);
+        model.CancelPromotion();  // nothing pending: nothing to do
+        EXPECT_TRUE(model.HasSelection());
+        Click(model, "a8");
+        EXPECT_TRUE(model.HasPendingPromotion()) << "the same target opens the choice again";
+    }
+
+    TEST(ChessGameModelTest, ResetSetPositionClearSelectionAndAMoveClearThePending) {
+        {
+            ChessGameModel model;
+            StartPromotion(model, kPromotionFen, "a7", "a8");
+            model.Reset();
+            EXPECT_FALSE(model.HasPendingPromotion()) << "Reset";
+            EXPECT_FALSE(model.HasSelection());
+        }
+        {
+            ChessGameModel model;
+            StartPromotion(model, kPromotionFen, "a7", "a8");
+            model.SetPosition(PositionFromFen(kPromotingCaptureFen));
+            EXPECT_FALSE(model.HasPendingPromotion()) << "SetPosition";
+        }
+        {
+            ChessGameModel model;
+            StartPromotion(model, kPromotionFen, "a7", "a8");
+            model.ClearSelection();
+            EXPECT_FALSE(model.HasPendingPromotion()) << "ClearSelection";
+            EXPECT_FALSE(model.HasSelection());
+        }
+        {
+            ChessGameModel model;
+            StartPromotion(model, kPromotionFen, "a7", "a8");
+            ASSERT_TRUE(Play(model, "a1b1"));
+            EXPECT_FALSE(model.HasPendingPromotion()) << "a move of another piece";
+            EXPECT_FALSE(model.ChoosePromotion(PieceType::Queen).has_value());
+            EXPECT_TRUE(model.GetPieceAt(Sq("a7")).type == PieceType::Pawn);
+        }
+        {
+            ChessGameModel model;
+            StartPromotion(model, kPromotionFen, "a7", "a8");
+            ASSERT_TRUE(Play(model, "a7a8r"));
+            EXPECT_FALSE(model.HasPendingPromotion()) << "the same pawn promoted by TryMove";
+        }
+    }
+
+    TEST(ChessGameModelTest, PromotionThatMatesEndsTheGame) {
+        ChessGameModel model;
+        StartPromotion(model, kMatingPromotionFen, "a7", "a8");
+        ASSERT_TRUE(model.HasPendingPromotion());
+
+        ASSERT_TRUE(model.ChoosePromotion(PieceType::Queen).has_value());
+
+        EXPECT_EQ(model.GetStatus(), GameStatus::Checkmate);
+        EXPECT_TRUE(model.IsGameOver());
+        ASSERT_TRUE(model.GetWinner().has_value());
+        EXPECT_TRUE(*model.GetWinner() == PieceColor::White);
+        EXPECT_FALSE(model.HasPendingPromotion());
+
+        const uint64_t version = model.GetVersion();
+        const auto after = model.ChoosePromotion(PieceType::Rook);
+        ASSERT_FALSE(after.has_value());
+        EXPECT_EQ(after.error(), MoveError::GameOver);
+        EXPECT_EQ(model.GetVersion(), version);
+        EXPECT_EQ(model.GetMoves().size(), 1u);
+    }
+
+    TEST(ChessGameModelTest, ABlackPromotionWorks) {
+        ChessGameModel model;
+        const Handles handles(model);
+        StartPromotion(model, kBlackPromotionFen, "a2", "a1");
+        ASSERT_TRUE(model.HasPendingPromotion());
+        EXPECT_EQ(model.GetPromotionTarget(), Sq("a1"));
+
+        ASSERT_TRUE(model.ChoosePromotion(PieceType::Knight).has_value());
+
+        EXPECT_EQ(model.GetMoves().back().ToUci(), "a2a1n");
+        EXPECT_TRUE(model.GetPieceAt(Sq("a1")).type == PieceType::Knight);
+        EXPECT_TRUE(model.GetPieceAt(Sq("a1")).color == PieceColor::Black);
+        const void* pawn = HandleOn(model, handles, "a1");
+        ASSERT_NE(pawn, nullptr);
+        EXPECT_TRUE(model.GetPieceOf(pawn).type == PieceType::Knight);
+        EXPECT_TRUE(model.GetPieceOf(pawn).color == PieceColor::Black);
+    }
+
+    TEST(ChessGameModelTest, MovesThatDoNotPromoteNeverSetThePending) {
+        ChessGameModel model;
+        ClickMoves(model, {"e2", "e4"});
+        EXPECT_FALSE(model.HasPendingPromotion());
+        EXPECT_EQ(model.GetMoves().size(), 1u);
+
+        // A click on a square the pawn cannot go to is no promotion either
+        ChessGameModel other;
+        other.SetPosition(PositionFromFen(kPromotionFen));
+        ClickMoves(other, {"a7", "a6"});
+        EXPECT_FALSE(other.HasPendingPromotion()) << "a7a6 is not a move";
+        ClickMoves(other, {"a1", "b1"});
+        EXPECT_FALSE(other.HasPendingPromotion());
+        EXPECT_EQ(other.GetMoves().size(), 1u) << "the king moved by a plain click pair";
+    }
+
+    TEST(ChessGameModelTest, NoPendingPromotionOnceTheGameIsOver) {
+        ChessGameModel model;
+        model.SetPosition(PositionFromFen("7k/5Q2/6K1/8/8/8/8/8 b - - 0 1"));  // stalemate for Black
+        ASSERT_TRUE(model.IsGameOver());
+        Click(model, "h8");
+        Click(model, "h7");
+        EXPECT_FALSE(model.HasPendingPromotion());
+        const auto result = model.ChoosePromotion(PieceType::Queen);
+        ASSERT_FALSE(result.has_value());
+        EXPECT_EQ(result.error(), MoveError::GameOver);
     }
 
     // ---- End of the game ----
