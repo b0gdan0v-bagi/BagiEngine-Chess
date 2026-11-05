@@ -1,5 +1,7 @@
 #include "ChessTestUtil.h"
 
+#include <Chess/Engine/OpponentEngines.h>
+#include <Chess/Engine/OpponentLevels.h>
 #include <Chess/Engine/OpponentText.h>
 
 /// The words of the HUD for the computer opponent: pure, they read their arguments and make text
@@ -28,22 +30,37 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(OpponentText::SideLabel(PieceColor::White), "You: Black") << "the program plays White, so the person has Black";
     }
 
-    TEST(OpponentTextTest, TheLevelIsNamedAfterItsWord) {
-        const auto levels = GetOpponentLevels();
-        ASSERT_FALSE(levels.empty());
-
-        for (const OpponentLevel& level : levels) {
-            const eastl::string expected = Format("Level: {}", level.name);
-            EXPECT_EQ(OpponentText::LevelLabel(level), expected);
-        }
-        EXPECT_EQ(OpponentText::LevelLabel(levels[kDefaultOpponentLevel]), "Level: Medium");
-        EXPECT_EQ(OpponentText::LevelLabel(levels.front()), "Level: Easy");
-        EXPECT_EQ(OpponentText::LevelLabel(levels.back()), "Level: Max");
+    TEST(OpponentTextTest, TheModeAndTheColorOfThePanelAreSaidInTheirPinnedWords) {
+        EXPECT_EQ(OpponentText::ModeLabel(false), "Two players");
+        EXPECT_EQ(OpponentText::ModeLabel(true), "Computer");
+        EXPECT_EQ(OpponentText::ColorLabel(PieceColor::White), "White");
+        EXPECT_EQ(OpponentText::ColorLabel(PieceColor::Black), "Black");
+        EXPECT_EQ(OpponentText::ModeLabel(false), OpponentText::SideLabel(kNobody)) << "the same words in the Opponent button and in its panel";
     }
 
-    TEST(OpponentTextTest, TheEngineIsNamedAfterItsWord) {
-        EXPECT_EQ(OpponentText::EngineLabel(OpponentEngine::Stockfish), "Stockfish");
-        EXPECT_EQ(OpponentText::EngineLabel(OpponentEngine::Own), "Own engine");
+    TEST(OpponentTextTest, NoTwoSegmentsOfAGroupOfThePanelSayTheSameWord) {
+        const auto distinct = [](const eastl::vector<eastl::string>& words) {
+            for (size_t a = 0; a < words.size(); ++a) {
+                EXPECT_FALSE(words[a].empty());
+                for (size_t b = a + 1; b < words.size(); ++b) {
+                    EXPECT_NE(words[a], words[b]);
+                }
+            }
+        };
+
+        distinct({OpponentText::ModeLabel(false), OpponentText::ModeLabel(true)});
+        distinct({OpponentText::ColorLabel(PieceColor::White), OpponentText::ColorLabel(PieceColor::Black)});
+        eastl::vector<eastl::string> engines;
+        for (const OpponentEngine engine : EnumUtils<OpponentEngine>::Values()) {
+            const eastl::string_view name = OpponentEngineName(engine);
+            engines.emplace_back(name.data(), name.size());
+        }
+        distinct(engines);
+        eastl::vector<eastl::string> levels;
+        for (const OpponentLevel& level : GetOpponentLevels()) {
+            levels.emplace_back(level.name.data(), level.name.size());
+        }
+        distinct(levels);
     }
 
     TEST(OpponentTextTest, ALaunchFailureSaysTheEngineIsNotFound) {
@@ -52,7 +69,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(OpponentTextTest, AnIllegalMoveIsSaidInTheWidthOfTheLongestStatus) {
-        // The Status label is laid out for "Draw: insufficient material"; the sentence was longer once and did not fit beside the Engine button
+        // The Status label is laid out for "Draw: insufficient material"; the sentence was longer once and did not fit the width of that label
         EXPECT_EQ(OpponentText::Error(EngineError{EngineErrorKind::IllegalMove, "e2e5"}), "Illegal engine move");
     }
 

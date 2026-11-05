@@ -20,7 +20,12 @@ namespace BECore::Chess {
         return chess ? &chess->GetOpponent() : nullptr;
     }
 
-    ChessGame::ChessGame() : _opponent(_model), _control(_model, _opponent) {}
+    OpponentChoice* ChessGame::GetActiveChoice() {
+        ChessGame* chess = GetActive();
+        return chess ? &chess->GetChoice() : nullptr;
+    }
+
+    ChessGame::ChessGame() : _opponent(_model), _choice(_opponent), _control(_model, _opponent) {}
 
     IControllableGame* ChessGame::AsControllable() {
         return &_control;
@@ -41,10 +46,12 @@ namespace BECore::Chess {
         _opponent.SetSide(std::nullopt);
         _opponent.SetLevel(kDefaultOpponentLevel);
         _opponent.SetEngine(kDefaultOpponentEngine);
+        _choice.Reset();  // a new game starts with White remembered as the person's color
     }
 
     void ChessGame::Stop() {
-        // Components own their own subscriptions. The opponent goes now, before TaskManager::Shutdown(): a search nobody cancelled would hold the join of the pool
+        // Components own their own subscriptions. The choice holds nothing but a reference to the controller and a color. The opponent goes now, before TaskManager::Shutdown(): a search nobody
+        // cancelled would hold the join of the pool
         _opponent.Shutdown();
     }
 

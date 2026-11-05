@@ -3,6 +3,7 @@
 #include <BECore/GameManager/CoreManager.h>
 #include <BECore/Renderer/IRenderer.h>
 #include <BECore/Scene/Scene.h>
+#include <BECore/Scene/SceneNode.h>
 #include <BECore/UI/UICanvasComponent.h>
 #include <Chess/ChessGame.h>
 #include <Chess/Engine/OpponentText.h>
@@ -58,6 +59,7 @@ namespace BECore::Chess {
         }
         // The opponent plays here, on the main thread, and not in OnDraw(): it changes the model
         game->GetOpponent().Update();
+        static_cast<void>(game->GetChoice().Color());  // reading it remembers the person's color of a side set from outside (the control API) before that side is cleared
         LogResultOnce(game->GetModel());
     }
 
@@ -77,62 +79,82 @@ namespace BECore::Chess {
         }
         const ChessGameModel& model = game->GetModel();
         const OpponentController& opponent = game->GetOpponent();
-        // A search starts and ends without a move of the game, and a side or a level changes without one: all of it is a reason to say the words again
+        const OpponentChoice& choice = game->GetChoice();
+        // Read on every refresh, also when nothing else changed: it remembers the person's color, which a set_state of the control API could otherwise take with it
+        const PieceColor personColor = choice.Color();
+        // A search starts and ends without a move of the game, and a side or a level changes without one: all of it is a reason to say the words again. The person's
+        // color changes without any of them while two people play
         const bool thinking = opponent.IsThinking();
         const bool opponentChanged = &model != _publishedModel || opponent.GetRevision() != _publishedRevision;
-        if (!opponentChanged && model.GetVersion() == _publishedVersion && thinking == _publishedThinking) {
+        if (!opponentChanged && model.GetVersion() == _publishedVersion && thinking == _publishedThinking && personColor == _publishedColor) {
             return;
         }
         _publishedModel = &model;
         _publishedVersion = model.GetVersion();
         _publishedRevision = opponent.GetRevision();
         _publishedThinking = thinking;
+        _publishedColor = personColor;
 
         // While an error of the opponent stands the game is stalled by it, so its sentence wins over "Check"
         const std::optional<EngineError>& error = opponent.GetError();
         const eastl::string turn = StatusText::Turn(model, thinking);
         const eastl::string status = error ? OpponentText::Error(*error) : StatusText::Status(model);
         const eastl::string side = OpponentText::SideLabel(opponent.GetPlays());
-        const eastl::string level = OpponentText::LevelLabel(GetOpponentLevels()[opponent.GetLevel()]);
-        const eastl::string engine = OpponentText::EngineLabel(opponent.GetEngine());
+        const eastl::string opponentError = error ? OpponentText::Error(*error) : eastl::string();
         UIVars& vars = CoreManager::GetUIVars();
         vars.Set("turn"_intern, eastl::string_view(turn.data(), turn.size()));
         vars.Set("status"_intern, eastl::string_view(status.data(), status.size()));
         vars.Set("side"_intern, eastl::string_view(side.data(), side.size()));
-        vars.Set("level"_intern, eastl::string_view(level.data(), level.size()));
-        vars.Set("engine"_intern, eastl::string_view(engine.data(), engine.size()));
+        // The ids of the opponent panel, those of the control API (the person's color, not the program's); the words are the text of the segments in the scene
+        vars.Set("opponentMode"_intern, choice.ModeId());
+        vars.Set("opponentColor"_intern, choice.ColorId());
+        vars.Set("opponentEngine"_intern, choice.EngineId());
+        vars.Set("opponentLevel"_intern, choice.LevelId());
+        vars.Set("opponentError"_intern, eastl::string_view(opponentError.data(), opponentError.size()));
+    }
 
-        // The strength means something only when the program plays; the engine button has no such rule (a failed Stockfish pick leaves nobody, and the person needs it then).
-        // A scene without an element of that name has nothing to show or hide
-        if (opponentChanged) {
-            UICanvasComponent::SetElementVisibleByName(GetScene(), "Level"_intern, opponent.GetPlays().has_value());
+    void ChessBoardComponent::AnswerSetAction(const InputEvents::ActionEvent& event) {
+        // The actions of the segments of the opponent panel; `value` is the id the person chose
+        OpponentChoice* choice = ChessGame::GetActiveChoice();
+        if (!choice) {
+            return;
+        }
+        const eastl::string_view value = event.value.ToStringView();
+        std::expected<void, ChoiceError> picked;
+        if (event.action == "ChessSetMode"_intern) {
+            picked = choice->SetMode(value);
+        } else if (event.action == "ChessSetColor"_intern) {
+            picked = choice->SetColor(value);
+        } else if (event.action == "ChessSetEngine"_intern) {
+            picked = choice->SetEngine(value);
+        } else if (event.action == "ChessSetLevel"_intern) {
+            picked = choice->SetLevel(value);
+        } else {
+            return;
+        }
+        // A refused pick (no Stockfish found) is kept by the controller and shown through the variables, so only an id that is in no table (a hand-made press) is said here
+        if (!picked && picked.error().kind == ChoiceErrorKind::BadId) {
+            LOG_WARNING("{} ignored: {}"_format(event.action.ToStringView(), picked.error().detail));
         }
     }
 
     void ChessBoardComponent::OnAction(const InputEvents::ActionEvent& event) {
         // The actions of the buttons of the HUD in config/SceneConfig.xml
         const PoolString resetAction = "ChessReset"_intern;
-        const PoolString cycleSideAction = "ChessCycleSide"_intern;
-        const PoolString cycleEngineAction = "ChessCycleEngine"_intern;
-        const PoolString cycleLevelAction = "ChessCycleLevel"_intern;
+        const PoolString openPanelAction = "ChessOpenOpponent"_intern;
+        const PoolString closePanelAction = "ChessCloseOpponent"_intern;
         if (event.action == resetAction) {
             if (ChessGameModel* model = ChessGame::GetActiveModel()) {
                 model->Reset();
             }
             return;
         }
-        OpponentController* opponent = ChessGame::GetActiveOpponent();
-        if (!opponent) {
+        // The opponent panel is a modal canvas of the scene, hidden at the start; a scene without it has nothing to show or hide
+        if (event.action == openPanelAction || event.action == closePanelAction) {
+            UICanvasComponent::SetVisibleByName(GetScene(), "OpponentPanel"_intern, event.action == openPanelAction);
             return;
         }
-        // A pick that finds no engine returns its error and keeps it in the controller; the Status label shows it, so there is nothing to handle here
-        if (event.action == cycleSideAction) {
-            opponent->CycleSide();
-        } else if (event.action == cycleEngineAction) {
-            opponent->CycleEngine();
-        } else if (event.action == cycleLevelAction) {
-            opponent->CycleLevel();
-        }
+        AnswerSetAction(event);
     }
 
     void ChessBoardComponent::SquareToPixel(int file, int rank, float& outX, float& outY) const {

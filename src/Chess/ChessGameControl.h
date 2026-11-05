@@ -12,7 +12,8 @@ namespace BECore::Chess {
         inline constexpr eastl::string_view kGameOver = "game_over";
         /// The move is a pawn move onto the last rank and does not say what to promote to: "e7e8" instead of "e7e8q"
         inline constexpr eastl::string_view kPromotionRequired = "promotion_required";
-        /// set_state asked for a computer opponent and there is no engine to make it (no Stockfish found; the own engine cannot fail): nothing was changed but the opponent, who is nobody now
+        /// set_state asked for a computer opponent and there is no engine to make it (no Stockfish found; the own engine cannot fail): the pick is refused as a whole, so the position and the opponent
+        /// stay as they were and the error is in the state
         inline constexpr eastl::string_view kEngineUnavailable = "engine_unavailable";
     }  // namespace ChessControlErrors
 
@@ -45,9 +46,9 @@ namespace BECore::Chess {
      * "engine": ..}} (inside it a missing member means unchanged; plays is "white", "black" or null; level and engine an id, "stockfish" or "own" for the engine,
      * exactly as written) or both; neither is invalid_params. Everything is checked before anything changes, so a refused call (invalid_params) changes nothing.
      * The opponent is applied first, then the position. A pick that finds no engine (only Stockfish can fail) is engine_unavailable (with the sentence of the
-     * engine's error): the position is not replaced, and the program plays nobody (the level and the engine stay picked, so a client can ask again with
-     * "engine": "own"). A pick that changes nothing (the same side, level and engine, no error standing) does nothing: a running Stockfish is not restarted. With
-     * an error standing, the same "plays" asks for an engine again, and plays null clears it.
+     * engine's error) and is refused as a whole: the position is not replaced and the opponent is unchanged (side, level, engine and a running search stay as they
+     * were), the error is in the state, so a client can ask again with "engine": "own". A pick that changes nothing (the same side, level and engine, no error standing) does nothing: a running
+     * Stockfish is not restarted. With an error standing, the same "plays" asks for an engine again, and plays null clears it.
      *
      * The state version is the version of the game plus the revision of the opponent (a pick, an error that appears or goes), so a push reports a change of the
      * opponent as well; it never goes back.

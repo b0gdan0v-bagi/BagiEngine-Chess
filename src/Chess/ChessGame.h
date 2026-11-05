@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Chess/ChessGameControl.h>
+#include <Chess/Engine/OpponentChoice.h>
 #include <Chess/Engine/OpponentController.h>
 #include <Chess/Game/ChessGameModel.h>
 #include <Games/IGame.h>
@@ -18,7 +19,8 @@ namespace BECore::Chess {
      *
      * Owns the adapter of the external control API (ChessGameControl) next to the model it drives, and the seat of the computer opponent
      * (OpponentController). A game starts with nobody as the opponent: Start() loads the settings (where Stockfish is) and nothing else; the opponent
-     * is made when a side is picked on GetOpponent(). IGame has no per-frame hook, so ChessBoardComponent runs GetOpponent().Update() every frame. Stop()
+     * is made when a side is picked on GetOpponent(). The choice the opponent panel makes (OpponentChoice: a mode, the person's color, an engine and a level by id) is owned
+     * here too, over the same controller, and remembers the person's color while nobody plays. IGame has no per-frame hook, so ChessBoardComponent runs GetOpponent().Update() every frame. Stop()
      * destroys the opponent, which happens before the task system goes down (Application::Cleanup()): a search that nobody cancelled would hold the join of the pool.
      */
     class ChessGame : public IGame {
@@ -50,6 +52,13 @@ namespace BECore::Chess {
             return _opponent;
         }
 
+        OpponentChoice& GetChoice() noexcept {
+            return _choice;
+        }
+        const OpponentChoice& GetChoice() const noexcept {
+            return _choice;
+        }
+
         /// The active game, or nullptr when no game is active or the active game is not Chess.
         static ChessGame* GetActive();
 
@@ -59,9 +68,13 @@ namespace BECore::Chess {
         /// The opponent of the active game, or nullptr when no game is active or the active game is not Chess.
         static OpponentController* GetActiveOpponent();
 
+        /// The choice of the opponent of the active game, or nullptr when no game is active or the active game is not Chess.
+        static OpponentChoice* GetActiveChoice();
+
     private:
         ChessGameModel _model;
         OpponentController _opponent;  ///< after the model (it holds a reference to it) and before the adapter
+        OpponentChoice _choice;        ///< after the controller (it holds a reference to it)
         ChessGameControl _control;
     };
 

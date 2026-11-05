@@ -15,26 +15,24 @@
 namespace BECore::Chess::Tests {
 
     struct HudWords {
-        eastl::vector<eastl::string> turn;    ///< `{turn}`: whose move it is, who won, "Computer is thinking"
-        eastl::vector<eastl::string> status;  ///< `{status}`: the status of the game ("" included) and every sentence of an engine error
-        eastl::vector<eastl::string> side;    ///< `{side}`: the three states of the opponent
-        eastl::vector<eastl::string> engine;  ///< `{engine}`: one per engine
-        eastl::vector<eastl::string> level;   ///< `{level}`: one per level
+        eastl::vector<eastl::string> turn;           ///< `{turn}`: whose move it is, who won, "Computer is thinking"
+        eastl::vector<eastl::string> status;         ///< `{status}`: the status of the game ("" included) and every sentence of an engine error
+        eastl::vector<eastl::string> side;           ///< `{side}`: the three states of the opponent
+        eastl::vector<eastl::string> opponentError;  ///< `{opponentError}` of the opponent panel: "" and every sentence of an engine error
 
         /// How many rounds cover every word: round i takes the word i of each list (the shorter lists wrap round). The elements of the HUD lay out independently of one another,
         /// so a word needs a round with some word of the others, not with each of them
         [[nodiscard]] size_t Rounds() const {
-            return std::max({turn.size(), status.size(), side.size(), engine.size(), level.size()});
+            return std::max({turn.size(), status.size(), side.size(), opponentError.size()});
         }
 
-        /// Sets `turn`, `status`, `side`, `engine` and `level` to the words of round @p round
+        /// Sets `turn`, `status`, `side` and `opponentError` to the words of round @p round
         void Publish(size_t round) const {
             UIVars& vars = CoreManager::GetUIVars();
             vars.Set("turn"_intern, View(turn, round));
             vars.Set("status"_intern, View(status, round));
             vars.Set("side"_intern, View(side, round));
-            vars.Set("engine"_intern, View(engine, round));
-            vars.Set("level"_intern, View(level, round));
+            vars.Set("opponentError"_intern, View(opponentError, round));
         }
 
     private:
@@ -69,7 +67,8 @@ namespace BECore::Chess::Tests {
     }  // namespace HudWordsDetail
 
     /// The words of the HUD, from a scratch game of their own: the opening, a move later, a check, a mate for each side, a stalemate and the three draws, then the
-    /// thinking form of the turn, the sentence of every kind of engine error, the three states of the side, every engine and every level
+    /// thinking form of the turn, the sentence of every kind of engine error, the three states of the side and the sentences of the error line of the panel. The names of the segments of the
+    /// panel (modes, colors, engines, levels) are not here: they are elements of the scene that a test walks, and a test holds their text to the tables
     inline HudWords AllHudWords() {
         using namespace HudWordsDetail;
         HudWords words;
@@ -119,11 +118,9 @@ namespace BECore::Chess::Tests {
         for (const std::optional<PieceColor> computerPlays : {std::optional<PieceColor>{}, std::optional<PieceColor>{PieceColor::White}, std::optional<PieceColor>{PieceColor::Black}}) {
             Add(words.side, OpponentText::SideLabel(computerPlays));
         }
-        for (const OpponentEngine engine : EnumUtils<OpponentEngine>::Values()) {
-            Add(words.engine, OpponentText::EngineLabel(engine));
-        }
-        for (const OpponentLevel& level : GetOpponentLevels()) {
-            Add(words.level, OpponentText::LevelLabel(level));
+        Add(words.opponentError, {});
+        for (const EngineErrorKind kind : EnumUtils<EngineErrorKind>::Values()) {
+            Add(words.opponentError, OpponentText::Error(EngineError{kind, {}}));
         }
         return words;
     }

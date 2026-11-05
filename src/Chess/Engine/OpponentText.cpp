@@ -12,13 +12,12 @@ namespace BECore::Chess {
             return *computerPlays == PieceColor::Black ? "You: White" : "You: Black";
         }
 
-        eastl::string LevelLabel(const OpponentLevel& level) {
-            return Format("Level: {}", level.name);
+        eastl::string ModeLabel(bool computer) {
+            return computer ? "Computer" : "Two players";
         }
 
-        eastl::string EngineLabel(OpponentEngine engine) {
-            const eastl::string_view name = OpponentEngineName(engine);
-            return eastl::string(name.data(), name.size());
+        eastl::string ColorLabel(PieceColor color) {
+            return color == PieceColor::White ? "White" : "Black";
         }
 
         eastl::string Error(const EngineError& error) {

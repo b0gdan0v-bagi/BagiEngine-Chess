@@ -693,7 +693,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(asked[1], "own");
     }
 
-    TEST_F(ChessGameControlTest, AFailedSwitchFromTheOwnEngineToStockfishLeavesStockfishPickedAndNobodyPlaying) {
+    TEST_F(ChessGameControlTest, AFailedSwitchFromTheOwnEngineToStockfishIsRefusedAndTheOpponentStaysAsItWas) {
         eastl::vector<eastl::string> asked;
         opponent.SetEngineFactory([&asked](OpponentEngine engine, const OpponentLevel&) -> MadeEngine {
             const eastl::string_view id = OpponentEngineId(engine);
@@ -713,9 +713,10 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(SetStateError(request), "engine_unavailable");
 
         EXPECT_EQ(StringMember(State(), "fen"), fenBefore) << "the position is not replaced";
-        EXPECT_EQ(StringMember(OpponentOfState(), "engine"), "stockfish") << "the pick of the engine stays, nothing falls back to the other one";
-        EXPECT_TRUE(OpponentMember("plays").is_null()) << "the program that played before plays nobody now";
-        EXPECT_EQ(StringMember(OpponentMember("error"), "kind"), "launch_failed");
+        EXPECT_EQ(StringMember(OpponentOfState(), "engine"), "own") << "an engine that cannot be had cannot be saved: the pick is refused and the old engine stays";
+        EXPECT_EQ(StringMember(OpponentOfState(), "plays"), "black") << "the program that played before goes on playing";
+        EXPECT_EQ(StringMember(OpponentOfState(), "level"), "easy");
+        EXPECT_EQ(StringMember(OpponentMember("error"), "kind"), "launch_failed") << "the refusal is shown";
         ASSERT_EQ(asked.size(), 2u);
         EXPECT_EQ(asked[0], "own");
         EXPECT_EQ(asked[1], "stockfish") << "the own engine is not asked for on its own";
@@ -909,11 +910,12 @@ namespace BECore::Chess::Tests {
         EXPECT_NE(std::string(result.error().message.c_str()).find("no Stockfish in the test"), std::string::npos) << "the sentence of the engine's error is in the message";
         EXPECT_EQ(StringMember(State(), "fen"), fenBefore) << "the position is not replaced";
         EXPECT_EQ(MoveCount(), 1u);
-        EXPECT_GT(control.GetStateVersion(), version) << "the opponent did change: nobody plays, the error stands";
+        EXPECT_GT(control.GetStateVersion(), version) << "the error that appeared is a change a client can see";
 
         const Json computer = OpponentOfState();
-        EXPECT_TRUE(FindJsonMember(computer, "plays")->is_null());
-        EXPECT_EQ(StringMember(computer, "level"), "hard");
+        EXPECT_TRUE(FindJsonMember(computer, "plays")->is_null()) << "nobody played and nobody plays: the pick is refused as a whole";
+        EXPECT_EQ(StringMember(computer, "level"), "medium") << "the level of the refused pick is not saved either";
+        EXPECT_EQ(StringMember(computer, "engine"), "stockfish");
         const Json* error = FindJsonMember(computer, "error");
         ASSERT_NE(error, nullptr);
         EXPECT_EQ(StringMember(*error, "kind"), "launch_failed");

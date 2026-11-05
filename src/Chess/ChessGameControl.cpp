@@ -1,5 +1,7 @@
 #include "ChessGameControl.h"
 
+#include <Chess/Engine/OpponentChoice.h>
+
 namespace BECore::Chess {
 
     namespace {
@@ -30,10 +32,6 @@ namespace BECore::Chess {
                     return "draw_fifty_moves";
             }
             return "ongoing";
-        }
-
-        eastl::string_view ColorName(PieceColor color) {
-            return color == PieceColor::White ? "white" : "black";
         }
 
         /// The kind of an engine error as it goes on the wire
@@ -91,9 +89,9 @@ namespace BECore::Chess {
         /// The members that say how the game stands; the state and the outcome of a move both carry them
         void AddStanding(Json& json, const ChessGameModel& model) {
             const auto winner = model.GetWinner();
-            json["turn"] = MakeJsonString(ColorName(model.GetTurn()));
+            json["turn"] = MakeJsonString(PieceColorId(model.GetTurn()));
             json["status"] = MakeJsonString(StatusName(model.GetStatus()));
-            json["winner"] = winner ? MakeJsonString(ColorName(*winner)) : Json();
+            json["winner"] = winner ? MakeJsonString(PieceColorId(*winner)) : Json();
             json["inCheck"] = model.IsInCheck();
         }
 
@@ -136,13 +134,11 @@ namespace BECore::Chess {
                     current.plays = std::nullopt;
                 } else {
                     const auto side = GetJsonString(opponent, "plays");
-                    if (side && *side == "white") {
-                        current.plays = PieceColor::White;
-                    } else if (side && *side == "black") {
-                        current.plays = PieceColor::Black;
-                    } else {
+                    const std::optional<PieceColor> color = side ? ParseColor(eastl::string_view(side->data(), side->size())) : std::nullopt;
+                    if (!color) {
                         return std::unexpected(BadOpponent("opponent 'plays' has to be \"white\", \"black\" or null (two people): the color the program plays"));
                     }
+                    current.plays = color;
                 }
             }
             if (FindJsonMember(opponent, "level")) {
@@ -205,7 +201,7 @@ namespace BECore::Chess {
         const std::optional<EngineError>& error = _opponent.GetError();
 
         Json opponent = Json::object();
-        opponent["plays"] = plays ? MakeJsonString(ColorName(*plays)) : Json();
+        opponent["plays"] = plays ? MakeJsonString(PieceColorId(*plays)) : Json();
         opponent["level"] = MakeJsonString(GetOpponentLevels()[_opponent.GetLevel()].id);
         opponent["engine"] = MakeJsonString(OpponentEngineId(_opponent.GetEngine()));
         opponent["thinking"] = _opponent.IsThinking();

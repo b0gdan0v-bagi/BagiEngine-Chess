@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Chess/Engine/OpponentLevels.h>
+#include <Chess/Engine/ChessEngine.h>
 #include <Chess/Game/ChessTypes.h>
 
 namespace BECore::Chess {
@@ -17,15 +17,15 @@ namespace BECore::Chess {
         /// kind that exists gets it
         inline constexpr eastl::string_view kUnknownErrorSentence = "Engine failed";
 
-        /// What the Side button says, from the person's point of view: @p computerPlays is the side the program plays, so the program as Black is "You: White".
+        /// What the Opponent button of the HUD says, from the person's point of view: @p computerPlays is the side the program plays, so the program as Black is "You: White".
         /// Nobody is "Two players"
         [[nodiscard]] eastl::string SideLabel(std::optional<PieceColor> computerPlays);
 
-        /// What the Level button says: "Level: Medium"
-        [[nodiscard]] eastl::string LevelLabel(const OpponentLevel& level);
+        /// The segment of the opponent panel's first choice: "Computer" when @p computer, else "Two players". The one source of the two words, so a test can hold the scene to it
+        [[nodiscard]] eastl::string ModeLabel(bool computer);
 
-        /// What the Engine button says: the name of the engine ("Stockfish", "Own engine")
-        [[nodiscard]] eastl::string EngineLabel(OpponentEngine engine);
+        /// The segment of the color choice, the color the PERSON plays: "White", "Black"
+        [[nodiscard]] eastl::string ColorLabel(PieceColor color);
 
         /// A short sentence for a failure of the engine, at most kMaxErrorLength characters ("Engine not found", "Engine did not answer"). It is what the Status label shows while
         /// the error stands; the detail of the error (paths, the engine's own words) is for the log and the control API

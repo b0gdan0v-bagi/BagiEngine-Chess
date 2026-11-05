@@ -20,7 +20,7 @@ namespace BECore::Chess {
     /// The engine with this id (exactly as written: ids are lower case), or nothing
     [[nodiscard]] std::optional<OpponentEngine> FindOpponentEngine(eastl::string_view id);
 
-    /// The engine after this one in the cycle of the Engine button: Stockfish, Own, and back to Stockfish
+    /// The engine after this one in the cycle of OpponentController::CycleEngine: Stockfish, Own, and back to Stockfish
     [[nodiscard]] OpponentEngine NextOpponentEngine(OpponentEngine engine);
 
 }  // namespace BECore::Chess
