@@ -41,6 +41,11 @@ namespace BECore::Chess {
      * color, the opposite of the one the control API's `opponent.plays` names. No group of the panel is greyed: a color or a level picked while two people play is remembered
      * and applies when Computer is picked. It reads the person's color on every refresh so a side set from outside is remembered.
      *
+     * The promotion picker is the modal canvas of the node `PromotionPanel` (Queen, Rook, Bishop, Knight, Cancel). The model owns the state (a click on a promotion target leaves it pending), so this
+     * component shows the canvas while ChessGameModel::HasPendingPromotion() and hides it otherwise, after a click on the board and on every SceneUpdateEvent (a reset, a set_state or a move of the
+     * program or of the control API closes it too). The actions are `ChessPromote` (`value` is an id of PromotionChoices: "queen", "rook", "bishop", "knight"; an id in no table is ignored with one
+     * warning) and `ChessCancelPromotion` (drops the choice, the pawn stays selected).
+     *
      * It is also the frame of the computer opponent: IGame has no per-frame hook, so on every SceneUpdateEvent it runs
      * ChessGame::GetOpponent().Update() (the one place that does; it changes the model, so it cannot be done in OnDraw()). While the program plays the side to move,
      * a click on the board does nothing: a half-made move of the person would only cancel the program's own search. After the game has ended a click still starts
@@ -88,6 +93,12 @@ namespace BECore::Chess {
 
         /// The four actions of the choice groups of the opponent panel (ChessSetMode, ChessSetColor, ChessSetEngine, ChessSetLevel, the id in `value`); any other action is ignored
         void AnswerSetAction(const InputEvents::ActionEvent& event);
+
+        /// The two actions of the promotion panel, ChessPromote (the id of the piece in `value`; an id in no table is ignored with one warning) and ChessCancelPromotion; false for any other action
+        bool AnswerPromotionAction(const InputEvents::ActionEvent& event);
+
+        /// Shows the canvas of the node `PromotionPanel` while the model has a promotion pending and hides it otherwise (only when that differs from what was set last)
+        void SyncPromotionPanel(const ChessGameModel& model);
         void OnUpdate(const SceneEvents::SceneUpdateEvent&);
 
         /// One line in the log when a game has ended, the first time it is seen: whether the person, the program or the control API played the last move
@@ -105,6 +116,8 @@ namespace BECore::Chess {
 
         uint64_t _loggedVersion = 0;         // the model version of the ended game that LogResultOnce() last logged, 0 for none
         const void* _loggedModel = nullptr;  // the model it was logged for
+
+        bool _promotionPanelShown = false;  // what SyncPromotionPanel() last set: the canvas starts hidden
 
         static ChessBoardComponent* s_active;
     };

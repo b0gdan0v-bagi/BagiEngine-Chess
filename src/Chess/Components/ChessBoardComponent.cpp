@@ -7,6 +7,7 @@
 #include <BECore/UI/UICanvasComponent.h>
 #include <Chess/ChessGame.h>
 #include <Chess/Engine/OpponentText.h>
+#include <Chess/Game/PromotionChoices.h>
 #include <Chess/Game/StatusText.h>
 #include <CoreSDL/SDLEvents.h>
 #include <Events/InputEvents.h>
@@ -61,6 +62,18 @@ namespace BECore::Chess {
         game->GetOpponent().Update();
         static_cast<void>(game->GetChoice().Color());  // reading it remembers the person's color of a side set from outside (the control API) before that side is cleared
         LogResultOnce(game->GetModel());
+        // A reset, a set_state, a move of the program or of the control API drops a pending promotion without a click on the board
+        SyncPromotionPanel(game->GetModel());
+    }
+
+    void ChessBoardComponent::SyncPromotionPanel(const ChessGameModel& model) {
+        const bool wanted = model.HasPendingPromotion();
+        if (wanted == _promotionPanelShown) {
+            return;
+        }
+        _promotionPanelShown = wanted;
+        // A scene without the node has nothing to show
+        UICanvasComponent::SetVisibleByName(GetScene(), "PromotionPanel"_intern, wanted);
     }
 
     void ChessBoardComponent::LogResultOnce(const ChessGameModel& model) {
@@ -138,6 +151,29 @@ namespace BECore::Chess {
         }
     }
 
+    bool ChessBoardComponent::AnswerPromotionAction(const InputEvents::ActionEvent& event) {
+        const bool promote = event.action == "ChessPromote"_intern;
+        if (!promote && event.action != "ChessCancelPromotion"_intern) {
+            return false;
+        }
+        ChessGameModel* model = ChessGame::GetActiveModel();
+        if (!model) {
+            return true;
+        }
+        if (!promote) {
+            model->CancelPromotion();
+        } else if (const std::optional<PieceType> piece = FindPromotion(event.value.ToStringView())) {
+            // Nothing pending (a press that came late) is an IllegalMove of the model and changes nothing
+            if (model->ChoosePromotion(*piece)) {
+                LogResultOnce(*model);
+            }
+        } else {
+            LOG_WARNING("ChessPromote ignored: '{}' is not a piece a pawn can become"_format(event.value.ToStringView()));
+        }
+        SyncPromotionPanel(*model);
+        return true;
+    }
+
     void ChessBoardComponent::OnAction(const InputEvents::ActionEvent& event) {
         // The actions of the buttons of the HUD in config/SceneConfig.xml
         const PoolString resetAction = "ChessReset"_intern;
@@ -152,6 +188,9 @@ namespace BECore::Chess {
         // The opponent panel is a modal canvas of the scene, hidden at the start; a scene without it has nothing to show or hide
         if (event.action == openPanelAction || event.action == closePanelAction) {
             UICanvasComponent::SetVisibleByName(GetScene(), "OpponentPanel"_intern, event.action == openPanelAction);
+            return;
+        }
+        if (AnswerPromotionAction(event)) {
             return;
         }
         AnswerSetAction(event);
@@ -242,6 +281,8 @@ namespace BECore::Chess {
         if (model->OnSquareClicked(Square{static_cast<int8_t>(file), static_cast<int8_t>(rank)})) {
             LogResultOnce(*model);
         }
+        // The click may have left a promotion pending (the panel asks for the piece) or dropped one
+        SyncPromotionPanel(*model);
     }
 
 }  // namespace BECore::Chess

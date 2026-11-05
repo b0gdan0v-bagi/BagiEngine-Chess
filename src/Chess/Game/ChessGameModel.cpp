@@ -1,5 +1,6 @@
 #include "ChessGameModel.h"
 
+#include <Chess/Game/PromotionChoices.h>
 #include <EASTL/algorithm.h>
 #include <EASTL/sort.h>
 
@@ -99,10 +100,21 @@ namespace BECore::Chess {
 
         const Piece clicked = _position.GetPieceAt(s);
 
+        if (_hasPendingPromotion) {
+            // The person clicked the board instead of naming a piece: the choice is dropped, the pawn stays selected.
+            CancelPromotion();
+            return false;
+        }
+
         if (_hasSelected) {
-            // The moves of a promoting pawn share a target; they are listed queen first, so the first match is the queen.
             for (const Move move : _selectedMoves) {
                 if (move.To() == s) {
+                    if (move.IsPromotion()) {
+                        // The moves of a promoting pawn share a target; the person names the piece (ChoosePromotion()).
+                        _hasPendingPromotion = true;
+                        _promotionTarget = s;
+                        return false;
+                    }
                     return TryMove(move).has_value();
                 }
             }
@@ -181,7 +193,28 @@ namespace BECore::Chess {
         return it != _pieces.end() && it->second.active;
     }
 
+    std::expected<void, MoveError> ChessGameModel::ChoosePromotion(PieceType piece) {
+        if (IsGameOver()) {
+            return std::unexpected(MoveError::GameOver);
+        }
+        if (!_hasPendingPromotion || PromotionId(piece).empty()) {
+            return std::unexpected(MoveError::IllegalMove);
+        }
+        for (const Move move : _selectedMoves) {
+            if (move.To() == _promotionTarget && move.IsPromotion() && move.PromotionType() == piece) {
+                return TryMove(move);
+            }
+        }
+        return std::unexpected(MoveError::IllegalMove);
+    }
+
+    void ChessGameModel::CancelPromotion() {
+        _hasPendingPromotion = false;
+        _promotionTarget = Square{};
+    }
+
     void ChessGameModel::ClearSelection() {
+        CancelPromotion();
         _hasSelected = false;
         _selected = Square{};
         _selectedMoves.clear();

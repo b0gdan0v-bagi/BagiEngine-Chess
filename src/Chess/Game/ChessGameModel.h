@@ -20,7 +20,9 @@ namespace BECore::Chess {
      * Once the status is not Ongoing no move is accepted until Reset() or SetPosition().
      *
      * GetVersion() grows with every change a controller has to see (a new game, a position set from outside, a played
-     * move) and never goes back; selecting a piece does not move it.
+     * move) and never goes back; selecting a piece does not move it. A click on the last rank does not move the pawn either:
+     * it leaves a promotion pending (HasPendingPromotion()) until the person names the piece (ChoosePromotion()) or drops it
+     * (CancelPromotion()); a pending promotion is not a change of the game, so the version stays.
      *
      * Also tracks visual-piece identities through opaque handles so the scene layer can render moves and captures
      * without re-deriving identity from piece type/color. Each handle is bound at registration time to its starting
@@ -103,8 +105,28 @@ namespace BECore::Chess {
         /// Helper for tests / UI: legal target squares for the piece on an arbitrary square.
         [[nodiscard]] eastl::vector<Square> GetLegalMovesFor(Square from) const;
 
-        /// Drops the selection and its legal targets, for an owner that takes over the turn (the computer opponent); the version does not move.
+        /// Drops the selection and its legal targets and any pending promotion, for an owner that takes over the turn (the computer opponent); the version does not move.
         void ClearSelection();
+
+        /// A selected pawn was clicked onto its last rank and waits for the piece it becomes (ChoosePromotion()); nothing has moved
+        [[nodiscard]] bool HasPendingPromotion() const noexcept {
+            return _hasPendingPromotion;
+        }
+        /// The square the pending promotion goes to; meaningful only while HasPendingPromotion()
+        [[nodiscard]] Square GetPromotionTarget() const noexcept {
+            return _promotionTarget;
+        }
+
+        /**
+         * @brief Plays the pending promotion as @p piece (Queen, Rook, Bishop or Knight).
+         *
+         * @return nothing when the move has been played; GameOver once the game is finished, IllegalMove when no promotion is
+         * pending or @p piece is not one of the four (then nothing changes).
+         */
+        std::expected<void, MoveError> ChoosePromotion(PieceType piece);
+
+        /// Drops the pending promotion and keeps the selection; the version does not move.
+        void CancelPromotion();
 
         /**
          * @brief Click handler. Drives the two-step selection / move flow:
@@ -112,11 +134,12 @@ namespace BECore::Chess {
          *   1. If no selection and `s` holds a piece of the side-to-move → select it.
          *   2. If a selection exists and `s` is a legal target of that selection →
          *      perform the move and switch turns. A pawn that reaches the last rank
-         *      becomes a queen.
+         *      does not move: the promotion is left pending (ChoosePromotion() plays it).
          *   3. If a selection exists and `s` holds another own-color piece →
          *      switch selection to it.
          *   4. Otherwise → clear selection.
          *
+         * While a promotion is pending any click on a square only drops it (the selection stays).
          * Clicks are ignored once the game is over.
          *
          * @return true if the board state changed (move executed).
@@ -175,6 +198,8 @@ namespace BECore::Chess {
         Square _selected{};
         MoveList _selectedMoves;
         eastl::vector<Square> _legalTargets;
+        bool _hasPendingPromotion = false;
+        Square _promotionTarget{};
 
         eastl::hash_map<PieceHandle, PieceTrack> _pieces;
     };

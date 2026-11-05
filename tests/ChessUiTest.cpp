@@ -23,6 +23,7 @@
 #include <Chess/Engine/OpponentChoice.h>
 #include <Chess/Engine/OpponentText.h>
 #include <Chess/Game/MoveGenerator.h>
+#include <Chess/Game/PromotionChoices.h>
 #include <Common/EngineEnvironment.h>
 #include <Common/RecordingRenderer.h>
 #include <Common/UILayoutMatrix.h>
@@ -46,12 +47,13 @@ namespace BECore::Chess::Tests {
         constexpr float kBoardTop = 80.0f;      // in view units
         constexpr float kBoardBottom = 720.0f;  // 80 + 8 * 80
         const Color kResetColor{40, 90, 60, 255};
-        const Color kOpponentColor{45, 75, 120, 255};  // the fills of the buttons of the HUD (SceneConfig.xml): a color each, so a test can tell where each one is drawn
-        const Color kPlateColor{36, 40, 52, 255};      // the plate of the opponent panel
-        constexpr float kMinGap = 8.0f;                // two controls of the HUD keep this much between them, in view units
-        constexpr float kButtonAir = 8.0f;             // the text of a button keeps this much from each edge of its fill
-        constexpr float kNarrowestWidth = 480.0f;      // the narrowest window of the size matrix, in pixels
-        constexpr float kNarrowestHeight = 853.0f;     // 9:16 at that width
+        const Color kOpponentColor{45, 75, 120, 255};       // the fills of the buttons of the HUD (SceneConfig.xml): a color each, so a test can tell where each one is drawn
+        const Color kPlateColor{36, 40, 52, 255};           // the plate of the opponent panel
+        const Color kPromotionPlateColor{44, 38, 52, 255};  // the plate of the promotion panel
+        constexpr float kMinGap = 8.0f;                     // two controls of the HUD keep this much between them, in view units
+        constexpr float kButtonAir = 8.0f;                  // the text of a button keeps this much from each edge of its fill
+        constexpr float kNarrowestWidth = 480.0f;           // the narrowest window of the size matrix, in pixels
+        constexpr float kNarrowestHeight = 853.0f;          // 9:16 at that width
 
         // The colors the board fills a full square with (ChessBoardComponent.cpp)
         const Color kSelectedColor{120, 200, 120, 200};
@@ -139,6 +141,8 @@ namespace BECore::Chess::Tests {
         constexpr const char* kSetColorAction = "ChessSetColor";
         constexpr const char* kSetEngineAction = "ChessSetEngine";
         constexpr const char* kSetLevelAction = "ChessSetLevel";
+        constexpr const char* kPromoteAction = "ChessPromote";  // the actions of the promotion panel
+        constexpr const char* kCancelPromotionAction = "ChessCancelPromotion";
 
         /// Replaces the first @p what in @p text and fails the test when it is not there (a broken copy that changed nothing would prove nothing)
         void Replace(std::string& text, const std::string& what, const std::string& with) {
@@ -226,10 +230,10 @@ namespace BECore::Chess::Tests {
             }
         }
 
-        /// What is wrong with the opponent panel as it is laid out, one problem to a line, nothing when it is right: a control that is not shown at all (an empty rect: a segment
-        /// without a `height`), text that its control cuts (the validator does not see it for an ellipsis label; a button keeps kButtonAir between its text and the edge of its
-        /// fill), a button under kSegmentHeight, and a plate that leaves the safe area
-        eastl::string PanelProblems(const UICanvasLayout& layout) {
+        /// What is wrong with a modal panel as it is laid out (the plate is the element @p plateName), one problem to a line, nothing when it is right: a control that is not shown at all (an empty
+        /// rect: a segment without a `height`), text that its control cuts (the validator does not see it for an ellipsis label; a button keeps kButtonAir between its text and the edge of its fill),
+        /// a button under kSegmentHeight, and a plate that leaves the safe area
+        eastl::string PanelProblems(const UICanvasLayout& layout, const char* plateName = "Plate") {
             eastl::string problems;
             const float scale = layout.GetResolved().scale;
             eastl::vector<const UIElement*> controls;
@@ -251,7 +255,7 @@ namespace BECore::Chess::Tests {
                     problems += Format("{} is {:.1f} units high, under {:.0f}\n", control->name.ToStringView(), control->rect.h, kSegmentHeight);
                 }
             }
-            if (const UIElement* plate = layout.root->FindByName(PoolString::Intern("Plate"))) {
+            if (const UIElement* plate = layout.root->FindByName(PoolString::Intern(plateName))) {
                 const Rect& safe = layout.root->rect;
                 if (plate->rect.x < safe.x - kPixelTolerance || plate->rect.y < safe.y - kPixelTolerance || plate->rect.x + plate->rect.w > safe.x + safe.w + kPixelTolerance ||
                     plate->rect.y + plate->rect.h > safe.y + safe.h + kPixelTolerance) {
@@ -374,25 +378,35 @@ namespace BECore::Chess::Tests {
             return *label;
         }
 
-        /// The canvas of the opponent panel: the node `OpponentPanel`, a modal canvas that starts hidden
-        IntrusivePtr<UICanvasComponent> Panel() const {
+        /// The canvas of a modal panel of the scene: the node of that name, a canvas that starts hidden
+        IntrusivePtr<UICanvasComponent> CanvasOf(const char* nodeName) const {
             for (const auto& node : GetScene().GetRootNode().GetChildren()) {
-                if (node->GetName() == PoolString::Intern("OpponentPanel")) {
+                if (node->GetName() == PoolString::Intern(nodeName)) {
                     return node->GetComponent<UICanvasComponent>();
                 }
             }
             return {};
         }
 
-        /// An element of the panel by name (the test fails when it is not there)
-        UIElement& PanelElement(const char* name) const {
-            const auto panel = Panel();
-            UIElement* element = panel ? panel->GetRoot().FindByName(PoolString::Intern(name)) : nullptr;
+        /// An element of the canvas of the node @p nodeName by name (the test fails when it is not there)
+        UIElement& ElementOf(const char* nodeName, const char* name) const {
+            const auto canvas = CanvasOf(nodeName);
+            UIElement* element = canvas ? canvas->GetRoot().FindByName(PoolString::Intern(name)) : nullptr;
             if (element == nullptr) {
-                ADD_FAILURE() << name << " is not in the panel";
+                ADD_FAILURE() << name << " is not in " << nodeName;
                 std::abort();  // a reference to nothing cannot be returned; the failure above is printed first
             }
             return *element;
+        }
+
+        /// The canvas of the opponent panel: the node `OpponentPanel`
+        IntrusivePtr<UICanvasComponent> Panel() const {
+            return CanvasOf("OpponentPanel");
+        }
+
+        /// An element of the opponent panel by name (the test fails when it is not there)
+        UIElement& PanelElement(const char* name) const {
+            return ElementOf("OpponentPanel", name);
         }
 
         /// A control of the panel by name, as the type it must be (the test fails when it is not there)
@@ -455,6 +469,55 @@ namespace BECore::Chess::Tests {
         /// The Ok button of the panel, clicked where it is laid out; whether the panel is hidden afterwards
         bool CloseThePanel() {
             return ClickPanel("Ok").Both() && Panel() && !Panel()->_visible;
+        }
+
+        /// The canvas of the promotion panel: the node `PromotionPanel`
+        IntrusivePtr<UICanvasComponent> Promotion() const {
+            return CanvasOf("PromotionPanel");
+        }
+
+        /// Whether the promotion panel is shown (false when the scene has none)
+        bool PromotionShown() const {
+            const auto panel = Promotion();
+            return panel && panel->_visible;
+        }
+
+        /// A control of the promotion panel by name (the test fails when it is not there)
+        UIElement& PromotionElement(const char* name) const {
+            return ElementOf("PromotionPanel", name);
+        }
+
+        /// A control of the promotion panel by name, as the type it must be (the test fails when it is not there)
+        template <typename T>
+        T& PromotionControl(const char* name) const {
+            T* typed = PromotionElement(name).template Cast<T>();
+            if (typed == nullptr) {
+                ADD_FAILURE() << name << " is not the expected control";
+                std::abort();
+            }
+            return *typed;
+        }
+
+        /// A click on a control of the promotion panel where it is laid out
+        Taken ClickPromotion(const char* name) {
+            return ClickControl(PromotionElement(name));
+        }
+
+        /// Starts a game from @p fen and lets the scene deal the pieces out
+        void StartFrom(const char* fen) {
+            Model().SetPosition(PositionFromFen(fen));
+            _manager->UpdateAll();
+        }
+
+        /// The piece node whose handle stands on @p square in the model, null when none does
+        const ChessPieceComponent* PieceNodeAt(const char* square) const {
+            for (const auto& node : GetScene().GetRootNode().GetChildren()) {
+                const auto piece = node->GetComponent<ChessPieceComponent>();
+                if (piece && Model().GetSquareOf(piece.Get()) == Sq(square)) {
+                    return piece.Get();
+                }
+            }
+            return nullptr;
         }
 
         /// The text a label or a button of the panel shows after a frame
@@ -687,14 +750,14 @@ namespace BECore::Chess::Tests {
         }
 
         /// PanelProblems() on every case of the matrix for each round of words: the lines of the first @p reportedCases cases that have any
-        eastl::string PanelProblemsOnMatrix(UICanvasLayout& layout, size_t reportedCases = kReportedCases) const {
+        eastl::string PanelProblemsOnMatrix(UICanvasLayout& layout, size_t reportedCases = kReportedCases, const char* plateName = "Plate") const {
             eastl::string report;
             size_t reported = 0;
             const HudWords words = AllHudWords();
             for (size_t round = 0; round < words.Rounds(); ++round) {
                 words.Publish(round);
                 OnEveryCaseOfTheMatrix(layout, [&](const eastl::string& label, const UICanvasLayout& laidOut) {
-                    const eastl::string problems = PanelProblems(laidOut);
+                    const eastl::string problems = PanelProblems(laidOut, plateName);
                     if (!problems.empty() && reported++ < reportedCases) {
                         report += Format("round {}, {}:\n{}", round, label.c_str(), problems.c_str());
                     }
@@ -2622,7 +2685,7 @@ namespace BECore::Chess::Tests {
             const std::string_view action = found.node().attribute("action").value();
             EXPECT_EQ(action.find(kRemovedActions), std::string_view::npos) << found.node().attribute("name").value() << " emits " << action;
             const bool known = action == "ChessReset" || action == "ChessOpenOpponent" || action == "ChessCloseOpponent" || action == kSetModeAction || action == kSetColorAction ||
-                               action == kSetEngineAction || action == kSetLevelAction;
+                               action == kSetEngineAction || action == kSetLevelAction || action == kPromoteAction || action == kCancelPromotionAction;
             EXPECT_TRUE(known) << found.node().attribute("name").value() << " emits " << action << ", which the board does not answer";
         }
         for (const pugi::xpath_node found : document.select_nodes("//element[@text]")) {
@@ -2690,6 +2753,524 @@ namespace BECore::Chess::Tests {
         ASSERT_LT(plate, _renderer->calls.size());
         EXPECT_LT(bar, plate) << "the plate is over the result bar";
         EXPECT_LT(reset, plate) << "and over the HUD";
+    }
+
+    // ---- the promotion panel -------------------------------------------------------------------------------------------------------
+    // A click on a promotion target leaves the promotion pending in the model; the board shows the modal PromotionPanel for as long as it is. The buttons are clicked where
+    // they are drawn (CoreManager::GetUIInput()), the board by a press on its square
+
+    namespace {
+
+        constexpr const char* kPromotionFen = "8/P6k/8/8/8/8/8/K7 w - - 0 1";  // a white pawn on a7, the way to a8 is free
+        constexpr const char* kBlackPromotionFen = "k7/8/8/8/8/8/p6K/8 b - - 0 1";
+        constexpr const char* kMatingPromotionFen = "7k/P7/6K1/8/8/8/8/8 w - - 0 1";  // a8 gives mate with a queen or a rook
+
+        /// The name of the button of a promotion piece in the scene: PromoteQueen, PromoteRook, ...
+        eastl::string PromoteButton(PieceType piece) {
+            return Format("Promote{}", PromotionLabel(piece));
+        }
+
+        constexpr const char* kPromotionPlate = "PromotionPlate";
+        constexpr float kPromotionPlateHeight = 224.0f;  // 16 + 44 + 56 + 56 + 3 x 12 + 16, the comment of the scene
+
+        /// Every element name of a tree, depth first
+        void CollectNames(const UIElement& element, eastl::vector<PoolString>& names) {
+            if (!element.name.ToStringView().empty()) {
+                names.push_back(element.name);
+            }
+            for (const auto& child : element.children) {
+                CollectNames(*child, names);
+            }
+        }
+
+    }  // namespace
+
+    TEST_F(ChessUiTest, ThePromotionPanelIsHiddenAtTheStartAndDrawsNothing) {
+        auto panel = Promotion();
+        ASSERT_TRUE(panel);
+        EXPECT_FALSE(panel->_visible);
+        EXPECT_TRUE(panel->_modal);
+        Draw();
+        EXPECT_TRUE(RectCalls(kPromotionPlateColor).empty());
+        _manager->UpdateAll();
+        EXPECT_FALSE(PromotionShown()) << "an update with nothing pending shows nothing";
+    }
+
+    TEST_F(ChessUiTest, AClickOnAPromotionTargetOpensThePanelAndPlaysNothing) {
+        StartFrom(kPromotionFen);
+        const uint64_t version = Model().GetVersion();
+        const eastl::string fen = Model().GetPosition().ToFen();
+
+        Click("a7");
+        EXPECT_FALSE(PromotionShown()) << "selecting the pawn is not a promotion";
+        Click("a8");
+
+        EXPECT_TRUE(PromotionShown());
+        EXPECT_TRUE(Model().HasPendingPromotion());
+        EXPECT_EQ(Model().GetVersion(), version);
+        EXPECT_EQ(Model().GetPosition().ToFen(), fen) << "nothing has moved";
+        Draw();
+        EXPECT_FALSE(RectCalls(kPromotionPlateColor).empty()) << "shown: the plate is drawn";
+        EXPECT_TRUE(RectCalls(kPlateColor).empty()) << "and it is not the opponent panel";
+        EXPECT_FALSE(Panel()->_visible);
+    }
+
+    TEST_F(ChessUiTest, EachPieceButtonPlaysItsPromotionClosesThePanelAndTheHandleReportsThePiece) {
+        for (const PieceType piece : PromotionPieces()) {
+            SCOPED_TRACE(eastl::string(PromotionLabel(piece)).c_str());
+            StartFrom(kPromotionFen);
+            const uint64_t version = Model().GetVersion();
+            const ChessGameModel::PieceHandle pawn = PieceNodeAt("a7");
+            ASSERT_NE(pawn, nullptr);
+            ClickMove("a7", "a8");
+            ASSERT_TRUE(PromotionShown());
+
+            const Taken taken = ClickPromotion(PromoteButton(piece).c_str());
+            EXPECT_TRUE(taken.Both());
+
+            ASSERT_EQ(Model().GetMoves().size(), 1u);
+            EXPECT_EQ(Model().GetMoves().back().ToUci().substr(0, 4), eastl::string("a7a8"));
+            EXPECT_TRUE(Model().GetMoves().back().IsPromotion());
+            EXPECT_EQ(Model().GetPieceAt(Sq("a8")).type, piece);
+            EXPECT_EQ(Model().GetPieceAt(Sq("a8")).color, PieceColor::White);
+            EXPECT_GT(Model().GetVersion(), version);
+            EXPECT_FALSE(PromotionShown());
+            EXPECT_FALSE(Model().HasPendingPromotion());
+            EXPECT_EQ(Model().GetSquareOf(pawn), Sq("a8"));
+            EXPECT_EQ(Model().GetPieceOf(pawn).type, piece) << "the handle of the pawn reports the piece";
+            EXPECT_EQ(Model().GetTurn(), PieceColor::Black);
+        }
+    }
+
+    TEST_F(ChessUiTest, TheLetterOfEachPromotionIsTheOneOfItsButton) {
+        const std::pair<PieceType, const char*> letters[] = {{PieceType::Queen, "a7a8q"}, {PieceType::Rook, "a7a8r"}, {PieceType::Bishop, "a7a8b"}, {PieceType::Knight, "a7a8n"}};
+        for (const auto& [piece, uci] : letters) {
+            SCOPED_TRACE(uci);
+            StartFrom(kPromotionFen);
+            ClickMove("a7", "a8");
+            ASSERT_TRUE(ClickPromotion(PromoteButton(piece).c_str()).Both());
+            ASSERT_EQ(Model().GetMoves().size(), 1u);
+            EXPECT_EQ(Model().GetMoves().back().ToUci(), eastl::string(uci));
+        }
+    }
+
+    TEST_F(ChessUiTest, CancelClosesThePanelKeepsThePawnSelectedAndTheSameTargetOpensItAgain) {
+        StartFrom(kPromotionFen);
+        const uint64_t version = Model().GetVersion();
+        ClickMove("a7", "a8");
+        ASSERT_TRUE(PromotionShown());
+        ActionLog log;
+
+        EXPECT_TRUE(ClickPromotion("PromotionCancel").Both());
+
+        EXPECT_EQ(log.LastAction(), PoolString::Intern("ChessCancelPromotion"));
+        EXPECT_FALSE(PromotionShown());
+        EXPECT_FALSE(Model().HasPendingPromotion());
+        EXPECT_EQ(Model().GetVersion(), version);
+        EXPECT_TRUE(Model().HasSelection());
+        EXPECT_EQ(Model().GetSelected(), Sq("a7"));
+        EXPECT_EQ(Model().GetPieceAt(Sq("a7")).type, PieceType::Pawn);
+        Draw();
+        EXPECT_TRUE(RectCalls(kPromotionPlateColor).empty());
+
+        Click("a8");
+        EXPECT_TRUE(PromotionShown()) << "the pawn is still selected, so the same target asks again";
+        ASSERT_TRUE(ClickPromotion("PromoteKnight").Both());
+        EXPECT_EQ(Model().GetPieceAt(Sq("a8")).type, PieceType::Knight);
+    }
+
+    TEST_F(ChessUiTest, WhileThePromotionPanelIsShownEveryPressIsItsAndNothingUnderItSeesOne) {
+        StartFrom(kPromotionFen);
+        ClickMove("a7", "a8");
+        ASSERT_TRUE(PromotionShown());
+        Draw();
+        ActionLog log;
+        const uint64_t version = Model().GetVersion();
+
+        // The board (two corners and the target), the dim, the Reset and the Opponent button of the HUD: the panel takes all of them
+        const std::pair<float, float> points[] = {
+            SquareCenter("a1"), SquareCenter("h8"), SquareCenter("a8"), ScreenCenter(*HudElement("Reset")), ScreenCenter(*HudElement("Opponent")), ScreenCenter(PromotionElement("PromotionTitle"))};
+        for (const auto& [x, y] : points) {
+            EXPECT_TRUE(ClickAtPixel(x, y).Both()) << x << "," << y;
+        }
+
+        EXPECT_EQ(log.Total(), 0u) << "no action was emitted: Reset and Opponent got no press";
+        EXPECT_EQ(Model().GetVersion(), version);
+        EXPECT_TRUE(Model().HasSelection());
+        EXPECT_EQ(Model().GetSelected(), Sq("a7"));
+        EXPECT_TRUE(Model().HasPendingPromotion());
+        EXPECT_TRUE(PromotionShown());
+        EXPECT_FALSE(Panel()->_visible) << "the opponent panel stays closed";
+    }
+
+    TEST_F(ChessUiTest, AResetASetPositionOrAMoveOfSomeoneElseClosesThePanelAtTheNextFrame) {
+        const auto open = [&] {
+            StartFrom(kPromotionFen);
+            ClickMove("a7", "a8");
+            ASSERT_TRUE(PromotionShown());
+        };
+
+        open();
+        Model().Reset();
+        _manager->UpdateAll();
+        EXPECT_FALSE(PromotionShown()) << "Reset";
+        EXPECT_FALSE(Model().HasPendingPromotion());
+
+        open();
+        Model().SetPosition(PositionFromFen("4k3/8/8/8/8/8/4P3/4K3 w - - 0 1"));
+        _manager->UpdateAll();
+        EXPECT_FALSE(PromotionShown()) << "SetPosition";
+
+        open();
+        ASSERT_TRUE(Play(Model(), "a1b1"));  // the control API plays a move of its own
+        _manager->UpdateAll();
+        EXPECT_FALSE(PromotionShown()) << "a move of someone else";
+        EXPECT_FALSE(Model().HasPendingPromotion());
+
+        // The Reset button cannot be pressed under the panel, but the action can be emitted (the control API's reset does the same to the model)
+        open();
+        Press("ChessReset");
+        _manager->UpdateAll();
+        EXPECT_FALSE(PromotionShown()) << "the action ChessReset";
+    }
+
+    TEST_F(ChessUiTest, APromotionThatMatesEndsTheGameAndClosesThePanel) {
+        StartFrom(kMatingPromotionFen);
+        ClickMove("a7", "a8");
+        ASSERT_TRUE(PromotionShown());
+
+        ASSERT_TRUE(ClickPromotion("PromoteQueen").Both());
+
+        EXPECT_FALSE(PromotionShown());
+        EXPECT_EQ(Model().GetStatus(), GameStatus::Checkmate);
+        EXPECT_EQ(Model().GetWinner(), std::optional<PieceColor>(PieceColor::White));
+        EXPECT_EQ(Var("turn"), "White wins");
+        EXPECT_EQ(Var("status"), "Checkmate");
+
+        // The knight does not mate (king and knight against a king is a draw): the same position, the other choice, ends the game another way
+        StartFrom(kMatingPromotionFen);
+        ClickMove("a7", "a8");
+        ASSERT_TRUE(ClickPromotion("PromoteKnight").Both());
+        EXPECT_EQ(Model().GetStatus(), GameStatus::DrawInsufficientMaterial);
+        EXPECT_FALSE(PromotionShown());
+    }
+
+    TEST_F(ChessUiTest, AnIdThatIsInNoTableChangesNothingAndLeavesThePanelOpen) {
+        StartFrom(kPromotionFen);
+        ClickMove("a7", "a8");
+        ASSERT_TRUE(PromotionShown());
+        const uint64_t version = Model().GetVersion();
+
+        for (const char* value : {"", "Queen", "QUEEN", "queen ", "pawn", "king", "que", "nonsense"}) {
+            PressWith("ChessPromote", value);
+        }
+        Press("ChessPromote");  // no value at all
+        _manager->UpdateAll();
+
+        EXPECT_EQ(Model().GetVersion(), version);
+        EXPECT_TRUE(Model().GetMoves().empty());
+        EXPECT_TRUE(Model().HasPendingPromotion());
+        EXPECT_TRUE(PromotionShown());
+        EXPECT_EQ(Model().GetPieceAt(Sq("a7")).type, PieceType::Pawn);
+    }
+
+    TEST_F(ChessUiTest, APromotionPressWithNothingPendingChangesNothing) {
+        StartFrom(kPromotionFen);
+        const uint64_t version = Model().GetVersion();
+        Press("ChessCancelPromotion");
+        PressWith("ChessPromote", "queen");
+        _manager->UpdateAll();
+        EXPECT_EQ(Model().GetVersion(), version);
+        EXPECT_FALSE(PromotionShown());
+        EXPECT_EQ(Model().GetPieceAt(Sq("a7")).type, PieceType::Pawn);
+    }
+
+    TEST_F(ChessUiTest, AwayFromTheLastRankAClickNeverOpensThePanel) {
+        ClickMove("e2", "e4");
+        EXPECT_FALSE(PromotionShown());
+        EXPECT_EQ(Model().GetMoves().size(), 1u);
+    }
+
+    TEST_F(ChessUiTest, WhileTheProgramPlaysTheOtherColorThePersonsPromotionWorksAndTheProgramAnswersIt) {
+        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        ASSERT_TRUE(Opponent().SetSide(PieceColor::Black).has_value());
+        StartFrom(kPromotionFen);
+        ClickMove("a7", "a8");
+        ASSERT_TRUE(PromotionShown());
+
+        ASSERT_TRUE(ClickPromotion("PromoteRook").Both());
+
+        ASSERT_EQ(Model().GetMoves().size(), 1u);
+        EXPECT_EQ(Model().GetMoves().front().ToUci(), eastl::string("a7a8r"));
+        EXPECT_FALSE(PromotionShown());
+        ASSERT_TRUE(FramesUntil([&] { return Model().GetMoves().size() == 2; })) << "the program answers the promotion";
+        EXPECT_EQ(Model().GetTurn(), PieceColor::White);
+        EXPECT_FALSE(PromotionShown());
+    }
+
+    TEST_F(ChessUiTest, TheProgramTakingTheTurnClosesThePanel) {
+        // The person selected the pawn and asked for the promotion; the program (switched on in the meantime) takes the turn and drops the half-made move
+        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        StartFrom(kPromotionFen);
+        ClickMove("a7", "a8");
+        ASSERT_TRUE(PromotionShown());
+
+        ASSERT_TRUE(Opponent().SetSide(PieceColor::White).has_value());
+        _manager->UpdateAll();
+
+        EXPECT_FALSE(Model().HasPendingPromotion());
+        EXPECT_FALSE(PromotionShown());
+    }
+
+    TEST_F(ChessUiTest, ABlackPromotionWorks) {
+        StartFrom(kBlackPromotionFen);
+        ClickMove("a2", "a1");
+        ASSERT_TRUE(PromotionShown());
+
+        ASSERT_TRUE(ClickPromotion("PromoteKnight").Both());
+
+        ASSERT_EQ(Model().GetMoves().size(), 1u);
+        EXPECT_EQ(Model().GetMoves().back().ToUci(), eastl::string("a2a1n"));
+        EXPECT_EQ(Model().GetPieceAt(Sq("a1")).type, PieceType::Knight);
+        EXPECT_EQ(Model().GetPieceAt(Sq("a1")).color, PieceColor::Black);
+        EXPECT_FALSE(PromotionShown());
+        EXPECT_EQ(Model().GetTurn(), PieceColor::White);
+    }
+
+    TEST_F(ChessUiTest, ThePromotedPieceIsDrawnWithItsSprite) {
+        StartFrom(kPromotionFen);
+        const auto* node = PieceNodeAt("a7");
+        ASSERT_NE(node, nullptr);
+        ClickMove("a7", "a8");
+        ASSERT_TRUE(ClickPromotion("PromoteBishop").Both());
+        _manager->UpdateAll();  // ChessPieceComponent switches the sprite in an update
+
+        const auto sprite = node->GetNode().GetComponent<SpriteRendererComponent>();
+        ASSERT_TRUE(sprite);
+        EXPECT_EQ(sprite->_spriteId, PoolString::Intern("WhiteBishop"));
+    }
+
+    // ---- the promotion panel: the layout ---------------------------------------------------------------------------------------------
+    // The checks of the opponent panel on the node PromotionPanel: the validator on the size matrix, no word cut on any case and in the narrowest window, the touch targets, the plate
+    // inside the view, the words and ids held to the table of PromotionChoices, the names of the three canvases apart and broken copies. The panel has no HTML + CSS twin in
+    // ChessHudWebTest: that file holds the HUD and the opponent panel, and the web front end has no entry for this panel yet
+
+    TEST_F(ChessUiTest, ThePromotionPanelPassesTheSizeMatrix) {
+        auto panel = Promotion();
+        ASSERT_TRUE(panel) << "the shipped scene has the node PromotionPanel";
+        panel->UpdateLayout(1280.0f, 720.0f);  // the reflected fields of the component reach the layout on its first update
+        const auto failures = ValidateWithWords(panel->GetLayout());
+        EXPECT_TRUE(failures.empty()) << DescribeMatrixFailures(failures).c_str();
+    }
+
+    TEST_F(ChessUiTest, NoWordOfThePromotionPanelIsCutOnAnyCaseOfTheMatrix) {
+        auto panel = Promotion();
+        ASSERT_TRUE(panel);
+        panel->UpdateLayout(1280.0f, 720.0f);
+        const eastl::string problems = PanelProblemsOnMatrix(panel->GetLayout(), kReportedCases, kPromotionPlate);
+        EXPECT_TRUE(problems.empty()) << problems.c_str();
+    }
+
+    TEST_F(ChessUiTest, NoWordOfThePromotionPanelIsCutInTheNarrowestWindowAndEveryButtonIsATouchTarget) {
+        auto panel = Promotion();
+        ASSERT_TRUE(panel);
+        panel->UpdateLayout(1280.0f, 720.0f);
+        UICanvasLayout& layout = panel->GetLayout();
+        LayOutInTheNarrowestWindow(layout);
+
+        const float scale = kNarrowestWidth / kViewWidth;
+        EXPECT_NEAR(layout.GetResolved().scale, scale, 0.01f);
+        EXPECT_NEAR(layout.root->rect.w, kNarrowestWidth * (1.0f - 2.0f * UIPreview::kSideInsetShare) / scale, 0.5f) << "the safe area, in view units: about 689";
+        const eastl::string problems = PanelProblems(layout, kPromotionPlate);
+        EXPECT_TRUE(problems.empty()) << problems.c_str();
+
+        // 94% of the safe area is more than maxWidth, so the plate is 640 here and in every other window: 608 inside the padding, 146 a piece button
+        EXPECT_NEAR(PromotionElement(kPromotionPlate).rect.w, 640.0f, kPixelTolerance);
+
+        const float minTouch = CoreManager::GetUIEnvironment().GetSettings().minTouchSize;
+        eastl::vector<eastl::string> buttons{"PromotionCancel"};
+        for (const PieceType piece : PromotionPieces()) {
+            buttons.push_back(PromoteButton(piece));
+        }
+        ASSERT_EQ(buttons.size(), 5u) << "four pieces and Cancel";
+        for (const eastl::string& name : buttons) {
+            const UIButton& button = PromotionControl<UIButton>(name.c_str());
+            EXPECT_GE(button.rect.h, kSegmentHeight - kPixelTolerance) << name.c_str();
+            EXPECT_GE(std::min(button.rect.w, button.rect.h) * layout.GetResolved().scale, minTouch - kPixelTolerance) << name.c_str() << " is a touch target on the smallest window";
+            const UIContentFit fit = button.CheckContent(button.rect.w - 2.0f * kButtonAir, button.rect.h, layout.GetResolved().scale);
+            EXPECT_TRUE(fit.hasContent && fit.fits) << name.c_str() << " '" << ShownText(button).c_str() << "' in " << button.rect.w << " units";
+        }
+        layout.Invalidate();
+    }
+
+    TEST_F(ChessUiTest, ThePromotionPlateIsInsideTheViewCenteredAndLaidOutAsTheCommentOfTheSceneSays) {
+        StartFrom(kPromotionFen);
+        ClickMove("a7", "a8");
+        ASSERT_TRUE(PromotionShown());
+
+        for (const auto& size : {std::pair{1280.0f, 720.0f}, std::pair{720.0f, 1280.0f}, std::pair{1024.0f, 768.0f}, std::pair{800.0f, 800.0f}, std::pair{2560.0f, 1080.0f}}) {
+            SCOPED_TRACE(Format("{}x{}", size.first, size.second).c_str());
+            DrawAt(size.first, size.second);
+            const UIElement& plate = PromotionElement(kPromotionPlate);
+            ASSERT_FALSE(plate.rect.IsEmpty()) << "the plate is shown";
+            EXPECT_GE(plate.rect.x, -kPixelTolerance);
+            EXPECT_GE(plate.rect.y, -kPixelTolerance);
+            EXPECT_LE(plate.rect.x + plate.rect.w, kViewWidth + kPixelTolerance);
+            EXPECT_LE(plate.rect.y + plate.rect.h, kViewHeight + kPixelTolerance);
+            EXPECT_NEAR(plate.rect.x + plate.rect.w * 0.5f, kViewWidth * 0.5f, 0.5f) << "the plate is centered in the view";
+            EXPECT_LE(plate.rect.w, 640.0f + kPixelTolerance);
+            EXPECT_NEAR(plate.rect.h, kPromotionPlateHeight, kPixelTolerance);
+
+            // The four pieces share one row of equal buttons that fills it; Cancel is the row below, the title the one above
+            const UIElement& row = PromotionControl<UIStack>("PromotionPieces");
+            float left = row.rect.x;
+            float width = -1.0f;
+            for (const PieceType piece : PromotionPieces()) {
+                const UIElement& button = PromotionElement(PromoteButton(piece).c_str());
+                EXPECT_NEAR(button.rect.x, left, kPixelTolerance) << PromoteButton(piece).c_str();
+                EXPECT_NEAR(button.rect.y, row.rect.y, kPixelTolerance) << PromoteButton(piece).c_str();
+                EXPECT_NEAR(button.rect.h, kSegmentHeight, kPixelTolerance) << PromoteButton(piece).c_str();
+                width = width < 0.0f ? button.rect.w : width;
+                EXPECT_NEAR(button.rect.w, width, kPixelTolerance) << PromoteButton(piece).c_str() << ": equal shares by flex";
+                left = button.rect.x + button.rect.w + 8.0f;
+            }
+            EXPECT_NEAR(left - 8.0f, row.rect.x + row.rect.w, kPixelTolerance) << "the four buttons fill the row";
+            const UIElement& cancel = PromotionElement("PromotionCancel");
+            const UIElement& title = PromotionElement("PromotionTitle");
+            EXPECT_GE(cancel.rect.y, row.rect.y + row.rect.h + 12.0f - kPixelTolerance) << "Cancel is under the row";
+            EXPECT_LE(title.rect.y + title.rect.h, row.rect.y - 12.0f + kPixelTolerance) << "the title is over the row";
+        }
+    }
+
+    // ---- the promotion panel: the words and the ids come from the table -----------------------------------------------------------------
+
+    TEST_F(ChessUiTest, TheTextValueAndActionOfEveryPieceButtonAreThoseOfThePromotionTable) {
+        const UIStack& row = PromotionControl<UIStack>("PromotionPieces");
+        const auto pieces = PromotionPieces();
+        ASSERT_EQ(row.children.size(), pieces.size()) << "exactly the pieces of the table, no more and no fewer";
+        ASSERT_EQ(pieces.size(), 4u);
+        EXPECT_EQ(pieces[0], PieceType::Queen) << "queen first";
+
+        for (size_t i = 0; i < pieces.size(); ++i) {
+            const PieceType piece = pieces[i];
+            SCOPED_TRACE(PromoteButton(piece).c_str());
+            const UIButton* button = row.children[i]->Cast<UIButton>();
+            ASSERT_NE(button, nullptr);
+            EXPECT_EQ(button->name, PoolString::Intern(PromoteButton(piece).c_str())) << "the buttons are in the order of the table";
+            const eastl::string_view label = PromotionLabel(piece);
+            const eastl::string_view id = PromotionId(piece);
+            EXPECT_EQ(ShownText(*button), eastl::string(label.data(), label.size()));
+            EXPECT_EQ(eastl::string(button->value.ToStringView().data(), button->value.ToStringView().size()), eastl::string(id.data(), id.size()));
+            EXPECT_EQ(button->action, PoolString::Intern(kPromoteAction));
+            EXPECT_EQ(FindPromotion(button->value.ToStringView()), std::optional<PieceType>(piece)) << "the value is an id the board accepts";
+        }
+
+        const UIButton& cancel = PromotionControl<UIButton>("PromotionCancel");
+        EXPECT_EQ(ShownText(cancel), "Cancel");
+        EXPECT_EQ(cancel.action, PoolString::Intern(kCancelPromotionAction));
+    }
+
+    TEST_F(ChessUiTest, EveryActionOfThePromotionPanelIsOneTheBoardAnswers) {
+        // Every button of the canvas emits ChessPromote or ChessCancelPromotion, and the board answers both (pressed here as the buttons would)
+        auto panel = Promotion();
+        ASSERT_TRUE(panel);
+        eastl::vector<const UIElement*> controls;
+        CollectControls(panel->GetRoot(), controls);
+        size_t buttons = 0;
+        for (const UIElement* control : controls) {
+            if (const UIButton* button = control->Cast<UIButton>()) {
+                ++buttons;
+                EXPECT_TRUE(button->action == PoolString::Intern(kPromoteAction) || button->action == PoolString::Intern(kCancelPromotionAction))
+                    << button->name.CStr() << " emits " << button->action.CStr() << ", which the board does not answer";
+            }
+        }
+        EXPECT_EQ(buttons, 5u);
+
+        StartFrom(kPromotionFen);
+        ClickMove("a7", "a8");
+        ASSERT_TRUE(Model().HasPendingPromotion());
+        Press(kCancelPromotionAction);
+        EXPECT_FALSE(Model().HasPendingPromotion()) << kCancelPromotionAction;
+        ClickMove("a7", "a8");
+        ASSERT_TRUE(Model().HasPendingPromotion());
+        PressWith(kPromoteAction, "queen");
+        EXPECT_FALSE(Model().HasPendingPromotion()) << kPromoteAction;
+        ASSERT_EQ(Model().GetMoves().size(), 1u);
+        EXPECT_EQ(Model().GetMoves().back().ToUci(), "a7a8q");
+    }
+
+    TEST_F(ChessUiTest, NoElementNameIsInTwoCanvasesOfTheScene) {
+        // Elements are found by name in every canvas of the scene (SetVisibleByName and the lookups of the tests): the HUD, the opponent panel and the promotion panel keep their own names
+        const struct {
+            const char* node;
+            IntrusivePtr<UICanvasComponent> canvas;
+        } canvases[] = {{"Hud", Hud()}, {"OpponentPanel", Panel()}, {"PromotionPanel", Promotion()}};
+        eastl::vector<PoolString> names[3];
+        for (size_t i = 0; i < 3; ++i) {
+            ASSERT_TRUE(canvases[i].canvas) << canvases[i].node;
+            CollectNames(canvases[i].canvas->GetRoot(), names[i]);
+            EXPECT_FALSE(names[i].empty()) << canvases[i].node;
+        }
+        for (size_t first = 0; first < 3; ++first) {
+            for (size_t second = first + 1; second < 3; ++second) {
+                for (const PoolString& name : names[first]) {
+                    EXPECT_EQ(eastl::find(names[second].begin(), names[second].end(), name), names[second].end())
+                        << name.CStr() << " is in both " << canvases[first].node << " and " << canvases[second].node;
+                }
+            }
+        }
+    }
+
+    // ---- the promotion panel: broken copies, so that the checks can fail ---------------------------------------------------------------------
+
+    TEST_F(ChessUiTest, APromotionButtonUnderTheTouchSizeIsCaught) {
+        // The row stretches its buttons to its own height (crossAlign), so the row is what makes the four piece buttons low; Cancel has a height of its own
+        std::string cancel = ShippedElementsXml("PromotionPanel");
+        ASSERT_FALSE(cancel.empty());
+        ASSERT_NO_FATAL_FAILURE(Replace(cancel, R"(name="PromotionCancel" height="56")", R"(name="PromotionCancel" height="40")"));
+        CanvasCopy lowCancel(cancel);
+        EXPECT_TRUE(HasIssue(ValidateWithWords(lowCancel.layout), UILayoutIssueKind::TouchTargetTooSmall));
+        EXPECT_NE(PanelProblemsOnMatrix(lowCancel.layout, kReportedCases, kPromotionPlate).find("PromotionCancel is 40.0 units high"), eastl::string::npos);
+
+        std::string row = ShippedElementsXml("PromotionPanel");
+        ASSERT_NO_FATAL_FAILURE(Replace(row, R"(name="PromotionPieces" height="56")", R"(name="PromotionPieces" height="40")"));
+        CanvasCopy lowRow(row);
+        EXPECT_TRUE(HasIssue(ValidateWithWords(lowRow.layout), UILayoutIssueKind::TouchTargetTooSmall));
+        EXPECT_NE(PanelProblemsOnMatrix(lowRow.layout, kReportedCases, kPromotionPlate).find("PromoteBishop is 40.0 units high"), eastl::string::npos);
+
+        CanvasCopy shipped(ShippedElementsXml("PromotionPanel"));
+        EXPECT_TRUE(PanelProblemsOnMatrix(shipped.layout, kReportedCases, kPromotionPlate).empty()) << "the same checks pass on the shipped panel";
+        EXPECT_FALSE(HasIssue(ValidateWithWords(shipped.layout), UILayoutIssueKind::TouchTargetTooSmall));
+    }
+
+    TEST_F(ChessUiTest, APromotionWordCutByAFontThatIsTooBigIsCaught) {
+        std::string xml = ShippedElementsXml("PromotionPanel");
+        ASSERT_NO_FATAL_FAILURE(Replace(xml, R"(text="Knight" fontSize="26")", R"(text="Knight" fontSize="60")"));
+        CanvasCopy copy(xml);
+        const eastl::string problems = PanelProblemsOnMatrix(copy.layout, kReportedCases, kPromotionPlate);
+        EXPECT_NE(problems.find("PromoteKnight cuts 'Knight'"), eastl::string::npos) << problems.c_str();
+    }
+
+    TEST_F(ChessUiTest, APromotionPlateTooNarrowForTheFourButtonsIsCaught) {
+        // A plate of 300 units leaves about 61 for a button, which cannot hold "Knight" with its air; the shipped 640 can
+        std::string xml = ShippedElementsXml("PromotionPanel");
+        ASSERT_NO_FATAL_FAILURE(Replace(xml, R"(maxWidth="640")", R"(maxWidth="300")"));
+        CanvasCopy copy(xml);
+        LayOutInTheNarrowestWindow(copy.layout);
+        const eastl::string problems = PanelProblems(copy.layout, kPromotionPlate);
+        EXPECT_NE(problems.find("cuts '"), eastl::string::npos) << problems.c_str();
+    }
+
+    TEST_F(ChessUiTest, APromotionPlateTallerThanTheSafeAreaIsCaught) {
+        std::string xml = ShippedElementsXml("PromotionPanel");
+        ASSERT_NO_FATAL_FAILURE(Replace(xml, R"(height="224")", R"(height="1200")"));
+        CanvasCopy copy(xml);
+        LayOutInTheNarrowestWindow(copy.layout);
+        EXPECT_NE(PanelProblems(copy.layout, kPromotionPlate).find("leaves the safe area"), eastl::string::npos);
     }
 
 }  // namespace BECore::Chess::Tests
