@@ -115,15 +115,11 @@ namespace BECore::Chess {
         const eastl::string turn = StatusText::Turn(model, thinking);
         const eastl::string status = error ? OpponentText::Error(*error) : StatusText::Status(model);
         const eastl::string side = OpponentText::SideLabel(opponent.GetPlays());
-        const eastl::string level = OpponentText::LevelLabel(GetOpponentLevels()[opponent.GetLevel()]);
-        const eastl::string engine = OpponentText::EngineLabel(opponent.GetEngine());
         const eastl::string opponentError = error ? OpponentText::Error(*error) : eastl::string();
         UIVars& vars = CoreManager::GetUIVars();
         vars.Set("turn"_intern, eastl::string_view(turn.data(), turn.size()));
         vars.Set("status"_intern, eastl::string_view(status.data(), status.size()));
         vars.Set("side"_intern, eastl::string_view(side.data(), side.size()));
-        vars.Set("level"_intern, eastl::string_view(level.data(), level.size()));
-        vars.Set("engine"_intern, eastl::string_view(engine.data(), engine.size()));
         // The ids of the opponent panel, those of the control API (the person's color, not the program's); the words are the text of the segments in the scene
         vars.Set("opponentMode"_intern, choice.ModeId());
         vars.Set("opponentColor"_intern, choice.ColorId());
@@ -140,11 +136,11 @@ namespace BECore::Chess {
         }
     }
 
-    bool ChessBoardComponent::AnswerSetAction(const InputEvents::ActionEvent& event) {
+    void ChessBoardComponent::AnswerSetAction(const InputEvents::ActionEvent& event) {
         // The actions of the segments of the opponent panel; `value` is the id the person chose
         OpponentChoice* choice = ChessGame::GetActiveChoice();
         if (!choice) {
-            return false;
+            return;
         }
         const eastl::string_view value = event.value.ToStringView();
         std::expected<void, ChoiceError> picked;
@@ -157,20 +153,17 @@ namespace BECore::Chess {
         } else if (event.action == "ChessSetLevel"_intern) {
             picked = choice->SetLevel(value);
         } else {
-            return false;
+            return;
         }
         // A refused pick (no Stockfish found) is kept by the controller and shown through the variables, so only an id that is in no table (a hand-made press) is said here
         if (!picked && picked.error().kind == ChoiceErrorKind::BadId) {
             LOG_WARNING("{} ignored: {}"_format(event.action.ToStringView(), picked.error().detail));
         }
-        return true;
     }
 
     void ChessBoardComponent::OnAction(const InputEvents::ActionEvent& event) {
         // The actions of the buttons of the HUD in config/SceneConfig.xml
         const PoolString resetAction = "ChessReset"_intern;
-        const PoolString cycleSideAction = "ChessCycleSide"_intern;
-        const PoolString cycleEngineAction = "ChessCycleEngine"_intern;
         const PoolString openPanelAction = "ChessOpenOpponent"_intern;
         const PoolString closePanelAction = "ChessCloseOpponent"_intern;
         if (event.action == resetAction) {
@@ -184,19 +177,7 @@ namespace BECore::Chess {
             UICanvasComponent::SetVisibleByName(GetScene(), "OpponentPanel"_intern, event.action == openPanelAction);
             return;
         }
-        OpponentController* opponent = ChessGame::GetActiveOpponent();
-        if (!opponent) {
-            return;
-        }
-        if (AnswerSetAction(event)) {
-            return;
-        }
-        // A pick that finds no engine returns its error and keeps it in the controller; the Status label shows it, so there is nothing to handle here
-        if (event.action == cycleSideAction) {
-            opponent->CycleSide();
-        } else if (event.action == cycleEngineAction) {
-            opponent->CycleEngine();
-        }
+        AnswerSetAction(event);
     }
 
     void ChessBoardComponent::SquareToPixel(int file, int rank, float& outX, float& outY) const {

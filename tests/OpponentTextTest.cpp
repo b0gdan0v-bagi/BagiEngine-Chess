@@ -50,7 +50,8 @@ namespace BECore::Chess::Tests {
         distinct({OpponentText::ColorLabel(PieceColor::White), OpponentText::ColorLabel(PieceColor::Black)});
         eastl::vector<eastl::string> engines;
         for (const OpponentEngine engine : EnumUtils<OpponentEngine>::Values()) {
-            engines.push_back(OpponentText::EngineLabel(engine));
+            const eastl::string_view name = OpponentEngineName(engine);
+            engines.emplace_back(name.data(), name.size());
         }
         distinct(engines);
         eastl::vector<eastl::string> levels;
@@ -60,31 +61,13 @@ namespace BECore::Chess::Tests {
         distinct(levels);
     }
 
-    TEST(OpponentTextTest, TheLevelIsNamedAfterItsWord) {
-        const auto levels = GetOpponentLevels();
-        ASSERT_FALSE(levels.empty());
-
-        for (const OpponentLevel& level : levels) {
-            const eastl::string expected = Format("Level: {}", level.name);
-            EXPECT_EQ(OpponentText::LevelLabel(level), expected);
-        }
-        EXPECT_EQ(OpponentText::LevelLabel(levels[kDefaultOpponentLevel]), "Level: Medium");
-        EXPECT_EQ(OpponentText::LevelLabel(levels.front()), "Level: Easy");
-        EXPECT_EQ(OpponentText::LevelLabel(levels.back()), "Level: Max");
-    }
-
-    TEST(OpponentTextTest, TheEngineIsNamedAfterItsWord) {
-        EXPECT_EQ(OpponentText::EngineLabel(OpponentEngine::Stockfish), "Stockfish");
-        EXPECT_EQ(OpponentText::EngineLabel(OpponentEngine::Own), "Own engine");
-    }
-
     TEST(OpponentTextTest, ALaunchFailureSaysTheEngineIsNotFound) {
         // The commonest failure and the one a person can fix, so its wording is pinned; the detail with the paths is for the log
         EXPECT_EQ(OpponentText::Error(EngineError{EngineErrorKind::LaunchFailed, "no Stockfish found: put its path in config/ChessSettings.local.xml"}), "Engine not found");
     }
 
     TEST(OpponentTextTest, AnIllegalMoveIsSaidInTheWidthOfTheLongestStatus) {
-        // The Status label is laid out for "Draw: insufficient material"; the sentence was longer once and did not fit beside the Engine button
+        // The Status label is laid out for "Draw: insufficient material"; the sentence was longer once and did not fit the width of that label
         EXPECT_EQ(OpponentText::Error(EngineError{EngineErrorKind::IllegalMove, "e2e5"}), "Illegal engine move");
     }
 
