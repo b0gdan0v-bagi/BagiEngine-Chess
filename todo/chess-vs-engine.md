@@ -1,6 +1,3 @@
----
-status: review 2026-11-05 branch todo/chess-vs-engine: tests against a real Stockfish 19 (known positions, rules cross-check by go perft, whole games, DISABLED_ strength yardstick), all skip without Stockfish; ChessTests 611/611 and the smoke test pass, no change in src/config/engine, slice 1 of about 5, after the merge set the status back to open
----
 # Chess: the computer opponent works in the window; no analysis, resign, takeback or promotion choice, and no engine of our own
 
 **Where:** `src/Chess/Game/ChessGameModel.h` (`OnSquareClicked` is the path of a person, `TryMove` the path of anything else; the model has no notion of a side played by a program), `src/Chess/Components/` (the board, the pieces and the result bar), `src/Chess/Game/Position.h` (`DoMove` / `UndoMove` exist), `src/Chess/Engine/` (the opponent core, see item 2: `ChessGame` owns the controller of it), `tools/stockfish_bridge.py` (the only way a whole game is played against Stockfish today), `engine/src/Modules/TaskSystem/` (a search runs off the main thread).
