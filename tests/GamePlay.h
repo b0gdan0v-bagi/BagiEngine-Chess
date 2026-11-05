@@ -26,6 +26,7 @@ namespace BECore::Chess::Tests {
         };
     }
 
+    /// A random legal move from @p random (seeded, so a game is the same on every run and platform); @p random must outlive the Player
     inline Player RandomPlayer(SeededRandom& random) {
         return [&random](const ChessGameModel& model) {
             const MoveList moves = MoveGenerator::GenerateLegal(model.GetPosition());

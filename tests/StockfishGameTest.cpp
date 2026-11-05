@@ -42,6 +42,10 @@ namespace BECore::Chess::Tests {
         constexpr eastl::string_view kMediumLevelId = "medium";
         constexpr eastl::string_view kMaxLevelId = "max";
         constexpr const char* kLaunchLogName = "launches.log";
+        constexpr const char* kPidLogName = "pids.log";
+        constexpr const char* kStdinLogName = "stdin.log";
+        constexpr eastl::string_view kMaxGoCommand = "go movetime 2000";  ///< what the Max level sends (kMaxMoveTimeMs of OpponentLevels.cpp)
+        constexpr eastl::string_view kStopCommand = "stop";
         constexpr const char* kWrapperName = "stockfish-wrapper.sh";
         constexpr std::filesystem::perms kScriptPermissions = std::filesystem::perms::owner_all | std::filesystem::perms::group_read | std::filesystem::perms::group_exec |
                                                               std::filesystem::perms::others_read | std::filesystem::perms::others_exec;  // 755
@@ -51,6 +55,12 @@ namespace BECore::Chess::Tests {
         constexpr int kYardstickMoveTimeMs = 50;
         constexpr size_t kYardstickPlies = 200;
         constexpr const char* kYardstickGamesVariable = "CHESS_YARDSTICK_GAMES";
+
+        std::optional<int> ParseInt(const char* text, size_t length) {
+            int value = 0;
+            const auto [end, error] = std::from_chars(text, text + length, value);
+            return error == std::errc{} && end == text + length ? std::optional<int>(value) : std::nullopt;
+        }
 
         bool Play(ChessGameModel& model, eastl::string_view uci) {
             const auto move = MoveGenerator::ParseUci(model.GetPosition(), uci);
@@ -98,23 +108,31 @@ namespace BECore::Chess::Tests {
         }
 
 #if !defined(_WIN32)
-        /// A shell script that notes its start in @p launches and the process id in @p pids, then becomes the Stockfish at @p stockfish (exec: the id stays the engine's)
-        std::filesystem::path WriteWrapper(const TempDirectory& directory, const eastl::string& stockfish, const char* pidFile) {
+        /// A shell script that notes its start in @p launches, its process id in @p pidFile and, when @p stdinLog is given, a copy of every line the game sends in that file
+        /// (tee), then becomes the Stockfish at @p stockfish. Without @p stdinLog the script `exec`s the program, so its id is the engine's. With it the script stays the
+        /// parent of a pipe `tee | program`: the second line of @p pidFile is the id of the program itself (a shell that `exec`s it), the first is the script's
+        std::filesystem::path WriteWrapper(const TempDirectory& directory, const eastl::string& stockfish, const char* pidFile, const char* stdinLog = nullptr) {
             const std::filesystem::path script = directory.File(kWrapperName);
             {
                 std::ofstream out(script);
                 out << "#!/bin/sh\n";
                 out << "echo started >> \"" << directory.File(kLaunchLogName).string() << "\"\n";
                 out << "echo $$ >> \"" << directory.File(pidFile).string() << "\"\n";
-                out << "exec \"" << stockfish.c_str() << "\" \"$@\"\n";
+                if (stdinLog == nullptr) {
+                    out << "exec \"" << stockfish.c_str() << "\" \"$@\"\n";
+                } else {
+                    out << "tee -a \"" << directory.File(stdinLog).string() << "\" | sh -c 'echo $$ >> \"$1\"; shift; exec \"$@\"' sh \"" << directory.File(pidFile).string() << "\" \""
+                        << stockfish.c_str() << "\" \"$@\"\n";
+                }
             }
             std::filesystem::permissions(script, kScriptPermissions, std::filesystem::perm_options::replace);
             return script;
         }
 
-        std::optional<int> FirstProcessId(const std::filesystem::path& pidFile) {
+        /// The process id on line @p index (from 0) of @p pidFile, once the script has written it
+        std::optional<int> ProcessIdAt(const std::filesystem::path& pidFile, size_t index) {
             const eastl::vector<eastl::string> lines = ReadFileLines(pidFile);
-            return lines.empty() ? std::nullopt : std::optional<int>(std::atoi(lines.front().c_str()));
+            return index < lines.size() ? ParseInt(lines[index].c_str(), lines[index].size()) : std::nullopt;
         }
 
         /// The process is gone and collected: a zombie would still answer kill(pid, 0)
@@ -125,8 +143,8 @@ namespace BECore::Chess::Tests {
 
         int YardstickGames() {
             const char* value = std::getenv(kYardstickGamesVariable);
-            const int games = value != nullptr ? std::atoi(value) : 0;
-            return games > 0 ? games : kYardstickGames;
+            const std::optional<int> games = value != nullptr ? ParseInt(value, std::strlen(value)) : std::nullopt;
+            return games.has_value() && *games > 0 ? *games : kYardstickGames;
         }
 
     }  // namespace
@@ -205,7 +223,7 @@ namespace BECore::Chess::Tests {
     TEST_F(StockfishGameTest, AChangeOfLevelStartsANewProcessAndItAnswersTheNextMoveToo) {
         SKIP_WITHOUT_STOCKFISH(path);
         const TempDirectory directory;
-        const std::filesystem::path wrapper = WriteWrapper(directory, *path, "pids.log");  // the real Stockfish behind a script that counts its starts
+        const std::filesystem::path wrapper = WriteWrapper(directory, *path, kPidLogName);  // the real Stockfish behind a script that counts its starts
         ChessGameModel model;
         OpponentController controller(model, SettingsFor(wrapper));
         ASSERT_TRUE(controller.SetLevel(LevelIndex(kEasyLevelId)).has_value());
@@ -227,7 +245,7 @@ namespace BECore::Chess::Tests {
     TEST_F(StockfishGameTest, ShutdownDuringAMaxLevelSearchReturnsAtOnceAndTheChildEnds) {
         SKIP_WITHOUT_STOCKFISH(path);
         const TempDirectory directory;
-        const std::filesystem::path wrapper = WriteWrapper(directory, *path, "pids.log");
+        const std::filesystem::path wrapper = WriteWrapper(directory, *path, kPidLogName, kStdinLogName);  // a copy of what the game writes to the program lands in stdin.log
         ChessGameModel model;
         OpponentController controller(model, SettingsFor(wrapper));
         ASSERT_TRUE(controller.SetLevel(LevelIndex(kMaxLevelId)).has_value());  // two seconds a move: the search is still running when Shutdown() comes
@@ -235,15 +253,20 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(Play(model, "e2e4"));
         controller.Update();
         ASSERT_TRUE(controller.IsThinking());
-        ASSERT_TRUE(WaitUntil([&] { return FirstProcessId(directory.File("pids.log")).has_value(); })) << "the search runs on the pool and starts the program";
-        const int processId = *FirstProcessId(directory.File("pids.log"));
+        // The proof that a search runs: the program was told to go. Shutdown() before this line would be the cancel during the handshake, which other tests have
+        ASSERT_TRUE(WaitForLogLine(directory.File(kStdinLogName), kMaxGoCommand)) << "the program never got `" << kMaxGoCommand.data() << "`";
+        ASSERT_TRUE(WaitUntil([&] { return ProcessIdAt(directory.File(kPidLogName), 1).has_value(); })) << "the program's process id";
+        const int scriptId = *ProcessIdAt(directory.File(kPidLogName), 0);
+        const int programId = *ProcessIdAt(directory.File(kPidLogName), 1);
 
         const auto started = std::chrono::steady_clock::now();
         controller.Shutdown();
         const auto took = std::chrono::steady_clock::now() - started;
 
         EXPECT_LT(took, kShutdownBudget);
-        EXPECT_TRUE(WaitUntil([&] { return IsGone(processId); }, kChildEndBudget)) << "process " << processId << " is still there";
+        EXPECT_TRUE(WaitUntil([&] { return IsGone(scriptId); }, kChildEndBudget)) << "the script " << scriptId << " is still there";
+        EXPECT_TRUE(WaitUntil([&] { return IsGone(programId); }, kChildEndBudget)) << "the program " << programId << " is still there";
+        EXPECT_TRUE(WaitForLogLine(directory.File(kStdinLogName), kStopCommand, kChildEndBudget)) << "a running search is told `stop` before the program is closed";
         EXPECT_EQ(model.GetMoves().size(), 1u) << "a late answer is never played";
         EXPECT_FALSE(controller.GetPlays().has_value()) << "nobody plays after Shutdown()";
     }
