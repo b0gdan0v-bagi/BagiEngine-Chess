@@ -1,5 +1,5 @@
 ---
-status: in progress 2026-11-05 branch todo/chess-vs-engine
+status: in progress 2026-11-05 branch todo/chess-vs-engine, stopped: 2 review rounds without APPROVE; the one blocking finding left is a false doc sentence (CLAUDE.md StockfishGameTest row and a comment in tests/StockfishGameTest.cpp say the handshake cancel is covered by OpponentControllerTest; it is not), code and tests are green (611/611)
 ---
 # Chess: the computer opponent works in the window; no analysis, resign, takeback or promotion choice, and no engine of our own
 
