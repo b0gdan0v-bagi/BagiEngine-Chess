@@ -1,3 +1,6 @@
+---
+status: in progress 2026-11-05 branch todo/chess-hud-opponent-panel
+---
 # Chess HUD: the mode and the color of the opponent are one cycle button; they need separate controls
 
 **Where:** `config/SceneConfig.xml` (the `Hud` node: the `Side`, `Engine` and `Level` cycle buttons), `src/Chess/Components/ChessBoardComponent.cpp` (the actions `ChessCycleSide`, `ChessCycleEngine`, `ChessCycleLevel`), `src/Chess/Engine/OpponentController.h` (`CycleSide`, `CycleEngine`, `CycleLevel`; `SetSide`, `SetEngine`, `SetLevel` already take a choice directly), `src/Chess/Engine/OpponentText.h` (`SideLabel`), `tests/ChessUiTest.cpp` and `tests/ChessHudWebTest.cpp` (the HUD layout through the size matrix).
