@@ -21,6 +21,12 @@ namespace BECore::Chess {
         /// Nobody is "Two players"
         [[nodiscard]] eastl::string SideLabel(std::optional<PieceColor> computerPlays);
 
+        /// The segment of the opponent panel's first choice: "Computer" when @p computer, else "Two players". The one source of the two words, so a test can hold the scene to it
+        [[nodiscard]] eastl::string ModeLabel(bool computer);
+
+        /// The segment of the color choice, the color the PERSON plays: "White", "Black"
+        [[nodiscard]] eastl::string ColorLabel(PieceColor color);
+
         /// What the Level button says: "Level: Medium"
         [[nodiscard]] eastl::string LevelLabel(const OpponentLevel& level);
 

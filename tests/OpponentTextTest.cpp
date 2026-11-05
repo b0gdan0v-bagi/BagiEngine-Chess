@@ -28,6 +28,38 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(OpponentText::SideLabel(PieceColor::White), "You: Black") << "the program plays White, so the person has Black";
     }
 
+    TEST(OpponentTextTest, TheModeAndTheColorOfThePanelAreSaidInTheirPinnedWords) {
+        EXPECT_EQ(OpponentText::ModeLabel(false), "Two players");
+        EXPECT_EQ(OpponentText::ModeLabel(true), "Computer");
+        EXPECT_EQ(OpponentText::ColorLabel(PieceColor::White), "White");
+        EXPECT_EQ(OpponentText::ColorLabel(PieceColor::Black), "Black");
+        EXPECT_EQ(OpponentText::ModeLabel(false), OpponentText::SideLabel(kNobody)) << "the same words in the Opponent button and in its panel";
+    }
+
+    TEST(OpponentTextTest, NoTwoSegmentsOfAGroupOfThePanelSayTheSameWord) {
+        const auto distinct = [](const eastl::vector<eastl::string>& words) {
+            for (size_t a = 0; a < words.size(); ++a) {
+                EXPECT_FALSE(words[a].empty());
+                for (size_t b = a + 1; b < words.size(); ++b) {
+                    EXPECT_NE(words[a], words[b]);
+                }
+            }
+        };
+
+        distinct({OpponentText::ModeLabel(false), OpponentText::ModeLabel(true)});
+        distinct({OpponentText::ColorLabel(PieceColor::White), OpponentText::ColorLabel(PieceColor::Black)});
+        eastl::vector<eastl::string> engines;
+        for (const OpponentEngine engine : EnumUtils<OpponentEngine>::Values()) {
+            engines.push_back(OpponentText::EngineLabel(engine));
+        }
+        distinct(engines);
+        eastl::vector<eastl::string> levels;
+        for (const OpponentLevel& level : GetOpponentLevels()) {
+            levels.emplace_back(level.name.data(), level.name.size());
+        }
+        distinct(levels);
+    }
+
     TEST(OpponentTextTest, TheLevelIsNamedAfterItsWord) {
         const auto levels = GetOpponentLevels();
         ASSERT_FALSE(levels.empty());
