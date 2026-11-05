@@ -1,5 +1,6 @@
 #include "ChessTestUtil.h"
 #include "FakeEngineUtil.h"
+#include "StockfishUtil.h"
 
 #include <Chess/Engine/SearchRequest.h>
 #include <Chess/Engine/UciEngine.h>
@@ -9,13 +10,6 @@
 #if !defined(_WIN32)
 #include <cstdlib>
 #endif
-
-// A test of UciEngineStockfishTest begins with this: it declares `path` (the Stockfish executable) or skips the test
-#define SKIP_WITHOUT_STOCKFISH(path)                                                                                                                                                                   \
-    const std::optional<eastl::string> path = ::BECore::Chess::Tests::StockfishPath();                                                                                                                 \
-    if (!path.has_value()) {                                                                                                                                                                           \
-        GTEST_SKIP() << "no Stockfish (or no process code on this platform): set STOCKFISH to its executable or put stockfish on PATH";                                                                \
-    }
 
 /// UciEngine against the fake engine (tests/fake_uci_engine.py): what it sends, how it answers, how it recovers. No fixed sleeps: a test that must
 /// not time out waits long, one that must is short. UciEngineStockfishTest runs the same class against a real Stockfish, when there is one
@@ -53,10 +47,6 @@ namespace BECore::Chess::Tests {
             UciEngineSettings settings;
             settings.launch = FakeEngineLaunch(flags);
             return settings;
-        }
-
-        eastl::string Describe(const EngineError& error) {
-            return Format("{}: {}", EnumUtils<EngineErrorKind>::ToString(error.kind), error.detail);
         }
 
         void ExpectMove(const std::expected<Move, EngineError>& result, eastl::string_view uci) {
@@ -651,25 +641,6 @@ namespace BECore::Chess::Tests {
 #endif  // !defined(_WIN32)
 
     // The same class against a real Stockfish, which the tests neither ship nor install: they find it like the bridge does (STOCKFISH, then PATH) and skip without it
-
-    /// Where Stockfish is, or nothing; nothing too where the process code is not there
-    inline std::optional<eastl::string> StockfishPath() {
-#if defined(_WIN32)
-        return std::nullopt;
-#else
-        return FindStockfish({});
-#endif
-    }
-
-    namespace {
-
-        UciEngineSettings StockfishSettings(const eastl::string& path) {
-            UciEngineSettings settings;
-            settings.launch.path = path;
-            return settings;
-        }
-
-    }  // namespace
 
     TEST(UciEngineStockfishTest, FindsTheMateInOne) {
         SKIP_WITHOUT_STOCKFISH(stockfish);
