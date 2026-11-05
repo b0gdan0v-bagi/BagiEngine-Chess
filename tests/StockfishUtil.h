@@ -22,6 +22,11 @@ namespace BECore::Chess::Tests {
 #endif
     }
 
+    /// An error as a sentence for a failed test
+    inline eastl::string Describe(const EngineError& error) {
+        return Format("{}: {}", EnumUtils<EngineErrorKind>::ToString(error.kind), error.detail);
+    }
+
     /// The settings of a UciEngine over the Stockfish at @p path, no options
     inline UciEngineSettings StockfishSettings(const eastl::string& path) {
         UciEngineSettings settings;

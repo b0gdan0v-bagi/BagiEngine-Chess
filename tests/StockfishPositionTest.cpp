@@ -45,10 +45,6 @@ namespace BECore::Chess::Tests {
         constexpr eastl::string_view kMateFen = "7k/6Q1/6K1/8/8/8/8/8 b - - 0 1";
         constexpr eastl::string_view kStalemateFen = "7k/5Q2/6K1/8/8/8/8/8 b - - 0 1";
 
-        eastl::string Describe(const EngineError& error) {
-            return Format("{}: {}", EnumUtils<EngineErrorKind>::ToString(error.kind), error.detail);
-        }
-
         /// A request for the position @p fen, no moves behind it
         SearchRequest RequestFor(eastl::string_view fen, SearchLimits limits = kDepth10) {
             SearchRequest request;

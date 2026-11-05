@@ -21,6 +21,7 @@ export PATH="$PWD/engine/.venv/bin:$PATH"     # the reflection generator needs j
 cmake --preset macos-debug                    # list: cmake --list-presets
 cmake --build --preset macos-debug
 ctest --preset macos-debug                    # ChessTests and BagiChessControlSmoke
+build/ClangmacOS/ChessTests --gtest_filter='Stockfish*'   # against a real Stockfish (STOCKFISH or PATH); skipped without one
 build/ClangmacOS/BagiChess                    # the game; the executable folder depends on compiler and OS
 ```
 

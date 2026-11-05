@@ -1,5 +1,4 @@
-#include "SeededRandom.h"
-#include "TestEngines.h"
+#include "GamePlay.h"
 
 #include <Chess/Engine/OpponentController.h>
 #include <Chess/Engine/OwnEngine.h>
@@ -31,7 +30,7 @@ namespace BECore::Chess::Tests {
         constexpr auto kCancelAfter = std::chrono::milliseconds(50);
         constexpr auto kStopBudget = std::chrono::milliseconds(1000);
         /// A game of the tests is stopped after this many plies, if it has not ended
-        constexpr size_t kPlyCap = 120;
+        constexpr size_t kPlyCap = kDefaultPlyCap;
         constexpr int kFloorGames = 4;
         constexpr uint64_t kRandomSeed = 0x2545F4914F6CDD1DULL;
 
@@ -60,39 +59,6 @@ namespace BECore::Chess::Tests {
         bool IsLegalIn(const Position& position, Move move) {
             const MoveList moves = MoveGenerator::GenerateLegal(position);
             return eastl::find(moves.begin(), moves.end(), move) != moves.end();
-        }
-
-        /// What a player of a test game is: the next move for the side to move of @p model
-        using Player = std::function<Move(const ChessGameModel&)>;
-
-        Player EnginePlayer(OwnEngine& engine, int depth) {
-            return [&engine, depth](const ChessGameModel& model) {
-                const auto move = Ask(engine, SearchRequest::FromModel(model, Depth(depth)));
-                EXPECT_TRUE(move.has_value()) << DescribeError(move ? std::nullopt : std::optional<EngineError>(move.error())).c_str();
-                return move.value_or(Move{});
-            };
-        }
-
-        Player RandomPlayer(SeededRandom& random) {
-            return [&random](const ChessGameModel& model) {
-                const MoveList moves = MoveGenerator::GenerateLegal(model.GetPosition());
-                return moves[random.Below(moves.size())];
-            };
-        }
-
-        /// Plays @p white and @p black against each other until the game ends or kPlyCap plies; every move must be accepted. Returns the moves in UCI
-        eastl::vector<eastl::string> PlayGame(ChessGameModel& model, const Player& white, const Player& black) {
-            eastl::vector<eastl::string> played;
-            while (!model.IsGameOver() && model.GetMoves().size() < kPlyCap) {
-                const Move move = (model.GetTurn() == PieceColor::White ? white : black)(model);
-                const auto accepted = model.TryMove(move);
-                EXPECT_TRUE(accepted.has_value()) << "move " << move.ToUci().c_str() << " in " << model.GetPosition().ToFen().c_str();
-                if (!accepted) {
-                    break;
-                }
-                played.push_back(move.ToUci());
-            }
-            return played;
         }
 
         /// An engine that asks another with limits of its own and counts the searches that have ended: the levels of the game give a move time, and these tests want a depth
@@ -276,7 +242,7 @@ namespace BECore::Chess::Tests {
         OwnEngine second;
         const auto play = [&](OwnEngine& engine) {
             ChessGameModel model;
-            const Player player = EnginePlayer(engine, kSelfPlayDepth);
+            const Player player = EnginePlayer(engine, Depth(kSelfPlayDepth));
             eastl::vector<eastl::string> moves = PlayGame(model, player, player);
             EXPECT_TRUE(model.IsGameOver() || model.GetMoves().size() == kPlyCap) << "the game ended or reached the cap, no move was refused";
             return moves;
@@ -297,7 +263,7 @@ namespace BECore::Chess::Tests {
         for (int game = 0; game < kFloorGames; ++game) {
             const bool engineIsWhite = game % 2 == 0;
             ChessGameModel model;
-            const Player engine = EnginePlayer(_engine, kFloorDepth);
+            const Player engine = EnginePlayer(_engine, Depth(kFloorDepth));
             const Player mover = RandomPlayer(random);
             PlayGame(model, engineIsWhite ? engine : mover, engineIsWhite ? mover : engine);
 

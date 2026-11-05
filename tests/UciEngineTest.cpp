@@ -49,10 +49,6 @@ namespace BECore::Chess::Tests {
             return settings;
         }
 
-        eastl::string Describe(const EngineError& error) {
-            return Format("{}: {}", EnumUtils<EngineErrorKind>::ToString(error.kind), error.detail);
-        }
-
         void ExpectMove(const std::expected<Move, EngineError>& result, eastl::string_view uci) {
             if (!result) {
                 ADD_FAILURE() << "expected the move " << eastl::string(uci).c_str() << ", got " << Describe(result.error()).c_str();

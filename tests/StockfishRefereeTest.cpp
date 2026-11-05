@@ -32,10 +32,6 @@ namespace BECore::Chess::Tests {
             uint64_t nodes = 0;
         };
 
-        eastl::string Describe(const EngineError& error) {
-            return Format("{}: {}", EnumUtils<EngineErrorKind>::ToString(error.kind), error.detail);
-        }
-
         /// The moves of a `go perft 1` result, sorted
         eastl::vector<eastl::string> MoveTexts(const PerftResult& result) {
             eastl::vector<eastl::string> moves;
@@ -44,6 +40,22 @@ namespace BECore::Chess::Tests {
             }
             eastl::sort(moves.begin(), moves.end());
             return moves;
+        }
+
+        /// The number in @p text (white space around it allowed), or nothing for anything else
+        std::optional<uint64_t> ParseCount(eastl::string_view text) {
+            while (!text.empty() && text.front() == ' ') {
+                text.remove_prefix(1);
+            }
+            while (!text.empty() && (text.back() == ' ' || text.back() == '\r')) {
+                text.remove_suffix(1);
+            }
+            uint64_t value = 0;
+            const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), value);
+            if (error != std::errc() || end != text.data() + text.size()) {
+                return std::nullopt;
+            }
+            return value;
         }
 
         /// A move as UCI spells it: e2e4, e7e8q
@@ -78,7 +90,7 @@ namespace BECore::Chess::Tests {
 
             ~StockfishReferee() {
                 if (_process->IsRunning()) {
-                    (void)_process->WriteLine("quit");
+                    static_cast<void>(_process->WriteLine("quit"));
                 }
                 _process->Close();
             }
@@ -99,12 +111,22 @@ namespace BECore::Chess::Tests {
                     const eastl::string_view text(line->data(), line->size());
                     constexpr eastl::string_view kTotal = "Nodes searched:";
                     if (text.substr(0, kTotal.size()) == kTotal) {
-                        result.nodes = std::strtoull(line->c_str() + kTotal.size(), nullptr, 10);
+                        const std::optional<uint64_t> total = ParseCount(text.substr(kTotal.size()));
+                        if (!total) {
+                            ADD_FAILURE() << "no count in '" << line->c_str() << "' for " << where.c_str();
+                            return std::nullopt;
+                        }
+                        result.nodes = *total;
                         return result;
                     }
                     const size_t colon = text.find(": ");
                     if (colon != eastl::string_view::npos && IsMoveText(text.substr(0, colon))) {
-                        result.divide.emplace_back(eastl::string(text.data(), colon), std::strtoull(line->c_str() + colon + 2, nullptr, 10));
+                        const std::optional<uint64_t> count = ParseCount(text.substr(colon + 2));
+                        if (!count) {
+                            ADD_FAILURE() << "no count in '" << line->c_str() << "' for " << where.c_str();
+                            return std::nullopt;
+                        }
+                        result.divide.emplace_back(eastl::string(text.data(), colon), *count);
                     }
                 }
             }
@@ -154,7 +176,7 @@ namespace BECore::Chess::Tests {
             eastl::string text;
             for (const eastl::string& move : moves) {
                 if (eastl::find(others.begin(), others.end(), move) == others.end()) {
-                    text += (text.empty() ? "" : " ") + move;
+                    text = text.empty() ? move : Format("{} {}", text, move);
                 }
             }
             return text;
@@ -248,7 +270,7 @@ namespace BECore::Chess::Tests {
         SeededRandom random(kWalkSeed);
         size_t compared = 0;
         size_t differing = 0;
-        for (int game = 0; game < kWalkGames; ++game) {
+        for (int game = 0; game < kWalkGames && differing == 0; ++game) {
             Position position = PositionFromFen(Position::kStartFen);
             for (size_t ply = 0; ply <= kWalkPlies; ++ply) {
                 ++compared;
@@ -278,7 +300,6 @@ namespace BECore::Chess::Tests {
             ASSERT_TRUE(theirs.has_value());
             EXPECT_TRUE(theirs->empty());
             EXPECT_TRUE(MoveGenerator::GenerateLegal(PositionFromFen(fen)).empty());
-            EXPECT_TRUE(ExpectSameMoves(*referee, PositionFromFen(fen)));
         }
     }
 
@@ -288,8 +309,8 @@ namespace BECore::Chess::Tests {
         const auto referee = StockfishReferee::Start(*path);
         ASSERT_NE(referee, nullptr);
 
-        ExpectSamePerft(*referee, Position::kStartFen, 3, 8902);
-        ExpectSamePerft(*referee, kKiwipeteFen, 3, 97862);
+        ASSERT_NO_FATAL_FAILURE(ExpectSamePerft(*referee, Position::kStartFen, 3, 8902));
+        ASSERT_NO_FATAL_FAILURE(ExpectSamePerft(*referee, kKiwipeteFen, 3, 97862));
     }
 
 }  // namespace BECore::Chess::Tests
