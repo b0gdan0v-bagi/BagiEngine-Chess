@@ -9,7 +9,8 @@
 /// UciEngine against a real Stockfish on positions with one clear answer, among them the ones where our request and our validation could go wrong:
 /// a game with a history, an underpromotion, castling and en passant. Every case skips itself when there is no Stockfish (StockfishUtil.h).
 /// The searches have a fixed depth, not a time: a depth gives the same answer on every run, a move time does not. Each position was checked
-/// against Stockfish 19 (the key move is the one move with a mate score, or the only legal move) and run several times
+/// against Stockfish 19 (the key move is the one move with a mate score, the only legal move, or, for the history pair and the stalemate trap, a move that
+/// stays clear of the others by a wide margin or is named below) and run several times
 namespace BECore::Chess::Tests {
 
     namespace {
@@ -20,7 +21,7 @@ namespace BECore::Chess::Tests {
         constexpr eastl::string_view kMateInTwoFen = "r2qkb1r/pp2nppp/3p4/2pNN1B1/2BnP3/3P4/PPP2PPP/R2bK2R w KQkq - 1 1";
         constexpr eastl::string_view kMirroredMateInTwoFen = "r2Bk2r/ppp2ppp/3p4/2bNp3/2Pnn1b1/3P4/PP2NPPP/R2QKB1R b KQkq - 1 1";
 
-        // White has a king and a queen against a king: Qb6 stalemates, Qa6 mates
+        // White has a king and a queen against a king: Qb6 stalemates, Qa6 or Qa1 mates
         constexpr eastl::string_view kStalemateTrapFen = "k7/2K5/5Q2/8/8/8/8/8 w - - 0 1";
 
         // The pawn on c7 promotes with c8=N mate; c8=Q, c8=R and c8=B leave Black without a move and without check: stalemate

@@ -1,3 +1,4 @@
+#include "SeededRandom.h"
 #include "TestEngines.h"
 
 #include <Chess/Engine/OpponentController.h>
@@ -60,22 +61,6 @@ namespace BECore::Chess::Tests {
             const MoveList moves = MoveGenerator::GenerateLegal(position);
             return eastl::find(moves.begin(), moves.end(), move) != moves.end();
         }
-
-        /// A small generator with a fixed seed (xorshift64): the same numbers on every platform, unlike std::uniform_int_distribution
-        class SeededRandom {
-        public:
-            explicit SeededRandom(uint64_t seed) : _state(seed) {}
-
-            size_t Below(size_t bound) {
-                _state ^= _state << 13;
-                _state ^= _state >> 7;
-                _state ^= _state << 17;
-                return static_cast<size_t>(_state % bound);
-            }
-
-        private:
-            uint64_t _state;
-        };
 
         /// What a player of a test game is: the next move for the side to move of @p model
         using Player = std::function<Move(const ChessGameModel&)>;
