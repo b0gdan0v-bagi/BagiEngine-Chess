@@ -132,10 +132,8 @@ namespace BECore::Chess {
         vars.Set("opponentError"_intern, eastl::string_view(opponentError.data(), opponentError.size()));
 
         if (opponentChanged) {
-            // The strength means something only when the program plays; the engine button has no such rule (a failed Stockfish pick leaves nobody, and the person needs it then).
-            // A scene without an element of that name has nothing to show or hide
-            UICanvasComponent::SetElementVisibleByName(GetScene(), "Level"_intern, opponent.GetPlays().has_value());
-            // The color and the level of the panel mean something only when the program plays; the engine group is never greyed for the reason above
+            // The color and the level of the panel mean something only when the program plays; the engine group is never greyed (a failed Stockfish pick leaves nobody, and
+            // the person needs the engine choice then). A scene without such a group has nothing to grey
             const bool twoPlayers = choice.Mode() == OpponentMode::Two;
             SetGroupDisabledIn(GetScene().GetRootNode(), "ColorGroup"_intern, twoPlayers);
             SetGroupDisabledIn(GetScene().GetRootNode(), "LevelGroup"_intern, twoPlayers);
@@ -173,11 +171,17 @@ namespace BECore::Chess {
         const PoolString resetAction = "ChessReset"_intern;
         const PoolString cycleSideAction = "ChessCycleSide"_intern;
         const PoolString cycleEngineAction = "ChessCycleEngine"_intern;
-        const PoolString cycleLevelAction = "ChessCycleLevel"_intern;
+        const PoolString openPanelAction = "ChessOpenOpponent"_intern;
+        const PoolString closePanelAction = "ChessCloseOpponent"_intern;
         if (event.action == resetAction) {
             if (ChessGameModel* model = ChessGame::GetActiveModel()) {
                 model->Reset();
             }
+            return;
+        }
+        // The opponent panel is a modal canvas of the scene, hidden at the start; a scene without it has nothing to show or hide
+        if (event.action == openPanelAction || event.action == closePanelAction) {
+            UICanvasComponent::SetVisibleByName(GetScene(), "OpponentPanel"_intern, event.action == openPanelAction);
             return;
         }
         OpponentController* opponent = ChessGame::GetActiveOpponent();
@@ -192,8 +196,6 @@ namespace BECore::Chess {
             opponent->CycleSide();
         } else if (event.action == cycleEngineAction) {
             opponent->CycleEngine();
-        } else if (event.action == cycleLevelAction) {
-            opponent->CycleLevel();
         }
     }
 

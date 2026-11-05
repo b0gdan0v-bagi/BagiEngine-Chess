@@ -14,9 +14,13 @@
 #include <BECore/UI/UICanvasComponent.h>
 #include <BECore/UI/UIElement.h>
 #include <BECore/UI/UILabel.h>
+#include <BECore/UI/UIScreenContent.h>
+#include <BECore/UI/UISegmented.h>
+#include <BECore/UI/UIStack.h>
 #include <Chess/ChessGame.h>
 #include <Chess/ChessGameControl.h>
 #include <Chess/Components/ChessPieceComponent.h>
+#include <Chess/Engine/OpponentChoice.h>
 #include <Chess/Engine/OpponentText.h>
 #include <Chess/Game/MoveGenerator.h>
 #include <Common/EngineEnvironment.h>
@@ -42,9 +46,10 @@ namespace BECore::Chess::Tests {
         constexpr float kBoardTop = 80.0f;      // in view units
         constexpr float kBoardBottom = 720.0f;  // 80 + 8 * 80
         const Color kResetColor{40, 90, 60, 255};
-        const Color kLevelColor{45, 75, 120, 255};  // the fills of the buttons of the HUD (SceneConfig.xml): a color each, so a test can tell where each one is drawn
+        const Color kOpponentColor{45, 75, 120, 255};  // the fills of the buttons of the HUD (SceneConfig.xml): a color each, so a test can tell where each one is drawn
         const Color kSideColor{110, 75, 40, 255};
         const Color kEngineColor{80, 60, 115, 255};
+        const Color kPlateColor{36, 40, 52, 255};   // the plate of the opponent panel
         constexpr float kMinGap = 8.0f;             // two controls of the HUD keep this much between them, in view units
         constexpr float kButtonAir = 8.0f;          // the text of a button keeps this much from each edge of its fill
         constexpr float kNarrowestWidth = 480.0f;   // the narrowest window of the size matrix, in pixels
@@ -127,6 +132,186 @@ namespace BECore::Chess::Tests {
                                                  << outer.w << ", " << outer.h << ")";
         }
 
+        constexpr float kSegmentHeight = 56.0f;  // a touch target at the smallest fit scale of the matrix (0.571)
+        constexpr size_t kPanelSegments = 10;    // two modes, two colors, two engines, four levels
+        constexpr size_t kReportedCases = 4;     // how many cases of a matrix a failure message lists
+
+        /// The actions that the segments of the panel emit, and that ChessBoardComponent answers
+        constexpr const char* kSetModeAction = "ChessSetMode";
+        constexpr const char* kSetColorAction = "ChessSetColor";
+        constexpr const char* kSetEngineAction = "ChessSetEngine";
+        constexpr const char* kSetLevelAction = "ChessSetLevel";
+
+        /// Replaces the first @p what in @p text and fails the test when it is not there (a broken copy that changed nothing would prove nothing)
+        void Replace(std::string& text, const std::string& what, const std::string& with) {
+            const size_t at = text.find(what);
+            ASSERT_NE(at, std::string::npos) << what;
+            text.replace(at, what.size(), with);
+        }
+
+        /// The `<elements>` of the canvas on the node @p nodeName of the shipped scene, as the content of a screen; empty when there is none
+        std::string ShippedElementsXml(const char* nodeName) {
+            pugi::xml_document document;
+            if (!document.load_file(ShippedSceneConfig().string().c_str())) {
+                return {};
+            }
+            const pugi::xml_node node = document.select_node(Format("//node[@name='{}']", nodeName).c_str()).node();
+            const pugi::xml_node elements = node.select_node(".//component[@type='UICanvasComponent']/elements").node();
+            if (!elements) {
+                return {};
+            }
+            std::ostringstream out;
+            out << "<ui>";
+            elements.print(out, "", pugi::format_raw);
+            out << "</ui>";
+            return out.str();
+        }
+
+        /// A canvas of the SceneView space laid out on its own, for the copies of the panel that a test breaks on purpose: the elements come from the text of the shipped file
+        /// with an edit, never from a second copy of the panel
+        struct CanvasCopy {
+            UIScreenContent content;
+            UICanvasLayout layout;
+
+            explicit CanvasCopy(const std::string& xml) {
+                XmlDeserializer deserializer;
+                EXPECT_TRUE(deserializer.LoadFromString(eastl::string_view(xml.data(), xml.size())));
+                content.Deserialize(deserializer);
+                EXPECT_FALSE(deserializer.HasErrors());
+                layout.root->children = content.elements;
+                layout.variants = content.variants;
+                layout.params.space = CanvasSpace::SceneView;
+                layout.params.scaleMode = CanvasScaleMode::ScaleWithScreen;
+                layout.params.referenceWidth = 1280.0f;
+                layout.params.referenceHeight = 720.0f;
+                layout.params.match = 0.5f;
+                layout.params.minScale = 0.7f;
+                layout.params.useSafeArea = true;
+                layout.Invalidate();
+            }
+        };
+
+        /// What reaches the actions: records every ActionEvent, the way the board sees them
+        class ActionLog : public SubscriptionHolder {
+        public:
+            ActionLog() {
+                Subscribe<InputEvents::ActionEvent, &ActionLog::OnAction>(this);
+            }
+
+            [[nodiscard]] size_t Total() const {
+                return _actions.size();
+            }
+            [[nodiscard]] PoolString LastAction() const {
+                return _actions.empty() ? PoolString{} : _actions.back();
+            }
+            [[nodiscard]] PoolString LastValue() const {
+                return _values.empty() ? PoolString{} : _values.back();
+            }
+
+        private:
+            void OnAction(const InputEvents::ActionEvent& event) {
+                _actions.push_back(event.action);
+                _values.push_back(event.value);
+            }
+
+            eastl::vector<PoolString> _actions;
+            eastl::vector<PoolString> _values;
+        };
+
+        /// Every control with text in the tree, depth first (a stack and a choice group have none of their own)
+        void CollectControls(const UIElement& element, eastl::vector<const UIElement*>& found) {
+            if (element.Cast<UILabel>() || element.Cast<UIButton>()) {
+                found.push_back(&element);
+            }
+            for (const auto& child : element.children) {
+                CollectControls(*child, found);
+            }
+        }
+
+        /// What is wrong with the opponent panel as it is laid out, one problem to a line, nothing when it is right: a control that is not shown at all (an empty rect: a segment
+        /// without a `height`), text that its control cuts (the validator does not see it for an ellipsis label; a button keeps kButtonAir between its text and the edge of its
+        /// fill), a button under kSegmentHeight, and a plate that leaves the safe area
+        eastl::string PanelProblems(const UICanvasLayout& layout) {
+            eastl::string problems;
+            const float scale = layout.GetResolved().scale;
+            eastl::vector<const UIElement*> controls;
+            CollectControls(*layout.root, controls);
+            for (const UIElement* control : controls) {
+                if (control->rect.IsEmpty()) {
+                    if (control->active.visible) {
+                        problems += Format("{} '{}' has an empty rect (a missing height?)\n", control->name.ToStringView(), ShownText(*control).c_str());
+                    }
+                    continue;
+                }
+                const float air = control->interactive ? kButtonAir : 0.0f;
+                const UIContentFit fit = control->CheckContent(control->rect.w - 2.0f * air, control->rect.h, scale);
+                if (fit.hasContent && !fit.fits) {
+                    problems += Format("{} cuts '{}': {:.1f} units wide with {:.1f} of air each side, at scale {:.3f}\n", control->name.ToStringView(), ShownText(*control).c_str(), control->rect.w,
+                                       air, scale);
+                }
+                if (control->interactive && control->rect.h < kSegmentHeight - kPixelTolerance) {
+                    problems += Format("{} is {:.1f} units high, under {:.0f}\n", control->name.ToStringView(), control->rect.h, kSegmentHeight);
+                }
+            }
+            if (const UIElement* plate = layout.root->FindByName(PoolString::Intern("Plate"))) {
+                const Rect& safe = layout.root->rect;
+                if (plate->rect.x < safe.x - kPixelTolerance || plate->rect.y < safe.y - kPixelTolerance || plate->rect.x + plate->rect.w > safe.x + safe.w + kPixelTolerance ||
+                    plate->rect.y + plate->rect.h > safe.y + safe.h + kPixelTolerance) {
+                    problems += Format("the plate ({:.1f}, {:.1f}, {:.1f}, {:.1f}) leaves the safe area ({:.1f}, {:.1f}, {:.1f}, {:.1f})\n", plate->rect.x, plate->rect.y, plate->rect.w, plate->rect.h,
+                                       safe.x, safe.y, safe.w, safe.h);
+                }
+            }
+            return problems;
+        }
+
+        bool HasIssue(const eastl::vector<UIMatrixFailure>& failures, UILayoutIssueKind kind) {
+            for (const auto& failure : failures) {
+                for (const UILayoutIssue& issue : failure.issues) {
+                    if (issue.kind == kind) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        /// A segment of the panel as the tables of the game say it must be: the element, its group and action, the word on it and the id it emits
+        struct PanelSegment {
+            eastl::string name;
+            const char* group = "";
+            const char* action = "";
+            eastl::string word;
+            eastl::string id;
+        };
+
+        eastl::string Joined(eastl::string_view prefix, eastl::string_view name) {
+            return Format("{}{}", prefix, name);
+        }
+
+        /// The ten segments, all of it taken from the tables of the game (the mode and color words of OpponentText, the engines, the levels); the scene is held to this list
+        eastl::vector<PanelSegment> ExpectedPanelSegments() {
+            eastl::vector<PanelSegment> segments;
+            for (const OpponentMode mode : EnumUtils<OpponentMode>::Values()) {
+                const eastl::string_view id = OpponentModeId(mode);
+                segments.push_back({Joined("Mode", EnumUtils<OpponentMode>::ToString(mode)), "ModeGroup", kSetModeAction, OpponentText::ModeLabel(mode == OpponentMode::Computer),
+                                    eastl::string(id.data(), id.size())});
+            }
+            for (const PieceColor color : {PieceColor::White, PieceColor::Black}) {
+                const eastl::string_view id = PieceColorId(color);
+                segments.push_back({Joined("Color", EnumUtils<PieceColor>::ToString(color)), "ColorGroup", kSetColorAction, OpponentText::ColorLabel(color), eastl::string(id.data(), id.size())});
+            }
+            for (const OpponentEngine engine : EnumUtils<OpponentEngine>::Values()) {
+                const eastl::string_view id = OpponentEngineId(engine);
+                const eastl::string_view word = OpponentEngineName(engine);
+                segments.push_back(
+                    {Joined("Engine", EnumUtils<OpponentEngine>::ToString(engine)), "EngineGroup", kSetEngineAction, eastl::string(word.data(), word.size()), eastl::string(id.data(), id.size())});
+            }
+            for (const OpponentLevel& level : GetOpponentLevels()) {
+                segments.push_back({Joined("Level", level.name), "LevelGroup", kSetLevelAction, eastl::string(level.name.data(), level.name.size()), eastl::string(level.id.data(), level.id.size())});
+            }
+            return segments;
+        }
+
     }  // namespace
 
     class ChessUiTest : public ::testing::Test {
@@ -189,6 +374,95 @@ namespace BECore::Chess::Tests {
             UILabel* label = element ? element->Cast<UILabel>() : nullptr;
             EXPECT_NE(label, nullptr) << name;
             return *label;
+        }
+
+        /// The canvas of the opponent panel: the node `OpponentPanel`, a modal canvas that starts hidden
+        IntrusivePtr<UICanvasComponent> Panel() const {
+            for (const auto& node : GetScene().GetRootNode().GetChildren()) {
+                if (node->GetName() == PoolString::Intern("OpponentPanel")) {
+                    return node->GetComponent<UICanvasComponent>();
+                }
+            }
+            return {};
+        }
+
+        /// An element of the panel by name (the test fails when it is not there)
+        UIElement& PanelElement(const char* name) const {
+            const auto panel = Panel();
+            UIElement* element = panel ? panel->GetRoot().FindByName(PoolString::Intern(name)) : nullptr;
+            if (element == nullptr) {
+                ADD_FAILURE() << name << " is not in the panel";
+                std::abort();  // a reference to nothing cannot be returned; the failure above is printed first
+            }
+            return *element;
+        }
+
+        /// A control of the panel by name, as the type it must be (the test fails when it is not there)
+        template <typename T>
+        T& PanelControl(const char* name) const {
+            const auto panel = Panel();
+            UIElement* element = panel ? panel->GetRoot().FindByName(PoolString::Intern(name)) : nullptr;
+            T* typed = element ? element->Cast<T>() : nullptr;
+            if (typed == nullptr) {
+                ADD_FAILURE() << name << (element ? " is not the expected control" : " is not in the panel");
+                std::abort();  // a reference to nothing cannot be returned; the failure above is printed first
+            }
+            return *typed;
+        }
+
+        /// The middle of an element as it was laid out in the last draw, in output pixels (the view is fitted into the output)
+        std::pair<float, float> ScreenCenter(const UIElement& element) const {
+            const ViewTransform fit = ViewTransform::Fit(kViewWidth, kViewHeight, _renderer->width, _renderer->height);
+            const Rect cell = fit.ToOutput(element.rect.x, element.rect.y, element.rect.w, element.rect.h);
+            return {cell.x + cell.w * 0.5f, cell.y + cell.h * 0.5f};
+        }
+
+        struct Taken {
+            bool pressed = false;
+            bool released = false;
+
+            [[nodiscard]] bool Both() const {
+                return pressed && released;
+            }
+        };
+
+        /// A press and its release at a point of the screen, the way a mouse makes a click; what the UI took of the two
+        static Taken ClickAtPixel(float x, float y) {
+            Taken taken;
+            taken.pressed = CoreManager::GetUIInput().DispatchMouseButtonDown(Button(x, y, true));
+            taken.released = CoreManager::GetUIInput().DispatchMouseButtonUp(Button(x, y, false));
+            return taken;
+        }
+
+        /// A click on the middle of a control where the last frame laid it out (a frame is drawn first, so the layout and the selection are current)
+        Taken ClickControl(const UIElement& element) {
+            Draw();
+            const auto [x, y] = ScreenCenter(element);
+            return ClickAtPixel(x, y);
+        }
+
+        /// A click on a segment (or any control) of the panel, by name
+        Taken ClickPanel(const char* name) {
+            return ClickControl(PanelElement(name));
+        }
+
+        /// The Opponent button of the HUD, clicked where it is drawn; whether the panel is shown afterwards
+        bool OpenThePanel() {
+            if (!ClickButton(kOpponentColor)) {
+                return false;
+            }
+            return Panel() && Panel()->_visible;
+        }
+
+        /// The Ok button of the panel, clicked where it is laid out; whether the panel is hidden afterwards
+        bool CloseThePanel() {
+            return ClickPanel("Ok").Both() && Panel() && !Panel()->_visible;
+        }
+
+        /// The text a label or a button of the panel shows after a frame
+        eastl::string PanelText(const char* name) {
+            Draw();
+            return ShownText(PanelElement(name));
         }
 
         /// An element of the HUD by name, null when there is none
@@ -357,26 +631,15 @@ namespace BECore::Chess::Tests {
             return problems;
         }
 
-        /// The HUD with two people playing or with the program as the opponent, as the board leaves it after a frame, through the size matrix with every word it can show: the
-        /// validator's findings, and HudProblems()
-        void ExpectTheHudSurvivesTheMatrix(bool programPlays) {
+        /// The HUD as the board leaves it after a frame, through the size matrix with every word it can show: the validator's findings, and HudProblems()
+        void ExpectTheHudSurvivesTheMatrix() {
             constexpr size_t kReportedFailures = 4;
-            CountingFactory factory({eastl::make_shared<InstantEngine>()});
-            Opponent().SetEngineFactory(factory.AsFactory());
-            _manager->UpdateAll();
-            if (programPlays) {
-                Press("ChessCycleSide");
-            }
-            Draw();  // the board publishes the words and shows or hides Level
+            Draw();  // the board publishes the words
 
             auto canvas = Hud();
             ASSERT_TRUE(canvas);
-            const UIElement* level = canvas->GetRoot().FindByName(PoolString::Intern("Level"));
-            ASSERT_NE(level, nullptr);
-            ASSERT_EQ(level->style.visible, programPlays);
-            const UIElement* engine = canvas->GetRoot().FindByName(PoolString::Intern("Engine"));
-            ASSERT_NE(engine, nullptr);
-            ASSERT_TRUE(engine->style.visible) << "Engine has no visibility rule: it is shown while two people play too";
+            ASSERT_NE(HudElement("Opponent"), nullptr);
+            ASSERT_EQ(HudElement("Level"), nullptr) << "the cycle button Level is gone: the panel has the level";
             canvas->UpdateLayout(1280.0f, 720.0f);  // the reflected fields of the component reach the layout on its first update
 
             const UILayoutContext base = ViewContext();
@@ -396,19 +659,53 @@ namespace BECore::Chess::Tests {
                     report += Format("round {}: {}", round, DescribeMatrixFailures(failures).c_str());
                 }
                 OnEveryCaseOfTheMatrix(canvas->GetLayout(), [&](const eastl::string& label, const UICanvasLayout& layout) {
-                    eastl::string problems = HudProblems(layout);
-                    if (level->rect.IsEmpty() == programPlays) {
-                        problems += programPlays ? "Level is hidden while the program plays\n" : "Level is shown while two people play\n";
-                    }
-                    if (engine->rect.IsEmpty()) {
-                        problems += "Engine is hidden\n";
-                    }
+                    const eastl::string problems = HudProblems(layout);
                     if (!problems.empty() && ++failed <= kReportedFailures) {
                         report += Format("round {}, {}:\n{}", round, label.c_str(), problems.c_str());
                     }
                 });
             }
             EXPECT_EQ(failed, 0u) << report.c_str();
+        }
+
+        /// The validator on the whole matrix for each round of words (the error line of the panel changes with the round): every finding of every round
+        eastl::vector<UIMatrixFailure> ValidateWithWords(UICanvasLayout& layout) const {
+            UILayoutValidatorOptions options;
+            options.minTouchSize = CoreManager::GetUIEnvironment().GetSettings().minTouchSize;
+            const HudWords words = AllHudWords();
+            eastl::vector<UIMatrixFailure> all;
+            for (size_t round = 0; round < words.Rounds(); ++round) {
+                words.Publish(round);
+                const auto failures = ValidateOnMatrix(layout, options, ViewContext());
+                all.insert(all.end(), failures.begin(), failures.end());
+            }
+            return all;
+        }
+
+        /// PanelProblems() on every case of the matrix for each round of words: the lines of the first @p reportedCases cases that have any
+        eastl::string PanelProblemsOnMatrix(UICanvasLayout& layout, size_t reportedCases = kReportedCases) const {
+            eastl::string report;
+            size_t reported = 0;
+            const HudWords words = AllHudWords();
+            for (size_t round = 0; round < words.Rounds(); ++round) {
+                words.Publish(round);
+                OnEveryCaseOfTheMatrix(layout, [&](const eastl::string& label, const UICanvasLayout& laidOut) {
+                    const eastl::string problems = PanelProblems(laidOut);
+                    if (!problems.empty() && reported++ < reportedCases) {
+                        report += Format("round {}, {}:\n{}", round, label.c_str(), problems.c_str());
+                    }
+                });
+            }
+            return report;
+        }
+
+        /// The canvas alone in the narrowest window of the matrix: 480 px wide with the side insets of a phone held sideways
+        void LayOutInTheNarrowestWindow(UICanvasLayout& layout) const {
+            UILayoutContext context = ViewContext();
+            context.outputWidth = kNarrowestWidth;
+            context.outputHeight = kNarrowestHeight;
+            context.safeArea = UIPreview::SimulatedSafeArea(SafeAreaSimulation::SideInsets, kNarrowestWidth, kNarrowestHeight);
+            layout.Update(context);
         }
 
         void DrawAt(float width, float height) {
@@ -480,19 +777,12 @@ namespace BECore::Chess::Tests {
 
     // ---- the screen -------------------------------------------------------------------------------------------------------
 
-    TEST_F(ChessUiTest, TheHudPassesTheSizeMatrixWithTheLongestWordsWhileTwoPeoplePlay) {
-        ExpectTheHudSurvivesTheMatrix(false);
-    }
-
-    TEST_F(ChessUiTest, TheHudPassesTheSizeMatrixWithTheLongestWordsWhileTheProgramPlays) {
-        ExpectTheHudSurvivesTheMatrix(true);
+    TEST_F(ChessUiTest, TheHudPassesTheSizeMatrixWithTheLongestWords) {
+        // The Opponent button is always shown and says the state ({side}, three words): there is no second state of the HUD to walk
+        ExpectTheHudSurvivesTheMatrix();
     }
 
     TEST_F(ChessUiTest, NoWordOfTheHudIsCutInTheNarrowestWindow) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
-        Opponent().SetEngineFactory(factory.AsFactory());
-        _manager->UpdateAll();
-        Press("ChessCycleSide");  // all six controls are shown
         Draw();
         auto canvas = Hud();
         ASSERT_TRUE(canvas);
@@ -500,12 +790,8 @@ namespace BECore::Chess::Tests {
 
         // 480 px wide, with the side insets of a phone held sideways: the narrowest the matrix has. The view is 840 units wide, so the scale is 0.57 and the safe area
         // about 689 units, which is what every row of the HUD has to fit in
-        UILayoutContext context = ViewContext();
-        context.outputWidth = kNarrowestWidth;
-        context.outputHeight = kNarrowestHeight;
-        context.safeArea = UIPreview::SimulatedSafeArea(SafeAreaSimulation::SideInsets, kNarrowestWidth, kNarrowestHeight);
         UICanvasLayout& layout = canvas->GetLayout();
-        layout.Update(context);
+        LayOutInTheNarrowestWindow(layout);
         const float scale = kNarrowestWidth / kViewWidth;
         EXPECT_NEAR(layout.GetResolved().scale, scale, 0.01f);
         EXPECT_NEAR(layout.root->rect.w, kNarrowestWidth * (1.0f - 2.0f * UIPreview::kSideInsetShare) / scale, 0.5f) << "the safe area, in view units";
@@ -516,7 +802,7 @@ namespace BECore::Chess::Tests {
             const eastl::string problems = HudProblems(layout);
             EXPECT_TRUE(problems.empty()) << "round " << round << ":\n" << problems.c_str();
         }
-        for (const char* name : {"Turn", "Level", "Reset", "Side", "Engine", "Status"}) {
+        for (const char* name : {"Turn", "Opponent", "Reset", "Side", "Engine", "Status"}) {
             const UIElement* element = layout.root->FindByName(PoolString::Intern(name));
             ASSERT_NE(element, nullptr) << name;
             EXPECT_FALSE(element->rect.IsEmpty()) << name << " is shown";
@@ -527,14 +813,11 @@ namespace BECore::Chess::Tests {
     TEST_F(ChessUiTest, TheHudStaysOutsideTheBoardWithoutInsets) {
         auto canvas = Hud();
         ASSERT_TRUE(canvas);
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
-        Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
-        Press("ChessCycleSide");  // Level is shown only while the program plays
 
         for (const auto& size : {std::pair{1280.0f, 720.0f}, std::pair{720.0f, 1280.0f}, std::pair{1024.0f, 768.0f}, std::pair{800.0f, 800.0f}, std::pair{2560.0f, 1080.0f}}) {
             DrawAt(size.first, size.second);
-            for (const char* name : {"Turn", "Level", "Reset"}) {
+            for (const char* name : {"Turn", "Opponent", "Reset"}) {
                 const UIElement* element = canvas->GetRoot().FindByName(PoolString::Intern(name));
                 ASSERT_NE(element, nullptr);
                 ASSERT_FALSE(element->rect.IsEmpty()) << name << " is shown at " << size.first << "x" << size.second;
@@ -547,6 +830,285 @@ namespace BECore::Chess::Tests {
                 EXPECT_GE(element->rect.y, kBoardBottom - 0.01f) << name << " at " << size.first << "x" << size.second;
             }
         }
+
+        // The panel is not a part of the margins (it covers the board while it is open) but its plate stays inside the view, in every one of the shapes
+        ASSERT_TRUE(OpenThePanel());
+        for (const auto& size : {std::pair{1280.0f, 720.0f}, std::pair{720.0f, 1280.0f}, std::pair{1024.0f, 768.0f}, std::pair{800.0f, 800.0f}, std::pair{2560.0f, 1080.0f}}) {
+            DrawAt(size.first, size.second);
+            const UIElement& plate = PanelControl<UIStack>("Plate");
+            ASSERT_FALSE(plate.rect.IsEmpty()) << "the plate is shown at " << size.first << "x" << size.second;
+            EXPECT_GE(plate.rect.x, -kPixelTolerance) << size.first << "x" << size.second;
+            EXPECT_GE(plate.rect.y, -kPixelTolerance) << size.first << "x" << size.second;
+            EXPECT_LE(plate.rect.x + plate.rect.w, kViewWidth + kPixelTolerance) << size.first << "x" << size.second;
+            EXPECT_LE(plate.rect.y + plate.rect.h, kViewHeight + kPixelTolerance) << size.first << "x" << size.second;
+            EXPECT_NEAR(plate.rect.x + plate.rect.w * 0.5f, kViewWidth * 0.5f, 0.5f) << "the plate is centered in the view, at " << size.first << "x" << size.second;
+        }
+    }
+
+    // ---- the opponent panel: the layout ------------------------------------------------------------------------------------------
+    // The panel is the node OpponentPanel of the shipped scene (a modal canvas, hidden at the start). The checks follow engine/tests/BECore/UISelectorScreenTest.cpp, the template of
+    // a choice panel: the validator on the size matrix, then CheckContent() of every control (an ellipsis label can shrink, so the validator alone misses a cut word), once per
+    // case of the matrix and for the narrowest window alone, with every word the game can show
+
+    TEST_F(ChessUiTest, ThePanelPassesTheSizeMatrix) {
+        auto panel = Panel();
+        ASSERT_TRUE(panel) << "the shipped scene has the node OpponentPanel";
+        panel->UpdateLayout(1280.0f, 720.0f);  // the reflected fields of the component reach the layout on its first update
+        const auto failures = ValidateWithWords(panel->GetLayout());
+        EXPECT_TRUE(failures.empty()) << DescribeMatrixFailures(failures).c_str();
+    }
+
+    TEST_F(ChessUiTest, NoWordOfThePanelIsCutOnAnyCaseOfTheMatrix) {
+        auto panel = Panel();
+        ASSERT_TRUE(panel);
+        panel->UpdateLayout(1280.0f, 720.0f);
+        const eastl::string problems = PanelProblemsOnMatrix(panel->GetLayout());
+        EXPECT_TRUE(problems.empty()) << problems.c_str();
+    }
+
+    TEST_F(ChessUiTest, NoWordOfThePanelIsCutInTheNarrowestWindowAndEverySegmentIsATouchTarget) {
+        auto panel = Panel();
+        ASSERT_TRUE(panel);
+        panel->UpdateLayout(1280.0f, 720.0f);
+        UICanvasLayout& layout = panel->GetLayout();
+        LayOutInTheNarrowestWindow(layout);
+
+        const float scale = kNarrowestWidth / kViewWidth;
+        EXPECT_NEAR(layout.GetResolved().scale, scale, 0.01f);
+        EXPECT_NEAR(layout.root->rect.w, kNarrowestWidth * (1.0f - 2.0f * UIPreview::kSideInsetShare) / scale, 0.5f) << "the safe area, in view units: about 689";
+
+        const HudWords words = AllHudWords();
+        for (size_t round = 0; round < words.Rounds(); ++round) {
+            words.Publish(round);
+            const eastl::string problems = PanelProblems(layout);
+            EXPECT_TRUE(problems.empty()) << "round " << round << ":\n" << problems.c_str();
+        }
+
+        const float minTouch = CoreManager::GetUIEnvironment().GetSettings().minTouchSize;
+        size_t segments = 0;
+        for (const PanelSegment& segment : ExpectedPanelSegments()) {
+            const UIButton& button = PanelControl<UIButton>(segment.name.c_str());
+            ++segments;
+            EXPECT_GE(button.rect.h, kSegmentHeight - kPixelTolerance) << segment.name.c_str();
+            EXPECT_GE(std::min(button.rect.w, button.rect.h) * layout.GetResolved().scale, minTouch - kPixelTolerance) << segment.name.c_str() << " is a touch target on the smallest window";
+            const UIContentFit fit = button.CheckContent(button.rect.w - 2.0f * kButtonAir, button.rect.h, layout.GetResolved().scale);
+            EXPECT_TRUE(fit.hasContent && fit.fits) << segment.name.c_str() << " '" << ShownText(button).c_str() << "' in " << button.rect.w << " units";
+        }
+        EXPECT_EQ(segments, kPanelSegments) << "two + two + two + four";
+        layout.Invalidate();
+    }
+
+    TEST_F(ChessUiTest, EveryErrorSentenceFitsTheErrorLineOfThePanelInTheNarrowestWindow) {
+        auto panel = Panel();
+        ASSERT_TRUE(panel);
+        panel->UpdateLayout(1280.0f, 720.0f);
+        UICanvasLayout& layout = panel->GetLayout();
+        LayOutInTheNarrowestWindow(layout);
+        const UILabel& line = PanelControl<UILabel>("OpponentError");
+        ASSERT_FALSE(line.rect.IsEmpty());
+        const float scale = layout.GetResolved().scale;
+
+        size_t sentences = 0;
+        for (const EngineErrorKind kind : EnumUtils<EngineErrorKind>::Values()) {
+            const eastl::string sentence = OpponentText::Error(EngineError{kind, {}});
+            CoreManager::GetUIVars().Set("opponentError"_intern, eastl::string_view(sentence.data(), sentence.size()));
+            const UIContentFit fit = line.CheckContent(line.rect.w, line.rect.h, scale);
+            EXPECT_TRUE(fit.hasContent && fit.fits) << "'" << sentence.c_str() << "' in " << line.rect.w << " units";
+            ++sentences;
+        }
+        EXPECT_GE(sentences, 1u);
+        layout.Invalidate();
+    }
+
+    TEST_F(ChessUiTest, TheRowsAreLaidOutAsTheCommentOfTheSceneSays) {
+        ASSERT_TRUE(OpenThePanel());
+        Draw();
+        const UIElement& plate = PanelControl<UIStack>("Plate");
+        EXPECT_LE(plate.rect.w, 640.0f + kPixelTolerance);
+        EXPECT_NEAR(plate.rect.h, 460.0f, kPixelTolerance) << "16 + 44 + 4 x 56 + 32 + 56 + 6 x 12 + 16";
+        for (const char* row : {"Mode", "Color", "Engine", "Level"}) {
+            const UIElement& caption = PanelElement(Format("{}Caption", row).c_str());
+            const UIElement& group = PanelElement(Format("{}Group", row).c_str());
+            EXPECT_LT(caption.rect.x + caption.rect.w, group.rect.x + kPixelTolerance) << row << ": the caption is beside its group";
+            EXPECT_NEAR(caption.rect.y, group.rect.y, kPixelTolerance) << row;
+            EXPECT_NEAR(group.rect.h, kSegmentHeight, kPixelTolerance) << row;
+        }
+        const UIElement& level = PanelControl<UISegmented>("LevelGroup");
+        float left = level.rect.x;
+        float width = -1.0f;
+        for (const PanelSegment& segment : ExpectedPanelSegments()) {
+            if (std::string_view(segment.group) != "LevelGroup") {
+                continue;
+            }
+            const UIElement& button = PanelControl<UIButton>(segment.name.c_str());
+            EXPECT_NEAR(button.rect.x, left, kPixelTolerance) << segment.name.c_str();
+            width = width < 0.0f ? button.rect.w : width;
+            EXPECT_NEAR(button.rect.w, width, kPixelTolerance) << segment.name.c_str() << ": equal shares by flex";
+            left = button.rect.x + button.rect.w + 4.0f;
+        }
+        EXPECT_NEAR(left - 4.0f, level.rect.x + level.rect.w, kPixelTolerance) << "the four segments fill the group";
+    }
+
+    // ---- the opponent panel: the words and the ids come from the tables ------------------------------------------------------------
+
+    TEST_F(ChessUiTest, TheTextAndTheValueOfEverySegmentAreThoseOfTheTables) {
+        const eastl::vector<PanelSegment> expected = ExpectedPanelSegments();
+        ASSERT_EQ(expected.size(), kPanelSegments);
+
+        for (const PanelSegment& want : expected) {
+            SCOPED_TRACE(want.name.c_str());
+            const UIButton& button = PanelControl<UIButton>(want.name.c_str());
+            EXPECT_EQ(ShownText(button), want.word) << "the word on the segment is the one of the table";
+            EXPECT_EQ(eastl::string(button.value.ToStringView().data(), button.value.ToStringView().size()), want.id);
+            EXPECT_EQ(button.action, PoolString::Intern(want.action));
+            EXPECT_EQ(button.selected, false) << "nothing is selected before a frame";
+        }
+
+        // The id of a segment is a valid id of the table behind its group, and the group holds exactly the segments of the table (a new level or engine without a segment fails here)
+        for (const char* groupName : {"ModeGroup", "ColorGroup", "EngineGroup", "LevelGroup"}) {
+            const UISegmented& group = PanelControl<UISegmented>(groupName);
+            size_t inTable = 0;
+            for (const PanelSegment& want : expected) {
+                inTable += std::string_view(want.group) == groupName ? 1u : 0u;
+            }
+            size_t buttons = 0;
+            for (const auto& child : group.children) {
+                const UIButton* button = child->Cast<UIButton>();
+                ASSERT_NE(button, nullptr) << groupName << ": only segments";
+                ++buttons;
+                const eastl::string_view value = button->value.ToStringView();
+                const std::string_view groupId = groupName;
+                if (groupId == "ModeGroup") {
+                    EXPECT_TRUE(ParseMode(value).has_value()) << value.data();
+                } else if (groupId == "ColorGroup") {
+                    EXPECT_TRUE(ParseColor(value).has_value()) << value.data();
+                } else if (groupId == "EngineGroup") {
+                    EXPECT_TRUE(FindOpponentEngine(value).has_value()) << value.data();
+                } else {
+                    EXPECT_TRUE(FindOpponentLevel(value).has_value()) << value.data();
+                }
+            }
+            EXPECT_EQ(buttons, inTable) << groupName;
+        }
+    }
+
+    TEST_F(ChessUiTest, TheGroupsAreBoundToTheVariablesTheBoardPublishesAndTheirNamesDoNotCollideWithTheHud) {
+        const struct {
+            const char* group;
+            const char* variable;
+        } bound[] = {{"ModeGroup", "opponentMode"}, {"ColorGroup", "opponentColor"}, {"EngineGroup", "opponentEngine"}, {"LevelGroup", "opponentLevel"}};
+        for (const auto& [group, variable] : bound) {
+            EXPECT_EQ(PanelControl<UISegmented>(group).bind, PoolString::Intern(variable)) << group;
+        }
+        // Elements are found by name in every canvas of the scene: the panel must not reuse a name of the HUD (nor the old Level and Engine)
+        for (const char* name : {"Turn", "Opponent", "Reset", "Side", "Engine", "Status", "Level"}) {
+            const auto hudHas = HudElement(name) != nullptr;
+            const auto panelHas = Panel()->GetRoot().FindByName(PoolString::Intern(name)) != nullptr;
+            EXPECT_FALSE(hudHas && panelHas) << name << " is in both canvases";
+        }
+        EXPECT_EQ(Panel()->GetRoot().FindByName(PoolString::Intern("Level")), nullptr);
+        EXPECT_EQ(Panel()->GetRoot().FindByName(PoolString::Intern("Engine")), nullptr);
+        EXPECT_EQ(Panel()->GetRoot().FindByName(PoolString::Intern("Mode")), nullptr);
+    }
+
+    TEST_F(ChessUiTest, EveryActionOfThePanelIsOneTheBoardAnswers) {
+        // Press each action with the id of a segment through the board, as the segment would: the controller reads the pick back (the unknown action is ignored by the board)
+        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        const struct {
+            const char* action;
+            const char* value;
+        } picks[] = {{kSetEngineAction, "own"}, {kSetLevelAction, "max"}};
+        for (const auto& [action, value] : picks) {
+            PressWith(action, value);
+        }
+        EXPECT_EQ(Opponent().GetEngine(), OpponentEngine::Own);
+        EXPECT_EQ(Opponent().GetLevel(), *FindOpponentLevel("max"));
+        PressWith(kSetColorAction, "black");
+        PressWith(kSetModeAction, "computer");
+        EXPECT_EQ(Opponent().GetPlays(), std::optional<PieceColor>(PieceColor::White));
+
+        for (const PanelSegment& segment : ExpectedPanelSegments()) {
+            const PoolString action = PanelControl<UIButton>(segment.name.c_str()).action;
+            const bool known = action == PoolString::Intern(kSetModeAction) || action == PoolString::Intern(kSetColorAction) || action == PoolString::Intern(kSetEngineAction) ||
+                               action == PoolString::Intern(kSetLevelAction);
+            EXPECT_TRUE(known) << segment.name.c_str() << " emits " << action.CStr() << ", which the board does not answer";
+        }
+        EXPECT_EQ(PanelControl<UIButton>("Ok").action, PoolString::Intern("ChessCloseOpponent"));
+        EXPECT_EQ(HudElement("Opponent")->Cast<UIButton>()->action, PoolString::Intern("ChessOpenOpponent"));
+    }
+
+    // ---- the opponent panel: broken copies, so that the checks can fail --------------------------------------------------------------
+    // Each copy is the text of the shipped panel with one edit (ShippedElementsXml), laid out alone
+
+    TEST_F(ChessUiTest, AWordCutByAFontThatIsTooBigIsCaughtByTheFitCheckAndNotByTheValidator) {
+        std::string xml = ShippedElementsXml("OpponentPanel");
+        ASSERT_FALSE(xml.empty());
+        ASSERT_NO_FATAL_FAILURE(Replace(xml, R"(text="Own engine" fontSize="24")", R"(text="Own engine" fontSize="44")"));
+        CanvasCopy copy(xml);
+
+        EXPECT_FALSE(HasIssue(ValidateWithWords(copy.layout), UILayoutIssueKind::TextDoesNotFit)) << "an ellipsis label can shrink: the validator does not report it";
+        const eastl::string problems = PanelProblemsOnMatrix(copy.layout);
+        EXPECT_NE(problems.find("EngineOwn cuts 'Own engine'"), eastl::string::npos) << problems.c_str();
+
+        // With the clip the validator reports it too
+        std::string clipped = ShippedElementsXml("OpponentPanel");
+        ASSERT_NO_FATAL_FAILURE(Replace(clipped, R"(text="Own engine" fontSize="24")", R"(text="Own engine" fontSize="44" overflow="Clip")"));
+        CanvasCopy clippedCopy(clipped);
+        EXPECT_TRUE(HasIssue(ValidateWithWords(clippedCopy.layout), UILayoutIssueKind::TextDoesNotFit));
+    }
+
+    TEST_F(ChessUiTest, ALongerWordInTheNarrowestWindowIsCaught) {
+        // A word that fits in the plate of a wide window but not in a quarter of the Level row on the narrowest one
+        std::string xml = ShippedElementsXml("OpponentPanel");
+        ASSERT_NO_FATAL_FAILURE(Replace(xml, R"(text="Medium")", R"(text="Intermediate")"));
+        CanvasCopy copy(xml);
+        LayOutInTheNarrowestWindow(copy.layout);
+        const eastl::string problems = PanelProblems(copy.layout);
+        EXPECT_NE(problems.find("LevelMedium cuts 'Intermediate'"), eastl::string::npos) << problems.c_str();
+    }
+
+    TEST_F(ChessUiTest, ASegmentUnderTheTouchSizeIsCaught) {
+        std::string xml = ShippedElementsXml("OpponentPanel");
+        ASSERT_NO_FATAL_FAILURE(Replace(xml, R"(name="LevelMax" flex="1" height="56")", R"(name="LevelMax" flex="1" height="40")"));
+        CanvasCopy copy(xml);
+        EXPECT_TRUE(HasIssue(ValidateWithWords(copy.layout), UILayoutIssueKind::TouchTargetTooSmall));
+        EXPECT_NE(PanelProblemsOnMatrix(copy.layout).find("LevelMax is 40.0 units high"), eastl::string::npos);
+    }
+
+    TEST_F(ChessUiTest, ASegmentWithoutAnExplicitHeightHasNoRectAndIsCaughtHere) {
+        // The gotcha of the widget: flex shares the width, not the height, so a segment without `height` gets a rect of height 0. It is not drawn, a click cannot find it
+        // (`ui_click` answers "hidden") and the validator skips an empty rect, so only PanelProblems() sees it
+        std::string xml = ShippedElementsXml("OpponentPanel");
+        ASSERT_NO_FATAL_FAILURE(Replace(xml, R"(name="LevelHard" flex="1" height="56")", R"(name="LevelHard" flex="1")"));
+        CanvasCopy copy(xml);
+        LayOutInTheNarrowestWindow(copy.layout);
+        const UIElement* hard = copy.layout.root->FindByName(PoolString::Intern("LevelHard"));
+        ASSERT_NE(hard, nullptr);
+        EXPECT_NEAR(hard->rect.h, 0.0f, kPixelTolerance);
+        const eastl::string problems = PanelProblems(copy.layout);
+        EXPECT_NE(problems.find("LevelHard 'Hard' has an empty rect"), eastl::string::npos) << problems.c_str();
+    }
+
+    TEST_F(ChessUiTest, AnErrorSentenceWiderThanThePlateIsCaught) {
+        // A plate 200 units wide cannot hold the longest sentences of the error line; the same copy with the shipped width is clean
+        std::string xml = ShippedElementsXml("OpponentPanel");
+        ASSERT_NO_FATAL_FAILURE(Replace(xml, R"(maxWidth="640")", R"(maxWidth="200")"));
+        CanvasCopy copy(xml);
+        const eastl::string problems = PanelProblemsOnMatrix(copy.layout, 100000);
+        EXPECT_NE(problems.find("OpponentError cuts"), eastl::string::npos) << problems.c_str();
+
+        CanvasCopy shipped(ShippedElementsXml("OpponentPanel"));
+        EXPECT_TRUE(PanelProblemsOnMatrix(shipped.layout).empty()) << PanelProblemsOnMatrix(shipped.layout).c_str();
+    }
+
+    TEST_F(ChessUiTest, APlateTallerThanTheSafeAreaIsCaught) {
+        std::string xml = ShippedElementsXml("OpponentPanel");
+        ASSERT_NO_FATAL_FAILURE(Replace(xml, R"(height="460")", R"(height="1200")"));
+        CanvasCopy copy(xml);
+        LayOutInTheNarrowestWindow(copy.layout);
+        EXPECT_NE(PanelProblems(copy.layout).find("leaves the safe area"), eastl::string::npos);
     }
 
     // ---- the words --------------------------------------------------------------------------------------------------------
@@ -1035,26 +1597,27 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(factory.Calls(), 3) << "a pick for each side, and none for nobody";
     }
 
-    TEST_F(ChessUiTest, TheLevelActionWalksTheLevelsAndWraps) {
+    TEST_F(ChessUiTest, TheLevelActionPicksEveryLevelAndTheFactoryIsAskedOnlyWhenTheProgramPlays) {
+        // Was TheLevelActionWalksTheLevelsAndWraps (the cycle is gone with the Level button): every level segment of the panel emits ChessSetLevel with its id
         const auto levels = GetOpponentLevels();
         CountingFactory factory({eastl::make_shared<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
 
-        for (size_t step = 1; step <= levels.size(); ++step) {
-            Press("ChessCycleLevel");
-            EXPECT_EQ(Var("level"), OpponentText::LevelLabel(levels[(kDefaultOpponentLevel + step) % levels.size()])) << "step " << step;
+        for (size_t index = 0; index < levels.size(); ++index) {
+            const eastl::string id(levels[index].id.data(), levels[index].id.size());
+            PressWith(kSetLevelAction, id.c_str());
+            EXPECT_EQ(Opponent().GetLevel(), index) << id.c_str();
+            EXPECT_EQ(Var("opponentLevel"), id) << id.c_str();
         }
-        EXPECT_EQ(Var("level"), "Level: Medium") << "after the last level comes the first of the walk again";
-        EXPECT_EQ(Opponent().GetLevel(), kDefaultOpponentLevel);
         EXPECT_EQ(factory.Calls(), 0) << "with nobody as the opponent a level is only a choice: no engine is asked for";
 
-        Press("ChessCycleSide");
-        Press("ChessCycleLevel");
-        EXPECT_EQ(Var("level"), OpponentText::LevelLabel(levels[(kDefaultOpponentLevel + 1) % levels.size()]));
+        PressWith(kSetModeAction, "computer");
+        PressWith(kSetLevelAction, "easy");
+        EXPECT_EQ(Var("opponentLevel"), "easy");
         ASSERT_EQ(factory.Calls(), 2) << "one engine for the pick, another for the level";
-        EXPECT_EQ(factory.Levels()[0], levels[kDefaultOpponentLevel].id);
-        EXPECT_EQ(factory.Levels()[1], levels[(kDefaultOpponentLevel + 1) % levels.size()].id);
+        EXPECT_EQ(factory.Levels()[0], levels[levels.size() - 1].id) << "the pick used the level that was picked last";
+        EXPECT_EQ(factory.Levels()[1], "easy");
     }
 
     TEST_F(ChessUiTest, TheEngineWordStartsAsStockfishAndTheActionWalksTheEnginesAndWraps) {
@@ -1161,49 +1724,6 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(Var("turn"), "White to move");
     }
 
-    TEST_F(ChessUiTest, TheLevelButtonIsShownOnlyWhileTheProgramPlays) {
-        const UIElement* level = HudElement("Level");
-        ASSERT_NE(level, nullptr) << "the HUD of the shipped scene has the Level button";
-        CountingFactory failing(EngineError{EngineErrorKind::LaunchFailed, "no Stockfish in the test"});
-        CountingFactory working({eastl::make_shared<InstantEngine>()});
-        _manager->UpdateAll();
-
-        Draw();
-        EXPECT_FALSE(level->style.visible) << "the first publication: nobody plays";
-        EXPECT_TRUE(level->rect.IsEmpty()) << "a hidden button has no place";
-        EXPECT_FALSE(DrawnCenter(kLevelColor).has_value()) << "and draws nothing";
-
-        Opponent().SetEngineFactory(working.AsFactory());
-        Press("ChessCycleSide");
-        Draw();
-        EXPECT_TRUE(level->style.visible) << "the program plays Black";
-        EXPECT_FALSE(level->rect.IsEmpty());
-        const auto where = DrawnCenter(kLevelColor);
-        ASSERT_TRUE(where.has_value()) << "and it is drawn";
-        Press("ChessCycleSide");
-        Draw();
-        EXPECT_TRUE(level->style.visible) << "the program plays White";
-        EXPECT_FALSE(level->rect.IsEmpty());
-        Press("ChessCycleSide");
-        Draw();
-        EXPECT_FALSE(level->style.visible) << "two people again";
-        EXPECT_TRUE(level->rect.IsEmpty());
-        EXPECT_FALSE(DrawnCenter(kLevelColor).has_value());
-
-        // Where the button was drawn there is nothing to press now: the HUD takes neither the press nor the release, and the level stays
-        const size_t levelBefore = Opponent().GetLevel();
-        EXPECT_FALSE(CoreManager::GetUIInput().DispatchMouseButtonDown(Button(where->first, where->second, true)));
-        EXPECT_FALSE(CoreManager::GetUIInput().DispatchMouseButtonUp(Button(where->first, where->second, false)));
-        EXPECT_EQ(Opponent().GetLevel(), levelBefore);
-        EXPECT_EQ(working.Calls(), 2) << "one engine for each pick of a side, none for the click on nothing";
-
-        Opponent().SetEngineFactory(failing.AsFactory());
-        Press("ChessCycleSide");
-        Draw();
-        EXPECT_FALSE(level->style.visible) << "a pick that found no engine leaves nobody: no strength to choose";
-        EXPECT_TRUE(level->rect.IsEmpty());
-    }
-
     TEST_F(ChessUiTest, TheEngineButtonIsShownWhetherOrNotTheProgramPlays) {
         const UIElement* engine = HudElement("Engine");
         ASSERT_NE(engine, nullptr) << "the HUD of the shipped scene has the Engine button";
@@ -1274,28 +1794,6 @@ namespace BECore::Chess::Tests {
         ClickMove("e2", "e4");
         ASSERT_TRUE(FramesUntil([&] { return Model().GetMoves().size() == 2; })) << "the person has White and moved: the program answers";
         EXPECT_EQ(engine->Calls(), 1);
-    }
-
-    TEST_F(ChessUiTest, ClickingTheLevelButtonOnTheScreenCyclesTheLevel) {
-        const auto levels = GetOpponentLevels();
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
-        Opponent().SetEngineFactory(factory.AsFactory());
-        _manager->UpdateAll();
-        Draw();
-        EXPECT_FALSE(ClickButton(kLevelColor)) << "no button, no click: the level is a choice that means something once the program plays";
-        EXPECT_EQ(Opponent().GetLevel(), kDefaultOpponentLevel);
-
-        ASSERT_TRUE(ClickButton(kSideColor));  // the program plays Black
-        for (size_t step = 1; step <= levels.size(); ++step) {
-            EXPECT_TRUE(ClickButton(kLevelColor)) << "step " << step;
-            const size_t expected = (kDefaultOpponentLevel + step) % levels.size();
-            EXPECT_EQ(Opponent().GetLevel(), expected) << "step " << step;
-            EXPECT_EQ(Var("level"), OpponentText::LevelLabel(levels[expected])) << "step " << step;
-            EXPECT_EQ(ShownText(*HudElement("Level")), OpponentText::LevelLabel(levels[expected]));
-        }
-        EXPECT_EQ(Opponent().GetLevel(), kDefaultOpponentLevel) << "round again";
-        EXPECT_EQ(factory.Calls(), 1 + static_cast<int>(levels.size())) << "an engine for the pick of the side and one for each new level";
-        EXPECT_EQ(Opponent().GetPlays(), std::optional<PieceColor>(PieceColor::Black)) << "the side stays";
     }
 
     TEST_F(ChessUiTest, ClickingTheEngineButtonOnTheScreenCyclesTheEngineAndAPressAloneDoesNothing) {
@@ -1384,14 +1882,14 @@ namespace BECore::Chess::Tests {
         ASSERT_EQ(Opponent().GetEngine(), OpponentEngine::Own);
         const std::optional<size_t> easy = FindOpponentLevel("easy");
         ASSERT_TRUE(easy.has_value());
-        ASSERT_TRUE(ClickButton(kSideColor));  // the Level button is shown only while the program plays
+        ASSERT_TRUE(ClickButton(kSideColor));
         EXPECT_EQ(Var("side"), "You: White");
-        for (size_t guard = 0; Opponent().GetLevel() != *easy && guard < GetOpponentLevels().size(); ++guard) {
-            ASSERT_TRUE(ClickButton(kLevelColor));
-        }
+        ASSERT_TRUE(OpenThePanel());  // the level is a segment of the panel now
+        ASSERT_TRUE(ClickPanel("LevelEasy").Both());
         ASSERT_EQ(Opponent().GetLevel(), *easy);
-        EXPECT_EQ(Var("level"), "Level: Easy");
+        EXPECT_EQ(Var("opponentLevel"), "easy");
         EXPECT_FALSE(Opponent().GetError().has_value());
+        ASSERT_TRUE(CloseThePanel());
 
         ClickMove("e2", "e4");
         ASSERT_TRUE(FramesUntil([&] { return Model().GetMoves().size() == 2; })) << "the own engine searched and its move was played";
@@ -1448,7 +1946,7 @@ namespace BECore::Chess::Tests {
         EXPECT_TRUE(Model().GetSelected() == Sq("e2"));
 
         // And a press on a button of the HUD is the HUD's: the selection is not changed by it
-        EXPECT_TRUE(ClickButton(kLevelColor));
+        EXPECT_TRUE(ClickButton(kOpponentColor));
         EXPECT_TRUE(Model().HasSelection());
         EXPECT_TRUE(Model().GetSelected() == Sq("e2"));
     }
@@ -1687,6 +2185,393 @@ namespace BECore::Chess::Tests {
         agree("computer", "black", "white");
         PressWith("ChessSetColor", "white");
         agree("computer", "white", "black");
+    }
+
+    // ---- the opponent panel, clicked where it is drawn ---------------------------------------------------------------------------
+    // The segments are found where the layout put them (their rect, mapped to output pixels) and clicked through CoreManager::GetUIInput(), never through Press: what the
+    // screen takes, what reaches the board and what the groups show are the point. The engines are the doubles of TestEngines.h
+
+    TEST_F(ChessUiTest, ThePanelIsHiddenAtTheStartDrawsNothingAndTakesNoClick) {
+        auto panel = Panel();
+        ASSERT_TRUE(panel);
+        EXPECT_FALSE(panel->_visible);
+        EXPECT_TRUE(panel->_modal);
+        EXPECT_FALSE(Hud()->_modal);
+        Draw();
+        EXPECT_TRUE(RectCalls(kPlateColor).empty()) << "hidden: not even the plate is drawn";
+
+        // Where a segment will be, the panel takes nothing and the board under it gets the click. Show it once to learn the place, then hide it again
+        ASSERT_TRUE(OpenThePanel());
+        Draw();
+        const auto place = ScreenCenter(PanelControl<UIButton>("LevelMedium"));
+        ASSERT_TRUE(CloseThePanel());
+        Draw();
+        EXPECT_TRUE(RectCalls(kPlateColor).empty());
+
+        ActionLog log;
+        const Taken taken = ClickAtPixel(place.first, place.second);
+        EXPECT_FALSE(taken.pressed);
+        EXPECT_FALSE(taken.released);
+        EXPECT_EQ(log.Total(), 0u);
+        EXPECT_EQ(Opponent().GetLevel(), kDefaultOpponentLevel);
+        const auto e2 = SquareCenter("e2");
+        EXPECT_FALSE(CoreManager::GetUIInput().DispatchMouseButtonDown(Button(e2.first, e2.second, true)));
+        EXPECT_TRUE(Model().HasSelection()) << "the board under the hidden panel gets its clicks";
+    }
+
+    TEST_F(ChessUiTest, TheOpponentButtonOpensThePanelAndOkClosesIt) {
+        ActionLog log;
+        Draw();
+        EXPECT_EQ(ShownText(*HudElement("Opponent")), "Two players");
+        ASSERT_TRUE(ClickButton(kOpponentColor));
+        EXPECT_EQ(log.LastAction(), PoolString::Intern("ChessOpenOpponent"));
+        ASSERT_TRUE(Panel()->_visible);
+        Draw();
+        EXPECT_FALSE(RectCalls(kPlateColor).empty()) << "shown: the plate is drawn";
+
+        // The Opponent button is under the dim now: the panel takes the press first, and nothing is emitted
+        const size_t actions = log.Total();
+        const auto button = ScreenCenter(*HudElement("Opponent"));
+        const Taken second = ClickAtPixel(button.first, button.second);
+        EXPECT_TRUE(second.Both()) << "the modal canvas takes it";
+        EXPECT_EQ(log.Total(), actions) << "and it is not the Opponent button's";
+
+        ASSERT_TRUE(CloseThePanel());
+        EXPECT_EQ(log.LastAction(), PoolString::Intern("ChessCloseOpponent"));
+        Draw();
+        EXPECT_TRUE(RectCalls(kPlateColor).empty());
+
+        // Closed: the board gets its clicks again and the button works
+        const auto e2 = SquareCenter("e2");
+        EXPECT_FALSE(CoreManager::GetUIInput().DispatchMouseButtonDown(Button(e2.first, e2.second, true)));
+        EXPECT_TRUE(Model().HasSelection());
+        ASSERT_TRUE(ClickButton(kOpponentColor));
+        EXPECT_EQ(log.LastAction(), PoolString::Intern("ChessOpenOpponent"));
+        EXPECT_TRUE(Panel()->_visible);
+    }
+
+    TEST_F(ChessUiTest, WhileThePanelIsShownEveryPressIsItsAndTheBoardAndTheResetButtonUnderItSeeNone) {
+        ASSERT_TRUE(OpenThePanel());
+        Draw();
+        ActionLog log;
+        const uint64_t version = Model().GetVersion();
+        ASSERT_TRUE(Play(Model(), "e2e4"));  // something for Reset to undo
+        const uint64_t afterMove = Model().GetVersion();
+        ASSERT_GT(afterMove, version);
+        Draw();
+
+        // On a segment, on the plate (its title), on the dim over the board (a1, below the plate) and over the Reset button: all of them are the panel's
+        const std::pair<float, float> points[] = {ScreenCenter(PanelControl<UIButton>("EngineOwn")),
+                                                  ScreenCenter(PanelElement("Title")),
+                                                  SquareCenter("a1"),
+                                                  SquareCenter("h8"),
+                                                  ScreenCenter(*HudElement("Reset")),
+                                                  ScreenCenter(*HudElement("Turn"))};
+        for (const auto& [x, y] : points) {
+            const Taken taken = ClickAtPixel(x, y);
+            EXPECT_TRUE(taken.Both()) << x << "," << y;
+        }
+        EXPECT_FALSE(Model().HasSelection()) << "no click reached the board";
+        EXPECT_EQ(Model().GetVersion(), afterMove) << "Reset under the dim was not pressed, the board did not move";
+        EXPECT_EQ(Model().GetMoves().size(), 1u);
+        EXPECT_EQ(log.Total(), 1u) << "only the click on EngineOwn is an action; the others hit the plate or the dim";
+        EXPECT_EQ(log.LastAction(), PoolString::Intern(kSetEngineAction));
+    }
+
+    TEST_F(ChessUiTest, EverySegmentEmitsItsActionAndValueAndTheSelectionFollowsTheController) {
+        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        ASSERT_TRUE(OpenThePanel());
+        ActionLog log;
+        const eastl::vector<PanelSegment> segments = ExpectedPanelSegments();
+
+        // Two people play first: only the mode and the engine groups take clicks. Computer is picked in the middle, which wakes the other two; then back to two
+        const auto clickGroup = [&](const char* group) {
+            for (const PanelSegment& segment : segments) {
+                if (std::string_view(segment.group) != group) {
+                    continue;
+                }
+                SCOPED_TRACE(segment.name.c_str());
+                const size_t before = log.Total();
+                const Taken taken = ClickPanel(segment.name.c_str());
+                EXPECT_TRUE(taken.Both());
+                ASSERT_EQ(log.Total(), before + 1);
+                EXPECT_EQ(log.LastAction(), PoolString::Intern(segment.action));
+                EXPECT_EQ(log.LastValue(), PoolString::Intern(segment.id.c_str()));
+
+                Draw();  // the board answered with the variable; the next draw moves the selection
+                for (const PanelSegment& other : segments) {
+                    if (std::string_view(other.group) == group) {
+                        EXPECT_EQ(PanelControl<UIButton>(other.name.c_str()).selected, other.name == segment.name) << other.name.c_str();
+                    }
+                }
+                if (std::string_view(group) == "ModeGroup") {
+                    EXPECT_EQ(Opponent().GetPlays().has_value(), segment.id == "computer");
+                } else if (std::string_view(group) == "ColorGroup") {
+                    EXPECT_EQ(Opponent().GetPlays(), std::optional<PieceColor>(segment.id == "white" ? PieceColor::Black : PieceColor::White)) << "the program plays the other color";
+                } else if (std::string_view(group) == "EngineGroup") {
+                    EXPECT_EQ(Opponent().GetEngine(), *FindOpponentEngine(segment.id));
+                } else {
+                    EXPECT_EQ(Opponent().GetLevel(), *FindOpponentLevel(segment.id));
+                }
+            }
+        };
+        clickGroup("EngineGroup");
+        clickGroup("ModeGroup");  // ends with Computer
+        ASSERT_TRUE(Opponent().GetPlays().has_value());
+        clickGroup("ColorGroup");
+        clickGroup("LevelGroup");
+        ASSERT_TRUE(ClickPanel("ModeTwo").Both());
+        Draw();
+        EXPECT_FALSE(Opponent().GetPlays().has_value());
+        EXPECT_TRUE(PanelControl<UIButton>("ModeTwo").selected);
+        EXPECT_TRUE(PanelControl<UIButton>("LevelMax").selected) << "the level that was picked stays shown while two people play";
+        EXPECT_TRUE(PanelControl<UIButton>("ColorBlack").selected) << "and so does the person's color";
+        EXPECT_EQ(log.Total(), 11u) << "ten segments, and ModeTwo again";
+    }
+
+    TEST_F(ChessUiTest, AClickWithoutAnAnswerLeavesTheGroupAlone) {
+        // The group owns no choice: it only reports. A pick the controller refuses leaves the segment that was selected selected
+        CountingFactory failing(EngineError{EngineErrorKind::LaunchFailed, "no Stockfish in the test"});
+        Opponent().SetEngineFactory(failing.AsFactory());
+        _manager->UpdateAll();
+        ASSERT_TRUE(OpenThePanel());
+        Draw();
+        ASSERT_TRUE(PanelControl<UIButton>("ModeTwo").selected);
+
+        ASSERT_TRUE(ClickPanel("ModeComputer").Both());
+        Draw();
+
+        EXPECT_TRUE(PanelControl<UIButton>("ModeTwo").selected);
+        EXPECT_FALSE(PanelControl<UIButton>("ModeComputer").selected);
+    }
+
+    TEST_F(ChessUiTest, TheColorAndLevelGroupsAreDisabledWhileTwoPeoplePlayAndTheEngineGroupNever) {
+        // Was TheLevelButtonIsShownOnlyWhileTheProgramPlays (the Level button hidden for two people): the greying of UISegmented::disabled is the rule now
+        CountingFactory working({eastl::make_shared<InstantEngine>()});
+        Opponent().SetEngineFactory(working.AsFactory());
+        _manager->UpdateAll();
+        Draw();  // the first publication
+
+        const auto disabled = [this](const char* group) { return PanelControl<UISegmented>(group).disabled; };
+        EXPECT_FALSE(disabled("ModeGroup"));
+        EXPECT_TRUE(disabled("ColorGroup")) << "two people play: the person's color means nothing yet";
+        EXPECT_FALSE(disabled("EngineGroup")) << "never greyed: the person needs it when the Stockfish pick failed";
+        EXPECT_TRUE(disabled("LevelGroup"));
+
+        ASSERT_TRUE(OpenThePanel());
+        Draw();  // a hidden canvas is not drawn, so its segments take the group's state on the first draw once it is shown
+        for (const char* name : {"ColorWhite", "ColorBlack", "LevelEasy", "LevelMedium", "LevelHard", "LevelMax"}) {
+            const UIButton& button = PanelControl<UIButton>(name);
+            EXPECT_TRUE(button.groupDisabled) << name;
+            EXPECT_LT(button.GetCurrentFill().a, 255) << name << " is drawn grey";
+        }
+        for (const char* name : {"ModeTwo", "ModeComputer", "EngineStockfish", "EngineOwn"}) {
+            const UIButton& button = PanelControl<UIButton>(name);
+            EXPECT_FALSE(button.groupDisabled) << name;
+            EXPECT_EQ(button.GetCurrentFill().a, 255) << name;
+        }
+
+        // A click on a segment of a disabled group changes nothing, and it emits nothing
+        ActionLog log;
+        const uint64_t revision = Opponent().GetRevision();
+        ClickPanel("ColorBlack");
+        ClickPanel("LevelHard");
+        EXPECT_EQ(log.Total(), 0u);
+        EXPECT_EQ(Opponent().GetRevision(), revision);
+        EXPECT_EQ(Var("opponentColor"), "white");
+        EXPECT_EQ(Var("opponentLevel"), "medium");
+        EXPECT_EQ(Opponent().GetLevel(), kDefaultOpponentLevel);
+
+        // The engine group works while two people play
+        ASSERT_TRUE(ClickPanel("EngineOwn").Both());
+        EXPECT_EQ(log.Total(), 1u);
+        EXPECT_EQ(Opponent().GetEngine(), OpponentEngine::Own);
+        EXPECT_FALSE(disabled("EngineGroup"));
+
+        // Computer wakes the other two
+        ASSERT_TRUE(ClickPanel("ModeComputer").Both());
+        Draw();
+        EXPECT_FALSE(disabled("ModeGroup"));
+        EXPECT_FALSE(disabled("ColorGroup"));
+        EXPECT_FALSE(disabled("EngineGroup"));
+        EXPECT_FALSE(disabled("LevelGroup"));
+        EXPECT_FALSE(PanelControl<UIButton>("LevelHard").groupDisabled);
+        EXPECT_EQ(PanelControl<UIButton>("LevelHard").GetCurrentFill().a, 255);
+        ASSERT_TRUE(ClickPanel("LevelHard").Both());
+        EXPECT_EQ(Opponent().GetLevel(), *FindOpponentLevel("hard"));
+        ASSERT_TRUE(ClickPanel("ColorBlack").Both());
+        EXPECT_EQ(Opponent().GetPlays(), std::optional<PieceColor>(PieceColor::White));
+
+        // And back to two people: they are greyed again, with the choice still shown
+        ASSERT_TRUE(ClickPanel("ModeTwo").Both());
+        Draw();
+        EXPECT_TRUE(disabled("ColorGroup"));
+        EXPECT_TRUE(disabled("LevelGroup"));
+        EXPECT_FALSE(disabled("EngineGroup"));
+        EXPECT_TRUE(PanelControl<UIButton>("ColorBlack").groupDisabled);
+        EXPECT_TRUE(PanelControl<UIButton>("LevelHard").selected);
+        EXPECT_TRUE(PanelControl<UIButton>("ColorBlack").selected);
+        const size_t total = log.Total();
+        ClickPanel("LevelEasy");
+        EXPECT_EQ(log.Total(), total) << "greyed again: no click";
+
+        // A pick that finds no engine leaves nobody, so the two groups stay grey; the engine group stays usable
+        CountingFactory failing(EngineError{EngineErrorKind::LaunchFailed, "no Stockfish in the test"});
+        Opponent().SetEngineFactory(failing.AsFactory());
+        ASSERT_TRUE(ClickPanel("EngineStockfish").Both());
+        ASSERT_TRUE(ClickPanel("ModeComputer").Both());
+        Draw();
+        EXPECT_FALSE(Opponent().GetPlays().has_value());
+        EXPECT_TRUE(disabled("ColorGroup"));
+        EXPECT_TRUE(disabled("LevelGroup"));
+        EXPECT_FALSE(disabled("EngineGroup"));
+    }
+
+    TEST_F(ChessUiTest, TheDisabledFlagFollowsAnOpponentSetFromOutside) {
+        // The control API picks the program's side without the panel: the groups wake up (and sleep) with the opponent, not with the clicks
+        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        Draw();
+        ASSERT_TRUE(PanelControl<UISegmented>("LevelGroup").disabled);
+
+        ControlPlays("black");
+        Draw();
+        EXPECT_FALSE(PanelControl<UISegmented>("ColorGroup").disabled);
+        EXPECT_FALSE(PanelControl<UISegmented>("LevelGroup").disabled);
+
+        ControlPlays(nullptr);
+        Draw();
+        EXPECT_TRUE(PanelControl<UISegmented>("ColorGroup").disabled);
+        EXPECT_TRUE(PanelControl<UISegmented>("LevelGroup").disabled);
+    }
+
+    TEST_F(ChessUiTest, TheOpponentButtonSaysWhatTheProgramPlaysAsThePanelChanges) {
+        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        ASSERT_TRUE(OpenThePanel());
+        EXPECT_EQ(ShownText(*HudElement("Opponent")), "Two players");
+
+        ASSERT_TRUE(ClickPanel("ModeComputer").Both());
+        Draw();
+        EXPECT_EQ(ShownText(*HudElement("Opponent")), "You: White") << "the person has White, the program Black";
+        EXPECT_EQ(Var("side"), "You: White");
+
+        ASSERT_TRUE(ClickPanel("ColorBlack").Both());
+        Draw();
+        EXPECT_EQ(ShownText(*HudElement("Opponent")), "You: Black");
+
+        ASSERT_TRUE(ClickPanel("ColorWhite").Both());
+        Draw();
+        EXPECT_EQ(ShownText(*HudElement("Opponent")), "You: White");
+
+        ASSERT_TRUE(ClickPanel("ModeTwo").Both());
+        Draw();
+        EXPECT_EQ(ShownText(*HudElement("Opponent")), "Two players");
+    }
+
+    TEST_F(ChessUiTest, ThePersonPlaysTheColorThePanelNamesAndTheProgramTheOther) {
+        const auto engine = eastl::make_shared<InstantEngine>();
+        CountingFactory factory({engine});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        ASSERT_TRUE(OpenThePanel());
+        ASSERT_TRUE(ClickPanel("ModeComputer").Both());
+        ASSERT_TRUE(CloseThePanel());
+
+        ClickMove("e2", "e4");
+        ASSERT_TRUE(FramesUntil([&] { return Model().GetMoves().size() == 2; })) << "the person has White: the program answers with a black piece";
+        EXPECT_EQ(Model().GetPieceAt(Model().GetMoves()[1].To()).color, PieceColor::Black);
+
+        ASSERT_TRUE(OpenThePanel());
+        ASSERT_TRUE(ClickPanel("ColorBlack").Both());
+        ASSERT_TRUE(CloseThePanel());
+        ASSERT_TRUE(FramesUntil([&] { return Model().GetMoves().size() == 3; })) << "the person has Black now: White is the program's and it is White's turn";
+        EXPECT_EQ(Model().GetPieceAt(Model().GetMoves()[2].To()).color, PieceColor::White);
+    }
+
+    TEST_F(ChessUiTest, WhenNoStockfishIsFoundThePanelLeadsToTheOwnEngineAndTheProgramPlays) {
+        // Was WhenNoStockfishIsFoundTheEngineButtonLeadsToTheOwnEngine... (the action-level twin is WhenNoStockfishIsFoundTheEngineRowLeadsToTheOwnEngineAndComputerPlays). The
+        // factory stands in for "no Stockfish found" and nothing else: it never makes the own engine for a Stockfish pick, so the program cannot have fallen back by itself
+        eastl::vector<eastl::string> asked;
+        Opponent().SetEngineFactory([&asked](OpponentEngine engine, const OpponentLevel&) -> MadeEngine {
+            const eastl::string_view id = OpponentEngineId(engine);
+            asked.emplace_back(id.data(), id.size());
+            if (engine == OpponentEngine::Stockfish) {
+                return std::unexpected(EngineError{EngineErrorKind::LaunchFailed, "no Stockfish in the test"});
+            }
+            return eastl::make_shared<InstantEngine>();
+        });
+        _manager->UpdateAll();
+        ASSERT_TRUE(OpenThePanel());
+        EXPECT_EQ(PanelText("OpponentError"), "") << "no error line to start with";
+
+        ASSERT_TRUE(ClickPanel("ModeComputer").Both());
+        Draw();
+        EXPECT_EQ(PanelText("OpponentError"), "Engine not found") << "the panel says it where the person looks";
+        EXPECT_EQ(Label("Status").GetDisplayText(), "Engine not found");
+        EXPECT_TRUE(PanelControl<UIButton>("ModeTwo").selected) << "the screen shows the truth: nobody plays";
+        EXPECT_FALSE(PanelControl<UIButton>("ModeComputer").selected);
+        EXPECT_TRUE(PanelControl<UIButton>("EngineStockfish").selected) << "the pick failed and the choice is still Stockfish: no silent switch";
+        EXPECT_EQ(ShownText(*HudElement("Opponent")), "Two players");
+        ASSERT_EQ(asked.size(), 1u);
+        EXPECT_EQ(asked[0], "stockfish");
+
+        ASSERT_TRUE(ClickPanel("EngineOwn").Both());
+        EXPECT_EQ(PanelText("OpponentError"), "") << "a new pick: the person has seen the sentence";
+        EXPECT_TRUE(PanelControl<UIButton>("EngineOwn").selected);
+        EXPECT_EQ(asked.size(), 1u) << "with nobody playing the choice only changes";
+
+        ASSERT_TRUE(ClickPanel("ModeComputer").Both());
+        Draw();
+        EXPECT_TRUE(PanelControl<UIButton>("ModeComputer").selected);
+        EXPECT_EQ(PanelText("OpponentError"), "");
+        EXPECT_EQ(ShownText(*HudElement("Opponent")), "You: White");
+        ASSERT_EQ(asked.size(), 2u);
+        EXPECT_EQ(asked[1], "own");
+
+        ASSERT_TRUE(CloseThePanel());
+        ClickMove("e2", "e4");
+        ASSERT_TRUE(FramesUntil([&] { return Model().GetMoves().size() == 2; })) << "the own engine, behind the double, answers the person's move";
+        EXPECT_EQ(Model().GetPieceAt(Model().GetMoves()[1].To()).color, PieceColor::Black);
+        EXPECT_FALSE(Opponent().GetError().has_value());
+    }
+
+    TEST_F(ChessUiTest, ASearchErrorIsOnTheErrorLineAndAnyPickOfThePanelLetsThePersonOut) {
+        // Twin of ChangingTheSideLetsThePersonOut... and ChangingTheLevelLetsThePersonOut... through the segments: the error line empties and the new engine is asked once
+        const auto engine = eastl::make_shared<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
+        CountingFactory factory({engine});
+        ASSERT_NO_FATAL_FAILURE(ProvokeAnEngineError(factory));
+        ASSERT_TRUE(OpenThePanel());
+        EXPECT_EQ(PanelText("OpponentError"), "Engine not found") << "the first search failed";
+        EXPECT_TRUE(PanelControl<UIButton>("ModeComputer").selected) << "the pick succeeded, only the search failed";
+
+        ASSERT_TRUE(ClickPanel("LevelHard").Both());
+
+        EXPECT_FALSE(Opponent().GetError().has_value());
+        EXPECT_EQ(PanelText("OpponentError"), "");
+        ASSERT_EQ(factory.Calls(), 2);
+        EXPECT_EQ(factory.Levels()[1], "hard");
+        ASSERT_TRUE(FramesUntil([&] { return Opponent().GetError().has_value(); })) << "black is still the program's and to move: the new engine is asked, and fails";
+        IdleFrames();
+        EXPECT_EQ(engine->Calls(), 2) << "once per act of the person, not per frame";
+
+        ASSERT_TRUE(ClickPanel("ModeTwo").Both());  // nobody is the way out for good
+        EXPECT_FALSE(Opponent().GetError().has_value());
+        EXPECT_EQ(PanelText("OpponentError"), "");
+    }
+
+    TEST_F(ChessUiTest, TheSentencesOfTheErrorLineAreTheOnesOfTheOpponentText) {
+        // The line shows OpponentText::Error of the error that stands, and nothing else
+        const auto engine = eastl::make_shared<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
+        CountingFactory factory({engine});
+        ASSERT_NO_FATAL_FAILURE(ProvokeAnEngineError(factory));
+        ASSERT_TRUE(OpenThePanel());
+        EXPECT_EQ(PanelText("OpponentError"), OpponentText::Error(*Opponent().GetError()));
+        EXPECT_EQ(PanelText("OpponentError"), Var("status"));
     }
 
 }  // namespace BECore::Chess::Tests

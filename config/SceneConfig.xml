@@ -17,23 +17,96 @@
         <!-- The HUD is in the margins of the view (space="SceneView"): it scales and moves with the board and never covers it, whatever the shape of the window.
              The board is 640 x 640 at (100, 80); the margin is 80 units above and below, so one row of 56-unit controls fits in each (12 units from the edge of the
              safe area), and a 56-unit button is still a 32 px touch target at the smallest fit scale of the size matrix (0.57, the 840 units of the width in a 480 px window).
-             The top row is Turn (left), Level and Reset (right); the bottom row is Side and Engine (left, side by side) and Status (right). Every element is anchored to a
+             The top row is Turn (left), Opponent and Reset (right); the bottom row is Side and Engine (left, side by side) and Status (right). Every element is anchored to a
              corner, so the row is as wide as the safe area, which is about 689 units in the narrowest window of the matrix (480 px with side insets): the widths below add up
-             to less than that with gaps, and ChessUiTest lays every word the game can show into them. Side, Engine and Level are cycle buttons: the engine has no selector
-             widget, so each press emits an action (ChessCycleSide, ChessCycleEngine, ChessCycleLevel) and the text is a variable that the board publishes ({side}, {engine},
-             {level}). Level is hidden by the board while nobody is the opponent; Engine is always shown, because the person needs it exactly when the Stockfish pick failed
-             and nobody plays (its font is 22: "Own engine" does not fit 138 units at 24, and the rest of the row is Status at 48%). The three have colors of their own, so they
-             do not read as Reset. -->
+             to less than that with gaps, and ChessUiTest lays every word the game can show into them. Opponent is the one button that opens the opponent panel (the node
+             OpponentPanel below): it emits ChessOpenOpponent, is always shown, and its text is the variable {side} ("Two players", "You: White", "You: Black"), so it also says
+             the state. Side and Engine are the old cycle buttons (ChessCycleSide, ChessCycleEngine; {side}, {engine}) and go when the panel has replaced them. Engine is always
+             shown, because the person needs it exactly when the Stockfish pick failed and nobody plays (its font is 22: "Own engine" does not fit 138 units at 24, and the
+             rest of the row is Status at 48%). The three buttons have colors of their own, so they do not read as Reset. -->
         <node name="Hud" layer="10">
           <components>
             <component type="UICanvasComponent" space="SceneView" useSafeArea="true">
               <elements>
                 <element type="UILabel" name="Turn" x="12" y="12" width="320" height="56" text="{turn}" fontSize="28" verticalAlign="Center" />
-                <element type="UIButton" name="Level" anchor="TopRight" x="-134" y="12" width="190" height="56" text="{level}" fontSize="24" action="ChessCycleLevel" color="45,75,120,255" />
+                <element type="UIButton" name="Opponent" anchor="TopRight" x="-134" y="12" width="190" height="56" text="{side}" fontSize="24" action="ChessOpenOpponent" color="45,75,120,255" />
                 <element type="UIButton" name="Reset" anchor="TopRight" x="-12" y="12" width="110" height="56" text="Reset" fontSize="26" action="ChessReset" color="40,90,60,255" />
                 <element type="UIButton" name="Side" anchor="BottomLeft" x="12" y="-12" width="170" height="56" text="{side}" fontSize="24" action="ChessCycleSide" color="110,75,40,255" />
                 <element type="UIButton" name="Engine" anchor="BottomLeft" x="192" y="-12" width="138" height="56" text="{engine}" fontSize="22" action="ChessCycleEngine" color="80,60,115,255" />
                 <element type="UILabel" name="Status" anchor="BottomRight" x="-12" y="-12" width="48%" height="56" text="{status}" fontSize="28" align="Right" verticalAlign="Center" />
+              </elements>
+            </component>
+          </components>
+        </node>
+
+        <!-- The opponent panel: a modal canvas over everything (layer 20, above the HUD and the end-of-game bar), started hidden. The Opponent button of the HUD shows it
+             (ChessOpenOpponent) and OK hides it (ChessCloseOpponent); while it is shown the dim takes every click, so the board gets none. Four choice groups (UISegmented), a
+             caption beside each. A segment emits its action with its id as the value (ChessSetMode / ChessSetColor / ChessSetEngine / ChessSetLevel); ChessBoardComponent applies
+             the pick at once and publishes the ids the groups are bound to (opponentMode, opponentColor, opponentEngine, opponentLevel), so the panel stays open and always shows
+             what the game really has. The ids are those of the control API; the color is the PERSON's color (the program plays the other one). ColorGroup and LevelGroup are
+             greyed by the board while two people play (they mean something only when the program plays); EngineGroup never is: the person needs it exactly when the Stockfish
+             pick failed. The groups are named ModeGroup, ColorGroup, EngineGroup and LevelGroup and not Mode, Engine and Level on purpose: elements are found by name in every
+             canvas of the scene. OpponentError is the sentence of the engine's error ({opponentError}, empty when there is none). A segment needs an explicit height (a flex
+             segment without one gets a rect of height 0). The plate is 16 + 44 (title) + 4 x 56 (rows) + 32 (error) + 56 (OK) + 6 x 12 (spacing) + 16 = 460 units high. The view
+             is a fixed 840 x 800, so there is no portrait variant. -->
+        <node name="OpponentPanel" layer="20">
+          <components>
+            <component type="UICanvasComponent" space="SceneView" useSafeArea="true" modal="true" visible="false">
+              <elements>
+                <element type="UIElement" name="Dim" anchor="Stretch" ignoreSafeArea="true" color="0,0,0,150" blocksInput="true" />
+                <element type="UIStack" name="Plate" anchor="Center" width="94%" maxWidth="640" height="460" direction="Vertical" spacing="12" padding="16" crossAlign="Stretch" color="36,40,52,255" blocksInput="true">
+                  <children>
+                    <element type="UILabel" name="Title" height="44" text="Opponent" fontSize="30" align="Center" />
+                    <element type="UIStack" name="ModeRow" height="56" direction="Horizontal" spacing="8" crossAlign="Stretch">
+                      <children>
+                        <element type="UILabel" name="ModeCaption" width="150" height="56" text="Opponent" fontSize="24" verticalAlign="Center" />
+                        <element type="UISegmented" name="ModeGroup" bind="opponentMode" flex="1" height="56" direction="Horizontal" spacing="4" color="30,30,30,255">
+                          <children>
+                            <element type="UIButton" name="ModeTwo" flex="1" height="56" text="Two players" fontSize="24" value="two" action="ChessSetMode" color="70,70,100,255" />
+                            <element type="UIButton" name="ModeComputer" flex="1" height="56" text="Computer" fontSize="24" value="computer" action="ChessSetMode" color="70,70,100,255" />
+                          </children>
+                        </element>
+                      </children>
+                    </element>
+                    <element type="UIStack" name="ColorRow" height="56" direction="Horizontal" spacing="8" crossAlign="Stretch">
+                      <children>
+                        <element type="UILabel" name="ColorCaption" width="150" height="56" text="Play as" fontSize="24" verticalAlign="Center" />
+                        <element type="UISegmented" name="ColorGroup" bind="opponentColor" flex="1" height="56" direction="Horizontal" spacing="4" color="30,30,30,255">
+                          <children>
+                            <element type="UIButton" name="ColorWhite" flex="1" height="56" text="White" fontSize="24" value="white" action="ChessSetColor" color="70,70,100,255" />
+                            <element type="UIButton" name="ColorBlack" flex="1" height="56" text="Black" fontSize="24" value="black" action="ChessSetColor" color="70,70,100,255" />
+                          </children>
+                        </element>
+                      </children>
+                    </element>
+                    <element type="UIStack" name="EngineRow" height="56" direction="Horizontal" spacing="8" crossAlign="Stretch">
+                      <children>
+                        <element type="UILabel" name="EngineCaption" width="150" height="56" text="Engine" fontSize="24" verticalAlign="Center" />
+                        <element type="UISegmented" name="EngineGroup" bind="opponentEngine" flex="1" height="56" direction="Horizontal" spacing="4" color="30,30,30,255">
+                          <children>
+                            <element type="UIButton" name="EngineStockfish" flex="1" height="56" text="Stockfish" fontSize="24" value="stockfish" action="ChessSetEngine" color="70,70,100,255" />
+                            <element type="UIButton" name="EngineOwn" flex="1" height="56" text="Own engine" fontSize="24" value="own" action="ChessSetEngine" color="70,70,100,255" />
+                          </children>
+                        </element>
+                      </children>
+                    </element>
+                    <element type="UIStack" name="LevelRow" height="56" direction="Horizontal" spacing="8" crossAlign="Stretch">
+                      <children>
+                        <element type="UILabel" name="LevelCaption" width="150" height="56" text="Level" fontSize="24" verticalAlign="Center" />
+                        <element type="UISegmented" name="LevelGroup" bind="opponentLevel" flex="1" height="56" direction="Horizontal" spacing="4" color="30,30,30,255">
+                          <children>
+                            <element type="UIButton" name="LevelEasy" flex="1" height="56" text="Easy" fontSize="24" value="easy" action="ChessSetLevel" color="70,70,100,255" />
+                            <element type="UIButton" name="LevelMedium" flex="1" height="56" text="Medium" fontSize="24" value="medium" action="ChessSetLevel" color="70,70,100,255" />
+                            <element type="UIButton" name="LevelHard" flex="1" height="56" text="Hard" fontSize="24" value="hard" action="ChessSetLevel" color="70,70,100,255" />
+                            <element type="UIButton" name="LevelMax" flex="1" height="56" text="Max" fontSize="24" value="max" action="ChessSetLevel" color="70,70,100,255" />
+                          </children>
+                        </element>
+                      </children>
+                    </element>
+                    <element type="UILabel" name="OpponentError" height="32" text="{opponentError}" fontSize="22" align="Center" verticalAlign="Center" textColor="240,120,120,255" />
+                    <element type="UIButton" name="Ok" height="56" text="OK" fontSize="26" action="ChessCloseOpponent" color="50,115,85,255" />
+                  </children>
+                </element>
               </elements>
             </component>
           </components>

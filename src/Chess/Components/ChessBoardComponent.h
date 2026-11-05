@@ -35,9 +35,9 @@ namespace BECore::Chess {
      * The HUD is not drawn here: it is a UI canvas of the scene (`config/SceneConfig.xml`) whose labels and buttons follow the variables `turn`, `status`, `side`,
      * `engine` and `level` (and, for the opponent panel, the ids `opponentMode`, `opponentColor`, `opponentEngine`, `opponentLevel` and the sentence `opponentError`), which this component publishes
      * to `CoreManager::GetUIVars()` whenever the game or the opponent changed (StatusText, OpponentText): `turn` says "Computer is thinking" while the program searches, `status` is the sentence of
-     * the opponent's error while one stands and the status of the game otherwise. It also shows the element `Level` of the HUD while a computer opponent plays and hides it for two people (`Engine` is
-     * always shown). Its buttons emit the actions `ChessReset` (a new game), `ChessCycleSide`, `ChessCycleEngine` and `ChessCycleLevel` (OpponentController::CycleSide(), CycleEngine() and
-     * CycleLevel()), which this component answers; so are the four actions of the panel's choice groups, `ChessSetMode`, `ChessSetColor`, `ChessSetEngine` and `ChessSetLevel`, whose `value` is an id
+     * the opponent's error while one stands and the status of the game otherwise. Its buttons emit the actions `ChessReset` (a new game), `ChessCycleSide` and `ChessCycleEngine`
+     * (OpponentController::CycleSide() and CycleEngine()), `ChessOpenOpponent` and `ChessCloseOpponent` (show and hide the modal canvas of the node `OpponentPanel`, the `Opponent` button and the OK
+     * button), which this component answers; so are the four actions of the panel's choice groups, `ChessSetMode`, `ChessSetColor`, `ChessSetEngine` and `ChessSetLevel`, whose `value` is an id
      * (OpponentChoice picks it; an id that is in no table is ignored with one warning). `opponentColor` is the PERSON's color, the opposite of the one the control API's `opponent.plays` names. It
      * greys the groups `ColorGroup` and `LevelGroup` of the panel while two people play (`EngineGroup` never), and reads the person's color on every refresh so a side set from outside is remembered.
      *
