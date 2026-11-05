@@ -1,6 +1,5 @@
 #pragma once
 
-
 namespace BECore::Chess::Tests {
 
     /// A small generator with a fixed seed (xorshift64): the same numbers on every platform, unlike std::uniform_int_distribution
