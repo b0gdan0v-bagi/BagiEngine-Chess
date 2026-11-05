@@ -10,7 +10,7 @@ namespace BECore::Chess {
     /// The name of a promotion piece in the scene and in the actions: "queen", "rook", "bishop", "knight" (lower case); empty for any other piece
     [[nodiscard]] eastl::string_view PromotionId(PieceType type);
 
-    /// The word of the HUD for a promotion piece: "Queen", "Rook", "Bishop", "Knight"; empty for any other piece
+    /// The word on the button of the promotion panel for a promotion piece: "Queen", "Rook", "Bishop", "Knight"; empty for any other piece
     [[nodiscard]] eastl::string_view PromotionLabel(PieceType type);
 
     /// The promotion piece with this id (exactly as written: ids are lower case), or nothing

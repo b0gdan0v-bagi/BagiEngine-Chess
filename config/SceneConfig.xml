@@ -115,8 +115,9 @@
              "bishop", "knight": the table of PromotionChoices) and plays the move; Cancel emits ChessCancelPromotion and the pawn stays selected. While it is shown the dim takes every
              click, so the board and the buttons of the HUD under it get none; there is no Escape and no click outside to cancel. Plain text buttons, no pieces drawn in them. The names
              start with Promotion or Promote because elements are found by name in every canvas of the scene (the opponent panel has Dim, Plate and Title). The four piece buttons share
-             one row: the plate is at most 640 units wide, 608 inside the padding, so a button is about 146 units wide in the widest case and still 8 units of air around "Knight" at
-             font 26 in the narrowest window (the plate is 94% of about 689 units). The plate is 16 + 44 (title) + 56 (pieces) + 56 (Cancel) + 3 x 12 (spacing) + 16 = 224 units high.
+             one row. The plate is 94% of the safe area up to 640 units, and 94% of even the narrowest safe area (about 689 units, so 647) is more than 640: the plate is 640 wide in
+             every window of the size matrix, 608 inside the padding, so a button is 146 units wide and keeps 8 units of air around "Knight" at font 26 everywhere (ChessUiTest holds
+             it). The plate is 16 + 44 (title) + 56 (pieces) + 56 (Cancel) + 3 x 12 (spacing) + 16 = 224 units high.
              The view is a fixed 840 x 800, so there is no portrait variant. -->
         <node name="PromotionPanel" layer="20">
           <components>

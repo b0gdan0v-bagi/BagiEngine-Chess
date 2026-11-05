@@ -520,10 +520,11 @@ namespace BECore::Chess::Tests {
 
     TEST(ChessGameModelTest, NoPendingPromotionOnceTheGameIsOver) {
         ChessGameModel model;
-        model.SetPosition(PositionFromFen("7k/5Q2/6K1/8/8/8/8/8 b - - 0 1"));  // stalemate for Black
+        model.SetPosition(PositionFromFen("8/P6k/8/8/8/8/8/K7 w - - 100 80"));  // a pawn on the 7th with a free way, but 50 moves went by without a capture or a pawn move
+        ASSERT_EQ(model.GetStatus(), GameStatus::DrawFiftyMoves);
         ASSERT_TRUE(model.IsGameOver());
-        Click(model, "h8");
-        Click(model, "h7");
+        Click(model, "a7");
+        Click(model, "a8");
         EXPECT_FALSE(model.HasPendingPromotion());
         const auto result = model.ChoosePromotion(PieceType::Queen);
         ASSERT_FALSE(result.has_value());
