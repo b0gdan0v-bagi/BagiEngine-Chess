@@ -1,5 +1,5 @@
 ---
-status: in progress 2026-11-05 branch todo/chess-hud-opponent-panel
+status: review 2026-11-05 branch todo/chess-hud-opponent-panel: the mode, the color, the engine and the level are separate choice groups (UISegmented) in a modal Opponent panel opened by one HUD button, the three cycle buttons are gone; 581 tests green (528 before, 4 Stockfish skipped), the panel through the size matrix, in HTML+CSS against the shipped XML, and a ui_click scenario in the control smoke on both clocks
 ---
 # Chess HUD: the mode and the color of the opponent are one cycle button; they need separate controls
 
