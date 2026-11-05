@@ -58,6 +58,11 @@ namespace BECore::Chess {
         OpponentChoice(OpponentChoice&&) = delete;
         OpponentChoice& operator=(OpponentChoice&&) = delete;
 
+        /// Forgets the remembered color: White again, as at the start of a game. The controller is not touched
+        void Reset() noexcept {
+            _personColor = PieceColor::White;
+        }
+
         /// "two" or "computer"
         std::expected<void, ChoiceError> SetMode(eastl::string_view id);
 

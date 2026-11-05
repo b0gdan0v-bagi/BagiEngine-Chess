@@ -1,6 +1,7 @@
 #pragma once
 
 #include <BECore/Scene/IComponent.h>
+#include <Chess/Game/ChessTypes.h>
 
 namespace BECore {
 
@@ -32,11 +33,13 @@ namespace BECore::Chess {
      * GameManager::GetActive().
      *
      * The HUD is not drawn here: it is a UI canvas of the scene (`config/SceneConfig.xml`) whose labels and buttons follow the variables `turn`, `status`, `side`,
-     * `engine` and `level`, which this component publishes to `CoreManager::GetUIVars()` whenever the game or the opponent changed (StatusText, OpponentText): `turn` says
-     * "Computer is thinking" while the program searches, `status` is the sentence of the opponent's error while one stands and the status of the game otherwise.
-     * It also shows the element `Level` of the HUD while a computer opponent plays and hides it for two people (`Engine` is always shown). Its buttons emit the
-     * actions `ChessReset` (a new game), `ChessCycleSide`, `ChessCycleEngine` and `ChessCycleLevel` (OpponentController::CycleSide(), CycleEngine() and CycleLevel()),
-     * which this component answers.
+     * `engine` and `level` (and, for the opponent panel, the ids `opponentMode`, `opponentColor`, `opponentEngine`, `opponentLevel` and the sentence `opponentError`), which this component publishes
+     * to `CoreManager::GetUIVars()` whenever the game or the opponent changed (StatusText, OpponentText): `turn` says "Computer is thinking" while the program searches, `status` is the sentence of
+     * the opponent's error while one stands and the status of the game otherwise. It also shows the element `Level` of the HUD while a computer opponent plays and hides it for two people (`Engine` is
+     * always shown). Its buttons emit the actions `ChessReset` (a new game), `ChessCycleSide`, `ChessCycleEngine` and `ChessCycleLevel` (OpponentController::CycleSide(), CycleEngine() and
+     * CycleLevel()), which this component answers; so are the four actions of the panel's choice groups, `ChessSetMode`, `ChessSetColor`, `ChessSetEngine` and `ChessSetLevel`, whose `value` is an id
+     * (OpponentChoice picks it; an id that is in no table is ignored with one warning). `opponentColor` is the PERSON's color, the opposite of the one the control API's `opponent.plays` names. It
+     * greys the groups `ColorGroup` and `LevelGroup` of the panel while two people play (`EngineGroup` never), and reads the person's color on every refresh so a side set from outside is remembered.
      *
      * It is also the frame of the computer opponent: IGame has no per-frame hook, so on every SceneUpdateEvent it runs
      * ChessGame::GetOpponent().Update() (the one place that does; it changes the model, so it cannot be done in OnDraw()). While the program plays the side to move,
@@ -82,6 +85,9 @@ namespace BECore::Chess {
     private:
         void OnMouseDown(const SDLEvents::MouseButtonDownEvent&);
         void OnAction(const InputEvents::ActionEvent&);
+
+        /// The four actions of the choice groups of the opponent panel (ChessSetMode, ChessSetColor, ChessSetEngine, ChessSetLevel, the id in `value`): true when the action was one of them
+        bool AnswerSetAction(const InputEvents::ActionEvent& event);
         void OnUpdate(const SceneEvents::SceneUpdateEvent&);
 
         /// One line in the log when a game has ended, the first time it is seen: whether the person, the program or the control API played the last move
@@ -91,10 +97,11 @@ namespace BECore::Chess {
         /// variables every frame
         void PublishUiVars();
 
-        uint64_t _publishedVersion = 0;         // the model version PublishUiVars() last published, 0 for none
-        const void* _publishedModel = nullptr;  // the model it was published for: another game starts the count again
-        uint64_t _publishedRevision = 0;        // the OpponentController::GetRevision() it was published for
-        bool _publishedThinking = false;        // whether the program was searching then: a search starts and ends without a move of the game
+        uint64_t _publishedVersion = 0;                  // the model version PublishUiVars() last published, 0 for none
+        const void* _publishedModel = nullptr;           // the model it was published for: another game starts the count again
+        uint64_t _publishedRevision = 0;                 // the OpponentController::GetRevision() it was published for
+        bool _publishedThinking = false;                 // whether the program was searching then: a search starts and ends without a move of the game
+        PieceColor _publishedColor = PieceColor::White;  // the person's color it was published for: it changes with no revision of the controller while two people play
 
         uint64_t _loggedVersion = 0;         // the model version of the ended game that LogResultOnce() last logged, 0 for none
         const void* _loggedModel = nullptr;  // the model it was logged for

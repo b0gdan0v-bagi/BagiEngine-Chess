@@ -15,7 +15,8 @@ namespace BECore::Chess {
             if (picked) {
                 return {};
             }
-            return std::unexpected(ChoiceError{ChoiceErrorKind::Engine, picked.error().detail, std::move(picked.error())});
+            EngineError engine = std::move(picked.error());
+            return std::unexpected(ChoiceError{ChoiceErrorKind::Engine, engine.detail, std::move(engine)});
         }
 
     }  // namespace

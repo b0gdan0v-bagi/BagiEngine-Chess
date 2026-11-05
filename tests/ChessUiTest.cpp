@@ -15,6 +15,7 @@
 #include <BECore/UI/UIElement.h>
 #include <BECore/UI/UILabel.h>
 #include <Chess/ChessGame.h>
+#include <Chess/ChessGameControl.h>
 #include <Chess/Components/ChessPieceComponent.h>
 #include <Chess/Engine/OpponentText.h>
 #include <Chess/Game/MoveGenerator.h>
@@ -220,6 +221,30 @@ namespace BECore::Chess::Tests {
         /// What a button of the HUD does when it is clicked: the action it emits
         static void Press(const char* action) {
             InputEvents::ActionEvent::Emit(PoolString::Intern(action));
+        }
+
+        /// What a segment of a choice group of the opponent panel does when it is clicked: its action with its value (the id of the choice)
+        static void PressWith(const char* action, const char* value) {
+            InputEvents::ActionEvent::Emit(PoolString::Intern(action), PoolString::Intern(value));
+        }
+
+        /// The "opponent" object of get_state of the control API, the way a client reads it
+        Json ControlOpponent() const {
+            const auto state = ChessGame::GetActive()->AsControllable()->GetState();
+            EXPECT_TRUE(state.has_value());
+            const Json* opponent = state ? FindJsonMember(*state, "opponent") : nullptr;
+            EXPECT_NE(opponent, nullptr);
+            return opponent ? *opponent : Json();
+        }
+
+        /// set_state {"opponent": {"plays": ..}} of the control API: "white", "black" or null for two people
+        void ControlPlays(const char* plays) const {
+            Json opponent = Json::object();
+            opponent["plays"] = plays ? Json(plays) : Json();
+            Json request = Json::object();
+            request["opponent"] = opponent;
+            const auto result = ChessGame::GetActive()->AsControllable()->SetState(request);
+            EXPECT_TRUE(result.has_value()) << DumpJson(request).c_str();
         }
 
         /// A press of the mouse on the middle of a square, where it is drawn: the way a click reaches the board (the output size it is mapped back from is the one of the last draw)
@@ -1426,6 +1451,242 @@ namespace BECore::Chess::Tests {
         EXPECT_TRUE(ClickButton(kLevelColor));
         EXPECT_TRUE(Model().HasSelection());
         EXPECT_TRUE(Model().GetSelected() == Sq("e2"));
+    }
+
+    // ---- the choice of the opponent panel: the actions with a value and the ids --------------------------------------------
+    // The segments of the panel emit ChessSetMode / ChessSetColor / ChessSetEngine / ChessSetLevel with the id as `value`; the board answers through OpponentChoice and
+    // publishes the ids. These tests press the actions the segments will emit (the panel itself is in the scene from WP 3) and read the variables
+
+    TEST_F(ChessUiTest, TheIdsOfThePanelStartAsTwoWhiteStockfishMediumAndNoError) {
+        EXPECT_EQ(Var("opponentMode"), "two");
+        EXPECT_EQ(Var("opponentColor"), "white");
+        EXPECT_EQ(Var("opponentEngine"), "stockfish");
+        EXPECT_EQ(Var("opponentLevel"), "medium");
+        EXPECT_EQ(Var("opponentError"), "");
+    }
+
+    TEST_F(ChessUiTest, EachActionOfThePanelPicksWhatTheControlApiWouldRead) {
+        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        const size_t hard = *FindOpponentLevel("hard");
+
+        // Nobody plays: each of the three is only a choice, no engine is asked for
+        PressWith("ChessSetEngine", "own");
+        EXPECT_EQ(Opponent().GetEngine(), OpponentEngine::Own);
+        EXPECT_EQ(Var("opponentEngine"), "own");
+        PressWith("ChessSetLevel", "hard");
+        EXPECT_EQ(Opponent().GetLevel(), hard);
+        EXPECT_EQ(Var("opponentLevel"), "hard");
+        PressWith("ChessSetColor", "black");
+        EXPECT_FALSE(Opponent().GetPlays().has_value()) << "the color of the person is remembered, nobody plays";
+        EXPECT_EQ(Var("opponentColor"), "black");
+        EXPECT_EQ(Var("opponentMode"), "two");
+        EXPECT_EQ(factory.Calls(), 0);
+
+        // Computer: the program plays the color the person does not, with the engine and the level that were picked, one engine made
+        PressWith("ChessSetMode", "computer");
+        EXPECT_EQ(Opponent().GetPlays(), std::optional<PieceColor>(PieceColor::White)) << "the person has Black";
+        EXPECT_EQ(Var("opponentMode"), "computer");
+        EXPECT_EQ(Var("opponentColor"), "black");
+        EXPECT_EQ(Var("side"), "You: Black");
+        ASSERT_EQ(factory.Calls(), 1);
+        EXPECT_EQ(factory.Engines()[0], "own");
+        EXPECT_EQ(factory.Levels()[0], "hard");
+
+        // While the program plays each pick remakes the engine once
+        PressWith("ChessSetEngine", "stockfish");
+        ASSERT_EQ(factory.Calls(), 2);
+        EXPECT_EQ(factory.Engines()[1], "stockfish");
+        EXPECT_EQ(Var("opponentEngine"), "stockfish");
+        PressWith("ChessSetLevel", "easy");
+        ASSERT_EQ(factory.Calls(), 3);
+        EXPECT_EQ(factory.Levels()[2], "easy");
+        EXPECT_EQ(Var("opponentLevel"), "easy");
+        PressWith("ChessSetColor", "white");
+        ASSERT_EQ(factory.Calls(), 4);
+        EXPECT_EQ(Opponent().GetPlays(), std::optional<PieceColor>(PieceColor::Black));
+        EXPECT_EQ(Var("opponentColor"), "white");
+        EXPECT_EQ(Var("side"), "You: White");
+
+        PressWith("ChessSetMode", "two");
+        EXPECT_FALSE(Opponent().GetPlays().has_value());
+        EXPECT_EQ(Var("opponentMode"), "two");
+        EXPECT_EQ(Var("opponentColor"), "white");
+        EXPECT_EQ(factory.Calls(), 4) << "nobody plays: nothing is asked";
+    }
+
+    TEST_F(ChessUiTest, ComputerAndThenBlackMakesTheProgramOpenAsWhite) {
+        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+
+        PressWith("ChessSetMode", "computer");
+        EXPECT_TRUE(Opponent().PlaysFor(PieceColor::Black));
+        PressWith("ChessSetColor", "black");
+        EXPECT_TRUE(Opponent().PlaysFor(PieceColor::White));
+        EXPECT_FALSE(Opponent().PlaysFor(PieceColor::Black));
+
+        ASSERT_TRUE(FramesUntil([&] { return Model().GetMoves().size() == 1; })) << "it is White's turn and White is the program's";
+        EXPECT_EQ(Model().GetPieceAt(Model().GetMoves()[0].To()).color, PieceColor::White);
+        EXPECT_EQ(Var("opponentMode"), "computer");
+        EXPECT_EQ(Var("opponentColor"), "black");
+    }
+
+    TEST_F(ChessUiTest, ThePersonsColorSurvivesTwoPlayersAndComesBack) {
+        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+
+        PressWith("ChessSetColor", "black");
+        PressWith("ChessSetMode", "computer");
+        PressWith("ChessSetMode", "two");
+        EXPECT_EQ(Var("opponentMode"), "two");
+        EXPECT_EQ(Var("opponentColor"), "black") << "the program is gone and the person still has the color";
+        PressWith("ChessSetMode", "computer");
+        EXPECT_EQ(Opponent().GetPlays(), std::optional<PieceColor>(PieceColor::White));
+        EXPECT_EQ(Var("opponentColor"), "black");
+    }
+
+    TEST_F(ChessUiTest, TheColorPickedWhileTwoPlayIsPublishedWithNoRevisionOfTheOpponent) {
+        // The controller knows nothing of the color then, so its revision does not move; the board still has to say the new word
+        EXPECT_EQ(Var("opponentColor"), "white");
+        const uint64_t revision = Opponent().GetRevision();
+
+        PressWith("ChessSetColor", "black");
+
+        EXPECT_EQ(Opponent().GetRevision(), revision);
+        EXPECT_EQ(Var("opponentColor"), "black");
+        PressWith("ChessSetColor", "white");
+        EXPECT_EQ(Var("opponentColor"), "white");
+    }
+
+    TEST_F(ChessUiTest, AnActionOfThePanelWithABadValueChangesNothing) {
+        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        PressWith("ChessSetMode", "computer");
+        ASSERT_EQ(factory.Calls(), 1);
+        const uint64_t revision = Opponent().GetRevision();
+        const uint64_t version = Model().GetVersion();
+
+        for (const char* action : {"ChessSetMode", "ChessSetColor", "ChessSetEngine", "ChessSetLevel"}) {
+            for (const char* value : {"", "White", "Computer", "OWN", "own ", "bl", "nonsense"}) {
+                PressWith(action, value);
+            }
+            Press(action);  // a plain button press: no value at all
+        }
+
+        EXPECT_EQ(factory.Calls(), 1) << "no engine is asked for an id that is in no table";
+        EXPECT_EQ(Opponent().GetRevision(), revision);
+        EXPECT_EQ(Model().GetVersion(), version);
+        EXPECT_EQ(Opponent().GetPlays(), std::optional<PieceColor>(PieceColor::Black));
+        EXPECT_EQ(Var("opponentMode"), "computer");
+        EXPECT_EQ(Var("opponentColor"), "white");
+        EXPECT_EQ(Var("opponentEngine"), "stockfish");
+        EXPECT_EQ(Var("opponentLevel"), "medium");
+        EXPECT_EQ(Var("opponentError"), "");
+    }
+
+    TEST_F(ChessUiTest, WhenNoStockfishIsFoundTheEngineRowLeadsToTheOwnEngineAndComputerPlays) {
+        // The user's path through the panel's actions: Stockfish is not installed, Computer says so and leaves two people, Own engine and Computer again let the program play.
+        // The factory fails for Stockfish and nothing else, so the program cannot have fallen back by itself
+        eastl::vector<eastl::string> asked;
+        Opponent().SetEngineFactory([&asked](OpponentEngine engine, const OpponentLevel&) -> MadeEngine {
+            const eastl::string_view id = OpponentEngineId(engine);
+            asked.emplace_back(id.data(), id.size());
+            if (engine == OpponentEngine::Stockfish) {
+                return std::unexpected(EngineError{EngineErrorKind::LaunchFailed, "no Stockfish in the test"});
+            }
+            return eastl::make_shared<InstantEngine>();
+        });
+        _manager->UpdateAll();
+
+        PressWith("ChessSetMode", "computer");
+
+        EXPECT_EQ(Var("opponentMode"), "two") << "the screen shows the truth: nobody plays";
+        EXPECT_EQ(Var("opponentError"), "Engine not found");
+        EXPECT_EQ(Var("status"), "Engine not found");
+        EXPECT_EQ(Var("opponentEngine"), "stockfish") << "no silent switch";
+        EXPECT_EQ(Var("side"), "Two players");
+        ASSERT_EQ(asked.size(), 1u);
+
+        PressWith("ChessSetEngine", "own");
+
+        EXPECT_EQ(Var("opponentEngine"), "own");
+        EXPECT_EQ(Var("opponentError"), "") << "a new pick: the person has seen the sentence";
+        EXPECT_EQ(Var("status"), "");
+        EXPECT_EQ(asked.size(), 1u) << "with nobody playing the choice only changes";
+
+        PressWith("ChessSetMode", "computer");
+
+        EXPECT_EQ(Var("opponentMode"), "computer");
+        EXPECT_EQ(Var("side"), "You: White");
+        EXPECT_EQ(Var("opponentError"), "");
+        ASSERT_EQ(asked.size(), 2u);
+        EXPECT_EQ(asked[1], "own");
+        ClickMove("e2", "e4");
+        ASSERT_TRUE(FramesUntil([&] { return Model().GetMoves().size() == 2; })) << "the program answers the person's move";
+        EXPECT_EQ(Model().GetPieceAt(Model().GetMoves()[1].To()).color, PieceColor::Black);
+        EXPECT_FALSE(Opponent().GetError().has_value());
+    }
+
+    TEST_F(ChessUiTest, AFailedSearchIsInTheErrorVariableToo) {
+        const auto engine = eastl::make_shared<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
+        CountingFactory factory({engine});
+        ASSERT_NO_FATAL_FAILURE(ProvokeAnEngineError(factory));
+
+        EXPECT_EQ(Var("opponentError"), OpponentText::Error(*Opponent().GetError()));
+        EXPECT_EQ(Var("opponentMode"), "computer") << "the pick succeeded, only the first search failed";
+
+        Press("ChessReset");
+        _manager->UpdateAll();
+
+        EXPECT_EQ(Var("opponentError"), "") << "the version moved: the error rule clears it";
+    }
+
+    TEST_F(ChessUiTest, TheIdsAgreeWithWhatTheControlApiReportsAfterASetState) {
+        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        const auto agree = [&](const char* mode, const char* personColor, const char* plays) {
+            const Json opponent = ControlOpponent();
+            const auto reported = GetJsonString(opponent, "plays");
+            if (plays == nullptr) {
+                EXPECT_FALSE(reported.has_value());
+            } else {
+                ASSERT_TRUE(reported.has_value());
+                EXPECT_EQ(std::string(reported->c_str(), reported->size()), plays);
+            }
+            EXPECT_EQ(Var("opponentMode"), mode);
+            EXPECT_EQ(Var("opponentColor"), personColor) << "the person has the opposite of what the program plays";
+            const auto engine = GetJsonString(opponent, "engine");
+            const auto level = GetJsonString(opponent, "level");
+            ASSERT_TRUE(engine.has_value());
+            ASSERT_TRUE(level.has_value());
+            EXPECT_EQ(Var("opponentEngine"), *engine);
+            EXPECT_EQ(Var("opponentLevel"), *level);
+        };
+
+        agree("two", "white", nullptr);
+
+        ControlPlays("black");
+        _manager->UpdateAll();
+        agree("computer", "white", "black");
+
+        ControlPlays("white");
+        _manager->UpdateAll();
+        agree("computer", "black", "white");
+
+        ControlPlays(nullptr);
+        _manager->UpdateAll();
+        agree("two", "black", nullptr);  // the color the person had stays
+
+        // A pick of the panel is read back by the API in the program's color
+        PressWith("ChessSetMode", "computer");
+        agree("computer", "black", "white");
+        PressWith("ChessSetColor", "white");
+        agree("computer", "white", "black");
     }
 
 }  // namespace BECore::Chess::Tests

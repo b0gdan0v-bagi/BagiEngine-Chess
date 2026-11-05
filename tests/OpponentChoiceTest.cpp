@@ -322,6 +322,18 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(seat.choice.Color(), PieceColor::Black) << "SetMode reads the color before the side goes";
     }
 
+    TEST_F(OpponentChoiceTest, ResetForgetsTheRememberedColorAndLeavesTheControllerAlone) {
+        Seat seat;
+        ASSERT_TRUE(seat.choice.SetColor("black").has_value());
+        ASSERT_EQ(seat.choice.Color(), PieceColor::Black);
+        const uint64_t revision = seat.controller.GetRevision();
+
+        seat.choice.Reset();
+
+        EXPECT_EQ(seat.choice.Color(), PieceColor::White);
+        EXPECT_EQ(seat.controller.GetRevision(), revision);
+    }
+
     TEST_F(OpponentChoiceTest, TheIdsRoundTripWithTheTablesOfTheControlApi) {
         Seat seat;
 
