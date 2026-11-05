@@ -1,5 +1,5 @@
 ---
-status: in progress 2026-11-05 branch todo/chess-vs-engine-2
+status: review 2026-11-05 branch todo/chess-vs-engine-2: promotion picker (a click on the last rank asks for the piece in a modal PromotionPanel: queen, rook, bishop, knight, Cancel; pending state in ChessGameModel), unit, flow and layout tests; ChessTests 656/656 and the smoke test pass, no change in engine/, slice 2 of about 4, after the merge set the status back to open
 ---
 # Chess: the computer opponent works in the window; no analysis, resign or takeback, and no engine of our own
 
