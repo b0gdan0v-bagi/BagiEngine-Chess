@@ -33,7 +33,7 @@ namespace BECore::Chess {
      * GameManager::GetActive().
      *
      * The HUD is not drawn here: it is a UI canvas of the scene (`config/SceneConfig.xml`) whose labels and buttons follow the variables `turn`, `status`, `side` (the text of the `Opponent` button)
-     * (and, for the opponent panel, the ids `opponentMode`, `opponentColor`, `opponentEngine`, `opponentLevel` and the sentence `opponentError`), which this component publishes
+     * and, for the opponent panel, the ids `opponentMode`, `opponentColor`, `opponentEngine`, `opponentLevel` and the sentence `opponentError`, which this component publishes
      * to `CoreManager::GetUIVars()` whenever the game or the opponent changed (StatusText, OpponentText): `turn` says "Computer is thinking" while the program searches, `status` is the sentence of
      * the opponent's error while one stands and the status of the game otherwise. Its buttons emit the actions `ChessReset` (a new game), `ChessOpenOpponent` and `ChessCloseOpponent` (show and hide
      * the modal canvas of the node `OpponentPanel`, the `Opponent` button and the OK button), which this component answers; so are the four actions of the panel's choice groups, `ChessSetMode`,

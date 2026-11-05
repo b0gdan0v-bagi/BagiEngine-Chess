@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Chess/Engine/OpponentLevels.h>
+#include <Chess/Engine/ChessEngine.h>
 #include <Chess/Game/ChessTypes.h>
 
 namespace BECore::Chess {
