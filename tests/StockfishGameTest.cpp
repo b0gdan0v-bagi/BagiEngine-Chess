@@ -22,7 +22,8 @@
 /// Whole games with a real Stockfish, through the classes the window uses: Stockfish against a seeded random mover and against the own engine through ChessGameModel,
 /// and a person's move answered by the real Stockfish through OpponentController with the DEFAULT factory (no SetEngineFactory). Every case skips itself without a
 /// Stockfish (StockfishUtil.h). A time-limited Stockfish is never asserted to play a particular move or to win; the games assert that every move was accepted and nothing
-/// failed. DISABLED_OwnEngineAgainstStockfishYardstick is the owner's measure of the own engine; a normal run does not pay for it
+/// failed. the two DISABLED_ yardsticks are by-hand measures of the ladder (the own engine against Stockfish Skill 0, the Stockfish levels against the own engine at depth 3); a normal run does not
+/// pay for them
 namespace BECore::Chess::Tests {
 
     namespace {
@@ -54,6 +55,7 @@ namespace BECore::Chess::Tests {
         constexpr int kYardstickGames = 4;
         constexpr int kYardstickMoveTimeMs = 50;
         constexpr size_t kYardstickPlies = 200;
+        constexpr int kYardstickReferenceDepth = 3;  ///< the own engine that the Stockfish levels play against
         constexpr const char* kYardstickGamesVariable = "CHESS_YARDSTICK_GAMES";
 
         std::optional<int> ParseInt(const char* text, size_t length) {
@@ -140,6 +142,48 @@ namespace BECore::Chess::Tests {
             return kill(static_cast<pid_t>(processId), 0) == -1 && errno == ESRCH;
         }
 #endif
+
+        struct YardstickResult {
+            int wins = 0;   ///< of the subject
+            int draws = 0;  ///< games stopped at the cap included
+            int losses = 0;
+            int capped = 0;
+            size_t plies = 0;  ///< all games together
+        };
+
+        /// @p games games of @p subject against @p reference through the model, the subject White in the even ones. The result is the subject's
+        YardstickResult PlayYardstick(IChessEngine& subject, SearchLimits subjectLimits, IChessEngine& reference, SearchLimits referenceLimits, int games) {
+            YardstickResult result;
+            for (int game = 0; game < games; ++game) {
+                const bool subjectIsWhite = game % 2 == 0;
+                ChessGameModel model;
+                const Player subjectPlayer = EnginePlayer(subject, subjectLimits);
+                const Player referencePlayer = EnginePlayer(reference, referenceLimits);
+
+                PlayGame(model, subjectIsWhite ? subjectPlayer : referencePlayer, subjectIsWhite ? referencePlayer : subjectPlayer, kYardstickPlies);
+
+                const std::optional<PieceColor> winner = model.GetWinner();
+                const PieceColor subjectColor = subjectIsWhite ? PieceColor::White : PieceColor::Black;
+                if (winner.has_value()) {
+                    ++(*winner == subjectColor ? result.wins : result.losses);
+                } else {
+                    ++result.draws;
+                    result.capped += model.IsGameOver() ? 0 : 1;
+                }
+                result.plies += model.GetMoves().size();
+            }
+            return result;
+        }
+
+        void PrintYardstickHeader(const char* knob) {
+            std::printf("%-8s %5s %5s %6s %7s %s\n", "level", knob, "wins", "draws", "losses", "(draws include games stopped at the cap; plies is the average of a game)");
+        }
+
+        void PrintYardstickRow(const OpponentLevel& level, int knob, const YardstickResult& result) {
+            const int games = result.wins + result.draws + result.losses;
+            std::printf("%-8s %5d %5d %6d %7d (%d capped, %zu plies)\n", level.id.data(), knob, result.wins, result.draws, result.losses, result.capped,
+                        games > 0 ? result.plies / static_cast<size_t>(games) : size_t{0});
+        }
 
         int YardstickGames() {
             const char* value = std::getenv(kYardstickGamesVariable);
@@ -312,42 +356,46 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(StockfishGameTest, DISABLED_OwnEngineAgainstStockfishYardstick) {
-        // The strength of the own engine at each of its levels against Stockfish at Skill Level 0 with a fixed move time. Run it by hand:
+        // The strength of the own engine at each of its levels, played as the game plays it (WithHandicap around an OwnEngine, the limits of LimitsOf(Own, level), so the
+        // table includes the blunders), against Stockfish at Skill Level 0 with a fixed move time. Run it by hand:
         //   ChessTests --gtest_also_run_disabled_tests --gtest_filter='StockfishGameTest.DISABLED_*'
         // CHESS_YARDSTICK_GAMES=2 shortens it. Only a refused move or an engine error fails it; the table is what it is for
         SKIP_WITHOUT_STOCKFISH(path);
         UciEngine stockfish(WeakStockfish(*path));
-        OwnEngine own;
         const int games = YardstickGames();
 
-        std::printf("\nown engine against Stockfish (Skill Level %d, %d ms a move), %d games per level, colors alternating, cap %zu plies\n", kStockfishSkill, kYardstickMoveTimeMs, games,
-                    kYardstickPlies);
-        std::printf("%-8s %5s %5s %6s %7s %s\n", "level", "depth", "wins", "draws", "losses", "(draws include games stopped at the cap)");
+        std::printf("\nown engine (as the game plays each level) against Stockfish (Skill Level %d, %d ms a move), %d games per level, colors alternating, cap %zu plies\n", kStockfishSkill,
+                    kYardstickMoveTimeMs, games, kYardstickPlies);
+        PrintYardstickHeader("depth");
         for (const OpponentLevel& level : GetOpponentLevels()) {
-            int wins = 0;
-            int draws = 0;
-            int losses = 0;
-            int capped = 0;
-            for (int game = 0; game < games; ++game) {
-                const bool ownIsWhite = game % 2 == 0;
-                ChessGameModel model;
-                const Player ownPlayer = EnginePlayer(own, LimitsOf(OpponentEngine::Own, level));
-                const Player stockfishPlayer = EnginePlayer(stockfish, SearchLimits{kYardstickMoveTimeMs, 0});
+            const eastl::shared_ptr<IChessEngine> own = WithHandicap(eastl::make_shared<OwnEngine>(), level);
+            const YardstickResult result = PlayYardstick(*own, LimitsOf(OpponentEngine::Own, level), stockfish, SearchLimits{kYardstickMoveTimeMs, 0}, games);
+            PrintYardstickRow(level, level.ownDepth, result);
+            RecordProperty(Format("{}", level.id).c_str(), Format("wins {} draws {} losses {}", result.wins, result.draws, result.losses).c_str());
+            EXPECT_EQ(result.wins + result.draws + result.losses, games);
+        }
+    }
 
-                PlayGame(model, ownIsWhite ? ownPlayer : stockfishPlayer, ownIsWhite ? stockfishPlayer : ownPlayer, kYardstickPlies);
+    TEST_F(StockfishGameTest, DISABLED_StockfishLevelsYardstick) {
+        // The strength of each Stockfish level as the game makes it (a UciEngine with EngineOptionsOf(level) and the move time of LimitsOf(Stockfish, level), wrapped by
+        // WithHandicap) against a fixed reference: the own engine at depth 3, no handicap (deterministic). Same way to run it and same assertions as the other yardstick
+        SKIP_WITHOUT_STOCKFISH(path);
+        OwnEngine reference;
+        const int games = YardstickGames();
+        const SearchLimits referenceLimits{kOwnMoveTimeCapMs, kYardstickReferenceDepth};
 
-                const std::optional<PieceColor> winner = model.GetWinner();
-                const PieceColor ownColor = ownIsWhite ? PieceColor::White : PieceColor::Black;
-                if (winner.has_value()) {
-                    ++(*winner == ownColor ? wins : losses);
-                } else {
-                    ++draws;
-                    capped += model.IsGameOver() ? 0 : 1;
-                }
-            }
-            std::printf("%-8s %5d %5d %6d %7d (%d capped)\n", level.id.data(), level.ownDepth, wins, draws, losses, capped);
-            RecordProperty(Format("{}", level.id).c_str(), Format("wins {} draws {} losses {}", wins, draws, losses).c_str());
-            EXPECT_EQ(wins + draws + losses, games);
+        std::printf("\nStockfish (as the game plays each level) against the own engine (depth %d, no handicap), %d games per level, colors alternating, cap %zu plies\n", kYardstickReferenceDepth,
+                    games, kYardstickPlies);
+        PrintYardstickHeader("skill");
+        for (const OpponentLevel& level : GetOpponentLevels()) {
+            UciEngineSettings settings = StockfishSettings(*path);
+            settings.options = EngineOptionsOf(level);
+            settings.quitGraceMs = kQuitGraceMs;
+            const eastl::shared_ptr<IChessEngine> subject = WithHandicap(eastl::make_shared<UciEngine>(settings), level);
+            const YardstickResult result = PlayYardstick(*subject, LimitsOf(OpponentEngine::Stockfish, level), reference, referenceLimits, games);
+            PrintYardstickRow(level, level.skillLevel, result);
+            RecordProperty(Format("{}", level.id).c_str(), Format("wins {} draws {} losses {}", result.wins, result.draws, result.losses).c_str());
+            EXPECT_EQ(result.wins + result.draws + result.losses, games);
         }
     }
 

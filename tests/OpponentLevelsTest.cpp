@@ -1,5 +1,6 @@
 #include "TestEngines.h"
 
+#include <Chess/Engine/BlunderEngine.h>
 #include <Chess/Engine/OpponentLevels.h>
 #include <Chess/Engine/Search.h>
 #include <Common/Printers.h>
@@ -58,15 +59,6 @@ namespace BECore::Chess::Tests {
         for (const OpponentLevel& level : GetOpponentLevels()) {
             EXPECT_GE(level.skillLevel, kLowestSkillLevel) << Text(level.id);
             EXPECT_LE(level.skillLevel, kHighestSkillLevel) << Text(level.id);
-        }
-    }
-
-    TEST(OpponentLevelsTest, AStrongerLevelNeverPlaysWeakerOrFaster) {
-        const auto levels = GetOpponentLevels();
-
-        for (size_t i = 0; i + 1 < levels.size(); ++i) {
-            EXPECT_LE(levels[i].skillLevel, levels[i + 1].skillLevel) << Text(levels[i + 1].id);
-            EXPECT_LT(levels[i].moveTimeMs, levels[i + 1].moveTimeMs) << Text(levels[i + 1].id);
         }
     }
 

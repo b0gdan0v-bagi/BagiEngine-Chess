@@ -725,7 +725,7 @@ namespace BECore::Chess::Tests {
         ChessGameModel model;
         OpponentController controller(model, SettingsFor(wrapper));
         // Hard and max: neither blunders (the handicap would answer e2e4 with a random move of its own and the fake would not be asked), and their skills differ
-        // (easy and medium share Skill Level 0 now)
+        // (easy and medium have the same Skill Level)
         const size_t hard = LevelIndex(kHardLevelId);
         const size_t max = LevelIndex("max");
         ASSERT_TRUE(controller.Choose(PieceColor::Black, hard).has_value());
@@ -951,10 +951,10 @@ namespace BECore::Chess::Tests {
     TEST_F(OpponentControllerTest, AtMaxTheDefaultFactoryOwnEngineIsThePlainOwnEngineWithNoHandicap) {
         const size_t max = LevelIndex("max");
         ASSERT_EQ(GetOpponentLevels()[max].blunderPercent, 0);
-        const SearchRequest request = [] {
+        const SearchRequest request = [max] {
             ChessGameModel model;
             EXPECT_TRUE(Play(model, "e2e4"));
-            return SearchRequest::FromModel(model, LimitsOf(OpponentEngine::Own, GetOpponentLevels()[LevelIndex("max")]));
+            return SearchRequest::FromModel(model, LimitsOf(OpponentEngine::Own, GetOpponentLevels()[max]));
         }();
         const auto plain = OwnEngine().FindMove(request, CancellationToken::Create());
         ASSERT_TRUE(plain.has_value());

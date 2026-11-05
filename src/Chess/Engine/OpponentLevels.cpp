@@ -1,5 +1,7 @@
 #include "OpponentLevels.h"
 
+#include <Chess/Engine/BlunderEngine.h>
+
 namespace BECore::Chess {
 
     namespace {
