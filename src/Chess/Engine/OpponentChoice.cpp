@@ -71,11 +71,15 @@ namespace BECore::Chess {
         if (!color) {
             return std::unexpected(BadId("color", id));
         }
-        _personColor = *color;
         if (!_opponent.GetPlays()) {
+            _personColor = *color;
             return {};
         }
-        return FromController(_opponent.SetSide(Opposite(*color)));
+        std::expected<void, ChoiceError> picked = FromController(_opponent.SetSide(Opposite(*color)));
+        if (picked) {
+            _personColor = *color;  // a refused pick keeps the color the program's side says
+        }
+        return picked;
     }
 
     std::expected<void, ChoiceError> OpponentChoice::SetEngine(eastl::string_view id) {

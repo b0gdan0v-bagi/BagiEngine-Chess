@@ -14,18 +14,22 @@ namespace BECore::Chess {
      * @brief The seat of the computer opponent: which side the program plays (or none), which engine, at which strength, and the EngineOpponent behind that choice.
      *
      * A game starts with nobody as the opponent: two people on one screen, and nothing is looked up or started. SetSide() picks the side the program plays
-     * (the side of the program, not of the person: the HUD turns it around), asks the engine factory for an engine and makes an EngineOpponent for it; a pick
-     * that finds no engine leaves nobody as the opponent, keeps the error in GetError() and logs one warning, so a missing Stockfish locks no one out. SetLevel()
+     * (the side of the program, not of the person: the HUD turns it around), asks the engine factory for an engine and makes an EngineOpponent for it.
+     *
+     * A pick that finds no engine is REFUSED: the engine is asked for first, and when there is none nothing changes (the side, the level, the engine and the running opponent with
+     * its search stay as they were), the error is kept in GetError(), the revision grows and one warning is logged. An engine that cannot be had cannot be saved, so a missing
+     * Stockfish never switches the program off; and a game that started with nobody stays with two people, so no one is locked out. Choose() is all or nothing. SetLevel()
      * picks the strength, SetEngine() the engine (Stockfish or the own one; a game starts with kDefaultOpponentEngine). A change of side, level or engine destroys the old EngineOpponent first (it
      * cancels its search and returns at once, and a late answer of that search is never played) and makes another, because the side is fixed by the EngineOpponent constructor and the Skill Level
      * option is sent at the handshake. A pick that changes nothing (the same side, level and engine, no error) does nothing.
      *
-     * The engine is part of the choice and nothing else picks it: there is no fallback from one engine to the other. A failed Stockfish pick leaves nobody as the opponent
-     * and the error in GetError(); the person picks the other engine (SetEngine()), which clears the error, and then a side. While nobody plays, SetEngine() only changes the
-     * choice: no factory call, nothing is looked up or started.
+     * The engine is part of the choice and nothing else picks it: there is no fallback from one engine to the other. A refused Stockfish pick keeps the old opponent and
+     * puts the error in GetError(); the person picks the other engine (SetEngine()), which clears the error, and then a side. While nobody plays, SetEngine() only changes the
+     * choice: no factory call, nothing is looked up or started (so it cannot be refused).
      *
      * The error rule: an error belongs to the version of the game it came from (ChessGameModel::GetVersion()). When the version moves (a reset, a position set from
      * outside, a move of someone else) Update() clears the error, the opponent's too, and a new pick clears it as well: the person has acted, so they have seen it.
+     * The program's own move does not take a refused pick's error away (the opponent that kept playing would otherwise erase the sentence before anyone read it).
      * Until then the game waits and no search starts, so a broken engine is one error and not a try per frame. A person who does not want to wait picks nobody.
      *
      * GetRevision() grows whenever something a display shows changes: the side, the level, the engine, an error that appears or goes. It does not grow with a search that
@@ -65,7 +69,7 @@ namespace BECore::Chess {
          * @brief The side the program plays, or nobody (two people).
          *
          * Remakes the opponent and clears the error, as described above. When the program takes the side to move, a half-made move of the person
-         * is dropped (ChessGameModel::ClearSelection()). Returns the engine factory's error when there is no engine: the opponent is then nobody, GetError() has it.
+         * is dropped (ChessGameModel::ClearSelection()). Returns the engine factory's error when there is no engine: the pick is refused and nothing changed, GetError() has the error.
          */
         std::expected<void, EngineError> SetSide(std::optional<PieceColor> computer);
 
@@ -122,8 +126,11 @@ namespace BECore::Chess {
             return _opponent && _opponent->IsThinking();
         }
 
-        /// Why the program does not play: the failed pick, else the failed search of the opponent; empty when nothing is wrong
+        /// Why the program does not play as asked: the refused pick, else the failed search of the opponent; empty when nothing is wrong. A refused pick does not stop a running opponent
         [[nodiscard]] const std::optional<EngineError>& GetError() const noexcept {
+            if (_pickError) {
+                return _pickError;
+            }
             return _opponent ? _opponent->GetLastError() : _pickError;
         }
 
@@ -145,7 +152,7 @@ namespace BECore::Chess {
         OpponentEngine _engine = kDefaultOpponentEngine;
         size_t _level = kDefaultOpponentLevel;        ///< an index of GetOpponentLevels()
         eastl::unique_ptr<EngineOpponent> _opponent;  ///< null: nobody, two people
-        std::optional<EngineError> _pickError;        ///< the factory's failure; the opponent is null while it stands
+        std::optional<EngineError> _pickError;        ///< the factory's failure of the last pick; the old opponent (if any) goes on playing while it stands
         bool _opponentErrorNoted = false;             ///< the error in _opponent has been counted in the revision
         uint64_t _errorVersion = 0;                   ///< GetVersion() of the model when the standing error came
         uint64_t _revision = 0;

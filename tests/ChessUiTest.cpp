@@ -509,6 +509,12 @@ namespace BECore::Chess::Tests {
             return opponent ? *opponent : Json();
         }
 
+        /// One string member of "opponent" of get_state ("plays", "level", "engine"); "<missing>" for null or absent
+        std::string ControlOpponentString(const char* key) const {
+            const auto value = GetJsonString(ControlOpponent(), key);
+            return value ? std::string(value->c_str(), value->size()) : std::string("<missing>");
+        }
+
         /// set_state {"opponent": {"plays": ..}} of the control API: "white", "black" or null for two people
         void ControlPlays(const char* plays) const {
             Json opponent = Json::object();
@@ -2328,105 +2334,152 @@ namespace BECore::Chess::Tests {
         EXPECT_FALSE(PanelControl<UIButton>("ModeComputer").selected);
     }
 
-    TEST_F(ChessUiTest, TheColorAndLevelGroupsAreDisabledWhileTwoPeoplePlayAndTheEngineGroupNever) {
-        // Was TheLevelButtonIsShownOnlyWhileTheProgramPlays (the Level button hidden for two people): the greying of UISegmented::disabled is the rule now
+    TEST_F(ChessUiTest, NoGroupOfThePanelIsGreyedAndALevelAndAColorPickedForTwoPeopleApplyAtComputer) {
+        // Replaces TheColorAndLevelGroupsAreDisabledWhileTwoPeoplePlayAndTheEngineGroupNever (and Was TheLevelButtonIsShownOnlyWhileTheProgramPlays): a greyed group read as a dead
+        // button, so every group takes clicks in every mode and the pick is remembered until Computer is picked
         CountingFactory working({eastl::make_shared<InstantEngine>()});
         Opponent().SetEngineFactory(working.AsFactory());
         _manager->UpdateAll();
-        Draw();  // the first publication
-
-        const auto disabled = [this](const char* group) { return PanelControl<UISegmented>(group).disabled; };
-        EXPECT_FALSE(disabled("ModeGroup"));
-        EXPECT_TRUE(disabled("ColorGroup")) << "two people play: the person's color means nothing yet";
-        EXPECT_FALSE(disabled("EngineGroup")) << "never greyed: the person needs it when the Stockfish pick failed";
-        EXPECT_TRUE(disabled("LevelGroup"));
-
         ASSERT_TRUE(OpenThePanel());
-        Draw();  // a hidden canvas is not drawn, so its segments take the group's state on the first draw once it is shown
-        for (const char* name : {"ColorWhite", "ColorBlack", "LevelEasy", "LevelMedium", "LevelHard", "LevelMax"}) {
-            const UIButton& button = PanelControl<UIButton>(name);
-            EXPECT_TRUE(button.groupDisabled) << name;
-            EXPECT_LT(button.GetCurrentFill().a, 255) << name << " is drawn grey";
-        }
-        for (const char* name : {"ModeTwo", "ModeComputer", "EngineStockfish", "EngineOwn"}) {
-            const UIButton& button = PanelControl<UIButton>(name);
-            EXPECT_FALSE(button.groupDisabled) << name;
-            EXPECT_EQ(button.GetCurrentFill().a, 255) << name;
-        }
+        Draw();
 
-        // A click on a segment of a disabled group changes nothing, and it emits nothing
+        const auto expectNoGreying = [this](const char* state) {
+            SCOPED_TRACE(state);
+            for (const char* group : {"ModeGroup", "ColorGroup", "EngineGroup", "LevelGroup"}) {
+                EXPECT_FALSE(PanelControl<UISegmented>(group).disabled) << group;
+            }
+            for (const char* name : {"ModeTwo", "ModeComputer", "ColorWhite", "ColorBlack", "EngineStockfish", "EngineOwn", "LevelEasy", "LevelMedium", "LevelHard", "LevelMax"}) {
+                const UIButton& button = PanelControl<UIButton>(name);
+                EXPECT_FALSE(button.groupDisabled) << name;
+                EXPECT_EQ(button.GetCurrentFill().a, 255) << name << " is drawn whole";
+            }
+        };
+        expectNoGreying("two people play");
+
+        // Two people play: a level and a color are picked on the drawn panel
         ActionLog log;
         const uint64_t revision = Opponent().GetRevision();
-        EXPECT_TRUE(ClickPanel("ColorBlack").Both()) << "the panel takes the click even on a greyed segment: it does not fall through to the board";
-        EXPECT_TRUE(ClickPanel("LevelHard").Both());
-        EXPECT_EQ(log.Total(), 0u);
-        EXPECT_EQ(Opponent().GetRevision(), revision);
-        EXPECT_EQ(Var("opponentColor"), "white");
-        EXPECT_EQ(Var("opponentLevel"), "medium");
-        EXPECT_EQ(Opponent().GetLevel(), kDefaultOpponentLevel);
+        ASSERT_TRUE(ClickPanel("LevelMax").Both());
+        ASSERT_TRUE(ClickPanel("ColorBlack").Both());
+        Draw();
+        EXPECT_EQ(log.Total(), 2u) << "both clicks emitted their action";
+        EXPECT_GT(Opponent().GetRevision(), revision);
+        EXPECT_TRUE(PanelControl<UIButton>("LevelMax").selected);
+        EXPECT_FALSE(PanelControl<UIButton>("LevelMedium").selected);
+        EXPECT_TRUE(PanelControl<UIButton>("ColorBlack").selected);
+        EXPECT_FALSE(PanelControl<UIButton>("ColorWhite").selected);
+        EXPECT_TRUE(PanelControl<UIButton>("ModeTwo").selected);
+        EXPECT_EQ(Var("opponentLevel"), "max");
+        EXPECT_EQ(Var("opponentColor"), "black");
+        EXPECT_EQ(ShownText(*HudElement("Opponent")), "Two players");
+        EXPECT_EQ(ControlOpponentString("level"), "max") << "get_state of the control API reads the remembered level";
+        EXPECT_EQ(ControlOpponentString("plays"), "<missing>") << "null: nobody plays";
+        EXPECT_EQ(working.Calls(), 0) << "nobody plays: nothing is asked for";
+        expectNoGreying("two people play, a level and a color picked");
 
-        // The engine group works while two people play
-        ASSERT_TRUE(ClickPanel("EngineOwn").Both());
-        EXPECT_EQ(log.Total(), 1u);
-        EXPECT_EQ(Opponent().GetEngine(), OpponentEngine::Own);
-        EXPECT_FALSE(disabled("EngineGroup"));
-
-        // Computer wakes the other two
+        // Computer applies both: the person has Black, so the program plays White at the level that was picked
         ASSERT_TRUE(ClickPanel("ModeComputer").Both());
         Draw();
-        EXPECT_FALSE(disabled("ModeGroup"));
-        EXPECT_FALSE(disabled("ColorGroup"));
-        EXPECT_FALSE(disabled("EngineGroup"));
-        EXPECT_FALSE(disabled("LevelGroup"));
-        EXPECT_FALSE(PanelControl<UIButton>("LevelHard").groupDisabled);
-        EXPECT_EQ(PanelControl<UIButton>("LevelHard").GetCurrentFill().a, 255);
-        ASSERT_TRUE(ClickPanel("LevelHard").Both());
-        EXPECT_EQ(Opponent().GetLevel(), *FindOpponentLevel("hard"));
-        ASSERT_TRUE(ClickPanel("ColorBlack").Both());
+        ASSERT_EQ(working.Calls(), 1);
+        EXPECT_EQ(working.Levels()[0], "max");
         EXPECT_EQ(Opponent().GetPlays(), std::optional<PieceColor>(PieceColor::White));
+        EXPECT_EQ(ControlOpponentString("plays"), "white");
+        EXPECT_EQ(ControlOpponentString("level"), "max");
+        EXPECT_TRUE(PanelControl<UIButton>("LevelMax").selected);
+        EXPECT_TRUE(PanelControl<UIButton>("ColorBlack").selected);
+        EXPECT_EQ(ShownText(*HudElement("Opponent")), "You: Black");
+        expectNoGreying("the program plays");
 
-        // And back to two people: they are greyed again, with the choice still shown
+        // Back to two people: nothing grey, the choice still shown, and the groups still take clicks
         ASSERT_TRUE(ClickPanel("ModeTwo").Both());
         Draw();
-        EXPECT_TRUE(disabled("ColorGroup"));
-        EXPECT_TRUE(disabled("LevelGroup"));
-        EXPECT_FALSE(disabled("EngineGroup"));
-        EXPECT_TRUE(PanelControl<UIButton>("ColorBlack").groupDisabled);
-        EXPECT_TRUE(PanelControl<UIButton>("LevelHard").selected);
+        EXPECT_TRUE(PanelControl<UIButton>("LevelMax").selected);
         EXPECT_TRUE(PanelControl<UIButton>("ColorBlack").selected);
+        expectNoGreying("two people again");
         const size_t total = log.Total();
-        EXPECT_TRUE(ClickPanel("LevelEasy").Both());
-        EXPECT_EQ(log.Total(), total) << "greyed again: no click";
-
-        // A pick that finds no engine leaves nobody, so the two groups stay grey; the engine group stays usable
-        CountingFactory failing(EngineError{EngineErrorKind::LaunchFailed, "no Stockfish in the test"});
-        Opponent().SetEngineFactory(failing.AsFactory());
-        ASSERT_TRUE(ClickPanel("EngineStockfish").Both());
-        ASSERT_TRUE(ClickPanel("ModeComputer").Both());
-        Draw();
-        EXPECT_FALSE(Opponent().GetPlays().has_value());
-        EXPECT_TRUE(disabled("ColorGroup"));
-        EXPECT_TRUE(disabled("LevelGroup"));
-        EXPECT_FALSE(disabled("EngineGroup"));
+        ASSERT_TRUE(ClickPanel("LevelEasy").Both());
+        EXPECT_EQ(log.Total(), total + 1) << "a click in Two players mode is a pick, not a dead button";
+        EXPECT_EQ(Opponent().GetLevel(), *FindOpponentLevel("easy"));
     }
 
-    TEST_F(ChessUiTest, TheDisabledFlagFollowsAnOpponentSetFromOutside) {
-        // The control API picks the program's side without the panel: the groups wake up (and sleep) with the opponent, not with the clicks
+    TEST_F(ChessUiTest, NoGroupOfThePanelIsGreyedWhateverTheControlApiSets) {
+        // Replaces TheDisabledFlagFollowsAnOpponentSetFromOutside: the control API picks the program's side without the panel and the groups stay whole while the choice follows it
         CountingFactory factory({eastl::make_shared<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
+        ASSERT_TRUE(OpenThePanel());  // a hidden canvas is not drawn, so its segments take the choice only once it is shown
         Draw();
-        ASSERT_TRUE(PanelControl<UISegmented>("LevelGroup").disabled);
+
+        const auto wholePanel = [this] {
+            for (const char* group : {"ModeGroup", "ColorGroup", "EngineGroup", "LevelGroup"}) {
+                EXPECT_FALSE(PanelControl<UISegmented>(group).disabled) << group;
+            }
+        };
+        wholePanel();
 
         ControlPlays("black");
         Draw();
-        EXPECT_FALSE(PanelControl<UISegmented>("ColorGroup").disabled);
-        EXPECT_FALSE(PanelControl<UISegmented>("LevelGroup").disabled);
+        wholePanel();
+        EXPECT_EQ(Var("opponentColor"), "white");
+        EXPECT_TRUE(PanelControl<UIButton>("ColorWhite").selected);
+
+        ControlPlays("white");
+        Draw();
+        wholePanel();
+        EXPECT_EQ(Var("opponentColor"), "black");
+        EXPECT_TRUE(PanelControl<UIButton>("ColorBlack").selected);
 
         ControlPlays(nullptr);
         Draw();
-        EXPECT_TRUE(PanelControl<UISegmented>("ColorGroup").disabled);
-        EXPECT_TRUE(PanelControl<UISegmented>("LevelGroup").disabled);
+        wholePanel();
+        EXPECT_TRUE(PanelControl<UIButton>("ModeTwo").selected);
+        EXPECT_TRUE(PanelControl<UIButton>("ColorBlack").selected) << "the person's color is kept when the program leaves";
+    }
+
+    TEST_F(ChessUiTest, ARefusedStockfishPickOnThePanelKeepsComputerTheOwnEngineAndTheLevelAndTheProgramStillAnswers) {
+        // The owner's report: choosing Stockfish switched the mode to Two players. An engine that cannot be had cannot be saved: nothing changes and the error is said
+        eastl::vector<eastl::string> asked;
+        Opponent().SetEngineFactory([&asked](OpponentEngine engine, const OpponentLevel&) -> MadeEngine {
+            const eastl::string_view id = OpponentEngineId(engine);
+            asked.emplace_back(id.data(), id.size());
+            if (engine == OpponentEngine::Stockfish) {
+                return std::unexpected(EngineError{EngineErrorKind::LaunchFailed, "no Stockfish in the test"});
+            }
+            return eastl::make_shared<InstantEngine>();
+        });
+        _manager->UpdateAll();
+        ASSERT_TRUE(OpenThePanel());
+        ASSERT_TRUE(ClickPanel("EngineOwn").Both());
+        ASSERT_TRUE(ClickPanel("LevelHard").Both());
+        ASSERT_TRUE(ClickPanel("ModeComputer").Both());
+        Draw();
+        ASSERT_EQ(Opponent().GetPlays(), std::optional<PieceColor>(PieceColor::Black));
+        ASSERT_EQ(asked.size(), 1u);
+
+        ASSERT_TRUE(ClickPanel("EngineStockfish").Both());
+        Draw();
+
+        ASSERT_EQ(asked.size(), 2u);
+        EXPECT_EQ(asked[1], "stockfish");
+        EXPECT_TRUE(PanelControl<UIButton>("ModeComputer").selected) << "the mode does not move";
+        EXPECT_FALSE(PanelControl<UIButton>("ModeTwo").selected);
+        EXPECT_TRUE(PanelControl<UIButton>("EngineOwn").selected) << "the engine that plays stays picked";
+        EXPECT_FALSE(PanelControl<UIButton>("EngineStockfish").selected);
+        EXPECT_TRUE(PanelControl<UIButton>("LevelHard").selected);
+        EXPECT_TRUE(PanelControl<UIButton>("ColorWhite").selected);
+        EXPECT_EQ(PanelText("OpponentError"), "Engine not found");
+        EXPECT_EQ(Label("Status").GetDisplayText(), "Engine not found");
+        EXPECT_EQ(ShownText(*HudElement("Opponent")), "You: White");
+        EXPECT_EQ(ControlOpponentString("engine"), "own");
+        EXPECT_EQ(ControlOpponentString("plays"), "black");
+
+        ASSERT_TRUE(CloseThePanel());
+        ClickMove("e2", "e4");
+        ASSERT_TRUE(FramesUntil([&] { return Model().GetMoves().size() == 2; })) << "the program that played before still answers";
+        EXPECT_EQ(Model().GetPieceAt(Model().GetMoves()[1].To()).color, PieceColor::Black);
+        EXPECT_EQ(asked.size(), 2u) << "no frame asked again";
+        Draw();
+        EXPECT_EQ(Var("opponentError"), "") << "the move of the person took the sentence away (the controller test pins that the program's own move does not)";
     }
 
     TEST_F(ChessUiTest, TheOpponentButtonSaysWhatTheProgramPlaysAsThePanelChanges) {

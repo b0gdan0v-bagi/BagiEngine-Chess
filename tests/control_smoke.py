@@ -366,11 +366,10 @@ def check_selected(tree: dict, selected: list, unselected: list) -> None:
         check(panel_element(tree, name)["selected"] is False, f"the segment {name} is selected")
 
 
-def check_group_disabled(tree: dict, color_and_level: bool) -> None:
-    """Play as and Level are greyed while two people play; Engine never."""
-    for group in ("ColorGroup", "LevelGroup"):
-        check(panel_element(tree, group)["disabled"] is color_and_level, f"{group} has disabled {panel_element(tree, group)['disabled']}, not {color_and_level}")
-    check(panel_element(tree, "EngineGroup")["disabled"] is False, "the engine group is disabled")
+def check_no_group_disabled(tree: dict) -> None:
+    """No group of the panel is greyed in any mode: a greyed group read as a dead button."""
+    for group in ("ModeGroup", "ColorGroup", "EngineGroup", "LevelGroup"):
+        check(panel_element(tree, group)["disabled"] is False, f"{group} is disabled")
 
 
 def run_opponent_panel_scenario(client: BagiControlClient, headless: bool) -> None:
@@ -393,15 +392,20 @@ def run_opponent_panel_scenario(client: BagiControlClient, headless: bool) -> No
     tree = press_in_the_panel(client, "Opponent", "ChessOpenOpponent", "")
     check(find_ui_canvas(tree, "OpponentPanel")["visible"] is True, "the Opponent button did not open the panel")
     check_selected(tree, ["ModeTwo", "ColorWhite", "EngineStockfish", "LevelMedium"], ["ModeComputer", "ColorBlack", "EngineOwn", "LevelEasy", "LevelHard", "LevelMax"])
-    check_group_disabled(tree, True)
+    check_no_group_disabled(tree)
     check(panel_element(tree, "OpponentError")["text"] == "", f"the error line is not empty: {panel_element(tree, 'OpponentError')}")
 
-    # A press on a greyed segment is taken by the panel and changes nothing
-    clicked = client.call("ui_click", {"name": "ColorBlack"})
-    check(clicked["consumed"], f"the panel did not take the press on a greyed segment: {clicked}")
-    let_frames_pass(client, 2)
-    check_selected(client.call("ui_tree"), ["ColorWhite"], ["ColorBlack"])
-    check(get_opponent(client)["plays"] is None, f"a press on a greyed segment picked a side: {get_opponent(client)}")
+    # Two people play and the Level and Play as groups take clicks all the same: the pick is remembered and read back (it applies when Computer is picked)
+    tree = press_in_the_panel(client, "LevelHard", "ChessSetLevel", "hard")
+    check_selected(tree, ["LevelHard"], ["LevelMedium"])
+    check_no_group_disabled(tree)
+    opponent = get_opponent(client)
+    check(opponent["level"] == "hard" and opponent["plays"] is None, f"a level picked for two people was not read back: {opponent}")
+    tree = press_in_the_panel(client, "ColorBlack", "ChessSetColor", "black")
+    check_selected(tree, ["ColorBlack"], ["ColorWhite"])
+    check(get_opponent(client)["plays"] is None, f"a color picked for two people made the program play: {get_opponent(client)}")
+    tree = press_in_the_panel(client, "ColorWhite", "ChessSetColor", "white")
+    check_selected(tree, ["ColorWhite", "LevelHard"], ["ColorBlack"])
 
     # The engine, then the mode: nothing is asked of Stockfish, the own engine is made when the program is picked
     tree = press_in_the_panel(client, "EngineOwn", "ChessSetEngine", "own")
@@ -410,10 +414,11 @@ def run_opponent_panel_scenario(client: BagiControlClient, headless: bool) -> No
     check(opponent["engine"] == "own" and opponent["plays"] is None and opponent["error"] is None, f"the engine was not read back: {opponent}")
 
     tree = press_in_the_panel(client, "ModeComputer", "ChessSetMode", "computer")
-    check_selected(tree, ["ModeComputer"], ["ModeTwo"])
-    check_group_disabled(tree, False)
+    check_selected(tree, ["ModeComputer", "LevelHard"], ["ModeTwo"])
+    check_no_group_disabled(tree)
     opponent = get_opponent(client)
-    check(opponent["plays"] == "black" and opponent["engine"] == "own" and opponent["error"] is None, f"Computer with White for the person is not read back: {opponent}")
+    check(opponent["plays"] == "black" and opponent["engine"] == "own" and opponent["level"] == "hard" and opponent["error"] is None,
+          f"Computer with White for the person and the level picked before is not read back: {opponent}")
     hud_button = find_ui_element({"canvases": [canvas for canvas in tree["canvases"] if canvas["node"] == "Hud"]}, "Opponent")
     check(hud_button["text"] == "You: White", f"the Opponent button does not say the pick: {hud_button['text']}")
 
@@ -439,11 +444,14 @@ def run_opponent_panel_scenario(client: BagiControlClient, headless: bool) -> No
     hud_button = find_ui_element({"canvases": [canvas for canvas in client.call("ui_tree")["canvases"] if canvas["node"] == "Hud"]}, "Opponent")
     check(hud_button["text"] == "You: Black", f"the Opponent button does not say the pick: {hud_button['text']}")
 
-    # Back to two people: the groups are greyed, the person's color is kept, the program stays out of the game
+    # Back to two people: no group is greyed, the person's color is kept, the program stays out of the game
     tree = press_in_the_panel(client, "ModeTwo", "ChessSetMode", "two")
     check_selected(tree, ["ModeTwo", "ColorBlack", "EngineOwn", "LevelEasy"], ["ModeComputer", "ColorWhite"])
-    check_group_disabled(tree, True)
+    check_no_group_disabled(tree)
     check(get_opponent(client)["plays"] is None, f"two people: the opponent is {get_opponent(client)}")
+    tree = press_in_the_panel(client, "LevelMax", "ChessSetLevel", "max")
+    check_selected(tree, ["LevelMax"], ["LevelEasy"])
+    check(get_opponent(client)["level"] == "max", f"a click on Level with two people was not read back: {get_opponent(client)}")
     moves = get_moves(client)
     let_frames_pass(client, FRAMES_WITHOUT_AN_ANSWER)
     check(get_moves(client) == moves and get_opponent(client)["thinking"] is False, "the program moved with nobody picked")

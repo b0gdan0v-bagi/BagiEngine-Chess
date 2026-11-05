@@ -40,9 +40,9 @@
              (ChessOpenOpponent) and OK hides it (ChessCloseOpponent); while it is shown the dim takes every click, so the board gets none. Four choice groups (UISegmented), a
              caption beside each. A segment emits its action with its id as the value (ChessSetMode / ChessSetColor / ChessSetEngine / ChessSetLevel); ChessBoardComponent applies
              the pick at once and publishes the ids the groups are bound to (opponentMode, opponentColor, opponentEngine, opponentLevel), so the panel stays open and always shows
-             what the game really has. The ids are those of the control API; the color is the PERSON's color (the program plays the other one). ColorGroup and LevelGroup are
-             greyed by the board while two people play (they mean something only when the program plays); EngineGroup never is: the person needs it exactly when the Stockfish
-             pick failed. The groups are named ModeGroup, ColorGroup, EngineGroup and LevelGroup and not Mode, Engine and Level on purpose: elements are found by name in every
+             what the game really has. The ids are those of the control API; the color is the PERSON's color (the program plays the other one). No group is greyed: a color or a level picked
+             while two people play is remembered and applies when Computer is picked, and the engine can be picked at any time (the person needs it exactly when the Stockfish
+             pick was refused). A pick of an engine that cannot be had changes nothing, the error line says why. The groups are named ModeGroup, ColorGroup, EngineGroup and LevelGroup and not Mode, Engine and Level on purpose: elements are found by name in every
              canvas of the scene. OpponentError is the sentence of the engine's error ({opponentError}, empty when there is none). A segment needs an explicit height (a flex
              segment without one gets a rect of height 0). The plate is 16 + 44 (title) + 4 x 56 (rows) + 32 (error) + 56 (OK) + 6 x 12 (spacing) + 16 = 460 units high. The view
              is a fixed 840 x 800, so there is no portrait variant. -->

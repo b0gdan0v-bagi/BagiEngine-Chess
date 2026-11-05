@@ -271,7 +271,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(controller.GetPlays(), std::optional<PieceColor>(PieceColor::Black));
     }
 
-    TEST_F(OpponentChoiceTest, AFailedColorPickWhileTheProgramPlaysKeepsTheColorThePersonPicked) {
+    TEST_F(OpponentChoiceTest, AFailedColorPickWhileTheProgramPlaysIsRefusedAndChangesNothing) {
         ChessGameModel model;
         OpponentController controller(model);
         OpponentChoice choice(controller);
@@ -290,8 +290,10 @@ namespace BECore::Chess::Tests {
 
         ASSERT_FALSE(failed.has_value());
         EXPECT_EQ(failed.error().kind, ChoiceErrorKind::Engine);
-        EXPECT_EQ(choice.Mode(), OpponentMode::Two);
-        EXPECT_EQ(choice.Color(), PieceColor::Black) << "the person asked for Black; the next Computer plays against it";
+        EXPECT_EQ(choice.Mode(), OpponentMode::Computer) << "the old opponent goes on";
+        EXPECT_EQ(choice.Color(), PieceColor::White) << "the color of the refused pick is not remembered";
+        EXPECT_EQ(controller.GetPlays(), std::optional<PieceColor>(PieceColor::Black));
+        EXPECT_TRUE(controller.GetError().has_value());
     }
 
     TEST_F(OpponentChoiceTest, TheColorFollowsTheControllerWhenSomeoneElseSetsTheSideAndIsKeptWhenNobodyPlaysAgain) {

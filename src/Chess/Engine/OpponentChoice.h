@@ -41,8 +41,8 @@ namespace BECore::Chess {
      * - SetEngine() and SetLevel() go to the controller as they are (it remembers both while nobody plays).
      *
      * An id that is not in the table (empty, other case, a prefix, a trailing space) is a ChoiceError of the kind BadId: nothing changes, no engine is asked, the revision of
-     * the controller stays. A refused pick (no Stockfish found) is a ChoiceError of the kind Engine; the controller keeps the error and leaves nobody as the opponent, so
-     * Mode() says Two then, and the remembered color is the one that was picked. Nothing falls back to another engine.
+     * the controller stays. A refused pick (no Stockfish found) is a ChoiceError of the kind Engine; the controller keeps the error and nothing else changes, so
+     * Mode(), Color(), the engine and the level say what they said before the pick. Nothing falls back to another engine.
      *
      * Color() follows the controller: when the program plays, the person's color is the opposite one, whoever set it (the control API's set_state included), and that color is
      * remembered, so a later "nobody" keeps it. It is refreshed whenever Color() is read, so a display that reads it every frame never loses it.

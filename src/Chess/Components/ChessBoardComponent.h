@@ -38,8 +38,8 @@ namespace BECore::Chess {
      * the opponent's error while one stands and the status of the game otherwise. Its buttons emit the actions `ChessReset` (a new game), `ChessOpenOpponent` and `ChessCloseOpponent` (show and hide
      * the modal canvas of the node `OpponentPanel`, the `Opponent` button and the OK button), which this component answers; so are the four actions of the panel's choice groups, `ChessSetMode`,
      * `ChessSetColor`, `ChessSetEngine` and `ChessSetLevel`, whose `value` is an id (OpponentChoice picks it; an id that is in no table is ignored with one warning). `opponentColor` is the PERSON's
-     * color, the opposite of the one the control API's `opponent.plays` names. It greys the groups `ColorGroup` and `LevelGroup` of the panel while two people play (`EngineGroup` never), and reads
-     * the person's color on every refresh so a side set from outside is remembered.
+     * color, the opposite of the one the control API's `opponent.plays` names. No group of the panel is greyed: a color or a level picked while two people play is remembered
+     * and applies when Computer is picked. It reads the person's color on every refresh so a side set from outside is remembered.
      *
      * It is also the frame of the computer opponent: IGame has no per-frame hook, so on every SceneUpdateEvent it runs
      * ChessGame::GetOpponent().Update() (the one place that does; it changes the model, so it cannot be done in OnDraw()). While the program plays the side to move,

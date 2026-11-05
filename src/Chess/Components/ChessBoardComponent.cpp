@@ -5,7 +5,6 @@
 #include <BECore/Scene/Scene.h>
 #include <BECore/Scene/SceneNode.h>
 #include <BECore/UI/UICanvasComponent.h>
-#include <BECore/UI/UISegmented.h>
 #include <Chess/ChessGame.h>
 #include <Chess/Engine/OpponentText.h>
 #include <Chess/Game/StatusText.h>
@@ -33,20 +32,6 @@ namespace BECore::Chess {
                 LOG_INFO("{}, {} wins"_format(status, EnumUtils<PieceColor>::ToString(*winner)));
             } else {
                 LOG_INFO("Game over: {}"_format(status));
-            }
-        }
-
-        // The choice groups of the opponent panel are found by name in every canvas of the scene (the panel is a canvas of its own); a scene without such a group has nothing to grey
-        void SetGroupDisabledIn(SceneNode& node, PoolString group, bool disabled) {
-            if (const auto canvas = node.GetComponent<UICanvasComponent>()) {
-                if (UIElement* element = canvas->GetRoot().FindByName(group)) {
-                    if (UISegmented* segmented = element->Cast<UISegmented>()) {
-                        segmented->disabled = disabled;
-                    }
-                }
-            }
-            for (const auto& child : node.GetChildren()) {
-                SetGroupDisabledIn(*child, group, disabled);
             }
         }
 
@@ -126,14 +111,6 @@ namespace BECore::Chess {
         vars.Set("opponentEngine"_intern, choice.EngineId());
         vars.Set("opponentLevel"_intern, choice.LevelId());
         vars.Set("opponentError"_intern, eastl::string_view(opponentError.data(), opponentError.size()));
-
-        if (opponentChanged) {
-            // The color and the level of the panel mean something only when the program plays; the engine group is never greyed (a failed Stockfish pick leaves nobody, and
-            // the person needs the engine choice then). A scene without such a group has nothing to grey
-            const bool twoPlayers = choice.Mode() == OpponentMode::Two;
-            SetGroupDisabledIn(GetScene().GetRootNode(), "ColorGroup"_intern, twoPlayers);
-            SetGroupDisabledIn(GetScene().GetRootNode(), "LevelGroup"_intern, twoPlayers);
-        }
     }
 
     void ChessBoardComponent::AnswerSetAction(const InputEvents::ActionEvent& event) {

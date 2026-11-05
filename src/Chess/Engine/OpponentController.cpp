@@ -87,7 +87,12 @@ namespace BECore::Chess {
     void OpponentController::Update() {
         DropStaleError();
         if (_opponent) {
+            const uint64_t version = _model.GetVersion();
             _opponent->Update(_model);
+            if (_pickError && _errorVersion == version) {
+                // Only the opponent can have moved the game in the call above, and a refused pick that left it playing must not lose its sentence to the program's own move
+                _errorVersion = _model.GetVersion();
+            }
             NoteOpponentError();
         }
     }
@@ -106,20 +111,29 @@ namespace BECore::Chess {
         if (level >= levels.size()) {
             return std::unexpected(EngineError{EngineErrorKind::BadRequest, Format("there is no level {}, the levels are 0 to {}", level, levels.size() - 1)});
         }
-        if (computer == GetPlays() && level == _level && engine == _engine && !GetError().has_value()) {
+        const bool unchanged = computer == GetPlays() && level == _level && engine == _engine;
+        if (unchanged && !GetError().has_value()) {
+            return {};
+        }
+        if (unchanged && _pickError && !(_opponent && _opponent->GetLastError().has_value())) {
+            // The person picks what already plays and only a refused pick is standing: they have seen it, nothing is remade and the running search stays
+            _pickError.reset();
+            ++_revision;
             return {};
         }
 
-        _opponent.reset();  // cancels the search of the old one and returns at once; its late answer stays with the worker
-        _pickError.reset();
-        _opponentErrorNoted = false;
-        _level = level;
-        _engine = engine;
-        ++_revision;
         if (!computer) {
+            // Nobody needs no engine, so this pick cannot fail
+            _opponent.reset();
+            _pickError.reset();
+            _opponentErrorNoted = false;
+            _level = level;
+            _engine = engine;
+            ++_revision;
             return {};
         }
 
+        // The engine first: a pick that finds none is refused and everything stays as it was, the running opponent and its search included
         const OpponentLevel& chosen = levels[level];
         std::expected<eastl::shared_ptr<IChessEngine>, EngineError> made = MakeEngine(engine, chosen);
         if (made && !*made) {
@@ -129,6 +143,12 @@ namespace BECore::Chess {
             FailPick(std::move(made.error()), *computer, engine, chosen);
             return std::unexpected(*_pickError);
         }
+        _opponent.reset();  // cancels the search of the old one and returns at once; its late answer stays with the worker
+        _pickError.reset();
+        _opponentErrorNoted = false;
+        _level = level;
+        _engine = engine;
+        ++_revision;
         _opponent = eastl::make_unique<EngineOpponent>(std::move(*made), *computer, LimitsOf(engine, chosen));
         if (_model.GetTurn() == *computer) {
             _model.ClearSelection();
@@ -150,10 +170,11 @@ namespace BECore::Chess {
     }
 
     void OpponentController::FailPick(EngineError error, PieceColor computer, OpponentEngine engine, const OpponentLevel& level) {
-        LOG_WARNING("Opponent: no {} engine to play {} at level {}, the game stays with two players, {}: {}"_format(OpponentEngineId(engine), EnumUtils<PieceColor>::ToString(computer), level.id,
-                                                                                                                    EnumUtils<EngineErrorKind>::ToString(error.kind), error.detail));
+        LOG_WARNING("Opponent: no {} engine to play {} at level {}, the pick is refused and the opponent stays as it was, {}: {}"_format(
+            OpponentEngineId(engine), EnumUtils<PieceColor>::ToString(computer), level.id, EnumUtils<EngineErrorKind>::ToString(error.kind), error.detail));
         _pickError = std::move(error);
         _errorVersion = _model.GetVersion();
+        ++_revision;
     }
 
     void OpponentController::DropStaleError() {
