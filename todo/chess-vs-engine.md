@@ -1,5 +1,5 @@
 ---
-status: in progress 2026-11-05 branch todo/chess-vs-engine-3
+status: review 2026-11-05 branch todo/chess-vs-engine-3: weaker levels (a BlunderEngine handicap wrapped around both engines by the default factory: Easy and Medium play a random legal move 40 % / 15 % of the time, Stockfish Skill 0 / 0 / 5 / 20, own depth 1 / 2 / 3 / 5; ids and wire unchanged), unit tests and two disabled yardsticks; ChessTests 677/677 and the smoke test pass, no change in engine/, the real strength is for the owner to tune by playing, slice 3 of about 4, after the merge set the status back to open
 ---
 # Chess: the computer opponent works in the window; no analysis, resign or takeback, and no engine of our own
 
