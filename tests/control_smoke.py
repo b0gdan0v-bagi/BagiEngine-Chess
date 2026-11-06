@@ -339,29 +339,61 @@ def run_own_engine_scenario(client: BagiControlClient, headless: bool) -> None:
         check_the_board_turns_with_the_program(client)
 
 
+# The scene is 840 x 800 units, the board 640 x 640 at y 80..720; the window fits the scene by the smaller scale and centers it
+VIEW_WIDTH, VIEW_HEIGHT = 840, 800
+BOARD_TOP, BOARD_BOTTOM = 80, 720
+BOARD_BAND_INSET = 2  # rows kept away from the edge of the board, against rounding
+
+
+def board_band(image) -> list:
+    """The rows of a screenshot that only the board covers: the HUD sits in the margins above and below it, and its words change with the opponent."""
+    scale = min(image.width / VIEW_WIDTH, image.height / VIEW_HEIGHT)
+    offset = (image.height - VIEW_HEIGHT * scale) / 2
+    first = int(offset + BOARD_TOP * scale) + BOARD_BAND_INSET
+    last = int(offset + BOARD_BOTTOM * scale) - BOARD_BAND_INSET
+    check(0 <= first < last <= image.height, f"the board band {first}..{last} is outside a picture {image.width}x{image.height}")
+    return image.rows[first:last]
+
+
 def check_the_board_turns_with_the_program(client: BagiControlClient) -> None:
     """The picture is drawn from Black's side while the program plays White, and from White's side otherwise.
 
-    The weak, robust check: the same position gives different pictures for the two orientations, and the rotated one is the same picture every time.
-    (Equality with a reference picture of "the white pieces at the bottom" is not asserted: the only way to the same position is a FEN, and the pictures of
-    a position set from outside and of one reached by moves are compared elsewhere.)"""
+    Only the rows of the board are compared (`board_band`): the Opponent button says "You: Black" in one picture and "Two players" in the other, so
+    whole pictures differ without the board turning. The same placement of the pieces is drawn three times: with the program as White (Black to move: the
+    program does not search), with two people (Black to move) and with the program as Black (White to move, the same pieces: the side to move is not
+    drawn on the board). The last two have White at the bottom and must give one board band, which also shows that the band leaves the HUD out; the
+    turned one must differ from them, and drawn again after a round trip it must be the same band. Equality with a reference of "the white pieces at the
+    bottom" proves the turn only as far as the pieces differ between the two orientations, which they do after any opening move."""
     client.call("reset")
     client.call("set_state", {"opponent": {"engine": "own", "plays": "white", "level": "easy"}})
     wait_until_the_program_played(client, lambda moves: len(moves) == 1, "the opening move of White")
     fen = client.call("get_state")["state"]["fen"]  # Black to move: the program, as White, does not search again
+    check(fen.split()[1] == "b", f"Black is not to move after the opening move of White: {fen}")
     let_frames_pass(client, 2)
     rotated = take_screenshot(client)
 
     client.call("set_state", {"opponent": {"plays": None}})
     client.call("set_state", {"fen": fen})
     let_frames_pass(client, 2)
-    upright = take_screenshot(client)
-    check(rotated.rows != upright.rows, "the picture does not change when the program stops playing White: the board is not turned")
+    two_people = take_screenshot(client)
 
-    client.call("set_state", {"opponent": {"plays": "white"}})
-    client.call("set_state", {"fen": fen})
+    # The same pieces with White to move and the program as Black: White stays at the bottom and the program has nothing to answer
+    white_to_move = " ".join(fen.split()[:1] + ["w"] + fen.split()[2:])
+    client.call("set_state", {"fen": white_to_move})  # first the position, so that the program never has a move to find on the way
+    client.call("set_state", {"opponent": {"plays": "black"}})
     let_frames_pass(client, 2)
-    check(take_screenshot(client).rows == rotated.rows, "the board turned again is not the picture it was the first time")
+    program_as_black = take_screenshot(client)
+    check(get_moves(client) == [], f"the program moved with White to move and itself as Black: {get_moves(client)}")
+
+    check(board_band(two_people) == board_band(program_as_black), "the board band changes with the HUD or the side to move, so it cannot tell a turned board")
+    check(board_band(rotated) != board_band(two_people), "the board is not turned while the program plays White: its rows are the ones of the board with White at the bottom")
+    check(board_band(rotated) != board_band(program_as_black), "the board is not turned while the program plays White: its rows are the ones of the board with White at the bottom")
+
+    client.call("set_state", {"opponent": {"plays": None}})
+    client.call("set_state", {"fen": fen})
+    client.call("set_state", {"opponent": {"plays": "white"}})
+    let_frames_pass(client, 2)
+    check(board_band(take_screenshot(client)) == board_band(rotated), "the board turned again is not the picture it was the first time")
     client.call("set_state", {"opponent": {"plays": None}})
 
 
