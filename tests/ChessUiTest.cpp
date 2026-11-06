@@ -6,6 +6,7 @@
 #include <BECore/Reflection/XmlDeserializer.h>
 #include <BECore/Renderer/ViewTransform.h>
 #include <BECore/Scene/Components/SpriteRendererComponent.h>
+#include <BECore/Scene/Components/TransformComponent.h>
 #include <BECore/Scene/Scene.h>
 #include <BECore/Scene/SceneManager.h>
 #include <BECore/Scene/SceneNode.h>
@@ -595,6 +596,48 @@ namespace BECore::Chess::Tests {
             CoreManager::GetUIInput().DispatchMouseButtonDown(Button(at.first, at.second, true));
         }
 
+        /// A press of the mouse on the middle of a cell of the drawn board, named by its place on the screen and not by its square
+        void ClickCell(int column, int rowFromTop) {
+            Draw();
+            const Rect cell = CellRect(column, rowFromTop);
+            CoreManager::GetUIInput().DispatchMouseButtonDown(Button(cell.x + cell.w * 0.5f, cell.y + cell.h * 0.5f, true));
+        }
+
+        /// Where the transform of a piece node is, in view units: the cell the piece is drawn in (ChessPieceComponent writes it in an update)
+        std::pair<float, float> PieceOrigin(const char* nodeName) const {
+            for (const auto& node : GetScene().GetRootNode().GetChildren()) {
+                if (node->GetName() == PoolString::Intern(nodeName)) {
+                    const auto transform = node->GetComponent<TransformComponent>();
+                    EXPECT_TRUE(transform) << nodeName;
+                    return transform ? std::pair<float, float>{transform->_x, transform->_y} : std::pair<float, float>{};
+                }
+            }
+            ADD_FAILURE() << "no piece node " << nodeName;
+            return {};
+        }
+
+        /// Every piece node that stands on a square is at the cell that square has in the orientation asked for (after an update)
+        void ExpectPiecesAtTheCellsOf(bool blackAtTheBottom) const {
+            size_t checked = 0;
+            for (const auto& node : GetScene().GetRootNode().GetChildren()) {
+                const auto piece = node->GetComponent<ChessPieceComponent>();
+                const auto transform = node->GetComponent<TransformComponent>();
+                if (!piece || !transform) {
+                    continue;
+                }
+                const Square square = Model().GetSquareOf(piece.Get());
+                if (!square.IsInside()) {
+                    continue;
+                }
+                const auto [column, row] = CellOfSquare(square, blackAtTheBottom);
+                const auto [x, y] = CellOrigin(column, row);
+                EXPECT_NEAR(transform->_x, x, kPixelTolerance) << node->GetName().CStr();
+                EXPECT_NEAR(transform->_y, y, kPixelTolerance) << node->GetName().CStr();
+                ++checked;
+            }
+            EXPECT_GT(checked, 0u);
+        }
+
         /// A move of the person: a click on the piece, a click on the target
         void ClickMove(const char* from, const char* to) {
             Click(from);
@@ -781,11 +824,33 @@ namespace BECore::Chess::Tests {
             Draw();
         }
 
-        /// A square of the board in output pixels, for the fit of the view into the current output
-        Rect SquareRect(const char* square) const {
-            const Square s = Sq(square);
+        /// The color at the bottom of the board as the opponent says it: Black exactly when the program plays White (taken from the controller, as the board does)
+        bool BlackIsAtTheBottom() const {
+            const OpponentController* opponent = ChessGame::GetActiveOpponent();
+            return opponent != nullptr && opponent->GetPlays() == std::optional<PieceColor>(PieceColor::White);
+        }
+
+        /// The top left corner of a cell of the board in view units: @p column from the left, @p rowFromTop from the top
+        static std::pair<float, float> CellOrigin(int column, int rowFromTop) {
+            return {100.0f + static_cast<float>(column) * 80.0f, kBoardTop + static_cast<float>(rowFromTop) * 80.0f};
+        }
+
+        /// The cell a square is drawn in, written out here and not taken from BoardOrientation.h: White at the bottom has a1 at the bottom left, Black at the bottom has the grid turned by 180 degrees
+        static std::pair<int, int> CellOfSquare(const Square& s, bool blackAtTheBottom) {
+            return blackAtTheBottom ? std::pair<int, int>{7 - s.file, s.rank} : std::pair<int, int>{s.file, 7 - s.rank};
+        }
+
+        /// A cell of the board in output pixels, for the fit of the view into the current output
+        Rect CellRect(int column, int rowFromTop) const {
             const ViewTransform fit = ViewTransform::Fit(kViewWidth, kViewHeight, _renderer->width, _renderer->height);
-            return fit.ToOutput(100.0f + static_cast<float>(s.file) * 80.0f, kBoardTop + static_cast<float>(7 - s.rank) * 80.0f, 80.0f, 80.0f);
+            const auto [x, y] = CellOrigin(column, rowFromTop);
+            return fit.ToOutput(x, y, 80.0f, 80.0f);
+        }
+
+        /// A square of the board in output pixels, for the fit of the view into the current output and the orientation the opponent gives
+        Rect SquareRect(const char* square) const {
+            const auto [column, row] = CellOfSquare(Sq(square), BlackIsAtTheBottom());
+            return CellRect(column, row);
         }
 
         /// The middle of a square of the board in output pixels
@@ -1297,6 +1362,360 @@ namespace BECore::Chess::Tests {
             EXPECT_TRUE(SameRect(check[0]->rect, SquareRect("e8")));
             EXPECT_TRUE(IsCenteredIn(king->rect, check[0]->rect));
             EXPECT_NEAR(king->rect.w / king->rect.h, kCellWidth / kCellHeight, 1e-4f) << "not stretched to the highlight";
+        }
+    }
+
+    // ---- the orientation of the board ---------------------------------------------------------------------------------------------
+    // The board is drawn from Black's side exactly when the program plays White. The expected cells are written out in the fixture (CellOfSquare), not taken from BoardOrientation.h,
+    // and the clicks go through the real mouse path
+
+    namespace {
+
+        const Color kLightSquareColor{240, 217, 181, 255};  // the squares of the board (ChessBoardComponent.cpp)
+        const Color kDarkSquareColor{181, 136, 99, 255};
+        const Color kBoardDimColor{0, 0, 0, 140};  // the dim of the result (ChessResultComponent.cpp)
+
+        constexpr const char* kBlackToMoveAfterE4 = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1";
+        constexpr const char* kFourRooks = "r3k2r/8/8/8/8/8/4K3/r6r b - - 0 1";  // Black to move, a rook in each corner of the board
+        constexpr const char* kBlackInCheck = "4k3/8/8/8/8/8/8/4RK2 b - - 0 1";
+        constexpr const char* kBlackPromotesOnE1 = "7k/8/8/8/8/8/4p3/K7 b - - 0 1";
+        constexpr const char* kBlackMatesOnA1 = "r5k1/8/8/8/8/8/5PPP/6K1 b - - 0 1";  // Ra1 is mate
+
+    }  // namespace
+
+    TEST_F(ChessUiTest, WithTheProgramAsWhiteTheBoardAndThePiecesAreTurnedBy180Degrees) {
+        CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (std::pair<float, float>{100.0f, 640.0f})) << "two people: a1 at the bottom left";
+
+        ControlPlays("white");
+        _manager->UpdateAll();
+        ASSERT_TRUE(BlackIsAtTheBottom());
+
+        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (std::pair<float, float>{660.0f, 80.0f})) << "a1 at the top right";
+        EXPECT_EQ(PieceOrigin("WhiteRook_h1"), (std::pair<float, float>{100.0f, 80.0f})) << "h1 at the top left";
+        EXPECT_EQ(PieceOrigin("BlackRook_a8"), (std::pair<float, float>{660.0f, 640.0f})) << "a8 at the bottom right";
+        ExpectPiecesAtTheCellsOf(true);
+
+        // The squares of the board: the cell of a1 is the one of h8 in the other orientation, with the color of a1 (dark) in both
+        Draw();
+        const Rect a1 = SquareRect("a1");
+        const Rect h8 = SquareRect("h8");
+        EXPECT_GT(a1.x, h8.x);
+        EXPECT_LT(a1.y, h8.y);
+        const auto fillOf = [this](const Rect& cell) -> std::optional<Color> {
+            for (const DrawCall& call : _renderer->calls) {
+                if (call.kind == DrawKind::Rect && SameRect(call.rect, cell)) {
+                    return call.color;
+                }
+            }
+            return std::nullopt;
+        };
+        ASSERT_TRUE(fillOf(a1).has_value());
+        EXPECT_TRUE(SameColor(*fillOf(a1), kDarkSquareColor)) << "a1 is a dark square wherever it is drawn";
+        ASSERT_TRUE(fillOf(h8).has_value());
+        EXPECT_TRUE(SameColor(*fillOf(h8), kDarkSquareColor)) << "and so is h8";
+        ASSERT_TRUE(fillOf(SquareRect("h1")).has_value());
+        EXPECT_TRUE(SameColor(*fillOf(SquareRect("h1")), kLightSquareColor));
+    }
+
+    TEST_F(ChessUiTest, AClickOnTheDrawnSquareSelectsThatSquareInTheTurnedBoard) {
+        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        ControlPlays("white");
+        StartFrom(kBlackToMoveAfterE4);
+        ASSERT_TRUE(BlackIsAtTheBottom());
+        ASSERT_EQ(Model().GetTurn(), PieceColor::Black);
+
+        // e7 is the fifth file from the right and the second row from the bottom
+        const Rect e7 = SquareRect("e7");
+        EXPECT_TRUE(SameRect(e7, CellRect(3, 6)));
+        Click("e7");
+
+        ASSERT_TRUE(Model().HasSelection());
+        EXPECT_EQ(Model().GetSelected(), Sq("e7"));
+        ASSERT_EQ(Model().GetLegalMoves().size(), 2u);
+        Draw();
+        const auto selected = RectCalls(kSelectedColor);
+        ASSERT_EQ(selected.size(), 1u);
+        EXPECT_TRUE(SameRect(selected[0]->rect, CellRect(3, 6)));
+        const auto moves = RectCalls(kLegalMoveColor);
+        ASSERT_EQ(moves.size(), 2u);
+        for (const char* target : {"e6", "e5"}) {
+            const Rect square = SquareRect(target);
+            EXPECT_TRUE(std::any_of(moves.begin(), moves.end(), [&](const DrawCall* call) { return SameRect(call->rect, square); })) << target;
+        }
+        EXPECT_TRUE(SameRect(SquareRect("e6"), CellRect(3, 5)));
+        EXPECT_TRUE(SameRect(SquareRect("e5"), CellRect(3, 4)));
+
+        // The cell where e2 stands on a board with White at the bottom (fifth column, second row from the bottom) is d7 here, not e2
+        Model().ClearSelection();
+        ClickCell(4, 6);
+        ASSERT_TRUE(Model().HasSelection());
+        EXPECT_EQ(Model().GetSelected(), Sq("d7"));
+
+        // e2 itself is drawn near the top, and a white pawn is not the person's to pick
+        Model().ClearSelection();
+        Click("e2");
+        EXPECT_FALSE(Model().HasSelection());
+    }
+
+    TEST_F(ChessUiTest, APersonsMoveByClicksInTheTurnedBoardIsPlayed) {
+        CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        ControlPlays("white");
+        StartFrom(kBlackToMoveAfterE4);
+
+        ClickMove("e7", "e5");
+
+        ASSERT_FALSE(Model().GetMoves().empty());
+        EXPECT_EQ(Model().GetMoves().back().ToUci(), "e7e5");
+        EXPECT_EQ(Model().GetPieceAt(Sq("e5")).type, PieceType::Pawn);
+        EXPECT_EQ(Model().GetPieceAt(Sq("e5")).color, PieceColor::Black);
+        _manager->UpdateAll();
+        ExpectPiecesAtTheCellsOf(true);
+    }
+
+    TEST_F(ChessUiTest, TheFourCornersOfTheTurnedBoardAreTheSquaresTheyShow) {
+        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        ControlPlays("white");
+        StartFrom(kFourRooks);
+        ASSERT_EQ(Model().GetTurn(), PieceColor::Black);
+
+        // The corners by their place on the screen: the clicks go through the mouse path, a rook of Black stands on each
+        const struct {
+            int column;
+            int row;
+            const char* square;
+        } corners[] = {{7, 0, "a1"}, {0, 0, "h1"}, {7, 7, "a8"}, {0, 7, "h8"}};
+        for (const auto& corner : corners) {
+            SCOPED_TRACE(corner.square);
+            Model().ClearSelection();
+            ClickCell(corner.column, corner.row);
+            ASSERT_TRUE(Model().HasSelection());
+            EXPECT_EQ(Model().GetSelected(), Sq(corner.square));
+            EXPECT_TRUE(SameRect(SquareRect(corner.square), CellRect(corner.column, corner.row)));
+        }
+    }
+
+    TEST_F(ChessUiTest, TheCheckSitsOnTheKingsTurnedCell) {
+        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        ControlPlays("white");
+        StartFrom(kBlackInCheck);
+        ASSERT_TRUE(Model().IsInCheck());
+
+        Draw();
+        const auto check = RectCalls(kCheckColor);
+        ASSERT_EQ(check.size(), 1u);
+        EXPECT_TRUE(SameRect(check[0]->rect, CellRect(3, 7))) << "e8: the fifth file from the right, the bottom row";
+        EXPECT_TRUE(SameRect(check[0]->rect, SquareRect("e8")));
+    }
+
+    TEST_F(ChessUiTest, APromotionInTheTurnedBoardAsksInAPlateThatDoesNotMove) {
+        const auto plateOf = [this]() -> std::optional<Rect> {
+            Draw();
+            const auto plate = RectCalls(kPromotionPlateColor);
+            return plate.empty() ? std::nullopt : std::optional<Rect>(plate.front()->rect);
+        };
+
+        // Two people: the plate as it is drawn with White at the bottom
+        StartFrom(kBlackPromotesOnE1);
+        ClickMove("e2", "e1");
+        ASSERT_TRUE(PromotionShown());
+        const auto plain = plateOf();
+        ASSERT_TRUE(plain.has_value());
+        Press("ChessCancelPromotion");
+        _manager->UpdateAll();
+        ASSERT_FALSE(PromotionShown());
+
+        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        ControlPlays("white");
+        StartFrom(kBlackPromotesOnE1);
+        ASSERT_TRUE(BlackIsAtTheBottom());
+        EXPECT_TRUE(SameRect(SquareRect("e1"), CellRect(3, 0))) << "e1 is on the top row, the pawn goes towards it";
+
+        Click("e2");
+        Click("e1");
+
+        EXPECT_TRUE(Model().HasPendingPromotion());
+        EXPECT_TRUE(PromotionShown());
+        EXPECT_TRUE(Model().GetMoves().empty()) << "nothing has moved";
+        const auto turned = plateOf();
+        ASSERT_TRUE(turned.has_value());
+        EXPECT_TRUE(SameRect(*turned, *plain)) << "the plate is fixed on the screen";
+
+        ClickPromotion("PromoteQueen");
+        ASSERT_EQ(Model().GetMoves().size(), 1u);
+        EXPECT_EQ(Model().GetMoves().back().ToUci(), "e2e1q");
+    }
+
+    TEST_F(ChessUiTest, TheDimAndTheResultBarCoverTheTurnedBoardTheSame) {
+        const auto dimOf = [this]() -> std::optional<Rect> {
+            Draw();
+            const auto dim = RectCalls(kBoardDimColor);
+            return dim.empty() ? std::nullopt : std::optional<Rect>(dim.front()->rect);
+        };
+
+        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        ControlPlays("white");
+        StartFrom(kBlackMatesOnA1);
+        ASSERT_TRUE(BlackIsAtTheBottom());
+
+        ClickMove("a8", "a1");
+
+        ASSERT_TRUE(Model().IsGameOver());
+        EXPECT_EQ(Model().GetWinner(), std::optional<PieceColor>(PieceColor::Black));
+        const auto dim = dimOf();
+        ASSERT_TRUE(dim.has_value());
+        const ViewTransform fit = ViewTransform::Fit(kViewWidth, kViewHeight, _renderer->width, _renderer->height);
+        EXPECT_TRUE(SameRect(*dim, fit.ToOutput(100.0f, kBoardTop, 640.0f, 640.0f))) << "the whole board, as with White at the bottom";
+        EXPECT_FALSE(RectCalls(Color{25, 25, 25, 245}).empty()) << "the bar of the winner";
+    }
+
+    TEST_F(ChessUiTest, TheBoardTurnsBackWhenNobodyOrBlackIsTheProgram) {
+        CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        ExpectPiecesAtTheCellsOf(false);
+
+        ControlPlays("white");
+        _manager->UpdateAll();
+        ExpectPiecesAtTheCellsOf(true);
+        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (std::pair<float, float>{660.0f, 80.0f}));
+
+        ControlPlays(nullptr);
+        _manager->UpdateAll();
+        ExpectPiecesAtTheCellsOf(false);
+        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (std::pair<float, float>{100.0f, 640.0f})) << "nobody plays: White at the bottom again";
+
+        ControlPlays("black");
+        _manager->UpdateAll();
+        ExpectPiecesAtTheCellsOf(false);
+        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (std::pair<float, float>{100.0f, 640.0f})) << "the program plays Black: the person has White at the bottom";
+        EXPECT_FALSE(BlackIsAtTheBottom());
+    }
+
+    TEST_F(ChessUiTest, TheColorSegmentsAndTheModeTurnTheBoardAtTheNextFrame) {
+        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+
+        PressWith("ChessSetMode", "computer");  // the person has White, the program plays Black
+        _manager->UpdateAll();
+        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (std::pair<float, float>{100.0f, 640.0f})) << "a1 at the bottom left";
+
+        PressWith("ChessSetColor", "black");
+        _manager->UpdateAll();
+        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (std::pair<float, float>{660.0f, 80.0f})) << "the person has Black: the board is turned";
+        ASSERT_TRUE(FramesUntil([&] { return Model().GetMoves().size() == 1; })) << "and the program, now White, opens";
+        _manager->UpdateAll();  // the pieces follow the move of this frame in the next one
+        ExpectPiecesAtTheCellsOf(true);
+
+        PressWith("ChessSetColor", "white");
+        _manager->UpdateAll();
+        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (std::pair<float, float>{100.0f, 640.0f})) << "the person has White again";
+    }
+
+    TEST_F(ChessUiTest, ABlackPickedWhileTwoPlayDoesNotTurnTheBoardUntilComputerIsPicked) {
+        CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+
+        PressWith("ChessSetColor", "black");
+        _manager->UpdateAll();
+        EXPECT_EQ(Var("opponentColor"), "black");
+        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (std::pair<float, float>{100.0f, 640.0f})) << "nobody plays yet: nothing turns";
+
+        PressWith("ChessSetMode", "computer");
+        _manager->UpdateAll();
+        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (std::pair<float, float>{660.0f, 80.0f})) << "now the program plays White";
+
+        PressWith("ChessSetMode", "two");
+        _manager->UpdateAll();
+        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (std::pair<float, float>{100.0f, 640.0f})) << "two people: White at the bottom";
+        EXPECT_EQ(Var("opponentColor"), "black") << "the color stays remembered";
+    }
+
+    TEST_F(ChessUiTest, ARefusedPickLeavesTheOrientationAsItWas) {
+        eastl::vector<eastl::string> asked;
+        Opponent().SetEngineFactory([&asked](OpponentEngine engine, const OpponentLevel&) -> MadeEngine {
+            const eastl::string_view id = OpponentEngineId(engine);
+            asked.emplace_back(id.data(), id.size());
+            if (engine == OpponentEngine::Stockfish) {
+                return std::unexpected(EngineError{EngineErrorKind::LaunchFailed, "no Stockfish in the test"});
+            }
+            return eastl::make_shared<GatedEngine>(true);
+        });
+        _manager->UpdateAll();
+
+        // Computer with a Stockfish that is not there changes nothing, a color picked before it included
+        PressWith("ChessSetColor", "black");
+        PressWith("ChessSetMode", "computer");
+        _manager->UpdateAll();
+        ASSERT_EQ(asked.size(), 1u);
+        EXPECT_EQ(Var("opponentMode"), "two") << "the pick was refused";
+        EXPECT_FALSE(BlackIsAtTheBottom());
+        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (std::pair<float, float>{100.0f, 640.0f}));
+
+        // The way on is the own engine; the board turns with Computer. A refused Stockfish pick afterwards leaves it turned
+        PressWith("ChessSetEngine", "own");
+        PressWith("ChessSetMode", "computer");
+        _manager->UpdateAll();
+        ASSERT_TRUE(BlackIsAtTheBottom());
+        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (std::pair<float, float>{660.0f, 80.0f}));
+        PressWith("ChessSetEngine", "stockfish");
+        _manager->UpdateAll();
+        EXPECT_EQ(Var("opponentEngine"), "own") << "refused";
+        EXPECT_TRUE(BlackIsAtTheBottom());
+        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (std::pair<float, float>{660.0f, 80.0f}));
+    }
+
+    TEST_F(ChessUiTest, ResetAndSetStateKeepTheTurnedBoardAndDealThePiecesToItsCells) {
+        CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        ControlPlays("white");
+        _manager->UpdateAll();
+        ASSERT_TRUE(BlackIsAtTheBottom());
+
+        Press("ChessReset");
+        _manager->UpdateAll();
+        ASSERT_TRUE(BlackIsAtTheBottom()) << "a reset keeps the opponent, so the orientation";
+        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (std::pair<float, float>{660.0f, 80.0f}));
+        ExpectPiecesAtTheCellsOf(true);
+
+        Model().Reset();
+        _manager->UpdateAll();
+        ExpectPiecesAtTheCellsOf(true);
+
+        Json request = Json::object();
+        request["fen"] = kBlackToMoveAfterE4;
+        const auto result = ChessGame::GetActive()->AsControllable()->SetState(request);
+        ASSERT_TRUE(result.has_value());
+        _manager->UpdateAll();
+        EXPECT_TRUE(BlackIsAtTheBottom());
+        ExpectPiecesAtTheCellsOf(true);
+    }
+
+    TEST_F(ChessUiTest, TheStateOfTheControlApiIsTheSameWhateverSideIsAtTheBottom) {
+        CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        ControlPlays("white");
+        _manager->UpdateAll();
+        ASSERT_TRUE(BlackIsAtTheBottom());
+
+        const auto state = ChessGame::GetActive()->AsControllable()->GetState();
+        ASSERT_TRUE(state.has_value());
+        const Json* board = FindJsonMember(*state, "board");
+        ASSERT_NE(board, nullptr);
+        ASSERT_EQ(board->size(), 8u);
+        const char* const expected[] = {"rnbqkbnr", "pppppppp", "........", "........", "........", "........", "PPPPPPPP", "RNBQKBNR"};
+        for (size_t row = 0; row < board->size(); ++row) {
+            EXPECT_EQ((*board)[row].get_ref<const std::string&>(), expected[row]) << "row " << row << ": rank 8 first, white upper case";
         }
     }
 

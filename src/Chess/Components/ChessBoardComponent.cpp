@@ -7,6 +7,7 @@
 #include <BECore/UI/UICanvasComponent.h>
 #include <Chess/ChessGame.h>
 #include <Chess/Engine/OpponentText.h>
+#include <Chess/Game/BoardOrientation.h>
 #include <Chess/Game/PromotionChoices.h>
 #include <Chess/Game/StatusText.h>
 #include <CoreSDL/SDLEvents.h>
@@ -196,10 +197,16 @@ namespace BECore::Chess {
         AnswerSetAction(event);
     }
 
+    PieceColor ChessBoardComponent::GetBottomColor() const {
+        const OpponentController* opponent = ChessGame::GetActiveOpponent();
+        return BottomColor(opponent ? opponent->GetPlays() : std::nullopt);
+    }
+
     void ChessBoardComponent::SquareToPixel(int file, int rank, float& outX, float& outY) const {
-        // rank 0 (White's back rank) is drawn at the bottom of the board.
-        outX = _originX + static_cast<float>(file) * _squareSize;
-        outY = _originY + static_cast<float>(7 - rank) * _squareSize;
+        // The cell comes from BoardOrientation.h: White's back rank is at the bottom unless the program plays White.
+        const BoardCell cell = CellOf(Square{static_cast<int8_t>(file), static_cast<int8_t>(rank)}, GetBottomColor());
+        outX = _originX + static_cast<float>(cell.column) * _squareSize;
+        outY = _originY + static_cast<float>(cell.rowFromTop) * _squareSize;
     }
 
     void ChessBoardComponent::OnDraw() {
@@ -259,10 +266,8 @@ namespace BECore::Chess {
             return;
         }
 
-        const int file = static_cast<int>(localX / _squareSize);
-        const int rankFromTop = static_cast<int>(localY / _squareSize);
-        const int rank = 7 - rankFromTop;
-        if (!Square::IsInside(file, rank)) {
+        const std::optional<Square> clicked = SquareAt(static_cast<int>(localX / _squareSize), static_cast<int>(localY / _squareSize), GetBottomColor());
+        if (!clicked) {
             return;
         }
 
@@ -278,7 +283,7 @@ namespace BECore::Chess {
             return;
         }
 
-        if (model->OnSquareClicked(Square{static_cast<int8_t>(file), static_cast<int8_t>(rank)})) {
+        if (model->OnSquareClicked(*clicked)) {
             LogResultOnce(*model);
         }
         // The click may have left a promotion pending (the panel asks for the piece) or dropped one

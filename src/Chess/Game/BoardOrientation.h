@@ -4,6 +4,9 @@
 
 namespace BECore::Chess {
 
+    /// The last index of a file, of a rank, of a column and of a row: the board is 8 x 8
+    constexpr int kLastIndex = 7;
+
     /// A cell of the drawn 8x8 grid: the column from the left and the row from the top, 0..7 each
     struct BoardCell {
         int column = 0;
@@ -21,9 +24,9 @@ namespace BECore::Chess {
     /// Black at the bottom: the same grid turned by 180 degrees, a1 at the top right, h8 at the bottom left
     [[nodiscard]] constexpr BoardCell CellOf(Square square, PieceColor bottom) noexcept {
         if (bottom == PieceColor::White) {
-            return BoardCell{square.file, 7 - square.rank};
+            return BoardCell{square.file, kLastIndex - square.rank};
         }
-        return BoardCell{7 - square.file, square.rank};
+        return BoardCell{kLastIndex - square.file, square.rank};
     }
 
     /// The square drawn in a cell (the inverse of `CellOf`), or nothing for a cell outside the board
@@ -32,9 +35,14 @@ namespace BECore::Chess {
             return std::nullopt;
         }
         if (bottom == PieceColor::White) {
-            return Square{static_cast<int8_t>(column), static_cast<int8_t>(7 - rowFromTop)};
+            return Square{static_cast<int8_t>(column), static_cast<int8_t>(kLastIndex - rowFromTop)};
         }
-        return Square{static_cast<int8_t>(7 - column), static_cast<int8_t>(rowFromTop)};
+        return Square{static_cast<int8_t>(kLastIndex - column), static_cast<int8_t>(rowFromTop)};
     }
+
+    static_assert(CellOf(Square{0, 0}, PieceColor::White).rowFromTop == kLastIndex);
+    static_assert(CellOf(Square{0, 0}, PieceColor::Black).column == kLastIndex);
+    static_assert(!SquareAt(8, 0, PieceColor::White).has_value());
+    static_assert(SquareAt(7, 0, PieceColor::Black)->file == 0);
 
 }  // namespace BECore::Chess

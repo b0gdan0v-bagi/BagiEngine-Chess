@@ -43,7 +43,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(BoardOrientationTest, TheBlackLayoutIsTheWhiteOneTurnedBy180Degrees) {
-        for (int index = 0; index < 64; ++index) {
+        for (int index = 0; index < kSquareCount; ++index) {
             const Square square = Square::FromIndex(index);
             const BoardCell white = CellOf(square, kWhite);
             const BoardCell black = CellOf(square, kBlack);
@@ -54,8 +54,9 @@ namespace BECore::Chess::Tests {
 
     TEST(BoardOrientationTest, SquareAtInvertsCellOfAndEveryCellIsHitOnce) {
         for (const PieceColor bottom : {kWhite, kBlack}) {
-            std::set<int> hit;
-            for (int index = 0; index < 64; ++index) {
+            eastl::array<bool, kSquareCount> hit{};
+            int hitCount = 0;
+            for (int index = 0; index < kSquareCount; ++index) {
                 const Square square = Square::FromIndex(index);
                 const BoardCell cell = CellOf(square, bottom);
                 EXPECT_TRUE(Square::IsInside(cell.column, cell.rowFromTop)) << index;
@@ -67,10 +68,13 @@ namespace BECore::Chess::Tests {
                 for (int column = 0; column < 8; ++column) {
                     const auto square = SquareAt(column, row, bottom);
                     ASSERT_TRUE(square.has_value());
-                    hit.insert(square->Index());
+                    if (!hit[square->Index()]) {
+                        hit[square->Index()] = true;
+                        ++hitCount;
+                    }
                 }
             }
-            EXPECT_EQ(hit.size(), 64u);
+            EXPECT_EQ(hitCount, kSquareCount);
         }
     }
 
