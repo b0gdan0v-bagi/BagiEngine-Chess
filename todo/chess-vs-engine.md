@@ -1,3 +1,6 @@
+---
+status: in progress 2026-11-06 branch todo/chess-vs-engine-5
+---
 # Chess: the computer opponent works in the window; no analysis, resign or takeback, and no engine of our own
 
 **Where:** `src/Chess/Game/ChessGameModel.h` (`OnSquareClicked` is the path of a person, `TryMove` the path of anything else; the model has no notion of a side played by a program), `src/Chess/Components/` (the board, the pieces and the result bar), `src/Chess/Game/Position.h` (`DoMove` / `UndoMove` exist), `src/Chess/Engine/` (the opponent core, see item 2: `ChessGame` owns the controller of it), `tools/stockfish_bridge.py` (the only way a whole game is played against Stockfish today), `engine/src/Modules/TaskSystem/` (a search runs off the main thread).
