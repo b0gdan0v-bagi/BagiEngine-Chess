@@ -2065,8 +2065,8 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(Var("status"), "");
     }
 
-    TEST_F(ChessUiTest, TheSideVariableOfTheOldOpponentButtonIsNoLongerPublished) {
-        // The Menu button says a fixed word, so nothing reads `side` any more and the board does not set it, at the start or after a pick
+    TEST_F(ChessUiTest, TheBoardDoesNotPublishASideVariable) {
+        // The board publishes no variable named `side`, at the start or after a pick
         Draw();
         EXPECT_TRUE(CoreManager::GetUIVars().Has(PoolString::Intern("opponentMode"))) << "the board publishes its variables: the check below is not about a missing frame";
         EXPECT_FALSE(CoreManager::GetUIVars().Has(PoolString::Intern("side")));
