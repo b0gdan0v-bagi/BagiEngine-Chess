@@ -1,5 +1,5 @@
 ---
-status: in progress 2026-11-06 branch todo/chess-vs-engine-5
+status: review 2026-11-06 branch todo/chess-vs-engine-5: the board turns for a person who plays Black (Black at the bottom exactly when the program plays White, read live, drawing and clicks through the pure BoardOrientation.h; the model, get_state and the panels are untouched), unit, UI and smoke tests (the smoke compares the board band of screenshots and was shown to fail without the turn); ChessTests 696/696 and the smoke test pass, no change in engine/, the look in a window is for the owner, slice 4 of about 5, after the merge set the status back to open
 ---
 # Chess: the computer opponent works in the window; no analysis, resign or takeback, and no engine of our own
 
