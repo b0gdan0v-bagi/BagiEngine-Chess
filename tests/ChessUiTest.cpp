@@ -48,7 +48,7 @@ namespace BECore::Chess::Tests {
         constexpr float kBoardTop = 80.0f;      // in view units
         constexpr float kBoardBottom = 720.0f;  // 80 + 8 * 80
         const Color kResetColor{40, 90, 60, 255};
-        const Color kOpponentColor{45, 75, 120, 255};       // the fills of the buttons of the HUD (SceneConfig.xml): a color each, so a test can tell where each one is drawn
+        const Color kMenuColor{45, 75, 120, 255};           // the fills of the buttons of the HUD (SceneConfig.xml): a color each, so a test can tell where each one is drawn
         const Color kPlateColor{36, 40, 52, 255};           // the plate of the opponent panel
         const Color kPromotionPlateColor{44, 38, 52, 255};  // the plate of the promotion panel
         constexpr float kMinGap = 8.0f;                     // two controls of the HUD keep this much between them, in view units
@@ -461,7 +461,7 @@ namespace BECore::Chess::Tests {
 
         /// The Menu button of the HUD, clicked where it is drawn; whether the panel is shown afterwards
         bool OpenThePanel() {
-            if (!ClickButton(kOpponentColor)) {
+            if (!ClickButton(kMenuColor)) {
                 return false;
             }
             return Panel() && Panel()->_visible;
@@ -2399,7 +2399,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheResetButtonStillResetsWithTheMenuButtonAround) {
-        // Was TheResetButtonStillResetsWithTheOpponentButtonsAround
+        // Reset keeps the opponent chosen in the panel; the Menu button beside it does not change that
         CountingFactory factory({eastl::make_shared<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -2433,7 +2433,7 @@ namespace BECore::Chess::Tests {
         EXPECT_TRUE(Model().GetSelected() == Sq("e2"));
 
         // And a press on a button of the HUD is the HUD's: the selection is not changed by it
-        EXPECT_TRUE(ClickButton(kOpponentColor));
+        EXPECT_TRUE(ClickButton(kMenuColor));
         EXPECT_TRUE(Panel()->_visible);
         EXPECT_TRUE(Model().HasSelection());
         EXPECT_TRUE(Model().GetSelected() == Sq("e2"));
@@ -2711,7 +2711,7 @@ namespace BECore::Chess::Tests {
         ActionLog log;
         Draw();
         EXPECT_EQ(ShownText(*HudElement("Menu")), "Menu");
-        ASSERT_TRUE(ClickButton(kOpponentColor));
+        ASSERT_TRUE(ClickButton(kMenuColor));
         EXPECT_EQ(log.LastAction(), PoolString::Intern("ChessOpenOpponent"));
         ASSERT_TRUE(Panel()->_visible);
         Draw();
@@ -2733,7 +2733,7 @@ namespace BECore::Chess::Tests {
         const auto e2 = SquareCenter("e2");
         EXPECT_FALSE(CoreManager::GetUIInput().DispatchMouseButtonDown(Button(e2.first, e2.second, true)));
         EXPECT_TRUE(Model().HasSelection());
-        ASSERT_TRUE(ClickButton(kOpponentColor));
+        ASSERT_TRUE(ClickButton(kMenuColor));
         EXPECT_EQ(log.LastAction(), PoolString::Intern("ChessOpenOpponent"));
         EXPECT_TRUE(Panel()->_visible);
     }
@@ -3018,7 +3018,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, ThePersonPlaysTheColorThePanelNamesAndTheProgramTheOther) {
-        // Also replaces TheSideButtonSaysWhatItDoesAndThePersonThenPlaysTheColorItNames: the person plays the color the PANEL names (the Menu button names nothing)
+        // The person plays the color the PANEL names (the Menu button names nothing)
         const auto engine = eastl::make_shared<InstantEngine>();
         CountingFactory factory({engine});
         Opponent().SetEngineFactory(factory.AsFactory());
@@ -3140,7 +3140,7 @@ namespace BECore::Chess::Tests {
             EXPECT_TRUE(text.find("{level}") == std::string_view::npos && text.find("{engine}") == std::string_view::npos) << found.node().attribute("name").value() << ": " << text;
         }
 
-        // The same in the loaded scene: the HUD is Turn, Opponent, Reset and Status, and nothing sits at the bottom left
+        // The same in the loaded scene: the HUD is Turn, Menu, Reset and Status, and nothing sits at the bottom left
         const auto hud = Hud();
         ASSERT_TRUE(hud);
         size_t elements = 0;
@@ -3148,7 +3148,7 @@ namespace BECore::Chess::Tests {
             ++elements;
             EXPECT_NE(child->style.rect.anchor, UIAnchor::BottomLeft) << child->name.CStr() << ": the bottom left of the HUD is empty";
         }
-        EXPECT_EQ(elements, 4u) << "Turn, Opponent, Reset, Status";
+        EXPECT_EQ(elements, 4u) << "Turn, Menu, Reset, Status";
         for (const char* name : {"Side", "Engine", "Level"}) {
             EXPECT_EQ(HudElement(name), nullptr) << name;
             EXPECT_EQ(Panel()->GetRoot().FindByName(PoolString::Intern(name)), nullptr) << name;

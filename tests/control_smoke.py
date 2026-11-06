@@ -447,8 +447,8 @@ def run_opponent_panel_scenario(client: BagiControlClient, headless: bool) -> No
     tree = client.call("ui_tree")
     panel = find_ui_canvas(tree, "OpponentPanel")
     check(panel["visible"] is False and panel["modal"] is True, f"the opponent panel should start hidden and modal: {panel}")
-    opponent_button = find_ui_element({"canvases": [canvas for canvas in tree["canvases"] if canvas["node"] == "Hud"]}, "Menu")
-    check(opponent_button is not None and opponent_button["text"] == "Menu" and opponent_button["action"] == "ChessOpenOpponent", f"the Menu button: {opponent_button}")
+    menu_button = find_ui_element({"canvases": [canvas for canvas in tree["canvases"] if canvas["node"] == "Hud"]}, "Menu")
+    check(menu_button is not None and menu_button["text"] == "Menu" and menu_button["action"] == "ChessOpenOpponent", f"the Menu button: {menu_button}")
     check(get_opponent(client)["plays"] is None, f"unexpected opponent at the start: {get_opponent(client)}")
 
     # One press on the HUD button opens the panel, which shows what the game has: two people, White, Stockfish, medium
