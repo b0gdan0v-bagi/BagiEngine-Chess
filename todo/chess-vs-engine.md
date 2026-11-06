@@ -1,6 +1,3 @@
----
-status: review 2026-11-06 branch todo/chess-vs-engine-5: the board turns for a person who plays Black (Black at the bottom exactly when the program plays White, read live, drawing and clicks through the pure BoardOrientation.h; the model, get_state and the panels are untouched), unit, UI and smoke tests (the smoke compares the board band of screenshots and was shown to fail without the turn); ChessTests 696/696 and the smoke test pass, no change in engine/, the look in a window is for the owner, slice 4 of about 5, after the merge set the status back to open
----
 # Chess: the computer opponent works in the window; no analysis, resign or takeback, and no engine of our own
 
 **Where:** `src/Chess/Game/ChessGameModel.h` (`OnSquareClicked` is the path of a person, `TryMove` the path of anything else; the model has no notion of a side played by a program), `src/Chess/Components/` (the board, the pieces and the result bar), `src/Chess/Game/Position.h` (`DoMove` / `UndoMove` exist), `src/Chess/Engine/` (the opponent core, see item 2: `ChessGame` owns the controller of it), `tools/stockfish_bridge.py` (the only way a whole game is played against Stockfish today), `engine/src/Modules/TaskSystem/` (a search runs off the main thread).
