@@ -8,7 +8,7 @@ which it finds through the environment variable BAGI_ENGINE_DIR (set by ctest), 
 --manual-clock, and with moves before its first frame. The computer opponent is played on both clocks in two ways. The engine of our own ("own
 engine" scenarios, base ones) needs nothing from the environment: it runs inside the game, with no process, so it also runs where the next kind is left out;
 it answers the same move to the same position (a fixed depth), which the scenario checks after a reset. The opponent panel ("opponent panel" scenarios, base
-ones too) is driven only by `ui_click` on the buttons and segments found by name, as a person would: open it with the Opponent button, pick the own engine,
+ones too) is driven only by `ui_click` on the buttons and segments found by name, as a person would: open it with the Menu button, pick the own engine,
 Computer, a level and a color, read the pick back from `get_state` and from `ui_tree`, play, close it with OK. Stockfish ("opponent" scenarios) is replaced by
 tests/fake_uci_engine.py: main() writes a wrapper script that starts it into a temporary directory and puts the script in STOCKFISH of the environment,
 which the game inherits. STOCKFISH comes before PATH in the game's search for an engine and the committed config has no path, so a Stockfish installed on
@@ -346,7 +346,7 @@ BOARD_BAND_INSET = 2  # rows kept away from the edge of the board, against round
 
 
 def board_band(image) -> list:
-    """The rows of a screenshot that only the board covers: the HUD sits in the margins above and below it, and its words change with the opponent."""
+    """The rows of a screenshot that only the board covers: the HUD sits in the margins above and below it, and its words (the turn, the status) change with the game."""
     scale = min(image.width / VIEW_WIDTH, image.height / VIEW_HEIGHT)
     offset = (image.height - VIEW_HEIGHT * scale) / 2
     first = int(offset + BOARD_TOP * scale) + BOARD_BAND_INSET
@@ -358,8 +358,8 @@ def board_band(image) -> list:
 def check_the_board_turns_with_the_program(client: BagiControlClient) -> None:
     """The picture is drawn from Black's side while the program plays White, and from White's side otherwise.
 
-    Only the rows of the board are compared (`board_band`): the Opponent button says "You: Black" in one picture and "Two players" in the other, so
-    whole pictures differ without the board turning. The same placement of the pieces is drawn three times: with the program as White (Black to move: the
+    Only the rows of the board are compared (`board_band`): the HUD above and below the board says other words in each picture (the
+    turn and the status), so whole pictures differ without the board turning. The same placement of the pieces is drawn three times: with the program as White (Black to move: the
     program does not search), with two people (Black to move) and with the program as Black (White to move, the same pieces: the side to move is not
     drawn on the board). The last two have White at the bottom and must give one board band, which also shows that the band leaves the HUD out; the
     turned one must differ from them, and drawn again after a round trip it must be the same band. Equality with a reference of "the white pieces at the
@@ -443,17 +443,17 @@ def run_opponent_panel_scenario(client: BagiControlClient, headless: bool) -> No
     client.call("reset")
     let_frames_pass(client, 2)
 
-    # The start: the panel is hidden and modal, the HUD button says what the opponent is
+    # The start: the panel is hidden and modal, the HUD button says "Menu"
     tree = client.call("ui_tree")
     panel = find_ui_canvas(tree, "OpponentPanel")
     check(panel["visible"] is False and panel["modal"] is True, f"the opponent panel should start hidden and modal: {panel}")
-    opponent_button = find_ui_element({"canvases": [canvas for canvas in tree["canvases"] if canvas["node"] == "Hud"]}, "Opponent")
-    check(opponent_button is not None and opponent_button["text"] == "Two players" and opponent_button["action"] == "ChessOpenOpponent", f"the Opponent button: {opponent_button}")
+    opponent_button = find_ui_element({"canvases": [canvas for canvas in tree["canvases"] if canvas["node"] == "Hud"]}, "Menu")
+    check(opponent_button is not None and opponent_button["text"] == "Menu" and opponent_button["action"] == "ChessOpenOpponent", f"the Menu button: {opponent_button}")
     check(get_opponent(client)["plays"] is None, f"unexpected opponent at the start: {get_opponent(client)}")
 
     # One press on the HUD button opens the panel, which shows what the game has: two people, White, Stockfish, medium
-    tree = press_in_the_panel(client, "Opponent", "ChessOpenOpponent", "")
-    check(find_ui_canvas(tree, "OpponentPanel")["visible"] is True, "the Opponent button did not open the panel")
+    tree = press_in_the_panel(client, "Menu", "ChessOpenOpponent", "")
+    check(find_ui_canvas(tree, "OpponentPanel")["visible"] is True, "the Menu button did not open the panel")
     check_selected(tree, ["ModeTwo", "ColorWhite", "EngineStockfish", "LevelMedium"], ["ModeComputer", "ColorBlack", "EngineOwn", "LevelEasy", "LevelHard", "LevelMax"])
     check_no_group_disabled(tree)
     check(panel_element(tree, "OpponentError")["text"] == "", f"the error line is not empty: {panel_element(tree, 'OpponentError')}")
@@ -482,8 +482,8 @@ def run_opponent_panel_scenario(client: BagiControlClient, headless: bool) -> No
     opponent = get_opponent(client)
     check(opponent["plays"] == "black" and opponent["engine"] == "own" and opponent["level"] == "hard" and opponent["error"] is None,
           f"Computer with White for the person and the level picked before is not read back: {opponent}")
-    hud_button = find_ui_element({"canvases": [canvas for canvas in tree["canvases"] if canvas["node"] == "Hud"]}, "Opponent")
-    check(hud_button["text"] == "You: White", f"the Opponent button does not say the pick: {hud_button['text']}")
+    hud_button = find_ui_element({"canvases": [canvas for canvas in tree["canvases"] if canvas["node"] == "Hud"]}, "Menu")
+    check(hud_button["text"] == "Menu", f"the Menu button is not a fixed word: {hud_button['text']}")
 
     tree = press_in_the_panel(client, "LevelEasy", "ChessSetLevel", "easy")
     check_selected(tree, ["LevelEasy"], ["LevelMedium"])
@@ -504,8 +504,8 @@ def run_opponent_panel_scenario(client: BagiControlClient, headless: bool) -> No
     wait_until_the_program_played(client, lambda moves: len(moves) == 1, "the opening move")
     state = client.call("get_state")["state"]
     check(state["opponent"]["plays"] == "white" and state["turn"] == "black" and state["moves"][0][1] in ("1", "2"), f"the program did not open as White: {state}")
-    hud_button = find_ui_element({"canvases": [canvas for canvas in client.call("ui_tree")["canvases"] if canvas["node"] == "Hud"]}, "Opponent")
-    check(hud_button["text"] == "You: Black", f"the Opponent button does not say the pick: {hud_button['text']}")
+    hud_button = find_ui_element({"canvases": [canvas for canvas in client.call("ui_tree")["canvases"] if canvas["node"] == "Hud"]}, "Menu")
+    check(hud_button["text"] == "Menu", f"the Menu button is not a fixed word: {hud_button['text']}")
 
     # Back to two people: no group is greyed, the person's color is kept, the program stays out of the game
     tree = press_in_the_panel(client, "ModeTwo", "ChessSetMode", "two")
