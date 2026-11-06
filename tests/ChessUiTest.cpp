@@ -2075,7 +2075,7 @@ namespace BECore::Chess::Tests {
         EXPECT_FALSE(CoreManager::GetUIVars().Has(PoolString::Intern("side")));
     }
 
-    TEST_F(ChessUiTest, ModeAndColorThroughThePanelWalkThreeWordsAndBackAndTheProgramPlaysTheSideTheWordSays) {
+    TEST_F(ChessUiTest, ModeAndColorThroughThePanelPickTheSideTheProgramPlays) {
         // Was TheSideActionWalksThreeWordsAndBackAndTheProgramPlaysTheSideTheWordSays (the cycle is gone with the Side button): the mode and the color are two choices now
         const auto engine = eastl::make_shared<InstantEngine>();
         CountingFactory factory({engine});
