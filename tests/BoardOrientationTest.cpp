@@ -9,6 +9,7 @@ namespace BECore::Chess::Tests {
 
         constexpr PieceColor kWhite = PieceColor::White;
         constexpr PieceColor kBlack = PieceColor::Black;
+        constexpr int kBoardSize = 8;  // files and ranks
 
         BoardCell Cell(const char* name, PieceColor bottom) {
             return CellOf(Sq(name), bottom);
@@ -64,8 +65,8 @@ namespace BECore::Chess::Tests {
                 ASSERT_TRUE(back.has_value()) << index;
                 EXPECT_TRUE(*back == square) << index;
             }
-            for (int row = 0; row < 8; ++row) {
-                for (int column = 0; column < 8; ++column) {
+            for (int row = 0; row < kBoardSize; ++row) {
+                for (int column = 0; column < kBoardSize; ++column) {
                     const auto square = SquareAt(column, row, bottom);
                     ASSERT_TRUE(square.has_value());
                     if (!hit[square->Index()]) {
@@ -81,9 +82,9 @@ namespace BECore::Chess::Tests {
     TEST(BoardOrientationTest, ACellOutsideTheBoardIsNoSquare) {
         for (const PieceColor bottom : {kWhite, kBlack}) {
             EXPECT_FALSE(SquareAt(-1, 0, bottom).has_value());
-            EXPECT_FALSE(SquareAt(8, 0, bottom).has_value());
+            EXPECT_FALSE(SquareAt(kBoardSize, 0, bottom).has_value());
             EXPECT_FALSE(SquareAt(0, -1, bottom).has_value());
-            EXPECT_FALSE(SquareAt(0, 8, bottom).has_value());
+            EXPECT_FALSE(SquareAt(0, kBoardSize, bottom).has_value());
         }
     }
 

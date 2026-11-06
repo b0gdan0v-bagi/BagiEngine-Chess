@@ -335,6 +335,35 @@ def run_own_engine_scenario(client: BagiControlClient, headless: bool) -> None:
     check(get_moves(client) == ["e2e4", second] + by_hand, f"the game is not played by two people: {get_moves(client)}")
     check(get_opponent(client)["thinking"] is False, "the opponent thinks with nobody picked")
 
+    if headless:
+        check_the_board_turns_with_the_program(client)
+
+
+def check_the_board_turns_with_the_program(client: BagiControlClient) -> None:
+    """The picture is drawn from Black's side while the program plays White, and from White's side otherwise.
+
+    The weak, robust check: the same position gives different pictures for the two orientations, and the rotated one is the same picture every time.
+    (Equality with a reference picture of "the white pieces at the bottom" is not asserted: the only way to the same position is a FEN, and the pictures of
+    a position set from outside and of one reached by moves are compared elsewhere.)"""
+    client.call("reset")
+    client.call("set_state", {"opponent": {"engine": "own", "plays": "white", "level": "easy"}})
+    wait_until_the_program_played(client, lambda moves: len(moves) == 1, "the opening move of White")
+    fen = client.call("get_state")["state"]["fen"]  # Black to move: the program, as White, does not search again
+    let_frames_pass(client, 2)
+    rotated = take_screenshot(client)
+
+    client.call("set_state", {"opponent": {"plays": None}})
+    client.call("set_state", {"fen": fen})
+    let_frames_pass(client, 2)
+    upright = take_screenshot(client)
+    check(rotated.rows != upright.rows, "the picture does not change when the program stops playing White: the board is not turned")
+
+    client.call("set_state", {"opponent": {"plays": "white"}})
+    client.call("set_state", {"fen": fen})
+    let_frames_pass(client, 2)
+    check(take_screenshot(client).rows == rotated.rows, "the board turned again is not the picture it was the first time")
+    client.call("set_state", {"opponent": {"plays": None}})
+
 
 def find_ui_canvas(tree: dict, node: str) -> dict:
     """The canvas of the node of that name in a `ui_tree` answer."""

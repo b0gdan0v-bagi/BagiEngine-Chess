@@ -78,6 +78,9 @@ namespace BECore::Chess {
         /// with Black at the bottom the grid is turned by 180 degrees and a1 is the top right cell.
         void SquareToPixel(int file, int rank, float& outX, float& outY) const;
 
+        /// The same for an orientation the caller has read once (OnDraw places 64 squares and more for one frame).
+        void SquareToPixel(int file, int rank, PieceColor bottom, float& outX, float& outY) const;
+
         float GetSquareSize() const noexcept {
             return _squareSize;
         }

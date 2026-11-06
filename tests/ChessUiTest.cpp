@@ -1373,7 +1373,8 @@ namespace BECore::Chess::Tests {
 
         const Color kLightSquareColor{240, 217, 181, 255};  // the squares of the board (ChessBoardComponent.cpp)
         const Color kDarkSquareColor{181, 136, 99, 255};
-        const Color kBoardDimColor{0, 0, 0, 140};  // the dim of the result (ChessResultComponent.cpp)
+        const Color kBoardDimColor{0, 0, 0, 140};      // the dim of the result (ChessResultComponent.cpp)
+        const Color kResultBarColor{25, 25, 25, 245};  // the bar of the winner (ChessResultComponent.cpp)
 
         constexpr const char* kBlackToMoveAfterE4 = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1";
         constexpr const char* kFourRooks = "r3k2r/8/8/8/8/8/4K3/r6r b - - 0 1";  // Black to move, a rook in each corner of the board
@@ -1574,7 +1575,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(dim.has_value());
         const ViewTransform fit = ViewTransform::Fit(kViewWidth, kViewHeight, _renderer->width, _renderer->height);
         EXPECT_TRUE(SameRect(*dim, fit.ToOutput(100.0f, kBoardTop, 640.0f, 640.0f))) << "the whole board, as with White at the bottom";
-        EXPECT_FALSE(RectCalls(Color{25, 25, 25, 245}).empty()) << "the bar of the winner";
+        EXPECT_FALSE(RectCalls(kResultBarColor).empty()) << "the bar of the winner";
     }
 
     TEST_F(ChessUiTest, TheBoardTurnsBackWhenNobodyOrBlackIsTheProgram) {
@@ -1619,6 +1620,9 @@ namespace BECore::Chess::Tests {
         PressWith("ChessSetColor", "white");
         _manager->UpdateAll();
         EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (std::pair<float, float>{100.0f, 640.0f})) << "the person has White again";
+        ASSERT_TRUE(FramesUntil([&] { return Model().GetMoves().size() == 2 && !Opponent().IsThinking(); })) << "the program, now Black, answers the opening";
+        _manager->UpdateAll();
+        ExpectPiecesAtTheCellsOf(false);  // every piece, the moved ones too
     }
 
     TEST_F(ChessUiTest, ABlackPickedWhileTwoPlayDoesNotTurnTheBoardUntilComputerIsPicked) {
