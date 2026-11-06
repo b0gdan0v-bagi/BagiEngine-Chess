@@ -4,14 +4,6 @@ namespace BECore::Chess {
 
     namespace OpponentText {
 
-        eastl::string SideLabel(std::optional<PieceColor> computerPlays) {
-            if (!computerPlays) {
-                return "Two players";
-            }
-            // The program plays one color, the person the other
-            return *computerPlays == PieceColor::Black ? "You: White" : "You: Black";
-        }
-
         eastl::string ModeLabel(bool computer) {
             return computer ? "Computer" : "Two players";
         }

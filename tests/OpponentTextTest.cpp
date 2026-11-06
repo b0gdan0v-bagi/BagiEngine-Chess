@@ -9,8 +9,6 @@ namespace BECore::Chess::Tests {
 
     namespace {
 
-        constexpr std::optional<PieceColor> kNobody = std::nullopt;
-
         /// The sentence of an error of the given kind; the detail is empty, because the sentence does not depend on it
         eastl::string ErrorWords(EngineErrorKind kind) {
             return OpponentText::Error(EngineError{kind, {}});
@@ -24,18 +22,11 @@ namespace BECore::Chess::Tests {
 
     }  // namespace
 
-    TEST(OpponentTextTest, TheSideIsSaidFromThePersonsPointOfView) {
-        EXPECT_EQ(OpponentText::SideLabel(kNobody), "Two players");
-        EXPECT_EQ(OpponentText::SideLabel(PieceColor::Black), "You: White") << "the program plays Black, so the person has White";
-        EXPECT_EQ(OpponentText::SideLabel(PieceColor::White), "You: Black") << "the program plays White, so the person has Black";
-    }
-
     TEST(OpponentTextTest, TheModeAndTheColorOfThePanelAreSaidInTheirPinnedWords) {
         EXPECT_EQ(OpponentText::ModeLabel(false), "Two players");
         EXPECT_EQ(OpponentText::ModeLabel(true), "Computer");
         EXPECT_EQ(OpponentText::ColorLabel(PieceColor::White), "White");
         EXPECT_EQ(OpponentText::ColorLabel(PieceColor::Black), "Black");
-        EXPECT_EQ(OpponentText::ModeLabel(false), OpponentText::SideLabel(kNobody)) << "the same words in the Opponent button and in its panel";
     }
 
     TEST(OpponentTextTest, NoTwoSegmentsOfAGroupOfThePanelSayTheSameWord) {

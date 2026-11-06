@@ -17,18 +17,17 @@
         <!-- The HUD is in the margins of the view (space="SceneView"): it scales and moves with the board and never covers it, whatever the shape of the window.
              The board is 640 x 640 at (100, 80); the margin is 80 units above and below, so one row of 56-unit controls fits in each (12 units from the edge of the
              safe area), and a 56-unit button is still a 32 px touch target at the smallest fit scale of the size matrix (0.57, the 840 units of the width in a 480 px window).
-             The top row is Turn (left), Opponent and Reset (right); the bottom margin holds only Status (bottom right). Every element is anchored to a corner, so the row is
-             as wide as the safe area, which is about 689 units in the narrowest window of the matrix (480 px with side insets): Turn (320), Opponent (190) and Reset (110) with
-             their gaps add up to less than that, and ChessUiTest lays every word the game can show into them. Opponent is the one button that opens the opponent panel (the
-             node OpponentPanel below): it emits ChessOpenOpponent, is always shown, and its text is the variable {side} ("Two players", "You: White", "You: Black": the
-             widest of the three fits its 190 units at font 24), so it also says the state. The side, the engine and the level are chosen in the panel, not on buttons of
-             the HUD: the margins are full. -->
+             The top row is Turn (left), Menu and Reset (right); the bottom margin holds only Status (bottom right). Every element is anchored to a corner, so the row is
+             as wide as the safe area, which is about 689 units in the narrowest window of the matrix (480 px with side insets): Turn (320), Menu (110) and Reset (110) with
+             their gaps add up to less than that, and ChessUiTest lays every word the game can show into them. Menu is the one button that opens the opponent panel (the
+             node OpponentPanel below): it emits ChessOpenOpponent, is always shown, and its text is the fixed word "Menu", not a state; the side, the engine and the level
+             are chosen in the panel, which also shows what is picked now, and not on buttons of the HUD: the margins are full. -->
         <node name="Hud" layer="10">
           <components>
             <component type="UICanvasComponent" space="SceneView" useSafeArea="true">
               <elements>
                 <element type="UILabel" name="Turn" x="12" y="12" width="320" height="56" text="{turn}" fontSize="28" verticalAlign="Center" />
-                <element type="UIButton" name="Opponent" anchor="TopRight" x="-134" y="12" width="190" height="56" text="{side}" fontSize="24" action="ChessOpenOpponent" color="45,75,120,255" />
+                <element type="UIButton" name="Menu" anchor="TopRight" x="-134" y="12" width="110" height="56" text="Menu" fontSize="24" action="ChessOpenOpponent" color="45,75,120,255" />
                 <element type="UIButton" name="Reset" anchor="TopRight" x="-12" y="12" width="110" height="56" text="Reset" fontSize="26" action="ChessReset" color="40,90,60,255" />
                 <element type="UILabel" name="Status" anchor="BottomRight" x="-12" y="-12" width="48%" height="56" text="{status}" fontSize="28" align="Right" verticalAlign="Center" />
               </elements>
@@ -36,7 +35,7 @@
           </components>
         </node>
 
-        <!-- The opponent panel: a modal canvas over everything (layer 20, above the HUD and the end-of-game bar), started hidden. The Opponent button of the HUD shows it
+        <!-- The opponent panel: a modal canvas over everything (layer 20, above the HUD and the end-of-game bar), started hidden. The Menu button of the HUD shows it
              (ChessOpenOpponent) and OK hides it (ChessCloseOpponent); while it is shown the dim takes every click, so the board gets none. Four choice groups (UISegmented), a
              caption beside each. A segment emits its action with its id as the value (ChessSetMode / ChessSetColor / ChessSetEngine / ChessSetLevel); ChessBoardComponent applies
              the pick at once and publishes the ids the groups are bound to (opponentMode, opponentColor, opponentEngine, opponentLevel), so the panel stays open and always shows

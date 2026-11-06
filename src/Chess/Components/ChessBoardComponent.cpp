@@ -113,12 +113,10 @@ namespace BECore::Chess {
         const std::optional<EngineError>& error = opponent.GetError();
         const eastl::string turn = StatusText::Turn(model, thinking);
         const eastl::string status = error ? OpponentText::Error(*error) : StatusText::Status(model);
-        const eastl::string side = OpponentText::SideLabel(opponent.GetPlays());
         const eastl::string opponentError = error ? OpponentText::Error(*error) : eastl::string();
         UIVars& vars = CoreManager::GetUIVars();
         vars.Set("turn"_intern, eastl::string_view(turn.data(), turn.size()));
         vars.Set("status"_intern, eastl::string_view(status.data(), status.size()));
-        vars.Set("side"_intern, eastl::string_view(side.data(), side.size()));
         // The ids of the opponent panel, those of the control API (the person's color, not the program's); the words are the text of the segments in the scene
         vars.Set("opponentMode"_intern, choice.ModeId());
         vars.Set("opponentColor"_intern, choice.ColorId());

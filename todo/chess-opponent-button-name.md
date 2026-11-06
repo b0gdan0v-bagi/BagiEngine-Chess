@@ -1,3 +1,7 @@
+---
+status: review 2026-11-06 branch todo/chess-opponent-button-name: the HUD button is the fixed word "Menu" (element Menu, 110 wide), the side variable and SideLabel are removed, the choice is shown only in the panel; build and 697 tests green (ChessUiTest, ChessHudWebTest, control smoke), 3 WPs reviewed, integration APPROVE
+---
+
 # Chess HUD: the button that opens the opponent panel is named after a state ("Two players"); it is to be called "Menu"
 
 **Where:** `config/SceneConfig.xml` (the `Opponent` button of the `Hud`, text `{side}`), `src/Chess/Engine/OpponentText.{h,cpp}` (`SideLabel`: "Two players", "You: White", "You: Black"), `src/Chess/Components/ChessBoardComponent.cpp` (publishes `side`), `tests/HudWords.h`, `tests/ChessUiTest.cpp` and `tests/ChessHudWebTest.cpp` (the layout through the size matrix with every word).

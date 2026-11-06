@@ -27,13 +27,13 @@ namespace BECore::Tests {
         // that it lays out like the HUD in config/SceneConfig.xml, the one the game ships.
         constexpr const char* kChessHudHtml = R"(
 <span id="Turn">{turn}</span>
-<button id="Opponent" data-action="ChessOpenOpponent">{side}</button>
+<button id="Menu" data-action="ChessOpenOpponent">Menu</button>
 <button id="Reset" data-action="ChessReset">Reset</button>
 <span id="Status">{status}</span>)";
 
         constexpr const char* kChessHudCss = R"(
 #Turn   { left: 12px; top: 12px; width: 320px; height: 56px; font-size: 28px; vertical-align: middle; }
-#Opponent { anchor: top-right; right: 134px; top: 12px; width: 190px; height: 56px; font-size: 24px; background: rgb(45, 75, 120); }
+#Menu   { anchor: top-right; right: 134px; top: 12px; width: 110px; height: 56px; font-size: 24px; background: rgb(45, 75, 120); }
 #Reset  { anchor: top-right; right: 12px; top: 12px; width: 110px; height: 56px; font-size: 26px; background: rgb(40, 90, 60); }
 #Status { anchor: bottom-right; right: 12px; bottom: 12px; width: 48%; height: 56px; font-size: 28px; text-align: right; vertical-align: middle; }
 )";
@@ -274,7 +274,7 @@ namespace BECore::Tests {
         for (const auto& [width, height] : {std::pair{1280.0f, 720.0f}, {480.0f, 480.0f}, {720.0f, 1280.0f}, {2560.0f, 1080.0f}}) {
             web.At(width, height);
             xml.At(width, height);
-            for (const char* name : {"Turn", "Opponent", "Reset", "Status"}) {
+            for (const char* name : {"Turn", "Menu", "Reset", "Status"}) {
                 SCOPED_TRACE(Format("{} at {}x{}", name, width, height).c_str());
                 ExpectSameRect(xml.Find(name), web.Find(name), name);
             }
