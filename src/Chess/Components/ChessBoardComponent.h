@@ -51,6 +51,9 @@ namespace BECore::Chess {
      * a click on the board does nothing: a half-made move of the person would only cancel the program's own search. After the game has ended a click still starts
      * the next one. The result of a game is logged once, whoever ended it.
      *
+     * The board is drawn from White's side, and from Black's side (turned by 180 degrees) while the program plays White, so the person who plays Black sees their own pieces at the bottom.
+     * The pieces, the highlights and the clicks all go through SquareToPixel() / OnMouseDown() and BoardOrientation.h; only the geometry turns, the model and the control API do not.
+     *
      * Its node sits on a layer below the pieces (`layer` in SceneConfig.xml), so the
      * squares and highlights are drawn first and the piece sprites on top.
      */
@@ -67,8 +70,16 @@ namespace BECore::Chess {
         void OnAttached() override;
         void OnDraw() override;
 
-        /// World-space pixel position (top-left) of a board cell.
+        /// The color drawn at the bottom of the board, read live from the opponent on every call (no cached flag): Black exactly when the program plays White (the person is Black and
+        /// sits at the bottom), White for two people and when the program plays Black. See BoardOrientation.h
+        [[nodiscard]] PieceColor GetBottomColor() const;
+
+        /// World-space pixel position (top-left) of the square (file, rank), for the orientation of GetBottomColor(): with White at the bottom a1 is the bottom left cell,
+        /// with Black at the bottom the grid is turned by 180 degrees and a1 is the top right cell.
         void SquareToPixel(int file, int rank, float& outX, float& outY) const;
+
+        /// The same for an orientation the caller has read once (OnDraw places 64 squares and more for one frame).
+        void SquareToPixel(int file, int rank, PieceColor bottom, float& outX, float& outY) const;
 
         float GetSquareSize() const noexcept {
             return _squareSize;

@@ -7,6 +7,7 @@
 #include <BECore/UI/UICanvasComponent.h>
 #include <Chess/ChessGame.h>
 #include <Chess/Engine/OpponentText.h>
+#include <Chess/Game/BoardOrientation.h>
 #include <Chess/Game/PromotionChoices.h>
 #include <Chess/Game/StatusText.h>
 #include <CoreSDL/SDLEvents.h>
@@ -196,22 +197,33 @@ namespace BECore::Chess {
         AnswerSetAction(event);
     }
 
+    PieceColor ChessBoardComponent::GetBottomColor() const {
+        const OpponentController* opponent = ChessGame::GetActiveOpponent();
+        return BottomColor(opponent ? opponent->GetPlays() : std::nullopt);
+    }
+
     void ChessBoardComponent::SquareToPixel(int file, int rank, float& outX, float& outY) const {
-        // rank 0 (White's back rank) is drawn at the bottom of the board.
-        outX = _originX + static_cast<float>(file) * _squareSize;
-        outY = _originY + static_cast<float>(7 - rank) * _squareSize;
+        SquareToPixel(file, rank, GetBottomColor(), outX, outY);
+    }
+
+    void ChessBoardComponent::SquareToPixel(int file, int rank, PieceColor bottom, float& outX, float& outY) const {
+        // The cell comes from BoardOrientation.h: White's back rank is at the bottom unless the program plays White.
+        const BoardCell cell = CellOf(Square{static_cast<int8_t>(file), static_cast<int8_t>(rank)}, bottom);
+        outX = _originX + static_cast<float>(cell.column) * _squareSize;
+        outY = _originY + static_cast<float>(cell.rowFromTop) * _squareSize;
     }
 
     void ChessBoardComponent::OnDraw() {
         PublishUiVars();
         auto& renderer = *CoreManager::GetRenderer();
+        const PieceColor bottom = GetBottomColor();  // once per draw: every square of this frame is placed for the same orientation
 
         // Checkered base.
         for (int rank = 0; rank < 8; ++rank) {
             for (int file = 0; file < 8; ++file) {
                 float px = 0.0f;
                 float py = 0.0f;
-                SquareToPixel(file, rank, px, py);
+                SquareToPixel(file, rank, bottom, px, py);
                 const bool isLight = ((file + rank) % 2) != 0;
                 renderer.DrawFilledRect(px, py, _squareSize, _squareSize, isLight ? kLightSquare : kDarkSquare);
             }
@@ -227,7 +239,7 @@ namespace BECore::Chess {
             const Square king = model->GetKingSquare(model->GetTurn());
             float kx = 0.0f;
             float ky = 0.0f;
-            SquareToPixel(king.file, king.rank, kx, ky);
+            SquareToPixel(king.file, king.rank, bottom, kx, ky);
             renderer.DrawFilledRect(kx, ky, _squareSize, _squareSize, model->IsGameOver() ? kMateSquare : kCheckSquare);
         }
 
@@ -235,11 +247,11 @@ namespace BECore::Chess {
             const Square sel = model->GetSelected();
             float px = 0.0f;
             float py = 0.0f;
-            SquareToPixel(sel.file, sel.rank, px, py);
+            SquareToPixel(sel.file, sel.rank, bottom, px, py);
             renderer.DrawFilledRect(px, py, _squareSize, _squareSize, kSelectedSquare);
 
             for (const auto target : model->GetLegalMoves()) {
-                SquareToPixel(target.file, target.rank, px, py);
+                SquareToPixel(target.file, target.rank, bottom, px, py);
                 const bool isCapture = !model->GetPieceAt(target).IsEmpty();
                 renderer.DrawFilledRect(px, py, _squareSize, _squareSize, isCapture ? kLegalCaptureSquare : kLegalMoveSquare);
             }
@@ -259,10 +271,8 @@ namespace BECore::Chess {
             return;
         }
 
-        const int file = static_cast<int>(localX / _squareSize);
-        const int rankFromTop = static_cast<int>(localY / _squareSize);
-        const int rank = 7 - rankFromTop;
-        if (!Square::IsInside(file, rank)) {
+        const std::optional<Square> clicked = SquareAt(static_cast<int>(localX / _squareSize), static_cast<int>(localY / _squareSize), GetBottomColor());
+        if (!clicked) {
             return;
         }
 
@@ -278,7 +288,7 @@ namespace BECore::Chess {
             return;
         }
 
-        if (model->OnSquareClicked(Square{static_cast<int8_t>(file), static_cast<int8_t>(rank)})) {
+        if (model->OnSquareClicked(*clicked)) {
             LogResultOnce(*model);
         }
         // The click may have left a promotion pending (the panel asks for the piece) or dropped one
