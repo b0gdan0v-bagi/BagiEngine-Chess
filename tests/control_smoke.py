@@ -262,10 +262,12 @@ def run_opponent_scenario(client: BagiControlClient, headless: bool) -> None:
     check(opponent["engine"] == "stockfish", f"the default engine is not stockfish: {opponent}")
 
     version = client.call("get_state")["version"]
-    picked = client.call("set_state", {"opponent": {"plays": "black", "level": "easy"}})
+    # "max", not "easy": the low levels replace a share of the program's moves by a random legal move of their own (and then the fake engine is not asked), so
+    # only a level without that handicap is sure to bring the scripted reply
+    picked = client.call("set_state", {"opponent": {"plays": "black", "level": "max"}})
     check(picked["version"] > version, "picking the opponent did not move the state version")
     opponent = get_opponent(client)
-    check(opponent["plays"] == "black" and opponent["level"] == "easy" and opponent["error"] is None, f"the pick was not read back: {opponent}")
+    check(opponent["plays"] == "black" and opponent["level"] == "max" and opponent["error"] is None, f"the pick was not read back: {opponent}")
     check(get_moves(client) == [], "picking the opponent played a move")
 
     client.call("perform_action", move("e2e4"))
@@ -312,7 +314,7 @@ def run_own_engine_scenario(client: BagiControlClient, headless: bool) -> None:
 
     first = play_against_the_own_engine(client)
 
-    # A fixed depth is deterministic: the same game after a reset gets the same reply, and the reset keeps the engine
+    # A fixed depth is deterministic, and so is the handicap of "easy" (a pure function of the position): the same game after a reset gets the same reply, and the reset keeps the engine
     client.call("reset")
     check(get_opponent(client)["engine"] == "own" and get_opponent(client)["plays"] == "black", f"a reset lost the pick: {get_opponent(client)}")
     second = play_against_the_own_engine(client)

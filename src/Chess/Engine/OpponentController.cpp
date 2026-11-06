@@ -19,7 +19,7 @@ namespace BECore::Chess {
                    "there is no fallback), or put stockfish on PATH. The game does not ship Stockfish; install it yourself";
         }
 
-        /// The default factory: a UciEngine over the Stockfish that FindStockfish() finds for the settings, with the Skill Level of the level
+        /// The default factory: a UciEngine over the Stockfish that FindStockfish() finds for the settings, with the Skill Level of the level, under the handicap of the level (WithHandicap)
         std::expected<eastl::shared_ptr<IChessEngine>, EngineError> MakeStockfishEngine(const OpponentSettings& settings, const OpponentLevel& level) {
             const std::optional<eastl::string> program = FindStockfish(settings.stockfishPath);
             if (!program) {
@@ -29,7 +29,7 @@ namespace BECore::Chess {
             engine.launch.path = *program;
             engine.options = EngineOptionsOf(level);
             engine.quitGraceMs = OpponentController::kQuitGraceMs;
-            return eastl::make_shared<UciEngine>(std::move(engine));
+            return WithHandicap(eastl::make_shared<UciEngine>(std::move(engine)), level);
         }
 
     }  // namespace
@@ -164,7 +164,7 @@ namespace BECore::Chess {
             case OpponentEngine::Stockfish:
                 return MakeStockfishEngine(_settings, level);
             case OpponentEngine::Own:
-                return eastl::make_shared<OwnEngine>();
+                return WithHandicap(eastl::make_shared<OwnEngine>(), level);
         }
         return std::unexpected(EngineError{EngineErrorKind::BadRequest, "unknown engine"});
     }

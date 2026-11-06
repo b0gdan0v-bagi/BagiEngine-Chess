@@ -62,7 +62,8 @@ namespace BECore::Chess {
         /// Where the default factory looks for Stockfish; read at the next pick, an opponent that already plays keeps its engine
         void SetSettings(OpponentSettings settings);
 
-        /// The factory that makes the engine at a pick, asked for (engine, level); an empty one puts the default back (the Stockfish of the settings, the OwnEngine)
+        /// The factory that makes the engine at a pick, asked for (engine, level); an empty one puts the default back (the Stockfish of the settings, the OwnEngine, each under the handicap of the
+        /// level: WithHandicap; a factory given here is never wrapped)
         void SetEngineFactory(EngineFactory factory);
 
         /**
@@ -148,7 +149,7 @@ namespace BECore::Chess {
 
         ChessGameModel& _model;
         OpponentSettings _settings;
-        EngineFactory _factory;  ///< empty: the Stockfish of _settings, the OwnEngine
+        EngineFactory _factory;  ///< empty: the Stockfish of _settings, the OwnEngine, each wrapped by WithHandicap
         OpponentEngine _engine = kDefaultOpponentEngine;
         size_t _level = kDefaultOpponentLevel;        ///< an index of GetOpponentLevels()
         eastl::unique_ptr<EngineOpponent> _opponent;  ///< null: nobody, two people
