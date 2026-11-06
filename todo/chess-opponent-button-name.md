@@ -1,3 +1,7 @@
+---
+status: in progress 2026-11-06 branch todo/chess-opponent-button-name
+---
+
 # Chess HUD: the button that opens the opponent panel is named after a state ("Two players"); it is to be called "Menu"
 
 **Where:** `config/SceneConfig.xml` (the `Opponent` button of the `Hud`, text `{side}`), `src/Chess/Engine/OpponentText.{h,cpp}` (`SideLabel`: "Two players", "You: White", "You: Black"), `src/Chess/Components/ChessBoardComponent.cpp` (publishes `side`), `tests/HudWords.h`, `tests/ChessUiTest.cpp` and `tests/ChessHudWebTest.cpp` (the layout through the size matrix with every word).
