@@ -1,17 +1,17 @@
 # The todo areas of this repository
 
-Read by the skills `todo-loop`, `todo-merge`, `todo-add`, `todo-sync` and by the agents `todo-*`. The skills and agents are one copy in the submodule (`engine/.claude/`), linked here by symlinks; `engine/.claude/skills/todo-loop/SKILL.md`, "Areas and the repository rules", explains the terms below. The engine is developed from this checkout: its entries are worked here, in the `engine/` submodule.
+Read by the skills `todo-loop`, `todo-merge`, `todo-add`, `todo-db` and by the agents `todo-*`. The skills and agents are one copy in the submodule (`engine/.claude/`), linked here by symlinks; `engine/.claude/skills/todo-loop/SKILL.md`, "Areas and the repository rules", explains the terms below. The engine is developed from this checkout: its entries are worked here, in the `engine/` submodule.
 
 ## Areas
 
-| Area | `<todo>` | `<R>` (git repository) | `<base>` | `<tracker>` (Vikunja project) | Env file |
-|------|----------|------------------------|----------|-------------------------------|----------|
-| game | `todo/` | `.` | `main` | `BagiEngine-Chess` | `.env` |
-| engine | `engine/todo/` | `engine` | `games/chess` (the `branch` of `.gitmodules`) | `BagiEngine` | `.env` of this repository (`--env-file .env`): the submodule has none |
+| Area | `<area>` (todo store) | `<R>` (git repository) | `<base>` | Vikunja project (the service's) |
+|------|-----------------------|------------------------|----------|---------------------------------|
+| game | `chess` | `.` | `main` | `BagiEngine-Chess` |
+| engine | `engine` | `engine` | `games/chess` (the `branch` of `.gitmodules`) | `BagiEngine` |
 
-`<engine>` is `engine`. The tool for the engine area runs from this repository's root as `engine/.venv/bin/python engine/tools/todo_sync/todo_sync.py --todo engine/todo [--env-file .env --project BagiEngine] <command>`. For the game area: `--todo todo --project BagiEngine-Chess`. Pass `--project` to every `pull` and `push`, always: the tool's default is `BagiEngine`.
+`<engine>` is `engine`. The CLI runs from this repository's root as `python3 engine/tools/todo/todo.py <command>` for both areas (an entry knows its area; `list --area chess|engine` narrows); `TODO_API_URL` and `TODO_API_TOKEN` come from the git-ignored `.env` of this repository (`.env.example`). The Vikunja project of an area is a setting of the store, not of the CLI: there is no push and no pull.
 
-An engine entry's branch `todo/<id>` is cut in `engine/` from `games/chess`; its commits, the status commits, the merge and the close commit are all in the engine repository. The game repository only ever changes the pointer of `engine/`, and only `todo-merge` does it, as a commit of its own, after the merge and the owner's yes (`Update engine: <title>`). A game entry that needs engine work waits (skip reason below) until the engine entry for it is merged.
+An engine entry's branch `todo/<id>` is cut in `engine/` from `games/chess`; its commits and the merge are in the engine repository, its status is in the store. The game repository only ever changes the pointer of `engine/`, and only `todo-merge` does it, as a commit of its own, after the merge and the owner's yes (`Update engine: <title>`). A game entry that needs engine work waits (skip reason below) until the engine entry for it is merged.
 
 ## Build and test (baseline and reviewer)
 
