@@ -2055,14 +2055,24 @@ namespace BECore::Chess::Tests {
     }
 
     // ---- the words and the actions of the opponent ------------------------------------------------------------------------
-    // The HUD shows `side`, `turn` and `status` and the panel the ids of the choice; the layout is another matter, so these tests press the actions the segments emit (or
+    // The HUD shows `turn` and `status` and the panel the ids of the choice; the layout is another matter, so these tests press the actions the segments emit (or
     // click the segments where they are drawn) and read the variables the board publishes. The engines are the doubles of TestEngines.h
 
     TEST_F(ChessUiTest, TheOpponentWordsStartWithTwoPlayersAtTheMediumLevel) {
-        EXPECT_EQ(Var("side"), "Two players");
+        EXPECT_EQ(Var("opponentMode"), "two");
         EXPECT_EQ(Var("opponentLevel"), "medium");
         EXPECT_EQ(Var("turn"), "White to move");
         EXPECT_EQ(Var("status"), "");
+    }
+
+    TEST_F(ChessUiTest, TheSideVariableOfTheOldOpponentButtonIsNoLongerPublished) {
+        // The Menu button says a fixed word, so nothing reads `side` any more and the board does not set it, at the start or after a pick
+        Draw();
+        EXPECT_TRUE(CoreManager::GetUIVars().Has(PoolString::Intern("opponentMode"))) << "the board publishes its variables: the check below is not about a missing frame";
+        EXPECT_FALSE(CoreManager::GetUIVars().Has(PoolString::Intern("side")));
+        PressWith("ChessSetLevel", "hard");  // a pick that needs no engine while nobody plays
+        Draw();
+        EXPECT_FALSE(CoreManager::GetUIVars().Has(PoolString::Intern("side")));
     }
 
     TEST_F(ChessUiTest, ModeAndColorThroughThePanelWalkThreeWordsAndBackAndTheProgramPlaysTheSideTheWordSays) {
@@ -2074,7 +2084,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(OpenThePanel());
 
         ASSERT_TRUE(ClickPanel("ModeComputer").Both());
-        EXPECT_EQ(Var("side"), "You: White");
+        EXPECT_EQ(Var("opponentMode"), "computer");
         EXPECT_TRUE(Opponent().PlaysFor(PieceColor::Black));
         ASSERT_TRUE(CloseThePanel());
         ClickMove("e2", "e4");
@@ -2083,7 +2093,7 @@ namespace BECore::Chess::Tests {
 
         ASSERT_TRUE(OpenThePanel());
         ASSERT_TRUE(ClickPanel("ColorBlack").Both());
-        EXPECT_EQ(Var("side"), "You: Black");
+        EXPECT_EQ(Var("opponentColor"), "black");
         EXPECT_TRUE(Opponent().PlaysFor(PieceColor::White));
         ASSERT_TRUE(CloseThePanel());
         ASSERT_TRUE(FramesUntil([&] { return Model().GetMoves().size() == 3; })) << "it is White's turn and White is the program's now";
@@ -2091,7 +2101,7 @@ namespace BECore::Chess::Tests {
 
         ASSERT_TRUE(OpenThePanel());
         ASSERT_TRUE(ClickPanel("ModeTwo").Both());
-        EXPECT_EQ(Var("side"), "Two players");
+        EXPECT_EQ(Var("opponentMode"), "two");
         EXPECT_FALSE(Opponent().PlaysFor(PieceColor::White));
         EXPECT_FALSE(Opponent().PlaysFor(PieceColor::Black));
         ASSERT_TRUE(CloseThePanel());
@@ -2104,9 +2114,9 @@ namespace BECore::Chess::Tests {
 
         ASSERT_TRUE(OpenThePanel());
         ASSERT_TRUE(ClickPanel("ModeComputer").Both());
-        EXPECT_EQ(Var("side"), "You: Black") << "and round again: the color the person had is kept while two people played";
+        EXPECT_EQ(Var("opponentColor"), "black") << "and round again: the color the person had is kept while two people played";
         ASSERT_TRUE(ClickPanel("ColorWhite").Both());
-        EXPECT_EQ(Var("side"), "You: White");
+        EXPECT_EQ(Var("opponentColor"), "white");
         EXPECT_EQ(factory.Calls(), 4) << "an engine for each pick that makes the program play (Computer, Black, Computer, White), none for two people";
     }
 
@@ -2161,7 +2171,6 @@ namespace BECore::Chess::Tests {
         ASSERT_EQ(factory.Calls(), 2) << "the program plays: a new engine for the new choice";
         EXPECT_EQ(factory.Engines()[1], "own");
         EXPECT_EQ(Opponent().GetPlays(), std::optional<PieceColor>(PieceColor::Black)) << "the side stays";
-        EXPECT_EQ(Var("side"), "You: White");
     }
 
     TEST_F(ChessUiTest, WhileTheProgramThinksTheTurnSaysSoAndTheAnswerBringsTheUsualWordsBack) {
@@ -2195,14 +2204,14 @@ namespace BECore::Chess::Tests {
         PressWith(kSetModeAction, "computer");
 
         EXPECT_EQ(Var("status"), "Engine not found");
-        EXPECT_EQ(Var("side"), "Two players") << "a pick that found nothing leaves two people on the screen";
+        EXPECT_EQ(Var("opponentMode"), "two") << "a pick that found nothing leaves two people on the screen";
         EXPECT_EQ(Var("turn"), "White to move");
 
         ClickMove("e2", "e4");
         _manager->UpdateAll();
 
         EXPECT_EQ(Var("status"), "") << "the person has played on: the sentence has been seen";
-        EXPECT_EQ(Var("side"), "Two players");
+        EXPECT_EQ(Var("opponentMode"), "two");
         EXPECT_EQ(factory.Calls(), 1);
     }
 
@@ -2212,7 +2221,7 @@ namespace BECore::Chess::Tests {
         ASSERT_NO_FATAL_FAILURE(ProvokeAnEngineError(factory));
 
         EXPECT_EQ(Var("status"), "Engine not found");
-        EXPECT_EQ(Var("side"), "You: White") << "the program is still Black, only the game waits";
+        EXPECT_EQ(Var("opponentMode"), "computer") << "the program is still Black, only the game waits";
         IdleFrames();
         EXPECT_EQ(Var("status"), "Engine not found") << "frames do not take it away";
 
@@ -2292,15 +2301,12 @@ namespace BECore::Chess::Tests {
         EXPECT_FALSE(Opponent().GetPlays().has_value()) << "a press alone does nothing";
         EXPECT_TRUE(CoreManager::GetUIInput().DispatchMouseButtonUp(Button(at.first, at.second, false)));
         EXPECT_EQ(Opponent().GetPlays(), std::optional<PieceColor>(PieceColor::Black));
-        EXPECT_EQ(Var("side"), "You: White");
 
         EXPECT_TRUE(ClickPanel("ColorBlack").Both());
         EXPECT_EQ(Opponent().GetPlays(), std::optional<PieceColor>(PieceColor::White));
-        EXPECT_EQ(Var("side"), "You: Black");
 
         EXPECT_TRUE(ClickPanel("ModeTwo").Both());
         EXPECT_FALSE(Opponent().GetPlays().has_value());
-        EXPECT_EQ(Var("side"), "Two players");
         EXPECT_FALSE(PanelControl<UIButton>("ModeComputer").rect.IsEmpty()) << "the way back to a pick is still there";
     }
 
@@ -2362,7 +2368,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(ClickPanel("EngineOwn").Both());
         ASSERT_EQ(Opponent().GetEngine(), OpponentEngine::Own);
         ASSERT_TRUE(ClickPanel("ModeComputer").Both());
-        EXPECT_EQ(Var("side"), "You: White");
+        EXPECT_EQ(Var("opponentMode"), "computer");
         ASSERT_TRUE(ClickPanel("LevelEasy").Both());
         ASSERT_EQ(Opponent().GetLevel(), *easy);
         EXPECT_EQ(Var("opponentLevel"), "easy");
@@ -2475,7 +2481,6 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(Opponent().GetPlays(), std::optional<PieceColor>(PieceColor::White)) << "the person has Black";
         EXPECT_EQ(Var("opponentMode"), "computer");
         EXPECT_EQ(Var("opponentColor"), "black");
-        EXPECT_EQ(Var("side"), "You: Black");
         ASSERT_EQ(factory.Calls(), 1);
         EXPECT_EQ(factory.Engines()[0], "own");
         EXPECT_EQ(factory.Levels()[0], "hard");
@@ -2493,7 +2498,6 @@ namespace BECore::Chess::Tests {
         ASSERT_EQ(factory.Calls(), 4);
         EXPECT_EQ(Opponent().GetPlays(), std::optional<PieceColor>(PieceColor::Black));
         EXPECT_EQ(Var("opponentColor"), "white");
-        EXPECT_EQ(Var("side"), "You: White");
 
         PressWith("ChessSetMode", "two");
         EXPECT_FALSE(Opponent().GetPlays().has_value());
@@ -2594,7 +2598,6 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(Var("opponentError"), "Engine not found");
         EXPECT_EQ(Var("status"), "Engine not found");
         EXPECT_EQ(Var("opponentEngine"), "stockfish") << "no silent switch";
-        EXPECT_EQ(Var("side"), "Two players");
         ASSERT_EQ(asked.size(), 1u);
 
         PressWith("ChessSetEngine", "own");
@@ -2607,7 +2610,6 @@ namespace BECore::Chess::Tests {
         PressWith("ChessSetMode", "computer");
 
         EXPECT_EQ(Var("opponentMode"), "computer");
-        EXPECT_EQ(Var("side"), "You: White");
         EXPECT_EQ(Var("opponentError"), "");
         ASSERT_EQ(asked.size(), 2u);
         EXPECT_EQ(asked[1], "own");
@@ -2996,7 +2998,6 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(ShownText(*HudElement("Menu")), "Menu") << "the button is not a state: the panel shows the pick";
         EXPECT_EQ(Opponent().GetPlays(), std::optional<PieceColor>(PieceColor::Black)) << "the person has White, the program Black";
         EXPECT_EQ(Var("opponentColor"), "white");
-        EXPECT_EQ(Var("side"), "You: White");
 
         ASSERT_TRUE(ClickPanel("ColorBlack").Both());
         Draw();

@@ -32,11 +32,11 @@ namespace BECore::Chess {
      * lives in ChessGameModel and is shared with ChessPieceComponent through
      * GameManager::GetActive().
      *
-     * The HUD is not drawn here: it is a UI canvas of the scene (`config/SceneConfig.xml`) whose labels and buttons follow the variables `turn`, `status`, `side` (the text of the `Opponent` button)
+     * The HUD is not drawn here: it is a UI canvas of the scene (`config/SceneConfig.xml`) whose labels and buttons follow the variables `turn`, `status`
      * and, for the opponent panel, the ids `opponentMode`, `opponentColor`, `opponentEngine`, `opponentLevel` and the sentence `opponentError`, which this component publishes
      * to `CoreManager::GetUIVars()` whenever the game or the opponent changed (StatusText, OpponentText): `turn` says "Computer is thinking" while the program searches, `status` is the sentence of
      * the opponent's error while one stands and the status of the game otherwise. Its buttons emit the actions `ChessReset` (a new game), `ChessOpenOpponent` and `ChessCloseOpponent` (show and hide
-     * the modal canvas of the node `OpponentPanel`, the `Opponent` button and the OK button), which this component answers; so are the four actions of the panel's choice groups, `ChessSetMode`,
+     * the modal canvas of the node `OpponentPanel`, the `Menu` button and the OK button), which this component answers; so are the four actions of the panel's choice groups, `ChessSetMode`,
      * `ChessSetColor`, `ChessSetEngine` and `ChessSetLevel`, whose `value` is an id (OpponentChoice picks it; an id that is in no table is ignored with one warning). `opponentColor` is the PERSON's
      * color, the opposite of the one the control API's `opponent.plays` names. No group of the panel is greyed: a color or a level picked while two people play is remembered
      * and applies when Computer is picked. It reads the person's color on every refresh so a side set from outside is remembered.
