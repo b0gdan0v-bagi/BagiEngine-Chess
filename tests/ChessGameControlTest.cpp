@@ -181,6 +181,103 @@ namespace BECore::Chess::Tests {
         EXPECT_TRUE(moves->empty());
     }
 
+    // ---- The material ----
+
+    namespace {
+
+        /// The "material" object of a state (null when it is not there)
+        Json MaterialOf(const Json& state) {
+            const Json* found = FindJsonMember(state, "material");
+            EXPECT_NE(found, nullptr);
+            return found ? *found : Json();
+        }
+
+        int CountOf(const Json& side, const char* piece) {
+            const Json* found = FindJsonMember(side, piece);
+            EXPECT_NE(found, nullptr) << piece;
+            EXPECT_TRUE(found && found->is_number_integer()) << piece;
+            return found && found->is_number_integer() ? found->get<int>() : -1;
+        }
+
+        void ExpectCaptured(const Json& material, const char* key, int queen, int rook, int bishop, int knight, int pawn) {
+            const Json* side = FindJsonMember(material, key);
+            ASSERT_NE(side, nullptr) << key;
+            ASSERT_TRUE(side->is_object()) << key;
+            EXPECT_EQ(side->size(), 5u) << key << ": exactly the five capturable pieces";
+            EXPECT_EQ(CountOf(*side, "queen"), queen) << key;
+            EXPECT_EQ(CountOf(*side, "rook"), rook) << key;
+            EXPECT_EQ(CountOf(*side, "bishop"), bishop) << key;
+            EXPECT_EQ(CountOf(*side, "knight"), knight) << key;
+            EXPECT_EQ(CountOf(*side, "pawn"), pawn) << key;
+        }
+
+    }  // namespace
+
+    TEST_F(ChessGameControlTest, StateHasTheMaterialOfTheStartPosition) {
+        const Json material = MaterialOf(State());
+        ASSERT_TRUE(material.is_object());
+        EXPECT_EQ(material.size(), 3u) << "balance, capturedByWhite, capturedByBlack";
+        EXPECT_EQ(GetJsonInt(material, "balance"), 0);
+        ExpectCaptured(material, "capturedByWhite", 0, 0, 0, 0, 0);
+        ExpectCaptured(material, "capturedByBlack", 0, 0, 0, 0, 0);
+    }
+
+    TEST_F(ChessGameControlTest, MaterialFollowsACapture) {
+        Perform("e2e4");
+        Perform("d7d5");
+        Perform("e4d5");
+
+        const Json material = MaterialOf(State());
+        EXPECT_EQ(GetJsonInt(material, "balance"), 1);
+        ExpectCaptured(material, "capturedByWhite", 0, 0, 0, 0, 1);
+        ExpectCaptured(material, "capturedByBlack", 0, 0, 0, 0, 0);
+
+        Perform("d8d5");  // Black takes the pawn back: level on pawns, and Black's capture is listed
+        const Json after = MaterialOf(State());
+        EXPECT_EQ(GetJsonInt(after, "balance"), 0);
+        ExpectCaptured(after, "capturedByWhite", 0, 0, 0, 0, 1);
+        ExpectCaptured(after, "capturedByBlack", 0, 0, 0, 0, 1);
+    }
+
+    TEST_F(ChessGameControlTest, MaterialFollowsSetStateAndReset) {
+        // White: a queen and two pawns; Black: the king alone
+        SetFen("4k3/8/8/8/8/8/PP6/Q3K3 w - - 0 1");
+        const Json material = MaterialOf(State());
+        EXPECT_EQ(GetJsonInt(material, "balance"), 9 + 2);
+        ExpectCaptured(material, "capturedByWhite", 1, 2, 2, 2, 8);
+        ExpectCaptured(material, "capturedByBlack", 0, 2, 2, 2, 6);
+
+        SetFen("4k3/8/8/8/8/8/8/R3K3 w - - 0 1");
+        EXPECT_EQ(GetJsonInt(MaterialOf(State()), "balance"), 5);
+
+        const auto reset = control.Reset(Json::object());
+        ASSERT_TRUE(reset.has_value());
+        const Json fresh = MaterialOf(State());
+        EXPECT_EQ(GetJsonInt(fresh, "balance"), 0);
+        ExpectCaptured(fresh, "capturedByWhite", 0, 0, 0, 0, 0);
+        ExpectCaptured(fresh, "capturedByBlack", 0, 0, 0, 0, 0);
+    }
+
+    TEST_F(ChessGameControlTest, MaterialCountsAPromotionAsPointsAndNotAsATake) {
+        SetFen("4k3/P7/8/8/8/8/1PPPPPPP/3QK3 w - - 0 1");
+        EXPECT_EQ(GetJsonInt(MaterialOf(State()), "balance"), 17);
+
+        Perform("a7a8q");
+        const Json material = MaterialOf(State());
+        EXPECT_EQ(GetJsonInt(material, "balance"), 25) << "the new queen is on the board";
+        ExpectCaptured(material, "capturedByWhite", 1, 2, 2, 2, 8);
+        ExpectCaptured(material, "capturedByBlack", 0, 2, 2, 2, 0);
+    }
+
+    TEST_F(ChessGameControlTest, MaterialDoesNotMoveTheStateVersion) {
+        Perform("e2e4");
+        const uint64_t before = control.GetStateVersion();
+        const Json first = State();
+        const Json second = State();
+        EXPECT_EQ(control.GetStateVersion(), before);
+        EXPECT_EQ(first.dump(), second.dump()) << "reading the state twice gives the same state";
+    }
+
     TEST_F(ChessGameControlTest, BoardIsEightRowsWithRankEightFirst) {
         const Json state = State();
         const Json* board = FindJsonMember(state, "board");

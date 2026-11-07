@@ -20,7 +20,7 @@ namespace BECore::Chess {
     /**
      * @brief The external control API of Chess: the position, the legal moves, a way to play one, to load a position and to pick the computer opponent.
      *
-     * State: {"fen", "board", "turn", "status", "winner", "inCheck", "legalMoveCount", "startFen", "moves", "opponent"}.
+     * State: {"fen", "board", "turn", "status", "winner", "inCheck", "legalMoveCount", "startFen", "moves", "opponent", "material"}.
      * board is 8 strings, rank 8 first, file a first: white pieces are upper case (PNBRQK), black ones lower case, '.' is an
      * empty square. turn and winner are "white" or "black" (winner is null until a side has won). status is one of
      * "ongoing", "checkmate", "stalemate", "draw_insufficient_material", "draw_threefold", "draw_fifty_moves"; everything but
@@ -35,6 +35,13 @@ namespace BECore::Chess {
      * of the log). While an error stands the program does not play and waits for the version of the game to move (a reset, set_state, a move of someone else) or
      * for another pick. A pick of Stockfish succeeds whenever a Stockfish file is found (a launch that fails shows only at the first search, as error
      * "launch_failed"); a pick of "own" always succeeds.
+     *
+     * material is {"balance", "capturedByWhite", "capturedByBlack"}, derived from the position at every call (it has no version of its own; a move that
+     * changes it changes the state version anyway): balance is White's points minus Black's on the board (pawn 1, knight 3, bishop 3, rook 5, queen 9; a
+     * piece made by a promotion counts, so it is not a count of what was taken), positive when White is ahead; capturedByWhite is the Black pieces that are gone
+     * and capturedByBlack the White ones, each {"queen", "rook", "bishop", "knight", "pawn"} with a count (never negative). Position-only: a piece beyond
+     * the starting set is a promoted pawn (it counts in the points and is not a missing pawn), a pawn that promoted into a piece that was missing shows as
+     * a pawn gone, and a promoted piece that is taken later shows as a missing pawn.
      *
      * Actions: {"type": "move", "uci": "e2e4"}, every legal move once; none once the game is over. The list does not change with the opponent: the program's
      * side is listed and accepted like the other (a controller may play for it; a search that the move makes stale is dropped). Castling is the king's move
