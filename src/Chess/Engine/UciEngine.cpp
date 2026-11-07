@@ -78,7 +78,7 @@ namespace BECore::Chess {
          * Reads the lines of @p process until @p wanted likes one (the trimmed line is the answer), skipping `info` and every line it does not know.
          * Cancelled as soon as @p token is, Timeout after @p timeoutMs; the failures of the process (ProcessDied, ProtocolError) come back with
          * what was waited for in the sentence. A token that was never made (the default one) is never cancelled. @p skipped, when given, sees every
-         * line that is skipped (the wait for `bestmove` of an analysis passes one; the handshake and the answer to `stop` pass none).
+         * line that is skipped (the wait for `bestmove` passes one; the handshake and the answer to `stop` pass none).
          */
         std::expected<eastl::string, EngineError> ReadUntil(UciProcess& process, LinePredicate wanted, eastl::string_view what, int timeoutMs, const CancellationToken& token,
                                                             InfoCollector* skipped = nullptr) {
