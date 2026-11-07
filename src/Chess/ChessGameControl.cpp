@@ -1,6 +1,7 @@
 #include "ChessGameControl.h"
 
 #include <Chess/Engine/OpponentChoice.h>
+#include <Chess/Game/CapturedMaterial.h>
 
 namespace BECore::Chess {
 
@@ -93,6 +94,24 @@ namespace BECore::Chess {
             json["status"] = MakeJsonString(StatusName(model.GetStatus()));
             json["winner"] = winner ? MakeJsonString(PieceColorId(*winner)) : Json();
             json["inCheck"] = model.IsInCheck();
+        }
+
+        /// {"balance", "capturedByWhite", "capturedByBlack"} of the position: a derived view, computed at every call (it has no version of its own)
+        Json MaterialJson(const Position& position) {
+            const MaterialSummary summary = SummarizeMaterial(position);
+            const auto captured = [&](PieceColor gone) {
+                Json counts = Json::object();
+                for (const PieceType type : CapturableTypes()) {
+                    counts[std::string(CapturedId(type).data(), CapturedId(type).size())] = summary.GetMissing(gone, type);
+                }
+                return counts;
+            };
+
+            Json material = Json::object();
+            material["balance"] = summary.GetBalance();
+            material["capturedByWhite"] = captured(PieceColor::Black);  // what White has taken is what Black is missing
+            material["capturedByBlack"] = captured(PieceColor::White);
+            return material;
         }
 
         /// "easy, medium, hard, max" for a message
@@ -193,6 +212,7 @@ namespace BECore::Chess {
         state["startFen"] = TextJson(_model.GetStartFen());
         state["moves"] = std::move(moves);
         state["opponent"] = OpponentJson();
+        state["material"] = MaterialJson(_model.GetPosition());
         return state;
     }
 
