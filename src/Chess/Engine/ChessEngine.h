@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Chess/Engine/Analysis.h>
 #include <Chess/Game/Move.h>
 #include <TaskSystem/CancellationToken.h>
 
@@ -43,6 +44,18 @@ namespace BECore::Chess {
          * watches @p token and answers Cancelled soon after it is cancelled.
          */
         [[nodiscard]] virtual std::expected<Move, EngineError> FindMove(const SearchRequest& request, const CancellationToken& token) = 0;
+
+        /**
+         * @brief How the position @p request leads to stands: the best move with its score (Analysis.h), within the limits of the request.
+         *
+         * The contract of FindMove(): the request is validated (BadRequest), a finished game is NoMove before any search or process, a cancelled
+         * @p token is Cancelled, and a returned move is legal in the position (IllegalMove otherwise). The score is from the side to move.
+         * Not pure: an engine that does not analyse keeps this default, which answers Unsupported, so the doubles of the tests and every other
+         * implementation stay as they are. An engine that wraps another one forwards the call.
+         */
+        [[nodiscard]] virtual std::expected<Analysis, EngineError> Analyse([[maybe_unused]] const SearchRequest& request, [[maybe_unused]] const CancellationToken& token) {
+            return std::unexpected(EngineError{EngineErrorKind::Unsupported, "this engine does not analyse"});
+        }
     };
 
 }  // namespace BECore::Chess
