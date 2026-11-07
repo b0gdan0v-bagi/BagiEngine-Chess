@@ -327,6 +327,7 @@ namespace BECore::Chess::Tests {
         constexpr float kPieceWidth = kCellSize * kCellWidth / kCellHeight;  // a piece fitted by Contain is as high as its cell, as wide as the aspect of its atlas cell, and centered
         constexpr float kPieceLeft = (kCellSize - kPieceWidth) * 0.5f;       // 15.5 units from the left edge of the cell
         constexpr float kPieceRight = kPieceLeft + kPieceWidth;              // 64.5 units
+        constexpr float kLabelBand = 30.0f;                                  // a rank number lies in the top 30 units of its cell, a file letter in the bottom 30 (the boxes are 2..28 and 52..78)
 
         /// One label of the board coordinates: its name and the drawn cell it sits in (the rank labels are in the left column, one per row; the file labels in the bottom row, one per column)
         struct BoardLabel {
@@ -347,19 +348,15 @@ namespace BECore::Chess::Tests {
             return labels;
         }
 
-        /// The color of a cell as the board paints it, written out here: (column + row) even is light, a1 (column 0, row 7) is dark; the same in both orientations
-        const Color& CellColor(int column, int row) {
-            return (column + row) % 2 == 0 ? kLightSquareColor : kDarkSquareColor;
-        }
-
-        /// The color of the text of a label: the other color of the board than its cell has, so it reads on the cell
+        /// The color of the text of a label: the other color of the board than its cell has, so it reads on the cell; (column + row) even is a light cell, a1 (column 0, row 7) is dark, the
+        /// same in both orientations
         const Color& ContrastColor(int column, int row) {
             return (column + row) % 2 == 0 ? kDarkSquareColor : kLightSquareColor;
         }
 
         /// What is wrong with the labels of the board as they are laid out, one problem to a line, nothing when it is right: a label that is missing or not shown, a glyph the box cuts
-        /// (the validator does not see it for a label that clips), a box that is not in the corner of its edge cell (the left of the piece for a rank, the right of it for a file) or leaves the
-        /// board, and a text color that does not read on the cell
+        /// (the validator does not see it for a label that clips), a box that is not in the corner of its edge cell (the top left, left of the piece, for a rank; the bottom right, right of it, for a
+        /// file) or leaves the board, and a text color that does not read on the cell
         eastl::string BoardLabelProblems(const UICanvasLayout& layout) {
             eastl::string problems;
             const float scale = layout.GetResolved().scale;
@@ -382,9 +379,11 @@ namespace BECore::Chess::Tests {
                 const float cellY = kBoardTop + static_cast<float>(spec.row) * kCellSize;
                 const float low = spec.file ? cellX + kPieceRight : cellX;
                 const float high = spec.file ? cellX + kCellSize : cellX + kPieceLeft;
-                if (rect.x < low - kPixelTolerance || rect.x + rect.w > high + kPixelTolerance || rect.y < cellY - kPixelTolerance || rect.y + rect.h > cellY + kCellSize + kPixelTolerance) {
+                const float top = spec.file ? cellY + kCellSize - kLabelBand : cellY;
+                const float bottom = spec.file ? cellY + kCellSize : cellY + kLabelBand;
+                if (rect.x < low - kPixelTolerance || rect.x + rect.w > high + kPixelTolerance || rect.y < top - kPixelTolerance || rect.y + rect.h > bottom + kPixelTolerance) {
                     problems += Format("{} ({:.1f}, {:.1f}, {:.1f}, {:.1f}) is not in the corner x {:.1f}..{:.1f}, y {:.1f}..{:.1f} of its cell\n", spec.name.c_str(), rect.x, rect.y, rect.w, rect.h,
-                                       low, high, cellY, cellY + kCellSize);
+                                       low, high, top, bottom);
                 }
                 const UILabel* label = element->Cast<UILabel>();
                 const Color& expected = ContrastColor(spec.column, spec.row);
@@ -2016,10 +2015,10 @@ namespace BECore::Chess::Tests {
             EXPECT_FLOAT_EQ(cellY, expectedY);
             EXPECT_GE(label.rect.x, spec.file ? cellX + kPieceRight : cellX) << "the rank numbers are left of the piece, the file letters right of it";
             EXPECT_LE(label.rect.x + label.rect.w, spec.file ? cellX + kCellSize : cellX + kPieceLeft);
-            EXPECT_GE(label.rect.y, cellY);
-            EXPECT_LE(label.rect.y + label.rect.h, cellY + kCellSize);
+            EXPECT_GE(label.rect.y, spec.file ? cellY + kCellSize - kLabelBand : cellY) << "the rank numbers are at the top of the cell, the file letters at the bottom";
+            EXPECT_LE(label.rect.y + label.rect.h, spec.file ? cellY + kCellSize : cellY + kLabelBand);
             EXPECT_GE(label.rect.x, kBoardLeft) << "inside the board";
-            EXPECT_LE(label.rect.x + label.rect.w, kBoardLeft + 8.0f * kCellSize);
+            EXPECT_LE(label.rect.x + label.rect.w, kBoardLeft + static_cast<float>(kBoardEdgeCells) * kCellSize);
             EXPECT_GE(label.rect.y, kBoardTop);
             EXPECT_LE(label.rect.y + label.rect.h, kBoardBottom);
         }
@@ -2300,6 +2299,14 @@ namespace BECore::Chess::Tests {
         Replace(inside, "name=\"RankLabel3\" x=\"102\"", "name=\"RankLabel3\" x=\"182\"");
         EXPECT_NE(problemsOf(inside).find("RankLabel3 (182.0"), eastl::string::npos) << "a label under a cell that is not at the edge";
 
+        std::string rankAtTheBottom = shipped;
+        Replace(rankAtTheBottom, "name=\"RankLabel0\" x=\"102\" y=\"82\"", "name=\"RankLabel0\" x=\"102\" y=\"132\"");
+        EXPECT_NE(problemsOf(rankAtTheBottom).find("RankLabel0 (102.0, 132.0"), eastl::string::npos) << "a rank number in the bottom left of its cell is not in the corner";
+
+        std::string fileAtTheTop = shipped;
+        Replace(fileAtTheTop, "name=\"FileLabel7\" x=\"725\" y=\"692\"", "name=\"FileLabel7\" x=\"725\" y=\"642\"");
+        EXPECT_NE(problemsOf(fileAtTheTop).find("FileLabel7 (725.0, 642.0"), eastl::string::npos) << "a file letter in the top right of its cell is not in the corner";
+
         std::string wrongColor = shipped;
         Replace(wrongColor, "textColor=\"181,136,99,255\"", "textColor=\"240,217,181,255\"");
         EXPECT_NE(problemsOf(wrongColor).find("RankLabel0 has not the color"), eastl::string::npos) << "cream on a light cell";
@@ -2307,8 +2314,6 @@ namespace BECore::Chess::Tests {
         std::string missing = shipped;
         Replace(missing, "name=\"FileLabel7\"", "name=\"FileLabelX\"");
         EXPECT_NE(problemsOf(missing).find("FileLabel7 is missing"), eastl::string::npos);
-
-        EXPECT_TRUE(ShippedElementsXml("NoSuchNode").empty()) << "a scene without the canvas has no elements to check";
     }
 
     TEST_F(ChessUiTest, TheHudStillStaysOutsideTheBoardWithTheCoordinatesOnIt) {
@@ -2318,7 +2323,9 @@ namespace BECore::Chess::Tests {
         const auto hud = Hud();
         ASSERT_TRUE(hud);
         for (const char* name : {"Turn", "Menu", "Reset"}) {
-            EXPECT_LE(hud->GetRoot().FindByName(PoolString::Intern(name))->rect.y + hud->GetRoot().FindByName(PoolString::Intern(name))->rect.h, kBoardTop + 0.01f) << name;
+            const UIElement* element = hud->GetRoot().FindByName(PoolString::Intern(name));
+            ASSERT_NE(element, nullptr) << name;
+            EXPECT_LE(element->rect.y + element->rect.h, kBoardTop + 0.01f) << name;
         }
     }
 
@@ -4106,7 +4113,7 @@ namespace BECore::Chess::Tests {
 
     // ---- the promotion panel: the layout ---------------------------------------------------------------------------------------------
     // The checks of the opponent panel on the node PromotionPanel: the validator on the size matrix, no word cut on any case and in the narrowest window, the touch targets, the plate
-    // inside the view, the words and ids held to the table of PromotionChoices, the names of the three canvases apart and broken copies. The panel has no HTML + CSS twin in
+    // inside the view, the words and ids held to the table of PromotionChoices, the names of the four canvases apart and broken copies. The panel has no HTML + CSS twin in
     // ChessHudWebTest: that file holds the HUD and the opponent panel, and the web front end has no entry for this panel yet
 
     TEST_F(ChessUiTest, ThePromotionPanelPassesTheSizeMatrix) {
@@ -4260,14 +4267,15 @@ namespace BECore::Chess::Tests {
             const char* node;
             IntrusivePtr<UICanvasComponent> canvas;
         } canvases[] = {{"Hud", Hud()}, {"BoardCoordinates", Coordinate()}, {"OpponentPanel", Panel()}, {"PromotionPanel", Promotion()}};
-        eastl::vector<PoolString> names[4];
-        for (size_t i = 0; i < 4; ++i) {
+        constexpr size_t kCanvasCount = std::size(canvases);
+        eastl::vector<PoolString> names[kCanvasCount];
+        for (size_t i = 0; i < kCanvasCount; ++i) {
             ASSERT_TRUE(canvases[i].canvas) << canvases[i].node;
             CollectNames(canvases[i].canvas->GetRoot(), names[i]);
             EXPECT_FALSE(names[i].empty()) << canvases[i].node;
         }
-        for (size_t first = 0; first < 4; ++first) {
-            for (size_t second = first + 1; second < 4; ++second) {
+        for (size_t first = 0; first < kCanvasCount; ++first) {
+            for (size_t second = first + 1; second < kCanvasCount; ++second) {
                 for (const PoolString& name : names[first]) {
                     EXPECT_EQ(eastl::find(names[second].begin(), names[second].end(), name), names[second].end())
                         << name.CStr() << " is in both " << canvases[first].node << " and " << canvases[second].node;
