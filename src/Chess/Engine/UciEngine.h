@@ -27,7 +27,7 @@ namespace BECore::Chess {
      * @brief A UCI engine (Stockfish, or any program that speaks UCI) in a child process: the C++ port of `UciEngine` of tools/stockfish_bridge.py.
      *
      * The constructor starts nothing, so the thread that makes the object never waits for a program to start. The process starts on
-     * the first FindMove() and again on the first one after an error closed it (a hung or dead engine is replaced, not waited for).
+     * the first FindMove() or Analyse() and again on the first one after an error closed it (a hung or dead engine is replaced, not waited for).
      * FindMove() and Analyse() block the calling thread for the whole search, so a caller that must not wait (the main thread) runs it on a worker.
      * Calls are serialized by a mutex: one search at a time, the others wait for their turn. A call takes the mutex before it looks at its
      * token, so a thread waiting for its turn sees its own cancellation only after the lock is taken, which includes the closing of a process
@@ -40,12 +40,12 @@ namespace BECore::Chess {
      * The waits go in slices of 20 ms, so a cancelled token is seen soon.
      *
      * What closes the process (`quit`, then `quitGraceMs`, then the signals of UciProcess::Close()): Timeout (no `uciok`, `readyok`
-     * or `bestmove` in time), ProcessDied, ProtocolError, a cancelled search whose engine does not answer `stop` within `stopGraceMs`
+     * or `bestmove` in time), ProcessDied, ProtocolError (except Analyse()'s missing score, below), a cancelled search whose engine does not answer `stop` within `stopGraceMs`
      * (the call still answers Cancelled), a cancel during the setup (the waits for `uciok` and `readyok`, `ucinewgame` and `isready`: no
      * search is running yet, so no `stop` is sent, the process is closed and Cancelled comes back once the process has gone: at once for an engine that obeys `quit`, after the
      * `quitGraceMs` and the signals for one that does not), and the
-     * destructor. What keeps it: NoMove and IllegalMove (the engine is alive and in step), and a cancelled search the engine did answer
-     * (its `bestmove` is dropped). The object logs nothing.
+     * destructor. What keeps it: NoMove and IllegalMove (the engine is alive and in step), the ProtocolError of an Analyse() whose `bestmove` came with no usable score (it answered, it is in step),
+     * and a cancelled search the engine did answer (its `bestmove` is dropped). The object logs nothing.
      */
     class UciEngine final : public IChessEngine {
     public:
@@ -94,7 +94,7 @@ namespace BECore::Chess {
         };
 
         /// The whole of FindMove() and Analyse(), with the mutex already held: validation, NoMove, Cancelled, Begin(), the wait for `bestmove` (StopSearch(), CloseAndFail()), the move checked
-        [[nodiscard]] std::expected<Searched, EngineError> Search(const SearchRequest& request, const CancellationToken& token);
+        [[nodiscard]] std::expected<Searched, EngineError> RunSearch(const SearchRequest& request, const CancellationToken& token);
         /// Everything up to and including `go`: the process (started and shaken hands with when there is none), a new game when it is one, `position`, `go`.
         /// On an error the process is in an unknown state; the caller closes it
         [[nodiscard]] std::expected<void, EngineError> Begin(const SearchRequest& request, const CancellationToken& token);

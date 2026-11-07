@@ -15,7 +15,7 @@ It answers `uci` with `id name`, `id author`, one option (`Skill Level`) and `uc
     --noisy-info         around the final `info` line (depth 2, the score of --scores) print lines an analysis must not take: an earlier depth
                          (cp -321), the same depth as a bound (cp 654 lowerbound), a second line of the search (multipv 2, mate 7), a text
                          line (`info string score cp 999`) and, after the final line, a bound again (mate -9 upperbound)
-    --no-score           the `info` lines carry no `score` at all
+    --no-score           the final `info` line carries no `score` (the noise lines of --noisy-info keep theirs)
     --think-ms N         wait N milliseconds before answering `go`; a `stop` line ends the wait at once (an `isready` is answered meanwhile)
     --think-first-only   --think-ms applies to the 1st `go` only (a search that is stopped, then one that answers at once)
     --ignore-stop        a `stop` line does not end the wait

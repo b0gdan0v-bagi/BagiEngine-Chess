@@ -57,7 +57,11 @@ namespace BECore::Chess {
                 if (!info || !info->score || info->multiPv != 1) {
                     return;
                 }
-                (info->lowerBound || info->upperBound ? _bound : _exact) = info;
+                if (info->lowerBound || info->upperBound) {
+                    _bound = info;
+                } else {
+                    _exact = info;
+                }
             }
 
             /// The line to analyse from, nothing when no usable one was seen
@@ -175,7 +179,7 @@ namespace BECore::Chess {
 
     std::expected<Move, EngineError> UciEngine::FindMove(const SearchRequest& request, const CancellationToken& token) {
         const std::lock_guard lock(_mutex);
-        auto searched = Search(request, token);
+        auto searched = RunSearch(request, token);
         if (!searched) {
             return std::unexpected(std::move(searched.error()));
         }
@@ -184,7 +188,7 @@ namespace BECore::Chess {
 
     std::expected<Analysis, EngineError> UciEngine::Analyse(const SearchRequest& request, const CancellationToken& token) {
         const std::lock_guard lock(_mutex);
-        auto searched = Search(request, token);
+        auto searched = RunSearch(request, token);
         if (!searched) {
             return std::unexpected(std::move(searched.error()));
         }
@@ -196,7 +200,7 @@ namespace BECore::Chess {
         return Analysis{{AnalysisLine{searched->move, *info.score, info.depth}}};
     }
 
-    std::expected<UciEngine::Searched, EngineError> UciEngine::Search(const SearchRequest& request, const CancellationToken& token) {
+    std::expected<UciEngine::Searched, EngineError> UciEngine::RunSearch(const SearchRequest& request, const CancellationToken& token) {
         if (auto valid = request.Validate(); !valid) {
             return std::unexpected(std::move(valid.error()));
         }
