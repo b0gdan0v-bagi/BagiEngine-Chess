@@ -913,14 +913,15 @@ namespace BECore::Chess::Tests {
             return CanvasOf("BoardCoordinates");
         }
 
-        /// A label of the board coordinates by name (the test fails when it is not there)
-        UILabel& CoordinateLabel(const char* name) const {
-            UILabel* label = ElementOf("BoardCoordinates", name).Cast<UILabel>();
+        /// A label of the board coordinates by name; null, with a failure recorded, when it is not a label (the caller stops with `ASSERT_NE`, so one test fails and the rest run)
+        UILabel* CoordinateLabel(const char* name) const {
+            const auto canvas = Coordinate();
+            UIElement* element = canvas ? canvas->GetRoot().FindByName(PoolString::Intern(name)) : nullptr;
+            UILabel* label = element != nullptr ? element->Cast<UILabel>() : nullptr;
             if (label == nullptr) {
-                ADD_FAILURE() << name << " is not a label";
-                std::abort();
+                ADD_FAILURE() << name << " is not a label of BoardCoordinates";
             }
-            return *label;
+            return label;
         }
 
         /// A rect of the view in output pixels, for the fit of the view into the current output
@@ -2007,7 +2008,9 @@ namespace BECore::Chess::Tests {
         Draw();
         for (const BoardLabel& spec : ExpectedBoardLabels()) {
             SCOPED_TRACE(spec.name.c_str());
-            const UILabel& label = CoordinateLabel(spec.name.c_str());
+            const UILabel* found = CoordinateLabel(spec.name.c_str());
+            ASSERT_NE(found, nullptr);
+            const UILabel& label = *found;
             const float cellX = kBoardLeft + static_cast<float>(spec.column) * kCellSize;
             const float cellY = kBoardTop + static_cast<float>(spec.row) * kCellSize;
             const auto [expectedX, expectedY] = CellOrigin(spec.column, spec.row);
@@ -2084,7 +2087,9 @@ namespace BECore::Chess::Tests {
 
             for (const BoardLabel& spec : ExpectedBoardLabels()) {
                 SCOPED_TRACE(spec.name.c_str());
-                const UILabel& label = CoordinateLabel(spec.name.c_str());
+                const UILabel* found = CoordinateLabel(spec.name.c_str());
+                ASSERT_NE(found, nullptr);
+                const UILabel& label = *found;
                 const Rect cell = CellRect(spec.column, spec.row);
                 const bool light = (spec.column + spec.row) % 2 == 0;
 
@@ -2185,7 +2190,9 @@ namespace BECore::Chess::Tests {
         const auto canvas = Coordinate();
         ASSERT_TRUE(canvas);
         for (const BoardLabel& spec : ExpectedBoardLabels()) {
-            const Rect& rect = CoordinateLabel(spec.name.c_str()).rect;  // canvas units: the view units of a SceneView canvas
+            const UILabel* label = CoordinateLabel(spec.name.c_str());
+            ASSERT_NE(label, nullptr);
+            const Rect& rect = label->rect;  // canvas units: the view units of a SceneView canvas
             EXPECT_EQ(canvas->GetLayout().HitTest(rect.x + rect.w * 0.5f, rect.y + rect.h * 0.5f), nullptr) << spec.name.c_str() << " is not found by a hit test";
         }
 
@@ -2205,7 +2212,9 @@ namespace BECore::Chess::Tests {
             _manager->UpdateAll();
             Model().ClearSelection();
             Draw();
-            const auto [x, y] = ScreenCenter(CoordinateLabel(press.label));
+            const UILabel* label = CoordinateLabel(press.label);
+            ASSERT_NE(label, nullptr);
+            const auto [x, y] = ScreenCenter(*label);
             EXPECT_FALSE(CoreManager::GetUIInput().DispatchMouseButtonDown(Button(x, y, true))) << "the canvas does not take the press";
             EXPECT_FALSE(CoreManager::GetUIInput().DispatchMouseButtonUp(Button(x, y, false)));
             ASSERT_TRUE(Model().HasSelection()) << "the board got it";
@@ -2220,14 +2229,18 @@ namespace BECore::Chess::Tests {
             Draw();
             eastl::string text;
             for (int index = 0; index <= kLastBoardIndex; ++index) {
-                text += ShownText(CoordinateLabel((files ? "FileLabel{}"_format(index) : "RankLabel{}"_format(index)).c_str()));
+                const UILabel* label = CoordinateLabel((files ? "FileLabel{}"_format(index) : "RankLabel{}"_format(index)).c_str());
+                if (label != nullptr) {
+                    text += ShownText(*label);
+                }
             }
             return text;
         };
         const auto rects = [&] {
             eastl::vector<Rect> found;
             for (const BoardLabel& spec : ExpectedBoardLabels()) {
-                found.push_back(CoordinateLabel(spec.name.c_str()).rect);
+                const UILabel* label = CoordinateLabel(spec.name.c_str());
+                found.push_back(label != nullptr ? label->rect : Rect{});
             }
             return found;
         };
@@ -2259,14 +2272,18 @@ namespace BECore::Chess::Tests {
         Draw();
         eastl::vector<Color> before;
         for (const BoardLabel& spec : ExpectedBoardLabels()) {
-            before.push_back(CoordinateLabel(spec.name.c_str()).textColor);
+            const UILabel* label = CoordinateLabel(spec.name.c_str());
+            ASSERT_NE(label, nullptr);
+            before.push_back(label->textColor);
         }
         ControlPlays("white");
         _manager->UpdateAll();
         Draw();
         size_t index = 0;
         for (const BoardLabel& spec : ExpectedBoardLabels()) {
-            EXPECT_TRUE(SameColor(CoordinateLabel(spec.name.c_str()).textColor, before[index++])) << spec.name.c_str();
+            const UILabel* label = CoordinateLabel(spec.name.c_str());
+            ASSERT_NE(label, nullptr);
+            EXPECT_TRUE(SameColor(label->textColor, before[index++])) << spec.name.c_str();
         }
     }
 
