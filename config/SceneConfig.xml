@@ -48,6 +48,98 @@
           </components>
         </node>
 
+        <!-- The captured pieces and the balance of the material, in the left margin of the view (x 0 to 100; the board is 100 to 740). A canvas of the SceneView space with no safe area,
+             like BoardCoordinates: it is at fixed scene units next to the board, and ChessMaterialComponent decides what a narrow window with insets leaves of it. Layer 5: over the pieces (0)
+             and the result bar (1), under the HUD (10) and the panels (20); the component is listed before the canvas so that it gives the variables their words before the canvas draws in the
+             same frame. Nothing here takes a click (no blocksInput, nothing interactive, not modal), so the board and the Reset button get every press. The right margin is left free.
+             Two groups mirrored about the middle of the board: the lower one (MaterialBottom*, y 500) is what the color at the bottom of the board has taken, the upper one (MaterialTop*, y 84)
+             what the other color has taken; they swap when the board turns. A group is a list of five rows in the order queen, rook, bishop, knight, pawn, each a chip with the picture of a piece
+             (a UIImage whose sprite the component sets: the pieces of the other color than the group's) and the count "x3"; a row of a piece that has not been taken is hidden and takes no room, so the
+             rows pack at the top of the list. The list is 64 x 216 at x 8 (5 x 40 + 4 x 4) and, with the balance box, is held by Game/MaterialLayout.h: the rows are shown only while the
+             lists lie inside the safe area (in the narrowest case of the size matrix, a 480 px window with side insets, the safe area starts at about x = 75.6 and about 24 units of the margin are left). The balance, "+3" on the side that is ahead and nothing
+             on the other, is a box of 23 x 28 units at the board's edge (x 77 to 100) whose AutoFit shrinks the text (to 12 units at the smallest) instead of cutting it, and it is never hidden. The names all start with
+             Material because elements are found by name in every canvas of the scene. The chip is a cream a little darker than the light squares (so that a test can tell a chip from a square), the text
+             a dark brown that is not one of the two colors of the board's labels. The look (the colors, the sizes of the font, the pictures at this size) is a first guess nobody has seen in a window. -->
+        <node name="Material" layer="5">
+          <components>
+            <component type="ChessMaterialComponent" />
+            <component type="UICanvasComponent" space="SceneView" useSafeArea="false">
+              <elements>
+                <element type="UIStack" name="MaterialTopList" x="8" y="84" width="64" height="216" direction="Vertical" spacing="4" crossAlign="Stretch">
+                  <children>
+                    <element type="UIStack" name="MaterialTopQueenRow" height="40" direction="Horizontal" spacing="4" padding="2" crossAlign="Stretch" color="232,210,170,255" visible="false">
+                      <children>
+                        <element type="UIImage" name="MaterialTopQueenIcon" width="26" />
+                        <element type="UILabel" name="MaterialTopQueenCount" flex="1" text="{materialTopQueen}" fontSize="20" align="Center" verticalAlign="Center" overflow="Clip" wrap="false" textColor="70,45,30,255" />
+                      </children>
+                    </element>
+                    <element type="UIStack" name="MaterialTopRookRow" height="40" direction="Horizontal" spacing="4" padding="2" crossAlign="Stretch" color="232,210,170,255" visible="false">
+                      <children>
+                        <element type="UIImage" name="MaterialTopRookIcon" width="26" />
+                        <element type="UILabel" name="MaterialTopRookCount" flex="1" text="{materialTopRook}" fontSize="20" align="Center" verticalAlign="Center" overflow="Clip" wrap="false" textColor="70,45,30,255" />
+                      </children>
+                    </element>
+                    <element type="UIStack" name="MaterialTopBishopRow" height="40" direction="Horizontal" spacing="4" padding="2" crossAlign="Stretch" color="232,210,170,255" visible="false">
+                      <children>
+                        <element type="UIImage" name="MaterialTopBishopIcon" width="26" />
+                        <element type="UILabel" name="MaterialTopBishopCount" flex="1" text="{materialTopBishop}" fontSize="20" align="Center" verticalAlign="Center" overflow="Clip" wrap="false" textColor="70,45,30,255" />
+                      </children>
+                    </element>
+                    <element type="UIStack" name="MaterialTopKnightRow" height="40" direction="Horizontal" spacing="4" padding="2" crossAlign="Stretch" color="232,210,170,255" visible="false">
+                      <children>
+                        <element type="UIImage" name="MaterialTopKnightIcon" width="26" />
+                        <element type="UILabel" name="MaterialTopKnightCount" flex="1" text="{materialTopKnight}" fontSize="20" align="Center" verticalAlign="Center" overflow="Clip" wrap="false" textColor="70,45,30,255" />
+                      </children>
+                    </element>
+                    <element type="UIStack" name="MaterialTopPawnRow" height="40" direction="Horizontal" spacing="4" padding="2" crossAlign="Stretch" color="232,210,170,255" visible="false">
+                      <children>
+                        <element type="UIImage" name="MaterialTopPawnIcon" width="26" />
+                        <element type="UILabel" name="MaterialTopPawnCount" flex="1" text="{materialTopPawn}" fontSize="20" align="Center" verticalAlign="Center" overflow="Clip" wrap="false" textColor="70,45,30,255" />
+                      </children>
+                    </element>
+                  </children>
+                </element>
+                <element type="UILabel" name="MaterialTopBalance" x="77" y="84" width="23" height="28" text="{materialTopBalance}" fontSize="20" minFontSize="12" align="Center" verticalAlign="Center" overflow="AutoFit" wrap="false" />
+                <element type="UIStack" name="MaterialBottomList" x="8" y="500" width="64" height="216" direction="Vertical" spacing="4" crossAlign="Stretch">
+                  <children>
+                    <element type="UIStack" name="MaterialBottomQueenRow" height="40" direction="Horizontal" spacing="4" padding="2" crossAlign="Stretch" color="232,210,170,255" visible="false">
+                      <children>
+                        <element type="UIImage" name="MaterialBottomQueenIcon" width="26" />
+                        <element type="UILabel" name="MaterialBottomQueenCount" flex="1" text="{materialBottomQueen}" fontSize="20" align="Center" verticalAlign="Center" overflow="Clip" wrap="false" textColor="70,45,30,255" />
+                      </children>
+                    </element>
+                    <element type="UIStack" name="MaterialBottomRookRow" height="40" direction="Horizontal" spacing="4" padding="2" crossAlign="Stretch" color="232,210,170,255" visible="false">
+                      <children>
+                        <element type="UIImage" name="MaterialBottomRookIcon" width="26" />
+                        <element type="UILabel" name="MaterialBottomRookCount" flex="1" text="{materialBottomRook}" fontSize="20" align="Center" verticalAlign="Center" overflow="Clip" wrap="false" textColor="70,45,30,255" />
+                      </children>
+                    </element>
+                    <element type="UIStack" name="MaterialBottomBishopRow" height="40" direction="Horizontal" spacing="4" padding="2" crossAlign="Stretch" color="232,210,170,255" visible="false">
+                      <children>
+                        <element type="UIImage" name="MaterialBottomBishopIcon" width="26" />
+                        <element type="UILabel" name="MaterialBottomBishopCount" flex="1" text="{materialBottomBishop}" fontSize="20" align="Center" verticalAlign="Center" overflow="Clip" wrap="false" textColor="70,45,30,255" />
+                      </children>
+                    </element>
+                    <element type="UIStack" name="MaterialBottomKnightRow" height="40" direction="Horizontal" spacing="4" padding="2" crossAlign="Stretch" color="232,210,170,255" visible="false">
+                      <children>
+                        <element type="UIImage" name="MaterialBottomKnightIcon" width="26" />
+                        <element type="UILabel" name="MaterialBottomKnightCount" flex="1" text="{materialBottomKnight}" fontSize="20" align="Center" verticalAlign="Center" overflow="Clip" wrap="false" textColor="70,45,30,255" />
+                      </children>
+                    </element>
+                    <element type="UIStack" name="MaterialBottomPawnRow" height="40" direction="Horizontal" spacing="4" padding="2" crossAlign="Stretch" color="232,210,170,255" visible="false">
+                      <children>
+                        <element type="UIImage" name="MaterialBottomPawnIcon" width="26" />
+                        <element type="UILabel" name="MaterialBottomPawnCount" flex="1" text="{materialBottomPawn}" fontSize="20" align="Center" verticalAlign="Center" overflow="Clip" wrap="false" textColor="70,45,30,255" />
+                      </children>
+                    </element>
+                  </children>
+                </element>
+                <element type="UILabel" name="MaterialBottomBalance" x="77" y="500" width="23" height="28" text="{materialBottomBalance}" fontSize="20" minFontSize="12" align="Center" verticalAlign="Center" overflow="AutoFit" wrap="false" />
+              </elements>
+            </component>
+          </components>
+        </node>
+
         <!-- The HUD is in the margins of the view (space="SceneView"): it scales and moves with the board and never covers it, whatever the shape of the window.
              The board is 640 x 640 at (100, 80); the margin is 80 units above and below, so one row of 56-unit controls fits in each (12 units from the edge of the
              safe area), and a 56-unit button is still a 32 px touch target at the smallest fit scale of the size matrix (0.57, the 840 units of the width in a 480 px window).

@@ -14,16 +14,21 @@
 #include <BECore/UI/UIButton.h>
 #include <BECore/UI/UICanvasComponent.h>
 #include <BECore/UI/UIElement.h>
+#include <BECore/UI/UIImage.h>
 #include <BECore/UI/UILabel.h>
+#include <BECore/UI/UIPreview.h>
 #include <BECore/UI/UIScreenContent.h>
 #include <BECore/UI/UISegmented.h>
 #include <BECore/UI/UIStack.h>
 #include <Chess/ChessGame.h>
 #include <Chess/ChessGameControl.h>
+#include <Chess/Components/ChessMaterialComponent.h>
 #include <Chess/Components/ChessPieceComponent.h>
 #include <Chess/Engine/OpponentChoice.h>
 #include <Chess/Engine/OpponentText.h>
 #include <Chess/Game/BoardCoordinates.h>
+#include <Chess/Game/CapturedMaterial.h>
+#include <Chess/Game/MaterialLayout.h>
 #include <Chess/Game/MoveGenerator.h>
 #include <Chess/Game/PromotionChoices.h>
 #include <Common/EngineEnvironment.h>
@@ -70,6 +75,7 @@ namespace BECore::Chess::Tests {
         constexpr float kCellWidth = 116.67f;
         constexpr float kCellHeight = 190.5f;
         constexpr size_t kPieceCount = 32;
+        constexpr const char* kMaterialPieces[] = {"Queen", "Rook", "Bishop", "Knight", "Pawn"};  // the rows of a group of the captured material, in the order of the scene
         constexpr float kPixelTolerance = 0.01f;
 
         constexpr int kManyFrames = 200;                            // frames that must pass with nothing happening
@@ -425,6 +431,7 @@ namespace BECore::Chess::Tests {
             GameManager::GetInstance().Shutdown();
             EngineEnvironment::UseSceneManager({});
             _manager.Reset();
+            CoreManager::GetUIEnvironment().SetSafeAreaOverride(std::nullopt);  // a test that simulated insets leaves the shared environment as it was
             CoreManager::GetUIVars().Clear();
             CoreManager::GetRendererManager().SetRenderer({});
             CoreManager::GetFontAtlasLibrary().Clear();
@@ -911,6 +918,94 @@ namespace BECore::Chess::Tests {
         /// The canvas of the letters and numbers at the edges of the board: the node `BoardCoordinates`
         IntrusivePtr<UICanvasComponent> Coordinate() const {
             return CanvasOf("BoardCoordinates");
+        }
+
+        /// The canvas of the captured pieces and the balance: the node `Material`
+        IntrusivePtr<UICanvasComponent> Material() const {
+            return CanvasOf("Material");
+        }
+
+        /// An element of the `Material` canvas by name (the test fails when it is not there)
+        UIElement& MaterialElement(const char* name) const {
+            return ElementOf("Material", name);
+        }
+
+        /// The row of a piece in a group of the display as it was laid out in the last draw: @p group is "Top" or "Bottom", @p piece "Queen" .. "Pawn"
+        UIElement& MaterialRow(const char* group, const char* piece) const {
+            return MaterialElement(Format("Material{}{}Row", group, piece).c_str());
+        }
+
+        /// Whether that row is on the screen: shown by the component and given a rect by the layout
+        bool RowShown(const char* group, const char* piece) const {
+            const UIElement& row = MaterialRow(group, piece);
+            return row.active.visible && !row.rect.IsEmpty();
+        }
+
+        /// The rows on the screen after the last draw, in the order of the scene ("TopQueen BottomPawn"), nothing when none is
+        eastl::string ShownMaterialRows() const {
+            eastl::string shown;
+            for (const char* group : {"Top", "Bottom"}) {
+                for (const char* piece : kMaterialPieces) {
+                    if (RowShown(group, piece)) {
+                        shown += shown.empty() ? "" : " ";
+                        shown += Format("{}{}", group, piece);
+                    }
+                }
+            }
+            return shown;
+        }
+
+        /// The text of the variable that a count of the display shows, after a frame: "x3" or ""
+        eastl::string MaterialCount(const char* group, const char* piece) {
+            return Var(Format("material{}{}", group, piece).c_str());
+        }
+
+        /// The sprite the icon of a row has been given
+        eastl::string MaterialSprite(const char* group, const char* piece) const {
+            const UIImage* icon = MaterialElement(Format("Material{}{}Icon", group, piece).c_str()).Cast<UIImage>();
+            if (icon == nullptr) {
+                ADD_FAILURE() << group << piece << " has no UIImage icon";
+                return {};
+            }
+            const eastl::string_view name = icon->sprite.ToStringView();
+            return eastl::string(name.data(), name.size());
+        }
+
+        /// The twelve variables of the display after a frame, joined: ten counts (top group queen to pawn, then the bottom group) and the two balances ("|" between them)
+        eastl::string MaterialWords() {
+            Draw();
+            eastl::string words;
+            for (const char* group : {"Top", "Bottom"}) {
+                for (const char* piece : kMaterialPieces) {
+                    const eastl::string_view value = CoreManager::GetUIVars().Get(PoolString::Intern(Format("material{}{}", group, piece).c_str()));
+                    words += Format("{}|", value);
+                }
+                const eastl::string_view balance = CoreManager::GetUIVars().Get(PoolString::Intern(Format("material{}Balance", group).c_str()));
+                words += Format("{}|", balance);
+            }
+            return words;
+        }
+
+        /// Draws the first two frames of a scene: the canvas has been laid out once only after the first, and the rows wait for that
+        void Settle() {
+            Draw();
+            Draw();
+        }
+
+        /// A window of @p width x @p height pixels with the safe area of a phone held sideways (SafeAreaSimulation::SideInsets), drawn twice so the rule of the lists has seen it
+        void ResizeWithSideInsets(float width, float height) {
+            _renderer->width = width;
+            _renderer->height = height;
+            CoreManager::GetUIEnvironment().SetSafeAreaOverride(UIPreview::SimulatedSafeArea(SafeAreaSimulation::SideInsets, width, height));
+            Settle();
+        }
+
+        /// A window of @p width x @p height pixels with no insets at all, drawn twice
+        void ResizeWithoutInsets(float width, float height) {
+            _renderer->width = width;
+            _renderer->height = height;
+            CoreManager::GetUIEnvironment().SetSafeAreaOverride(std::nullopt);
+            Settle();
         }
 
         /// A label of the board coordinates by name; null, with a failure recorded, when it is not a label (the caller stops with `ASSERT_NE`, so one test fails and the rest run)
@@ -4278,12 +4373,12 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, NoElementNameIsInTwoCanvasesOfTheScene) {
-        // Elements are found by name in every canvas of the scene (SetVisibleByName and the lookups of the tests): the HUD, the board coordinates, the opponent panel and the promotion panel keep
-        // their own names
+        // Elements are found by name in every canvas of the scene (SetVisibleByName and the lookups of the tests): the HUD, the board coordinates, the captured material, the opponent panel and
+        // the promotion panel keep their own names
         const struct {
             const char* node;
             IntrusivePtr<UICanvasComponent> canvas;
-        } canvases[] = {{"Hud", Hud()}, {"BoardCoordinates", Coordinate()}, {"OpponentPanel", Panel()}, {"PromotionPanel", Promotion()}};
+        } canvases[] = {{"Hud", Hud()}, {"BoardCoordinates", Coordinate()}, {"Material", Material()}, {"OpponentPanel", Panel()}, {"PromotionPanel", Promotion()}};
         constexpr size_t kCanvasCount = std::size(canvases);
         eastl::vector<PoolString> names[kCanvasCount];
         for (size_t i = 0; i < kCanvasCount; ++i) {
@@ -4347,6 +4442,520 @@ namespace BECore::Chess::Tests {
         CanvasCopy copy(xml);
         LayOutInTheNarrowestWindow(copy.layout);
         EXPECT_NE(PanelProblems(copy.layout, kPromotionPlate).find("leaves the safe area"), eastl::string::npos);
+    }
+
+    // ---- the captured material: the node Material ---------------------------------------------------------------------------------------
+    // A canvas in the left margin (SceneConfig.xml has the reasons for its numbers) that ChessMaterialComponent gives its words and its sprites. Two groups: the lower one shows what the color at
+    // the bottom of the board has taken, the upper one what the other color has taken. The rows are shown while the lists lie inside the safe area (Game/MaterialLayout.h). Here: the behavior on
+    // the shipped scene; the library of textures is empty in the test, so an icon has its sprite name and draws nothing
+
+    namespace {
+
+        constexpr const char* kWhiteTookAPawn = "rnbqkbnr/ppp1pppp/8/3P4/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 3";       // White has taken the d pawn of Black: +1 for White
+        constexpr const char* kBlackTookTheQueen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB1KBNR w KQkq - 0 1";      // the queen of White is gone: +9 for Black
+        constexpr const char* kBlackCanTakeAPawn = "rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2";  // Black to move: d5e4 takes a pawn
+        constexpr const char* kPawnAboutToPromote = "8/P6k/8/8/8/8/8/K7 w - - 0 1";                                 // White: a pawn; Black: a king. a7a8q makes a queen
+        constexpr const char* kEightPawnsAgainstNothing = "4k3/8/8/8/8/8/PPPPPPPP/4K3 w - - 0 1";                   // White: king and eight pawns, Black: a bare king
+        constexpr const char* kEmptyMaterialWords = "||||||||||||";                                                 // twelve variables, each followed by "|"
+        const Color kMaterialChipColor{232, 210, 170, 255};                                                         // the fill of a row (SceneConfig.xml)
+        constexpr float kMaterialMarginRight = 100.0f;                                                              // the left margin ends where the board begins
+
+        bool FenSetsTheState(const char* fen) {
+            Json request = Json::object();
+            request["fen"] = fen;
+            return ChessGame::GetActive()->AsControllable()->SetState(request).has_value();
+        }
+
+    }  // namespace
+
+    TEST_F(ChessUiTest, TheMaterialCanvasIsOnItsOwnLayerOverThePiecesAndUnderTheHud) {
+        const auto& nodes = GetScene().GetRootNode().GetChildren();
+        const auto indexOf = [&](const char* name) -> int {
+            for (size_t i = 0; i < nodes.size(); ++i) {
+                if (nodes[i]->GetName() == PoolString::Intern(name)) {
+                    return static_cast<int>(i);
+                }
+            }
+            return -1;
+        };
+        const auto layerOf = [&](const char* name) { return nodes[static_cast<size_t>(indexOf(name))]->GetLayer(); };
+        ASSERT_GE(indexOf("Material"), 0);
+        EXPECT_EQ(layerOf("Material"), 5);
+        EXPECT_GT(indexOf("Material"), indexOf("BoardCoordinates")) << "written after the coordinates";
+        EXPECT_GT(layerOf("Material"), 0) << "over the pieces (layer 0)";
+        EXPECT_GT(layerOf("Material"), layerOf("Result")) << "and over the result bar";
+        EXPECT_LT(layerOf("Material"), layerOf("Hud"));
+        EXPECT_LT(layerOf("Material"), layerOf("OpponentPanel"));
+        EXPECT_LT(layerOf("Material"), layerOf("PromotionPanel"));
+
+        // The component comes before the canvas on the node: it gives the variables their words before the canvas draws in the same frame
+        const auto& components = nodes[static_cast<size_t>(indexOf("Material"))]->GetComponents();
+        const auto words = nodes[static_cast<size_t>(indexOf("Material"))]->GetComponent<ChessMaterialComponent>();
+        const auto canvas = Material();
+        ASSERT_TRUE(words);
+        ASSERT_TRUE(canvas);
+        ASSERT_EQ(components.size(), 2u);
+        EXPECT_EQ(components[0].Get(), static_cast<IComponent*>(words.Get())) << "the component is listed first";
+        EXPECT_EQ(components[1].Get(), static_cast<IComponent*>(canvas.Get()));
+
+        EXPECT_EQ(canvas->_space, CanvasSpace::SceneView);
+        EXPECT_FALSE(canvas->_useSafeArea) << "fixed scene units like the board; the rule of the lists reads the safe area itself";
+        EXPECT_FALSE(canvas->_modal);
+        EXPECT_TRUE(canvas->_visible);
+    }
+
+    TEST_F(ChessUiTest, TheMaterialCanvasHasTwoGroupsOfFiveRowsAndNothingInItTakesAClick) {
+        const auto canvas = Material();
+        ASSERT_TRUE(canvas);
+        const UIElement& root = canvas->GetRoot();
+        ASSERT_EQ(root.children.size(), 4u) << "two lists and two balances";
+        eastl::vector<const UIElement*> everything;
+        const std::function<void(const UIElement&)> collect = [&](const UIElement& element) {
+            everything.push_back(&element);
+            for (const auto& child : element.children) {
+                collect(*child);
+            }
+        };
+        collect(root);
+        for (const UIElement* element : everything) {
+            EXPECT_FALSE(element->blocksInput) << element->name.CStr();
+            EXPECT_FALSE(element->interactive) << element->name.CStr();
+            if (element != &root) {
+                EXPECT_EQ(std::string(element->name.CStr()).rfind("Material", 0), 0u) << element->name.CStr() << " starts with Material: elements are found by name in every canvas";
+            }
+        }
+
+        for (const char* group : {"Top", "Bottom"}) {
+            SCOPED_TRACE(group);
+            const UIElement& list = MaterialElement(Format("Material{}List", group).c_str());
+            EXPECT_NE(list.Cast<UIStack>(), nullptr);
+            ASSERT_EQ(list.children.size(), 5u);
+            for (size_t index = 0; index < 5; ++index) {
+                const UIElement& row = *list.children[index];
+                EXPECT_EQ(row.name, PoolString::Intern(Format("Material{}{}Row", group, kMaterialPieces[index]).c_str())) << "the order of the rows: queen, rook, bishop, knight, pawn";
+                EXPECT_FALSE(row.style.visible) << row.name.CStr() << " starts hidden";
+                ASSERT_EQ(row.children.size(), 2u);
+                EXPECT_NE(row.children[0]->Cast<UIImage>(), nullptr) << "the icon";
+                const UILabel* count = row.children[1]->Cast<UILabel>();
+                ASSERT_NE(count, nullptr) << "the count";
+                EXPECT_EQ(count->text, Format("{{material{}{}}}", group, kMaterialPieces[index]));
+            }
+            const UILabel* balance = MaterialElement(Format("Material{}Balance", group).c_str()).Cast<UILabel>();
+            ASSERT_NE(balance, nullptr);
+            EXPECT_EQ(balance->text, Format("{{material{}Balance}}", group));
+            EXPECT_EQ(balance->overflow, TextOverflow::AutoFit) << "the sign is shrunk into its box and never cut";
+        }
+    }
+
+    TEST_F(ChessUiTest, TheListsAndTheBalancesLieInTheMarginOfTheBoardWhereTheLayoutRuleSaysSo) {
+        Settle();
+        const Rect top = MaterialElement("MaterialTopList").rect;
+        const Rect bottom = MaterialElement("MaterialBottomList").rect;
+        EXPECT_TRUE(SameRect(top, Rect{8.0f, 84.0f, 64.0f, 216.0f}));
+        EXPECT_TRUE(SameRect(bottom, Rect{8.0f, 500.0f, 64.0f, 216.0f}));
+        // the box of Game/MaterialLayout.h is the one of the two lists
+        EXPECT_FLOAT_EQ(kMaterialListLeft, std::min(top.x, bottom.x));
+        EXPECT_FLOAT_EQ(kMaterialListTop, top.y);
+        EXPECT_FLOAT_EQ(kMaterialListRight, std::max(top.x + top.w, bottom.x + bottom.w));
+        EXPECT_FLOAT_EQ(kMaterialListBottom, bottom.y + bottom.h);
+        EXPECT_LE(top.y + top.h, bottom.y) << "the lists do not meet";
+        const Rect topBalance = MaterialElement("MaterialTopBalance").rect;
+        const Rect bottomBalance = MaterialElement("MaterialBottomBalance").rect;
+        EXPECT_TRUE(SameRect(topBalance, Rect{77.0f, 84.0f, 23.0f, 28.0f}));
+        EXPECT_TRUE(SameRect(bottomBalance, Rect{77.0f, 500.0f, 23.0f, 28.0f}));
+        EXPECT_LE(topBalance.x + topBalance.w, kMaterialMarginRight) << "the balance box ends where the board begins";
+        EXPECT_GE(topBalance.x, top.x + top.w) << "and does not touch the list";
+    }
+
+    TEST_F(ChessUiTest, TheMaterialStartsWithNoRowShownAndEmptyWords) {
+        EXPECT_EQ(MaterialWords(), kEmptyMaterialWords) << "after the first frame";
+        Settle();
+        EXPECT_EQ(ShownMaterialRows(), "");
+        EXPECT_EQ(MaterialWords(), kEmptyMaterialWords);
+    }
+
+    TEST_F(ChessUiTest, NoRowIsShownInTheFirstFrameWhateverTheGameSays) {
+        // The canvas has not been laid out when the component runs in the first frame, so the safe area is not known and the rows wait: nothing flashes for a frame
+        StartFrom(kWhiteTookAPawn);
+        Draw();
+        EXPECT_EQ(CoreManager::GetUIVars().Get(PoolString::Intern("materialBottomPawn")), "x1") << "the words are there at once";
+        EXPECT_EQ(ShownMaterialRows(), "") << "the rows are not";
+        Draw();
+        EXPECT_EQ(ShownMaterialRows(), "BottomPawn") << "the next frame has the safe area";
+    }
+
+    TEST_F(ChessUiTest, ACaptureByClicksShowsThePieceInTheGroupOfTheColorThatTookItAndTheLeadOfThePoints) {
+        Settle();
+        ClickMove("e2", "e4");
+        ClickMove("d7", "d5");
+        ASSERT_EQ(ShownMaterialRows(), "") << "nothing is gone yet";
+        ClickMove("e4", "d5");
+        ASSERT_EQ(Model().GetMoves().size(), 3u);
+
+        EXPECT_EQ(MaterialCount("Bottom", "Pawn"), "x1") << "White is at the bottom, and White has taken a pawn";
+        EXPECT_EQ(ShownMaterialRows(), "BottomPawn");
+        EXPECT_EQ(MaterialSprite("Bottom", "Pawn"), "BlackPawn") << "the piece that was taken is Black's";
+        EXPECT_EQ(MaterialWords(), "||||||||||x1|+1|") << "only the pawn count and the lead of White: the other ten words are empty";
+        EXPECT_EQ(Var("materialTopBalance"), "");
+        EXPECT_EQ(Var("materialBottomBalance"), "+1");
+
+        // Black takes back: both groups have a pawn and the lead is gone
+        ClickMove("d8", "d5");
+        ASSERT_EQ(Model().GetMoves().size(), 4u);
+        EXPECT_EQ(MaterialCount("Top", "Pawn"), "x1");
+        EXPECT_EQ(MaterialCount("Bottom", "Pawn"), "x1");
+        EXPECT_EQ(ShownMaterialRows(), "TopPawn BottomPawn");
+        EXPECT_EQ(MaterialSprite("Top", "Pawn"), "WhitePawn");
+        EXPECT_EQ(Var("materialTopBalance"), "");
+        EXPECT_EQ(Var("materialBottomBalance"), "") << "an equal material leads for nobody";
+    }
+
+    TEST_F(ChessUiTest, TheRowsOfAGroupFollowTheOrderOfTheTableAndTheBalanceIsInTheGroupThatIsAhead) {
+        StartFrom(kBlackTookTheQueen);
+        Settle();
+        EXPECT_EQ(MaterialCount("Top", "Queen"), "x1") << "Black has taken the queen: the upper group, because White is at the bottom";
+        EXPECT_EQ(MaterialSprite("Top", "Queen"), "WhiteQueen");
+        EXPECT_EQ(ShownMaterialRows(), "TopQueen");
+        EXPECT_EQ(Var("materialTopBalance"), "+9");
+        EXPECT_EQ(Var("materialBottomBalance"), "");
+
+        StartFrom(kEightPawnsAgainstNothing);
+        Settle();
+        EXPECT_EQ(MaterialCount("Bottom", "Queen"), "x1") << "White has taken everything of Black's but the king";
+        EXPECT_EQ(MaterialCount("Bottom", "Rook"), "x2");
+        EXPECT_EQ(MaterialCount("Bottom", "Bishop"), "x2");
+        EXPECT_EQ(MaterialCount("Bottom", "Knight"), "x2");
+        EXPECT_EQ(MaterialCount("Bottom", "Pawn"), "x8");
+        EXPECT_EQ(MaterialCount("Top", "Queen"), "x1") << "and Black everything of White's but the king and the pawns";
+        EXPECT_EQ(MaterialCount("Top", "Pawn"), "");
+        EXPECT_EQ(ShownMaterialRows(), "TopQueen TopRook TopBishop TopKnight BottomQueen BottomRook BottomBishop BottomKnight BottomPawn");
+        EXPECT_EQ(Var("materialBottomBalance"), "+8");
+        EXPECT_EQ(Var("materialTopBalance"), "");
+    }
+
+    TEST_F(ChessUiTest, TheShownRowsPackAtTheTopOfTheirListAndAHiddenRowTakesNoRoom) {
+        StartFrom(kEightPawnsAgainstNothing);
+        Settle();
+        const float step = MaterialRow("Bottom", "Rook").rect.y - MaterialRow("Bottom", "Queen").rect.y;
+        EXPECT_NEAR(step, 44.0f, kPixelTolerance) << "a row is 40 units high and 4 apart";
+        EXPECT_NEAR(MaterialRow("Bottom", "Queen").rect.y, 500.0f, kPixelTolerance);
+
+        StartFrom(kWhiteTookAPawn);  // only the pawn of Black is gone
+        Settle();
+        ASSERT_EQ(ShownMaterialRows(), "BottomPawn");
+        EXPECT_NEAR(MaterialRow("Bottom", "Pawn").rect.y, 500.0f, kPixelTolerance) << "the first row of the list: the four above it take no room";
+        EXPECT_TRUE(MaterialRow("Bottom", "Queen").rect.IsEmpty());
+    }
+
+    TEST_F(ChessUiTest, WithTheProgramAsWhiteTheGroupsSwapWithTheBoard) {
+        CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        StartFrom(kWhiteTookAPawn);
+        Settle();
+        EXPECT_EQ(ShownMaterialRows(), "BottomPawn") << "two people: White at the bottom, and White has taken the pawn";
+
+        ControlPlays("white");
+        _manager->UpdateAll();
+        ASSERT_TRUE(BlackIsAtTheBottom());
+        Settle();
+        EXPECT_EQ(MaterialCount("Top", "Pawn"), "x1") << "Black is at the bottom now: White's captures are in the upper group";
+        EXPECT_EQ(MaterialCount("Bottom", "Pawn"), "");
+        EXPECT_EQ(ShownMaterialRows(), "TopPawn");
+        EXPECT_EQ(MaterialSprite("Top", "Pawn"), "BlackPawn") << "the sprite is the piece that was taken: the upper group is White's, so the pieces are Black's";
+        EXPECT_EQ(MaterialSprite("Bottom", "Pawn"), "WhitePawn") << "the icons of the lower group were given the other color too";
+        EXPECT_EQ(Var("materialTopBalance"), "+1") << "the lead goes with the group";
+        EXPECT_EQ(Var("materialBottomBalance"), "");
+
+        ControlPlays(nullptr);
+        _manager->UpdateAll();
+        Settle();
+        EXPECT_EQ(ShownMaterialRows(), "BottomPawn") << "nobody plays: White is at the bottom again";
+        EXPECT_EQ(MaterialSprite("Bottom", "Pawn"), "BlackPawn");
+        EXPECT_EQ(Var("materialBottomBalance"), "+1");
+    }
+
+    TEST_F(ChessUiTest, WithTheProgramAsBlackAndWithTwoPeopleWhiteStaysAtTheBottomOfTheDisplayToo) {
+        CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        StartFrom(kBlackTookTheQueen);
+        ControlPlays("black");
+        _manager->UpdateAll();
+        ASSERT_FALSE(BlackIsAtTheBottom());
+        Settle();
+        EXPECT_EQ(ShownMaterialRows(), "TopQueen") << "the program plays Black: White stays at the bottom, and Black's captures are in the upper group";
+        EXPECT_EQ(Var("materialTopBalance"), "+9");
+    }
+
+    TEST_F(ChessUiTest, ThePanelTurnsTheDisplayWithTheBoard) {
+        CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        StartFrom(kBlackTookTheQueen);
+        Settle();
+        ASSERT_EQ(ShownMaterialRows(), "TopQueen");
+
+        PressWith(kSetColorAction, "black");  // the person plays Black, but two people are playing: nothing turns
+        _manager->UpdateAll();
+        Settle();
+        EXPECT_EQ(ShownMaterialRows(), "TopQueen");
+
+        PressWith(kSetModeAction, "computer");  // the person has Black, the program White: Black is at the bottom
+        _manager->UpdateAll();
+        ASSERT_TRUE(BlackIsAtTheBottom());
+        Settle();
+        EXPECT_EQ(ShownMaterialRows(), "BottomQueen") << "Black's capture is in the lower group now";
+        EXPECT_EQ(MaterialSprite("Bottom", "Queen"), "WhiteQueen");
+        EXPECT_EQ(Var("materialBottomBalance"), "+9");
+        EXPECT_EQ(Var("materialTopBalance"), "");
+    }
+
+    TEST_F(ChessUiTest, TheDisplayFollowsAResetASetStateAndASetPosition) {
+        StartFrom(kBlackTookTheQueen);
+        Settle();
+        ASSERT_EQ(ShownMaterialRows(), "TopQueen");
+
+        Model().Reset();
+        Settle();
+        EXPECT_EQ(MaterialWords(), kEmptyMaterialWords) << "a new game: nothing is gone";
+        EXPECT_EQ(ShownMaterialRows(), "");
+
+        ASSERT_TRUE(FenSetsTheState(kWhiteTookAPawn)) << "set_state of the control API";
+        _manager->UpdateAll();
+        Settle();
+        EXPECT_EQ(ShownMaterialRows(), "BottomPawn");
+        EXPECT_EQ(Var("materialBottomBalance"), "+1");
+
+        StartFrom(kBlackTookTheQueen);  // SetPosition
+        Settle();
+        EXPECT_EQ(ShownMaterialRows(), "TopQueen");
+        EXPECT_EQ(Var("materialBottomBalance"), "");
+        EXPECT_EQ(Var("materialTopBalance"), "+9");
+    }
+
+    TEST_F(ChessUiTest, APromotionChangesTheBalanceAndTheCountOfThePawns) {
+        StartFrom(kPawnAboutToPromote);
+        Settle();
+        EXPECT_EQ(MaterialCount("Top", "Queen"), "x1") << "White has no queen";
+        EXPECT_EQ(MaterialCount("Top", "Pawn"), "x7");
+        EXPECT_EQ(Var("materialBottomBalance"), "+1") << "a pawn against a bare king";
+
+        ClickMove("a7", "a8");
+        ASSERT_TRUE(Model().HasPendingPromotion());
+        PressWith(kPromoteAction, "queen");
+        ASSERT_EQ(Model().GetMoves().size(), 1u);
+        Settle();
+        EXPECT_EQ(Var("materialBottomBalance"), "+9") << "the new queen counts: nine points against nothing";
+        EXPECT_EQ(MaterialCount("Top", "Queen"), "") << "White has a queen again: none is gone";
+        EXPECT_EQ(MaterialCount("Top", "Pawn"), "x8") << "and its pawn is: the position cannot tell that a pawn became the queen";
+    }
+
+    TEST_F(ChessUiTest, AMoveOfTheProgramIsSeenByTheDisplayInTheSameFrameItIsPlayed) {
+        StartFrom(kBlackCanTakeAPawn);
+        Settle();
+        ASSERT_EQ(ShownMaterialRows(), "");
+        const auto take = MoveGenerator::ParseUci(Model().GetPosition(), "d5e4");
+        ASSERT_TRUE(take.has_value());
+        const auto engine = eastl::make_shared<GatedEngine>(true, *take);
+        CountingFactory factory({engine});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        ASSERT_TRUE(Opponent().SetSide(PieceColor::Black).has_value());
+        engine->Open();
+        ASSERT_TRUE(FramesUntil([&] { return Model().GetMoves().size() == 1; })) << "the program took the pawn";
+        Settle();
+        EXPECT_EQ(MaterialCount("Top", "Pawn"), "x1") << "Black is the program and has taken a pawn: the upper group, White is at the bottom";
+        EXPECT_EQ(MaterialSprite("Top", "Pawn"), "WhitePawn");
+        EXPECT_EQ(Var("materialTopBalance"), "+1");
+        EXPECT_EQ(ShownMaterialRows(), "TopPawn");
+    }
+
+    TEST_F(ChessUiTest, WithNoGameActiveTheDisplayIsEmpty) {
+        StartFrom(kWhiteTookAPawn);
+        Settle();
+        ASSERT_EQ(ShownMaterialRows(), "BottomPawn");
+
+        GameManager::GetInstance().Shutdown();
+        ASSERT_EQ(ChessGame::GetActive(), nullptr);
+        Draw();
+        Draw();
+        EXPECT_EQ(MaterialWords(), kEmptyMaterialWords);
+        EXPECT_EQ(ShownMaterialRows(), "");
+    }
+
+    TEST_F(ChessUiTest, TheMaterialCanvasTakesNoClickAndTheBoardStillGetsItsOwn) {
+        StartFrom(kWhiteTookAPawn);
+        Settle();
+        ASSERT_EQ(ShownMaterialRows(), "BottomPawn");
+        const auto canvas = Material();
+        ASSERT_TRUE(canvas);
+
+        // a hit test of the canvas finds nothing at the middle of any element, whether it is shown or not
+        eastl::vector<const UIElement*> everything;
+        const std::function<void(const UIElement&)> collect = [&](const UIElement& element) {
+            everything.push_back(&element);
+            for (const auto& child : element.children) {
+                collect(*child);
+            }
+        };
+        collect(canvas->GetRoot());
+        for (const UIElement* element : everything) {
+            const Rect& rect = element->rect;
+            EXPECT_EQ(canvas->GetLayout().HitTest(rect.x + rect.w * 0.5f, rect.y + rect.h * 0.5f), nullptr) << element->name.CStr();
+        }
+        // and a press where the shown row and the balance are drawn is not taken by the UI
+        for (const char* name : {"MaterialBottomPawnRow", "MaterialBottomBalance", "MaterialBottomList", "MaterialTopBalance"}) {
+            const auto [x, y] = ScreenCenter(MaterialElement(name));
+            EXPECT_FALSE(CoreManager::GetUIInput().DispatchMouseButtonDown(Button(x, y, true))) << name;
+            EXPECT_FALSE(CoreManager::GetUIInput().DispatchMouseButtonUp(Button(x, y, false))) << name;
+        }
+
+        // the board right next to the balance boxes (their right edge is the left edge of the board) takes a press
+        ASSERT_TRUE(Model().GetTurn() == PieceColor::Black);
+        const Rect nextToTheBalance = OutputRect(Rect{kMaterialMarginRight + 1.0f, 100.0f, 2.0f, 2.0f});  // inside the cell of a8, a hair from the balance box
+        EXPECT_FALSE(Model().HasSelection());
+        CoreManager::GetUIInput().DispatchMouseButtonDown(Button(nextToTheBalance.x + nextToTheBalance.w * 0.5f, nextToTheBalance.y + nextToTheBalance.h * 0.5f, true));
+        ASSERT_TRUE(Model().HasSelection()) << "the press went through the margin to the board";
+        EXPECT_EQ(Model().GetSelected(), Sq("a8"));
+    }
+
+    TEST_F(ChessUiTest, TheMaterialIsDrawnOverThePiecesAndTheResultBarAndUnderTheHudAndThePanels) {
+        const auto king = GiveAtlasCell("WhiteKing_e1");
+        StartFrom(kBlackMatesOnA1);
+        ASSERT_TRUE(Play(Model(), "a8a1"));
+        ASSERT_TRUE(Model().IsGameOver());
+        _manager->UpdateAll();
+        Settle();
+        ASSERT_NE(ShownMaterialRows(), "") << "most of the pieces are gone";
+        ASSERT_TRUE(OpenThePanel());
+        Draw();
+
+        const auto& calls = _renderer->calls;
+        long lastSquare = -1;
+        long firstGlyph = -1;
+        long lastGlyph = -1;
+        long firstPiece = -1;
+        long dim = -1;
+        long firstChip = -1;
+        long lastChip = -1;
+        long resetButton = -1;
+        long plate = -1;
+        for (size_t i = 0; i < calls.size(); ++i) {
+            const DrawCall& call = calls[i];
+            const long at = static_cast<long>(i);
+            if (call.kind == DrawKind::Rect && (SameColor(call.color, kLightSquareColor) || SameColor(call.color, kDarkSquareColor))) {
+                lastSquare = at;
+            } else if (IsLabelGlyph(call)) {
+                firstGlyph = firstGlyph < 0 ? at : firstGlyph;
+                lastGlyph = at;
+            } else if (call.kind == DrawKind::Texture && call.texture == king.Get()) {
+                firstPiece = firstPiece < 0 ? at : firstPiece;
+            } else if (call.kind == DrawKind::Rect && SameColor(call.color, kBoardDimColor)) {
+                dim = at;
+            } else if (call.kind == DrawKind::Rect && SameColor(call.color, kMaterialChipColor)) {
+                firstChip = firstChip < 0 ? at : firstChip;
+                lastChip = at;
+            } else if (call.kind == DrawKind::Rect && SameColor(call.color, kResetColor)) {
+                resetButton = at;
+            } else if (call.kind == DrawKind::Rect && SameColor(call.color, kPlateColor)) {
+                plate = at;
+            }
+        }
+        ASSERT_GE(lastSquare, 0);
+        ASSERT_GE(lastGlyph, 0);
+        ASSERT_GE(firstPiece, 0) << "the king is drawn";
+        ASSERT_GE(dim, 0) << "the game is over: the board is dimmed";
+        ASSERT_GE(firstChip, 0) << "the rows are drawn";
+        ASSERT_GE(resetButton, 0);
+        ASSERT_GE(plate, 0) << "the opponent panel is open";
+        EXPECT_LT(lastSquare, firstChip) << "over the squares";
+        EXPECT_LT(lastGlyph, firstChip) << "and over the coordinates";
+        EXPECT_LT(firstPiece, firstChip) << "over the pieces";
+        EXPECT_LT(dim, firstChip) << "and over the dim of the finished game";
+        EXPECT_LT(lastChip, resetButton) << "under the HUD";
+        EXPECT_LT(lastChip, plate) << "and under the panels";
+    }
+
+    TEST_F(ChessUiTest, InTheNarrowestWindowWithSideInsetsTheListsAreHiddenAndTheBalanceStays) {
+        StartFrom(kWhiteTookAPawn);
+        Settle();
+        ASSERT_EQ(ShownMaterialRows(), "BottomPawn") << "a window with no insets: the lists are shown";
+
+        ResizeWithSideInsets(kNarrowestWidth, kNarrowestHeight);
+        const auto canvas = Material();
+        ASSERT_TRUE(canvas);
+        const Rect safe = canvas->GetLayout().GetResolved().safeBounds;
+        EXPECT_NEAR(safe.x, 75.6f, 0.2f) << "9 % of 480 px at the fit scale 0.571";
+        EXPECT_EQ(ShownMaterialRows(), "") << "the box of the lists reaches out of the safe area";
+        EXPECT_EQ(Var("materialBottomPawn"), "x1") << "the words are not taken away, only the rows";
+        EXPECT_EQ(Var("materialBottomBalance"), "+1") << "the balance is still there";
+
+        const UILabel& balance = *MaterialElement("MaterialBottomBalance").Cast<UILabel>();
+        EXPECT_EQ(ShownText(balance), "+1");
+        EXPECT_GE(balance.rect.x, safe.x) << "inside the safe area";
+        EXPECT_LE(balance.rect.x + balance.rect.w, kMaterialMarginRight) << "inside the margin";
+        EXPECT_FALSE(balance.rect.IsEmpty());
+        EXPECT_TRUE(balance.active.visible);
+
+        // The sign of a big lead is shrunk into its box (AutoFit), not cut: the size drawn is in whole pixels and never under the smallest the label asks for
+        const float scale = canvas->GetLayout().GetResolved().scale;
+        for (const char* lead : {"+1", "+39", "+99"}) {
+            CoreManager::GetUIVars().Set(PoolString::Intern("materialBottomBalance"), lead);
+            Draw();
+            const TextLayoutResult& drawn = balance.GetLastLayout();
+            EXPECT_FALSE(drawn.overflowed) << lead;
+            EXPECT_FALSE(drawn.truncated) << lead;
+            EXPECT_LE(drawn.width, balance.rect.w * scale + kPixelTolerance) << lead << " is inside its box";
+            EXPECT_GE(drawn.fontSize, std::floor(balance.minFontSize * scale)) << lead << " is not under the smallest size";
+            EXPECT_LE(drawn.fontSize, std::ceil(balance.GetFontSize() * scale)) << lead;
+        }
+
+        ResizeWithoutInsets(1280.0f, 720.0f);  // and the other way
+        EXPECT_EQ(ShownMaterialRows(), "BottomPawn") << "the window grows again: the rows come back";
+        ResizeWithSideInsets(kNarrowestWidth, kNarrowestHeight);
+        EXPECT_EQ(ShownMaterialRows(), "");
+    }
+
+    TEST_F(ChessUiTest, AHiddenListStaysHiddenWhenTheGameChangesAndAppearsWhenTheWindowHasRoom) {
+        StartFrom(kWhiteTookAPawn);
+        ResizeWithSideInsets(kNarrowestWidth, kNarrowestHeight);
+        ASSERT_EQ(ShownMaterialRows(), "");
+        ASSERT_TRUE(Play(Model(), "d8d5")) << "Black takes the pawn back";
+        Settle();
+        EXPECT_EQ(MaterialCount("Top", "Pawn"), "x1");
+        EXPECT_EQ(ShownMaterialRows(), "") << "a change of the counts does not show a row the window has no room for";
+        EXPECT_EQ(Var("materialTopBalance"), "");
+
+        ResizeWithoutInsets(1280.0f, 720.0f);
+        EXPECT_EQ(ShownMaterialRows(), "TopPawn BottomPawn");
+    }
+
+    TEST_F(ChessUiTest, EveryBalanceFromPlusOneToPlusNinetyNineFitsItsBoxInTheNarrowestWindow) {
+        Draw();
+        auto canvas = Material();
+        ASSERT_TRUE(canvas);
+        canvas->UpdateLayout(1280.0f, 720.0f);  // the reflected fields of the component reach the layout on its first update
+        UICanvasLayout& layout = canvas->GetLayout();
+        LayOutInTheNarrowestWindow(layout);
+        EXPECT_NEAR(layout.GetResolved().scale, kNarrowestWidth / kViewWidth, 0.01f);
+        const float scale = layout.GetResolved().scale;
+
+        size_t checked = 0;
+        for (const char* group : {"Top", "Bottom"}) {
+            const UILabel* label = MaterialElement(Format("Material{}Balance", group).c_str()).Cast<UILabel>();
+            ASSERT_NE(label, nullptr);
+            const PoolString variable = PoolString::Intern(Format("material{}Balance", group).c_str());
+            for (int points = 1; points <= 99; ++points) {
+                const eastl::string text = BalanceText(points);
+                CoreManager::GetUIVars().Set(variable, eastl::string_view(text.data(), text.size()));
+                const UIContentFit fit = label->CheckContent(label->rect.w, label->rect.h, scale);
+                ASSERT_TRUE(fit.hasContent) << text.c_str();
+                EXPECT_TRUE(fit.fits) << group << ": " << text.c_str() << " is cut in a box of " << label->rect.w << " x " << label->rect.h << " units at scale " << scale;
+                ++checked;
+            }
+        }
+        EXPECT_EQ(checked, 198u);
+        layout.Invalidate();
     }
 
 }  // namespace BECore::Chess::Tests
