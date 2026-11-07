@@ -13,11 +13,11 @@ From a clean `git clone` to a running game and a green test run. The commands ar
 | `git` | The engine is the submodule `engine/` and it has submodules of its own (SDL, SDL_image with its codecs, Vulkan-Headers, googletest): the clone must be recursive. |
 | CMake 3.31 or newer | `cmake_minimum_required(VERSION 3.31)` in `CMakeLists.txt` and `cmakeMinimumRequired` 3.31 in `CMakePresets.json`. |
 | Ninja | The macOS presets and the `windows-msvc-*` / `windows-clang-*` presets use the Ninja generator (the `windows-vs2022*` presets use Visual Studio 2022 instead). |
-| A C++23 compiler | `CMAKE_CXX_STANDARD 23` (`engine/cmake/BagiEngine.cmake`). macOS: Clang, the presets set `clang` / `clang++` (Apple clang 17 from the Xcode command line tools builds it). Windows: MSVC or Clang, see "Windows". |
+| A C++23 compiler | `CMAKE_CXX_STANDARD 23` (`engine/cmake/BagiEngine.cmake`). macOS: Clang, the presets set `clang` / `clang++` (Apple Clang, e.g. from Xcode or its command line tools, builds it). Windows: MSVC or Clang, see "Windows". |
 | [`uv`](https://docs.astral.sh/uv/) and a Python 3 | `CI/setup_venv.*` calls `uv` to create `engine/.venv`, which holds the reflection generator's dependencies (Jinja2) and the Python of the control smoke test. Install it from its page (Homebrew, `pip install uv`, or the installer script). |
-| `glslc` (the Vulkan SDK or the `shaderc` tools) | The engine compiles its Vulkan shaders at build time. Configure stops with "glslc not found" when it is on neither `PATH` nor under `VULKAN_SDK` (`engine/src/Modules/Vulkan/CMakeLists.txt`). Install the [Vulkan SDK](https://vulkan.lunarg.com/) or put `glslc` on `PATH`; if it is somewhere else, pass `VULKAN_SDK` (see "Your own settings"). |
+| `glslc` (from the Vulkan SDK or the `shaderc` tools); on macOS the Vulkan SDK itself | The engine compiles its Vulkan shaders at build time. Configure stops with "glslc not found" when it is on neither `PATH` nor under `VULKAN_SDK` (`engine/src/Modules/Vulkan/CMakeLists.txt`). Install the [Vulkan SDK](https://vulkan.lunarg.com/) or put `glslc` on `PATH`; if it is somewhere else, pass `VULKAN_SDK` (see "Your own settings"). **On macOS install the Vulkan SDK:** it also brings MoltenVK, the Vulkan driver that `BagiChess` needs to open its window (`renderer="VulkanRendererBackend"` in `config/ApplicationConfig.xml`, with no fallback renderer), and the vendored loader is only the loader, macOS has no Vulkan driver of its own. `glslc` from `shaderc` alone is enough to configure, build and run the tests (they run headless on the SDL renderer), but not to open the game window. |
 
-Nothing else is installed by hand: SDL, SDL_image, the Vulkan headers and the Vulkan loader are in `engine/external/` and the loader's binaries are in the same folder. The reflection generator is plain Python and needs no LLVM.
+Beyond that, SDL, SDL_image, the Vulkan headers and the Vulkan loader library are in `engine/external/` (the loader's binaries only for macOS, see "Windows"), so they are not installed by hand. The reflection generator is plain Python and needs no LLVM.
 
 ### From clone to a running game
 
@@ -50,7 +50,7 @@ Nothing else is installed by hand: SDL, SDL_image, the Vulkan headers and the Vu
    cmake --preset macos-debug
    ```
 
-   Run this again after adding or deleting a source file (the sources are globbed), after changing a class that uses `BE_CLASS` / `BE_REFLECT_FIELD` (the reflection code is generated at configure time) and after the `engine/` pointer moves.
+   Run this again after adding or deleting a source file (the sources are globbed), after changing a class that uses `BE_CLASS`, `BE_EVENT` or `BE_REFLECT_FIELD` (the reflection code is generated at configure time), after a change to `CMakePresets.json`, `CMakeUserPresets.json` or a `*.cmake` file, and after the `engine/` pointer moves.
 
 5. Build everything (`BagiChess` and `ChessTests`; the first build also compiles the engine and its libraries and takes a while):
 
@@ -84,7 +84,7 @@ Release is the same with `macos-release`. The `*-rmlui-*` presets also build the
 
 The presets for Windows are in `engine/CMakePresets.json`; they are written from that file and not run on a Windows machine for this README. Steps 1 to 3 and 5 to 7 are the same, with these changes:
 
-- Tools: Visual Studio 2022 with the "Desktop development with C++" workload (it brings MSVC), CMake 3.31 or newer and Ninja (for the Ninja presets), `git`, `uv`, and the Vulkan SDK. The `VULKAN_SDK` cache variable defaults to `C:/VulkanSDK/1.4.341.1` (`engine/cmake/BagiEngine.cmake`); with another version installed, pass the real path (see below). Without an SDK the vendored loader in `engine/external/Vulkan-Loader/Windows` is used, but `glslc` is still needed.
+- Tools: Visual Studio 2022 with the "Desktop development with C++" workload (it brings MSVC), CMake 3.31 or newer and Ninja (for the Ninja presets), `git`, `uv`, and the Vulkan SDK. The `VULKAN_SDK` cache variable defaults to `C:/VulkanSDK/1.4.341.1` (`engine/cmake/BagiEngine.cmake`); with another version installed, pass the real path (see below). Without an SDK the build links the vendored import library `engine/external/Vulkan-Loader/Windows/Lib/vulkan-1.lib` (no loader DLL is vendored for Windows: `vulkan-1.dll` comes from the GPU driver or the SDK), and `glslc` is still needed.
 - Step 2: `CI\setup_venv.bat` (cmd) or `CI\setup_venv.ps1` (PowerShell); the venv's Python is `engine\.venv\Scripts\python.exe`, and step 3 is `set PATH=%CD%\engine\.venv\Scripts;%PATH%` (cmd) or `$env:PATH = "$PWD\engine\.venv\Scripts;$env:PATH"` (PowerShell).
 - Step 4, one of:
   - `windows-msvc-debug` / `windows-msvc-release`: MSVC (`cl`) with Ninja. These presets do not load the Visual Studio environment themselves (`vs-env` is the `external` strategy: the caller does), so configure from a shell where `cl` works, an x64 Visual Studio developer prompt, or let VS Code CMake Tools load it (see "VS Code").
@@ -95,7 +95,7 @@ The presets for Windows are in `engine/CMakePresets.json`; they are written from
 
 ### VS Code
 
-Open `CI/BagiChess.code-workspace` (File, Open Workspace from File). It recommends the extensions (C/C++, CMake Tools, CodeLLDB), sets `cmake.useCMakePresets` to `always`, and has the launch configurations and build tasks. Then:
+Open `CI/BagiChess.code-workspace` (File, Open Workspace from File). It recommends the extensions (C/C++, CMake Tools, `twxs.cmake`, CodeLLDB), sets `cmake.useCMakePresets` to `always`, and has the launch configurations and build tasks. Then:
 
 1. Run "CMake: Select Configure Preset" and pick the preset for your OS (`macOS Clang Debug`, `Windows MSVC Ninja Debug`, ...), and "CMake: Select Build Preset" for the matching build preset. Only the presets whose host matches your OS are offered.
 2. "CMake: Configure" is step 4, "Build" (F7) is step 5. The default build task builds `BagiChess`; the debug configurations (F5) build first and start the CMake launch target. With the `windows-msvc-*` presets CMake Tools loads the Visual Studio environment itself.
