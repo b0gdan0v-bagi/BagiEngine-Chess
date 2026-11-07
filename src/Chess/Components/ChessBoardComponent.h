@@ -54,6 +54,10 @@ namespace BECore::Chess {
      * The board is drawn from White's side, and from Black's side (turned by 180 degrees) while the program plays White, so the person who plays Black sees their own pieces at the bottom.
      * The pieces, the highlights and the clicks all go through SquareToPixel() / OnMouseDown() and BoardOrientation.h; only the geometry turns, the model and the control API do not.
      *
+     * It also publishes the letters and numbers at the edges of the board (`coordFile0..7`, the file drawn in the bottom-row cell of each column, and `coordRank0..7`, the rank drawn in the
+     * left-column cell of each row; Game/BoardCoordinates.h) to `CoreManager::GetUIVars()` from the orientation it draws, also when no game is active. The labels are the UI elements of the scene;
+     * they stay at the same cells of the screen and their text turns with the board.
+     *
      * Its node sits on a layer below the pieces (`layer` in SceneConfig.xml), so the
      * squares and highlights are drawn first and the piece sprites on top.
      */
@@ -118,6 +122,12 @@ namespace BECore::Chess {
         /// Gives the UI labels the words for the state of the game and of the opponent; only when something they say changed, since a label checks the version of the
         /// variables every frame
         void PublishUiVars();
+
+        /// Gives the 16 labels at the edges of the board their letters and numbers (`coordFile0..7`, `coordRank0..7`) for the orientation read in OnDraw(); only when the bottom color
+        /// changed since the last time, since the labels sit at fixed cells of the screen and only their text turns with the board
+        void PublishCoordinates(PieceColor bottom);
+
+        std::optional<PieceColor> _publishedBottom;  // the bottom color the board coordinates were published for, none before the first draw
 
         uint64_t _publishedVersion = 0;                  // the model version PublishUiVars() last published, 0 for none
         const void* _publishedModel = nullptr;           // the model it was published for: another game starts the count again

@@ -554,6 +554,18 @@ namespace BECore::Chess::Tests {
             return eastl::string(value.data(), value.size());
         }
 
+        /// The letters or the numbers at the edge of the board as the 16 variables read after a frame: coordFile0..7 (files, by column) or coordRank0..7 (ranks, by row from the top), joined
+        eastl::string Coordinates(bool files) {
+            Draw();
+            eastl::string text;
+            for (int index = 0; index < 8; ++index) {
+                const eastl::string name = files ? "coordFile{}"_format(index) : "coordRank{}"_format(index);
+                const eastl::string_view value = CoreManager::GetUIVars().Get(PoolString::Intern(eastl::string_view(name.data(), name.size())));
+                text.append(value.data(), value.size());
+            }
+            return text;
+        }
+
         /// What a button of the HUD does when it is clicked: the action it emits
         static void Press(const char* action) {
             InputEvents::ActionEvent::Emit(PoolString::Intern(action));
@@ -1718,6 +1730,83 @@ namespace BECore::Chess::Tests {
         _manager->UpdateAll();
         EXPECT_TRUE(BlackIsAtTheBottom());
         ExpectPiecesAtTheCellsOf(true);
+    }
+
+    TEST_F(ChessUiTest, TheCoordinateVariablesStartAsWhitesViewOfTheBoard) {
+        EXPECT_EQ(Coordinates(true), "abcdefgh");
+        EXPECT_EQ(Coordinates(false), "87654321");
+    }
+
+    TEST_F(ChessUiTest, WithTheProgramAsWhiteTheCoordinateVariablesReadFromBlacksSide) {
+        CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        ControlPlays("white");
+        _manager->UpdateAll();
+        ASSERT_TRUE(BlackIsAtTheBottom());
+        EXPECT_EQ(Coordinates(true), "hgfedcba");
+        EXPECT_EQ(Coordinates(false), "12345678");
+    }
+
+    TEST_F(ChessUiTest, TheCoordinateVariablesTurnBackWithTwoPeopleAndWithTheProgramAsBlack) {
+        CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        ControlPlays("white");
+        _manager->UpdateAll();
+        ASSERT_EQ(Coordinates(true), "hgfedcba");
+
+        ControlPlays(nullptr);
+        _manager->UpdateAll();
+        EXPECT_EQ(Coordinates(true), "abcdefgh") << "two people: White at the bottom";
+        EXPECT_EQ(Coordinates(false), "87654321");
+
+        ControlPlays("white");
+        _manager->UpdateAll();
+        ASSERT_EQ(Coordinates(true), "hgfedcba");
+        ControlPlays("black");
+        _manager->UpdateAll();
+        EXPECT_EQ(Coordinates(true), "abcdefgh") << "the program plays Black: the person has White at the bottom";
+        EXPECT_EQ(Coordinates(false), "87654321");
+    }
+
+    TEST_F(ChessUiTest, TheCoordinateVariablesFollowTheColorSegmentsAndTheModeOfThePanel) {
+        CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+
+        PressWith("ChessSetColor", "black");
+        _manager->UpdateAll();
+        EXPECT_EQ(Coordinates(true), "abcdefgh") << "a color picked while two people play turns nothing";
+        PressWith("ChessSetMode", "computer");
+        _manager->UpdateAll();
+        EXPECT_EQ(Coordinates(true), "hgfedcba");
+        EXPECT_EQ(Coordinates(false), "12345678");
+        PressWith("ChessSetMode", "two");
+        _manager->UpdateAll();
+        EXPECT_EQ(Coordinates(true), "abcdefgh");
+    }
+
+    TEST_F(ChessUiTest, AResetAndASetStateKeepTheCoordinatesOfTheBoardThatIsTurned) {
+        CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        ControlPlays("white");
+        _manager->UpdateAll();
+
+        Press("ChessReset");
+        _manager->UpdateAll();
+        EXPECT_EQ(Coordinates(true), "hgfedcba") << "a reset keeps the opponent, so the orientation";
+        EXPECT_EQ(Coordinates(false), "12345678");
+
+        Json request = Json::object();
+        request["fen"] = kBlackToMoveAfterE4;
+        ASSERT_TRUE(ChessGame::GetActive()->AsControllable()->SetState(request).has_value());
+        _manager->UpdateAll();
+        EXPECT_EQ(Coordinates(true), "hgfedcba");
+        EXPECT_EQ(Coordinates(false), "12345678");
+
+        ControlPlays(nullptr);
+        _manager->UpdateAll();
+        EXPECT_EQ(Coordinates(true), "abcdefgh");
+        EXPECT_EQ(Coordinates(false), "87654321");
     }
 
     TEST_F(ChessUiTest, TheStateOfTheControlApiIsTheSameWhateverSideIsAtTheBottom) {
