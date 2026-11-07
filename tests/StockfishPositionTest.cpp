@@ -1,6 +1,8 @@
 #include "ChessTestUtil.h"
 #include "StockfishUtil.h"
 
+#include <Chess/Engine/Analysis.h>
+#include <Chess/Engine/OwnEngine.h>
 #include <Chess/Engine/SearchRequest.h>
 #include <Chess/Engine/UciEngine.h>
 #include <Chess/Game/ChessGameModel.h>
@@ -42,6 +44,14 @@ namespace BECore::Chess::Tests {
         constexpr eastl::string_view kShuffleStartFen = "7r/6k1/2q5/8/8/8/7R/K7 b - - 0 1";
         constexpr eastl::string_view kShuffleBareFen = "7r/6k1/2q5/8/8/8/7R/1K6 w - - 0 1";
 
+        // Analysis: a mate in one for each color (Ra8# and Ra1#), a mate in two (kMateInTwoFen above), a side that every move of which loses to a
+        // mate in one, a rook that takes a queen nothing guards, and a position where White has a lone king against a queen and a rook
+        constexpr eastl::string_view kMateInOneFen = "6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1";
+        constexpr eastl::string_view kMirroredMateInOneFen = "r5k1/5ppp/8/8/8/8/5PPP/6K1 b - - 0 1";
+        constexpr eastl::string_view kMatedInOneFen = "kbK5/pp6/RP6/8/8/8/8/8 b - - 0 1";
+        constexpr eastl::string_view kHangingQueenFen = "4k3/8/8/3q4/8/8/8/3RK3 w - - 0 1";
+        constexpr eastl::string_view kLostFen = "4k3/8/8/8/8/2q5/1r6/6K1 w - - 0 1";
+
         constexpr eastl::string_view kMateFen = "7k/6Q1/6K1/8/8/8/8/8 b - - 0 1";
         constexpr eastl::string_view kStalemateFen = "7k/5Q2/6K1/8/8/8/8/8 b - - 0 1";
 
@@ -57,6 +67,22 @@ namespace BECore::Chess::Tests {
         std::expected<Move, EngineError> Ask(const eastl::string& path, const SearchRequest& request) {
             UciEngine engine(StockfishSettings(path));
             return engine.FindMove(request, CancellationToken());
+        }
+
+        /// The analysis of a fresh UciEngine over the Stockfish at @p path
+        std::expected<Analysis, EngineError> Analyse(const eastl::string& path, const SearchRequest& request) {
+            UciEngine engine(StockfishSettings(path));
+            return engine.Analyse(request, CancellationToken());
+        }
+
+        /// The best line of the analysis, or a failure that says why not
+        std::optional<AnalysisLine> BestLine(const eastl::string& path, eastl::string_view fen, SearchLimits limits = kDepth10) {
+            const auto result = Analyse(path, RequestFor(fen, limits));
+            if (!result) {
+                ADD_FAILURE() << Describe(result.error()).c_str();
+                return std::nullopt;
+            }
+            return result->Best();
         }
 
         bool Play(ChessGameModel& model, Move move) {
@@ -261,6 +287,100 @@ namespace BECore::Chess::Tests {
 
         ASSERT_FALSE(result.has_value());
         EXPECT_EQ(result.error().kind, EngineErrorKind::NoMove) << result.error().detail.c_str();
+    }
+
+    TEST(StockfishPositionTest, AnalysisOfAMateInOneIsTheMatingMoveAndMateOne) {
+        SKIP_WITHOUT_STOCKFISH(stockfish);
+
+        const auto line = BestLine(*stockfish, kMateInOneFen);
+
+        ASSERT_TRUE(line.has_value());
+        EXPECT_EQ(line->move.ToUci(), "a1a8");
+        EXPECT_EQ(line->score, (AnalysisScore{AnalysisScoreKind::Mate, 1})) << ScoreText(line->score).c_str();
+        EXPECT_GE(line->depth, 1);
+    }
+
+    TEST(StockfishPositionTest, AnalysisOfTheMirroredMateInOneWithBlackToMoveIsMateOneToo) {
+        SKIP_WITHOUT_STOCKFISH(stockfish);
+
+        const auto line = BestLine(*stockfish, kMirroredMateInOneFen);
+
+        ASSERT_TRUE(line.has_value());
+        EXPECT_EQ(line->move.ToUci(), "a8a1");
+        EXPECT_EQ(line->score, (AnalysisScore{AnalysisScoreKind::Mate, 1})) << "positive for the side to move, Black here: " << ScoreText(line->score).c_str();
+    }
+
+    TEST(StockfishPositionTest, AnalysisOfAHangingQueenIsTheCaptureAndWellAbovePlusThree) {
+        SKIP_WITHOUT_STOCKFISH(stockfish);
+
+        const auto line = BestLine(*stockfish, kHangingQueenFen);
+
+        ASSERT_TRUE(line.has_value());
+        EXPECT_EQ(line->move.ToUci(), "d1d5");
+        EXPECT_EQ(line->score.kind, AnalysisScoreKind::Centipawns);
+        EXPECT_GT(line->score.value, 300) << ScoreText(line->score).c_str();
+    }
+
+    TEST(StockfishPositionTest, AnalysisOfTheStartPositionIsWithinEightyCentipawnsOfZero) {
+        SKIP_WITHOUT_STOCKFISH(stockfish);
+
+        const auto line = BestLine(*stockfish, Position::kStartFen);
+
+        ASSERT_TRUE(line.has_value());
+        EXPECT_EQ(line->score.kind, AnalysisScoreKind::Centipawns);
+        EXPECT_GE(line->score.value, -80) << ScoreText(line->score).c_str();
+        EXPECT_LE(line->score.value, 80) << ScoreText(line->score).c_str();
+    }
+
+    TEST(StockfishPositionTest, AnalysisOfALostPositionIsNegativeForTheSideToMove) {
+        SKIP_WITHOUT_STOCKFISH(stockfish);
+
+        const auto line = BestLine(*stockfish, kLostFen);
+
+        ASSERT_TRUE(line.has_value());
+        EXPECT_LT(line->score.value, 0) << "from the side to move, White here: " << ScoreText(line->score).c_str();
+    }
+
+    TEST(StockfishPositionTest, AnalysisOfAMatedGameHasNoLineToGive) {
+        SKIP_WITHOUT_STOCKFISH(stockfish);
+
+        const auto result = Analyse(*stockfish, RequestFor(kMateFen));
+
+        ASSERT_FALSE(result.has_value());
+        EXPECT_EQ(result.error().kind, EngineErrorKind::NoMove) << result.error().detail.c_str();
+    }
+
+    TEST(StockfishPositionTest, TheOwnEngineAndStockfishAgreeOnTheMateInAnalysis) {
+        SKIP_WITHOUT_STOCKFISH(stockfish);
+        OwnEngine own;
+        // Mates for the side to move in one and in two, for each color, and a loss to a mate in one: the sign, the kind and the number of moves are the same
+        struct Case {
+            eastl::string_view fen;
+            int ownDepth;
+            int mateMoves;
+            const char* key;
+        };
+        const Case cases[] = {
+            {kMateInOneFen, 2, 1, "a1a8"},
+            {kMirroredMateInOneFen, 2, 1, "a8a1"},
+            {kMateInTwoFen, 4, 2, "d5f6"},
+            {kMatedInOneFen, 4, -1, nullptr},
+        };
+
+        for (const Case& test : cases) {
+            const auto fromStockfish = Analyse(*stockfish, RequestFor(test.fen));
+            const auto fromOwn = own.Analyse(RequestFor(test.fen, SearchLimits{0, test.ownDepth}), CancellationToken());
+            ASSERT_TRUE(fromStockfish.has_value()) << test.fen.data() << ": " << Describe(fromStockfish.error()).c_str();
+            ASSERT_TRUE(fromOwn.has_value()) << test.fen.data() << ": " << Describe(fromOwn.error()).c_str();
+
+            const AnalysisScore expected{AnalysisScoreKind::Mate, test.mateMoves};
+            EXPECT_EQ(fromStockfish->Best().score, expected) << test.fen.data() << " (Stockfish): " << ScoreText(fromStockfish->Best().score).c_str();
+            EXPECT_EQ(fromOwn->Best().score, expected) << test.fen.data() << " (own): " << ScoreText(fromOwn->Best().score).c_str();
+            if (test.key != nullptr) {
+                EXPECT_EQ(fromStockfish->Best().move.ToUci(), eastl::string(test.key)) << test.fen.data();
+                EXPECT_EQ(fromOwn->Best().move.ToUci(), eastl::string(test.key)) << test.fen.data();
+            }
+        }
     }
 
 }  // namespace BECore::Chess::Tests

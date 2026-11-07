@@ -332,6 +332,9 @@ namespace BECore::Chess::Tests {
 
         ASSERT_TRUE(analysis.has_value());
         EXPECT_EQ(analysis->Best().move, Mv("a1a8")) << "the mating move, not a random one";
+        const auto played = alwaysBlunders.FindMove(request, CancellationToken::Create());
+        ASSERT_TRUE(played.has_value());
+        EXPECT_NE(*played, Mv("a1a8")) << "the blunder of this position (a pure function of it) is not the mate: the two answers differ";
     }
 
     TEST(BlunderEngineTest, AnalyseOverAnEngineThatDoesNotAnalyseIsUnsupported) {

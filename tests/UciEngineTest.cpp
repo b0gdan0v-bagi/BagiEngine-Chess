@@ -2,6 +2,7 @@
 #include "FakeEngineUtil.h"
 #include "StockfishUtil.h"
 
+#include <Chess/Engine/Analysis.h>
 #include <Chess/Engine/SearchRequest.h>
 #include <Chess/Engine/UciEngine.h>
 #include <chrono>
@@ -66,6 +67,34 @@ namespace BECore::Chess::Tests {
             EXPECT_FALSE(result.error().detail.empty());
         }
 
+        void ExpectAnalysis(const std::expected<Analysis, EngineError>& result, eastl::string_view uci, AnalysisScore score, int depth) {
+            if (!result) {
+                ADD_FAILURE() << "expected an analysis with the move " << eastl::string(uci).c_str() << ", got " << Describe(result.error()).c_str();
+                return;
+            }
+            ASSERT_EQ(result->lines.size(), 1u);
+            EXPECT_EQ(result->Best().move.ToUci(), eastl::string(uci));
+            EXPECT_EQ(result->Best().score, score) << ScoreText(result->Best().score).c_str();
+            EXPECT_EQ(result->Best().depth, depth);
+        }
+
+        void ExpectAnalysisError(const std::expected<Analysis, EngineError>& result, EngineErrorKind kind) {
+            if (result) {
+                ADD_FAILURE() << "expected " << EnumUtils<EngineErrorKind>::ToString(kind).data() << ", got the move " << result->Best().move.ToUci().c_str();
+                return;
+            }
+            EXPECT_EQ(result.error().kind, kind) << result.error().detail.c_str();
+            EXPECT_FALSE(result.error().detail.empty());
+        }
+
+        constexpr AnalysisScore Cp(int value) {
+            return AnalysisScore{AnalysisScoreKind::Centipawns, value};
+        }
+
+        constexpr AnalysisScore MateOf(int moves) {
+            return AnalysisScore{AnalysisScoreKind::Mate, moves};
+        }
+
         size_t CountLines(const eastl::vector<eastl::string>& lines, eastl::string_view text) {
             return static_cast<size_t>(std::count_if(lines.begin(), lines.end(), [text](const eastl::string& line) { return eastl::string_view(line.data(), line.size()) == text; }));
         }
@@ -113,6 +142,14 @@ namespace BECore::Chess::Tests {
         UciEngine engine(std::move(settings));
 
         ExpectError(engine.FindMove(MakeRequest({}), CancellationToken()), EngineErrorKind::Unsupported);
+    }
+
+    TEST(UciEngineTest, AnAnalysisIsUnsupportedOnWindows) {
+        UciEngineSettings settings;
+        settings.launch.path = "engine.exe";
+        UciEngine engine(std::move(settings));
+
+        ExpectAnalysisError(engine.Analyse(MakeRequest({}), CancellationToken()), EngineErrorKind::Unsupported);
     }
 
 #else
@@ -516,6 +553,261 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(searchLines, Lines({position, "go movetime 50", position, "go movetime 50"}));
     }
 
+    // -- Analyse ---------------------------------------------------------------------------------------------------------------
+
+    TEST(UciEngineTest, AnalyseGivesTheScriptedMoveWithItsCentipawnScoreAndDepth) {
+        SKIP_WITHOUT_FAKE_ENGINE();
+        UciEngine engine(FakeSettings({"--moves", "e2e4", "--scores", "cp:35"}));
+
+        ExpectAnalysis(engine.Analyse(MakeRequest({}), CancellationToken()), "e2e4", Cp(35), 1);
+    }
+
+    TEST(UciEngineTest, AnalyseReadsAMateScoreAndANegativeOne) {
+        SKIP_WITHOUT_FAKE_ENGINE();
+        UciEngine engine(FakeSettings({"--moves", "e2e4,e7e5,g1f3", "--scores", "mate:3,mate:-2,cp:-120"}));
+
+        ExpectAnalysis(engine.Analyse(MakeRequest({}), CancellationToken()), "e2e4", MateOf(3), 1);
+        ExpectAnalysis(engine.Analyse(MakeRequest({"e2e4"}), CancellationToken()), "e7e5", MateOf(-2), 1);
+        ExpectAnalysis(engine.Analyse(MakeRequest({"e2e4", "e7e5"}), CancellationToken()), "g1f3", Cp(-120), 1);
+    }
+
+    TEST(UciEngineTest, AnalyseTakesTheExactMainLineScoreOfTheLastDepthAmongNoise) {
+        SKIP_WITHOUT_FAKE_ENGINE();
+        // Around the final line the fake prints an earlier depth, the same depth as a lower bound, a second line of the search, a text line with a score in it and an upper bound after it
+        UciEngine engine(FakeSettings({"--noisy-info", "--moves", "e2e4,e7e5", "--scores", "cp:42,mate:2"}));
+
+        ExpectAnalysis(engine.Analyse(MakeRequest({}), CancellationToken()), "e2e4", Cp(42), 2);
+        ExpectAnalysis(engine.Analyse(MakeRequest({"e2e4"}), CancellationToken()), "e7e5", MateOf(2), 2);
+    }
+
+    TEST(UciEngineTest, AnalyseWithNoScoreIsProtocolErrorAndTheProcessIsKept) {
+        SKIP_WITHOUT_FAKE_ENGINE();
+        const TempDirectory directory;
+        const eastl::string log = directory.FileText(kLogName);
+        UciEngine engine(FakeSettings({"--log", log, "--no-score", "--moves", "e2e4,d2d4,g1f3"}));
+
+        const auto first = engine.Analyse(MakeRequest({}), CancellationToken());
+        const auto played = engine.FindMove(MakeRequest({}), CancellationToken());
+        const auto second = engine.Analyse(MakeRequest({}), CancellationToken());
+
+        ExpectAnalysisError(first, EngineErrorKind::ProtocolError);
+        if (!first) {
+            EXPECT_NE(first.error().detail.find("no score"), eastl::string::npos) << first.error().detail.c_str();
+        }
+        ExpectMove(played, "d2d4");  // the same object, the same process: a move needs no score
+        ExpectAnalysisError(second, EngineErrorKind::ProtocolError);
+        const eastl::vector<eastl::string> lines = ReadFileLines(directory.File(kLogName));
+        EXPECT_EQ(CountLines(lines, "uci"), 1u) << "the engine was in step: no new process";
+        EXPECT_EQ(CountLines(lines, "ucinewgame"), 1u);
+        EXPECT_EQ(CountLines(lines, "quit"), 0u);
+    }
+
+    TEST(UciEngineTest, AnalyseSendsTheSameCommandsAsFindMove) {
+        SKIP_WITHOUT_FAKE_ENGINE();
+        const TempDirectory directory;
+        const eastl::string moveLog = directory.FileText("find.log");
+        const eastl::string analysisLog = directory.FileText("analyse.log");
+        UciEngineSettings analyserSettings = FakeSettings({"--log", analysisLog, "--moves", "g1f3"});
+        analyserSettings.options.emplace_back("Skill Level", "5");
+        UciEngineSettings playerSettings = FakeSettings({"--log", moveLog, "--moves", "g1f3"});
+        playerSettings.options.emplace_back("Skill Level", "5");
+        UciEngine analyser(std::move(analyserSettings));
+        UciEngine player(std::move(playerSettings));
+        const SearchRequest request = MakeRequest({"e2e4", "e7e5"}, SearchLimits{80, 8});
+
+        ExpectAnalysis(analyser.Analyse(request, CancellationToken()), "g1f3", Cp(10), 1);
+        ExpectMove(player.FindMove(request, CancellationToken()), "g1f3");
+
+        const eastl::vector<eastl::string> lines = ReadFileLines(directory.File("analyse.log"));
+        EXPECT_EQ(lines, ReadFileLines(directory.File("find.log")));
+        EXPECT_EQ(CountLines(lines, "go depth 8 movetime 80"), 1u);
+        EXPECT_EQ(CountLines(lines, Format("{} moves e2e4 e7e5", StartPositionCommand())), 1u);
+    }
+
+    TEST(UciEngineTest, AnalyseOfAGameThatIsOverIsNoMoveAndNoProcessIsStarted) {
+        SKIP_WITHOUT_FAKE_ENGINE();
+        const TempDirectory directory;
+        const eastl::string log = directory.FileText(kLogName);
+        UciEngine engine(FakeSettings({"--log", log}));
+
+        const eastl::string mate = "7k/6Q1/6K1/8/8/8/8/8 b - - 0 1";
+        const eastl::string stalemate = "7k/5Q2/6K1/8/8/8/8/8 b - - 0 1";
+        ExpectAnalysisError(engine.Analyse(MakeRequest({}, SearchLimits{kMoveTimeMs, 0}, mate), CancellationToken()), EngineErrorKind::NoMove);
+        ExpectAnalysisError(engine.Analyse(MakeRequest({}, SearchLimits{kMoveTimeMs, 0}, stalemate), CancellationToken()), EngineErrorKind::NoMove);
+
+        EXPECT_FALSE(std::filesystem::exists(directory.File(kLogName))) << "the fake was started";
+    }
+
+    TEST(UciEngineTest, AnalyseWhenTheEngineSaysBestmoveNoneOrZerosIsNoMoveAndTheEngineIsKept) {
+        SKIP_WITHOUT_FAKE_ENGINE();
+        const TempDirectory directory;
+        const eastl::string log = directory.FileText(kLogName);
+        UciEngine engine(FakeSettings({"--log", log, "--moves", "(none),0000,a7a6"}));
+        const SearchRequest request = MakeRequest({"e2e4"});  // black to move, and black has moves
+
+        const auto none = engine.Analyse(request, CancellationToken());
+        const auto zeros = engine.Analyse(request, CancellationToken());
+        const auto next = engine.Analyse(request, CancellationToken());
+
+        ExpectAnalysisError(none, EngineErrorKind::NoMove);
+        ExpectAnalysisError(zeros, EngineErrorKind::NoMove);
+        ExpectAnalysis(next, "a7a6", Cp(10), 1);
+        const eastl::vector<eastl::string> lines = ReadFileLines(directory.File(kLogName));
+        EXPECT_EQ(CountLines(lines, "uci"), 1u);
+        EXPECT_EQ(CountLines(lines, "quit"), 0u);
+    }
+
+    TEST(UciEngineTest, AnalyseWithAnIllegalMoveFromTheEngineIsIllegalMoveAndTheEngineIsKept) {
+        SKIP_WITHOUT_FAKE_ENGINE();
+        const TempDirectory directory;
+        const eastl::string log = directory.FileText(kLogName);
+        UciEngine engine(FakeSettings({"--log", log, "--moves", "e2e5,e2e4"}));
+
+        const auto illegal = engine.Analyse(MakeRequest({}), CancellationToken());
+        const auto again = engine.Analyse(MakeRequest({}), CancellationToken());
+
+        ExpectAnalysisError(illegal, EngineErrorKind::IllegalMove);
+        if (!illegal) {
+            EXPECT_NE(illegal.error().detail.find("e2e5"), eastl::string::npos) << illegal.error().detail.c_str();
+        }
+        ExpectAnalysis(again, "e2e4", Cp(10), 1);
+        const eastl::vector<eastl::string> lines = ReadFileLines(directory.File(kLogName));
+        EXPECT_EQ(CountLines(lines, "uci"), 1u);
+        EXPECT_EQ(CountLines(lines, "quit"), 0u);
+    }
+
+    TEST(UciEngineTest, AnalyseWithBadLimitsOrARequestThatIsBrokenIsBadRequestWithoutAProcess) {
+        SKIP_WITHOUT_FAKE_ENGINE();
+        const TempDirectory directory;
+        const eastl::string log = directory.FileText(kLogName);
+        UciEngine engine(FakeSettings({"--log", log}));
+
+        ExpectAnalysisError(engine.Analyse(MakeRequest({}, SearchLimits{0, 0}), CancellationToken()), EngineErrorKind::BadRequest);
+        ExpectAnalysisError(engine.Analyse(MakeRequest({}, SearchLimits{-1, 5}), CancellationToken()), EngineErrorKind::BadRequest);
+        ExpectAnalysisError(engine.Analyse(MakeRequest({}, SearchLimits{kMoveTimeMs, 0}, "not a fen"), CancellationToken()), EngineErrorKind::BadRequest);
+        ExpectAnalysisError(engine.Analyse(MakeRequest({"e2e5"}), CancellationToken()), EngineErrorKind::BadRequest);
+
+        EXPECT_FALSE(std::filesystem::exists(directory.File(kLogName)));
+    }
+
+    TEST(UciEngineTest, AnalyseWithATokenCancelledBeforeIsCancelledWithoutAProcess) {
+        SKIP_WITHOUT_FAKE_ENGINE();
+        const TempDirectory directory;
+        const eastl::string log = directory.FileText(kLogName);
+        UciEngine engine(FakeSettings({"--log", log}));
+        CancellationToken token = CancellationToken::Create();
+        token.Cancel();
+
+        ExpectAnalysisError(engine.Analyse(MakeRequest({}), token), EngineErrorKind::Cancelled);
+
+        EXPECT_FALSE(std::filesystem::exists(directory.File(kLogName)));
+    }
+
+    TEST(UciEngineTest, AnalyseOfAnEngineThatNeverAnswersIsTimeoutAndIsReplaced) {
+        SKIP_WITHOUT_FAKE_ENGINE();
+        const TempDirectory directory;
+        const eastl::string log = directory.FileText(kLogName);
+        UciEngineSettings settings = FakeSettings({"--log", log, "--hang-on-go"});
+        settings.answerSlackMs = kShortTimeoutMs;
+        UciEngine engine(std::move(settings));
+        const SearchRequest request = MakeRequest({}, SearchLimits{20, 0});
+
+        const Clock::time_point begin = Clock::now();
+        const auto first = engine.Analyse(request, CancellationToken());
+        const Clock::duration took = Clock::now() - begin;
+
+        ExpectAnalysisError(first, EngineErrorKind::Timeout);
+        EXPECT_GE(took, milliseconds(20 + kShortTimeoutMs));
+        EXPECT_LT(took, kMustNotTimeOut);
+        EXPECT_TRUE(WaitForLogLine(directory.File(kLogName), "quit")) << "the hung engine was told to leave";
+
+        ExpectAnalysisError(engine.Analyse(request, CancellationToken()), EngineErrorKind::Timeout);
+        EXPECT_EQ(CountLines(ReadFileLines(directory.File(kLogName)), "uci"), 2u) << "the second analysis started a process of its own";
+    }
+
+    TEST(UciEngineTest, AnalyseOfAnEngineThatDiesIsProcessDiedAndTheNextOneRestarts) {
+        SKIP_WITHOUT_FAKE_ENGINE();
+        const TempDirectory directory;
+        const eastl::string log = directory.FileText(kLogName);
+        const eastl::string marker = directory.FileText("died-once");
+        UciEngine engine(FakeSettings({"--log", log, "--die-once", marker, "--moves", "e2e4", "--scores", "cp:7"}));
+
+        ExpectAnalysisError(engine.Analyse(MakeRequest({}), CancellationToken()), EngineErrorKind::ProcessDied);
+        ExpectAnalysis(engine.Analyse(MakeRequest({}), CancellationToken()), "e2e4", Cp(7), 1);
+
+        EXPECT_EQ(CountLines(ReadFileLines(directory.File(kLogName)), "uci"), 2u);
+    }
+
+    TEST(UciEngineTest, ACancelledAnalysisStopsTheEngineAndTheEngineIsReusable) {
+        SKIP_WITHOUT_FAKE_ENGINE();
+        const TempDirectory directory;
+        const eastl::string log = directory.FileText(kLogName);
+        // The first go thinks for five seconds unless it is stopped; the second answers at once. The answer to `stop` is e2e4 and must not be taken for the second search's
+        UciEngine engine(FakeSettings({"--log", log, "--think-ms", "5000", "--think-first-only", "--moves", "e2e4,d2d4", "--scores", "cp:1,cp:2"}));
+        const CancellationToken token = CancellationToken::Create();
+        CancelOnLogLine canceller(token, directory.File(kLogName), "go movetime 50");
+
+        const Clock::time_point begin = Clock::now();
+        const auto cancelled = engine.Analyse(MakeRequest({}), token);
+        const Clock::duration took = Clock::now() - begin;
+
+        ExpectAnalysisError(cancelled, EngineErrorKind::Cancelled);
+        EXPECT_LT(took, milliseconds(4000)) << "the engine would have thought for 5000 ms";
+        ExpectAnalysis(engine.Analyse(MakeRequest({}), CancellationToken()), "d2d4", Cp(2), 1);
+        const eastl::vector<eastl::string> lines = ReadFileLines(directory.File(kLogName));
+        EXPECT_EQ(CountLines(lines, "stop"), 1u);
+        EXPECT_EQ(CountLines(lines, "uci"), 1u) << "the engine answered `stop`: it stays";
+        EXPECT_EQ(CountLines(lines, "quit"), 0u);
+    }
+
+    TEST(UciEngineTest, AnalyseAndFindMoveOnOneObjectShareTheNewGameRule) {
+        SKIP_WITHOUT_FAKE_ENGINE();
+        const TempDirectory directory;
+        const eastl::string log = directory.FileText(kLogName);
+        UciEngine engine(FakeSettings({"--log", log, "--moves", "e7e5,b8c6,e2e4,e7e5", "--scores", "cp:1,cp:2,cp:3,cp:4"}));
+        const eastl::string pawnEndgame = "4k3/8/8/8/8/8/4P3/4K3 w - - 0 1";
+        const auto ucinewgames = [&] { return CountLines(ReadFileLines(directory.File(kLogName)), "ucinewgame"); };
+
+        ExpectMove(engine.FindMove(MakeRequest({"e2e4"}), CancellationToken()), "e7e5");
+        EXPECT_EQ(ucinewgames(), 1u);
+
+        ExpectAnalysis(engine.Analyse(MakeRequest({"e2e4", "e7e5", "g1f3"}), CancellationToken()), "b8c6", Cp(2), 1);
+        EXPECT_EQ(ucinewgames(), 1u) << "the moves extend what FindMove asked: the same game";
+
+        ExpectAnalysis(engine.Analyse(MakeRequest({}, SearchLimits{kMoveTimeMs, 0}, pawnEndgame), CancellationToken()), "e2e4", Cp(3), 1);
+        EXPECT_EQ(ucinewgames(), 2u) << "another start FEN";
+
+        ExpectMove(engine.FindMove(MakeRequest({"e2e4"}), CancellationToken()), "e7e5");
+        EXPECT_EQ(ucinewgames(), 3u) << "the start FEN is back";
+        EXPECT_EQ(CountLines(ReadFileLines(directory.File(kLogName)), "uci"), 1u);
+    }
+
+    TEST(UciEngineTest, TwoThreadsAnalysingAreServedOneAfterTheOther) {
+        SKIP_WITHOUT_FAKE_ENGINE();
+        constexpr milliseconds kThink{100};
+        UciEngine engine(FakeSettings({"--think-ms", "100", "--moves", "e2e4,d2d4", "--scores", "cp:1,cp:2"}));
+        std::expected<Analysis, EngineError> results[2] = {std::unexpected(EngineError{}), std::unexpected(EngineError{})};
+
+        const Clock::time_point begin = Clock::now();
+        {
+            std::thread first([&] { results[0] = engine.Analyse(MakeRequest({}), CancellationToken()); });
+            std::thread second([&] { results[1] = engine.Analyse(MakeRequest({}), CancellationToken()); });
+            first.join();
+            second.join();
+        }
+        const Clock::duration took = Clock::now() - begin;
+
+        ASSERT_TRUE(results[0].has_value()) << Describe(results[0].error()).c_str();
+        ASSERT_TRUE(results[1].has_value()) << Describe(results[1].error()).c_str();
+        // Each analysis got the move and the score of its own go, never the move of one and the score of the other
+        for (const auto& result : results) {
+            const eastl::string move = result->Best().move.ToUci();
+            EXPECT_EQ(result->Best().score, move == "e2e4" ? Cp(1) : Cp(2)) << move.c_str();
+        }
+        EXPECT_NE(results[0]->Best().move, results[1]->Best().move);
+        EXPECT_GE(took, 2 * kThink) << "the second analysis waited for the first";
+    }
+
 #endif  // defined(_WIN32)
 
     TEST(UciEngineTest, FindStockfishTakesAnExplicitExistingFile) {
@@ -659,6 +951,18 @@ namespace BECore::Chess::Tests {
         const auto result = engine.FindMove(MakeRequest({}, SearchLimits{0, 8}, "4k3/8/8/3q4/8/8/8/3RK3 w - - 0 1"), CancellationToken());
 
         ExpectMove(result, "d1d5");
+    }
+
+    TEST(UciEngineStockfishTest, AnalysesTheMateInOne) {
+        SKIP_WITHOUT_STOCKFISH(stockfish);
+        UciEngine engine(StockfishSettings(*stockfish));
+
+        const auto result = engine.Analyse(MakeRequest({}, SearchLimits{0, 6}, "6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1"), CancellationToken());
+
+        ASSERT_TRUE(result.has_value()) << Describe(result.error()).c_str();
+        EXPECT_EQ(result->Best().move.ToUci(), "a1a8");
+        EXPECT_EQ(result->Best().score, MateOf(1));
+        EXPECT_GE(result->Best().depth, 1);
     }
 
     TEST(UciEngineStockfishTest, ASkillLevelOptionDoesNotBreakTheHandshake) {

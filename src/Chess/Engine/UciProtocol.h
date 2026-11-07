@@ -4,7 +4,7 @@
 
 namespace BECore::Chess {
 
-    /// The text of the UCI protocol (the commands we send, the one line we read). Pure: no process, no thread, nothing to log
+    /// The text of the UCI protocol (the commands we send, the lines we read: `bestmove` and `info`). Pure: no process, no thread, nothing to log
     namespace UciProtocol {
 
         /// The answer of an engine to `go`: `bestmove e2e4`, `bestmove e2e4 ponder e7e5` (the ponder move is dropped)
