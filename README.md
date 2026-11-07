@@ -2,28 +2,112 @@
 
 Chess on the [BagiEngine](https://github.com/b0gdan0v-bagi/BagiEngine): rules as plain C++ (bitboards, perft-tested), a scene with an engine-drawn HUD, a control API for tests and for playing against Stockfish. The engine is the git submodule `engine/`, on the permanent branch `games/chess` of the engine repository.
 
-## Get it
-
-```bash
-git clone --recurse-submodules <url> BagiEngine-Chess
-cd BagiEngine-Chess
-CI/setup_venv.sh          # Windows: CI\setup_venv.bat or .ps1; creates engine/.venv, needs uv
-```
-
-An existing clone: `git submodule update --init --recursive`.
-
 ## Build and test
 
-The presets are the engine's (`CMakePresets.json` includes `engine/CMakePresets.json`):
+From a clean `git clone` to a running game and a green test run. The commands are for macOS (what the game is built and tested on); Windows is in "Windows" below, the editor in "VS Code". The build facts that the agents read (targets, when to re-run configure) are in `.claude/rules/build-project.md`.
 
-```bash
-export PATH="$PWD/engine/.venv/bin:$PATH"     # the reflection generator needs jinja2
-cmake --preset macos-debug                    # list: cmake --list-presets
-cmake --build --preset macos-debug
-ctest --preset macos-debug                    # ChessTests and BagiChessControlSmoke
-build/ClangmacOS/ChessTests --gtest_filter='Stockfish*:UciEngineStockfishTest*'   # against a real Stockfish (STOCKFISH or PATH); skipped without one
-build/ClangmacOS/BagiChess                    # the game; the executable folder depends on compiler and OS
-```
+### What you need
+
+| Need | Why, and what the repository says |
+|------|-----------------------------------|
+| `git` | The engine is the submodule `engine/` and it has submodules of its own (SDL, SDL_image with its codecs, Vulkan-Headers, googletest): the clone must be recursive. |
+| CMake 3.31 or newer | `cmake_minimum_required(VERSION 3.31)` in `CMakeLists.txt` and `cmakeMinimumRequired` 3.31 in `CMakePresets.json`. |
+| Ninja | The macOS presets and the `windows-msvc-*` / `windows-clang-*` presets use the Ninja generator (the `windows-vs2022*` presets use Visual Studio 2022 instead). |
+| A C++23 compiler | `CMAKE_CXX_STANDARD 23` (`engine/cmake/BagiEngine.cmake`). macOS: Clang, the presets set `clang` / `clang++` (Apple clang 17 from the Xcode command line tools builds it). Windows: MSVC or Clang, see "Windows". |
+| [`uv`](https://docs.astral.sh/uv/) and a Python 3 | `CI/setup_venv.*` calls `uv` to create `engine/.venv`, which holds the reflection generator's dependencies (Jinja2) and the Python of the control smoke test. Install it from its page (Homebrew, `pip install uv`, or the installer script). |
+| `glslc` (the Vulkan SDK or the `shaderc` tools) | The engine compiles its Vulkan shaders at build time. Configure stops with "glslc not found" when it is on neither `PATH` nor under `VULKAN_SDK` (`engine/src/Modules/Vulkan/CMakeLists.txt`). Install the [Vulkan SDK](https://vulkan.lunarg.com/) or put `glslc` on `PATH`; if it is somewhere else, pass `VULKAN_SDK` (see "Your own settings"). |
+
+Nothing else is installed by hand: SDL, SDL_image, the Vulkan headers and the Vulkan loader are in `engine/external/` and the loader's binaries are in the same folder. The reflection generator is plain Python and needs no LLVM.
+
+### From clone to a running game
+
+1. Clone with the submodules (the clone is large because of them):
+
+   ```bash
+   git clone --recurse-submodules <url> BagiEngine-Chess
+   cd BagiEngine-Chess
+   ```
+
+   A clone made without `--recurse-submodules`, or a pull that moved `engine/`: `git submodule update --init --recursive`.
+
+2. Create the Python environment, once (Windows: `CI\setup_venv.bat` or `CI\setup_venv.ps1`):
+
+   ```bash
+   CI/setup_venv.sh
+   ```
+
+   It creates `engine/.venv` and installs `engine/requirements.txt` into it (it fetches the engine submodule itself if that is missing). CMake picks `engine/.venv`'s Python by itself when the folder exists (`engine/cmake/BagiEngine.cmake`, "Python Virtual Environment Detection"); without it the configure falls back to the system Python and the reflection generator fails on a missing `jinja2`.
+
+3. Put the venv first on `PATH` for the shell you configure from (a safeguard: it makes the same Python win everywhere, and it is what the failure hint below tells you to do):
+
+   ```bash
+   export PATH="$PWD/engine/.venv/bin:$PATH"
+   ```
+
+4. Configure. The presets are the engine's (`CMakePresets.json` includes `engine/CMakePresets.json`); `cmake --list-presets` lists the ones that exist on your OS:
+
+   ```bash
+   cmake --preset macos-debug
+   ```
+
+   Run this again after adding or deleting a source file (the sources are globbed), after changing a class that uses `BE_CLASS` / `BE_REFLECT_FIELD` (the reflection code is generated at configure time) and after the `engine/` pointer moves.
+
+5. Build everything (`BagiChess` and `ChessTests`; the first build also compiles the engine and its libraries and takes a while):
+
+   ```bash
+   cmake --build --preset macos-debug
+   ```
+
+6. Run the game. The executable lands in `build/<Compiler><Platform>/`, not in the preset's folder (`build/ClangmacOS/` here; Debug and Release builds overwrite each other). Start it from a terminal so the log is visible:
+
+   ```bash
+   build/ClangmacOS/BagiChess
+   ```
+
+   It opens a window with two people on one screen; "Playing against the computer" below tells how to play the computer.
+
+7. Run the tests:
+
+   ```bash
+   ctest --preset macos-debug
+   ```
+
+   That is `ChessTests` (the gtest cases, each in its own process) and `BagiChessControlSmoke`, a Python script that starts `BagiChess --control --headless` and plays it over the control API. The smoke test needs the built `BagiChess` and is **skipped** (exit code 77) when the executable is missing, so build the default target as in step 5, or add `BagiChess` to a narrower `--target ChessTests BagiChess`. Stockfish is not needed: the tests that use a real one skip themselves. To run them against yours:
+
+   ```bash
+   build/ClangmacOS/ChessTests --gtest_filter='Stockfish*:UciEngineStockfishTest*'   # STOCKFISH or PATH
+   ```
+
+Release is the same with `macos-release`. The `*-rmlui-*` presets also build the vendored RmlUi; the game does not need it.
+
+### Windows
+
+The presets for Windows are in `engine/CMakePresets.json`; they are written from that file and not run on a Windows machine for this README. Steps 1 to 3 and 5 to 7 are the same, with these changes:
+
+- Tools: Visual Studio 2022 with the "Desktop development with C++" workload (it brings MSVC), CMake 3.31 or newer and Ninja (for the Ninja presets), `git`, `uv`, and the Vulkan SDK. The `VULKAN_SDK` cache variable defaults to `C:/VulkanSDK/1.4.341.1` (`engine/cmake/BagiEngine.cmake`); with another version installed, pass the real path (see below). Without an SDK the vendored loader in `engine/external/Vulkan-Loader/Windows` is used, but `glslc` is still needed.
+- Step 2: `CI\setup_venv.bat` (cmd) or `CI\setup_venv.ps1` (PowerShell); the venv's Python is `engine\.venv\Scripts\python.exe`, and step 3 is `set PATH=%CD%\engine\.venv\Scripts;%PATH%` (cmd) or `$env:PATH = "$PWD\engine\.venv\Scripts;$env:PATH"` (PowerShell).
+- Step 4, one of:
+  - `windows-msvc-debug` / `windows-msvc-release`: MSVC (`cl`) with Ninja. These presets do not load the Visual Studio environment themselves (`vs-env` is the `external` strategy: the caller does), so configure from a shell where `cl` works, an x64 Visual Studio developer prompt, or let VS Code CMake Tools load it (see "VS Code").
+  - `windows-vs2022`: the Visual Studio 2022 generator, x64, MSVC; it needs no developer prompt. The build and test presets are `windows-vs2022-debug` and `windows-vs2022-release` (`cmake --build --preset windows-vs2022-debug`, `ctest --preset windows-vs2022-debug`).
+  - `windows-clang-debug` / `windows-clang-release` (Clang with Ninja, same `vs-env` rule) and `windows-vs2022-clangcl` (build presets `windows-vs2022-clangcl-debug` / `-release`) are there too.
+- Step 6: the executable is `build/MSVCWindows/BagiChess.exe` for MSVC (`build/ClangWindows/` for Clang); a Visual Studio configuration may add `Debug/` or `Release/` below that folder.
+- Stockfish does not play on Windows yet, only the own engine does (see "Playing against the computer").
+
+### VS Code
+
+Open `CI/BagiChess.code-workspace` (File, Open Workspace from File). It recommends the extensions (C/C++, CMake Tools, CodeLLDB), sets `cmake.useCMakePresets` to `always`, and has the launch configurations and build tasks. Then:
+
+1. Run "CMake: Select Configure Preset" and pick the preset for your OS (`macOS Clang Debug`, `Windows MSVC Ninja Debug`, ...), and "CMake: Select Build Preset" for the matching build preset. Only the presets whose host matches your OS are offered.
+2. "CMake: Configure" is step 4, "Build" (F7) is step 5. The default build task builds `BagiChess`; the debug configurations (F5) build first and start the CMake launch target. With the `windows-msvc-*` presets CMake Tools loads the Visual Studio environment itself.
+3. The workspace does not run `CI/setup_venv.*` for you: do step 2 above once, in a terminal. The workspace does not put the venv on `PATH`, which is fine, CMake finds `engine/.venv` itself.
+
+### Your own settings
+
+`CMakeUserPresets.json` is git-ignored and holds what is specific to your machine: a different `VULKAN_SDK`, `ccache`, a preset of your own. It may inherit from the shared presets, but it needs a build preset of its own to show up in CMake Tools; a worked example is in `.claude/rules/build-project.md`, "Local overrides". The `.env` file at the root (copy `.env.example`) is for the todo tools only, not for the build.
+
+### When it fails
+
+The common causes and their fixes (a missing `engine/external/*`, a missing `jinja2`, `glslc not found`) are in `.claude/rules/build-project.md`, "Failure hints"; the usual first step for anything odd is `git submodule status --recursive` (a line starting with `-` is a submodule that was not fetched) and a fresh `cmake --preset ...`.
 
 ## Playing against the computer
 
