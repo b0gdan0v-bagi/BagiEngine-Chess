@@ -9,7 +9,9 @@ which it finds through the environment variable BAGI_ENGINE_DIR (set by ctest), 
 engine" scenarios, base ones) needs nothing from the environment: it runs inside the game, with no process, so it also runs where the next kind is left out;
 it answers the same move to the same position (a fixed depth), which the scenario checks after a reset. The opponent panel ("opponent panel" scenarios, base
 ones too) is driven only by `ui_click` on the buttons and segments found by name, as a person would: open it with the Menu button, pick the own engine,
-Computer, a level and a color, read the pick back from `get_state` and from `ui_tree`, play, close it with OK. Stockfish ("opponent" scenarios) is replaced by
+Computer, a level and a color, read the pick back from `get_state` and from `ui_tree`, play, close it with OK. The captured material ("captured material"
+scenarios, base ones too, no engine) reads `get_state.material` after a capture, after a position set from outside and after a reset, and, on the headless
+run, compares the left margin of a screenshot (the display of the captured pieces) before and after a capture and after the reset. Stockfish ("opponent" scenarios) is replaced by
 tests/fake_uci_engine.py: main() writes a wrapper script that starts it into a temporary directory and puts the script in STOCKFISH of the environment,
 which the game inherits. STOCKFISH comes before PATH in the game's search for an engine and the committed config has no path, so a Stockfish installed on
 this machine is never used. A config/ChessSettings.local.xml (a person's own path, which would win over STOCKFISH) leaves the Stockfish scenarios out, as
@@ -345,13 +347,24 @@ BOARD_TOP, BOARD_BOTTOM = 80, 720
 BOARD_BAND_INSET = 2  # rows kept away from the edge of the board, against rounding
 
 
+def view_in_picture(image) -> tuple:
+    """Where the scene is in a screenshot: (scale, left, top). The window fits the 840 x 800 view by the smaller scale and centers it."""
+    scale = min(image.width / VIEW_WIDTH, image.height / VIEW_HEIGHT)
+    return scale, (image.width - VIEW_WIDTH * scale) / 2, (image.height - VIEW_HEIGHT * scale) / 2
+
+
+def board_rows(image) -> tuple:
+    """The first and the last row of a screenshot that only the board covers, kept BOARD_BAND_INSET away from its edges."""
+    scale, _, top = view_in_picture(image)
+    first = int(top + BOARD_TOP * scale) + BOARD_BAND_INSET
+    last = int(top + BOARD_BOTTOM * scale) - BOARD_BAND_INSET
+    check(0 <= first < last <= image.height, f"the board band {first}..{last} is outside a picture {image.width}x{image.height}")
+    return first, last
+
+
 def board_band(image) -> list:
     """The rows of a screenshot that only the board covers: the HUD sits in the margins above and below it, and its words (the turn, the status) change with the game."""
-    scale = min(image.width / VIEW_WIDTH, image.height / VIEW_HEIGHT)
-    offset = (image.height - VIEW_HEIGHT * scale) / 2
-    first = int(offset + BOARD_TOP * scale) + BOARD_BAND_INSET
-    last = int(offset + BOARD_BOTTOM * scale) - BOARD_BAND_INSET
-    check(0 <= first < last <= image.height, f"the board band {first}..{last} is outside a picture {image.width}x{image.height}")
+    first, last = board_rows(image)
     return image.rows[first:last]
 
 
@@ -412,14 +425,11 @@ def get_material(client: BagiControlClient) -> dict:
 def margin_band(image) -> list:
     """The part of a screenshot that only the left margin covers: the rows of the board, the columns from the left edge of the view to the board. The HUD above and below
     the board and the board itself are left out, so what differs between two pictures of it is the display of the captured material."""
-    scale = min(image.width / VIEW_WIDTH, image.height / VIEW_HEIGHT)
-    left = (image.width - VIEW_WIDTH * scale) / 2
-    top = (image.height - VIEW_HEIGHT * scale) / 2
-    first_row = int(top + BOARD_TOP * scale) + BOARD_BAND_INSET
-    last_row = int(top + BOARD_BOTTOM * scale) - BOARD_BAND_INSET
+    scale, left, _ = view_in_picture(image)
+    first_row, last_row = board_rows(image)
     first_column = int(left) + MARGIN_INSET
     last_column = int(left + MARGIN_WIDTH * scale) - MARGIN_INSET
-    check(0 <= first_row < last_row <= image.height and 0 <= first_column < last_column <= image.width, f"the margin band is outside a picture {image.width}x{image.height}")
+    check(0 <= first_column < last_column <= image.width, f"the margin band columns {first_column}..{last_column} are outside a picture {image.width}x{image.height}")
     return [row[first_column * image.channels : last_column * image.channels] for row in image.rows[first_row:last_row]]
 
 
@@ -470,9 +480,10 @@ def run_material_scenario(client: BagiControlClient, headless: bool) -> None:
     client.call("perform_action", move("e4d5"))
     if headless:
         let_frames_pass(client, 2)
-        captured_band = margin_band(take_screenshot(client))
+        captured = take_screenshot(client)
+        captured_band = margin_band(captured)
         check(captured_band != start_band, "the left margin did not change after White took a pawn")
-        check(band_has_color(captured_band, 3, CHIP_COLOR) or band_has_color(captured_band, 4, CHIP_COLOR), "no row of the display is drawn in the left margin after the capture")
+        check(band_has_color(captured_band, captured.channels, CHIP_COLOR), "no row of the display is drawn in the left margin after the capture")
 
     client.call("reset")
     check_material(get_material(client), 0, {}, {}, "after a reset")

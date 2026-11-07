@@ -15,7 +15,8 @@ namespace BECore::Chess {
      * (`BottomColor` of Game/BoardOrientation.h, the same function the board draws with, so the groups swap when the board turns). A group is a list of five rows (queen, rook, bishop, knight,
      * pawn) and a balance box. In OnDraw(), which runs before the canvas on the same node draws, it reads the model and the opponent and, only when the model, its version or the bottom color
      * changed, publishes the twelve `UIVars` (`material<Top|Bottom><Queen|Rook|Bishop|Knight|Pawn>`: "x3" or "", and `material<Top|Bottom>Balance`: "+N" for the group that is ahead, else ""),
-     * and gives each of the ten icons the sprite `<Color><Type>` of the pieces its group has taken (the other color than the group's). With no game active the variables are empty and no row is shown.
+     * and, when the bottom color changed (also at the first draw), gives each of the ten icons the sprite `<Color><Type>` of the pieces its group has taken (the other color than the group's). With no
+     * game active the variables are empty and no row is shown.
      *
      * A row is shown when its count is above 0 and the lists fit: Game/MaterialLayout.h says whether the box of the lists lies inside the safe area of the canvas, and this is asked on every
      * draw (the safe area changes with the window, not with the model). Before the canvas has been laid out once the safe area is not known and the rows stay hidden, so nothing flashes for

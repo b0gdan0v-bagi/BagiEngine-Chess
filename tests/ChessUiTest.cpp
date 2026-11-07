@@ -77,6 +77,7 @@ namespace BECore::Chess::Tests {
         constexpr size_t kPieceCount = 32;
         constexpr const char* kMaterialPieces[] = {"Queen", "Rook", "Bishop", "Knight", "Pawn"};  // the rows of a group of the captured material, in the order of the scene
         constexpr float kPixelTolerance = 0.01f;
+        constexpr float kGlyphTolerance = 1.0f;  // a glyph of a label is laid out to the pixel of the font, not to the unit
 
         constexpr int kManyFrames = 200;                            // frames that must pass with nothing happening
         constexpr std::chrono::milliseconds kShutdownBudget{3000};  // a gated engine gives up after 10 s (kGateGiveUp): a shutdown that waited for it would not fit
@@ -109,6 +110,11 @@ namespace BECore::Chess::Tests {
                    std::abs(left.h - right.h) <= kPixelTolerance;
         }
 
+        /// The rect lies inside the other one, give or take @p tolerance
+        bool LiesIn(const Rect& inner, const Rect& outer, float tolerance = kPixelTolerance) {
+            return inner.x >= outer.x - tolerance && inner.y >= outer.y - tolerance && inner.x + inner.w <= outer.x + outer.w + tolerance && inner.y + inner.h <= outer.y + outer.h + tolerance;
+        }
+
         /// The two rects are closer to each other than @p gap (or overlap)
         bool Touch(const Rect& left, const Rect& right, float gap) {
             return left.x < right.x + right.w + gap && right.x < left.x + left.w + gap && left.y < right.y + right.h + gap && right.y < left.y + left.h + gap;
@@ -129,8 +135,7 @@ namespace BECore::Chess::Tests {
 
         /// The rect lies inside the other one and both have the same middle
         ::testing::AssertionResult IsCenteredIn(const Rect& inner, const Rect& outer) {
-            const bool inside = inner.x >= outer.x - kPixelTolerance && inner.y >= outer.y - kPixelTolerance && inner.x + inner.w <= outer.x + outer.w + kPixelTolerance &&
-                                inner.y + inner.h <= outer.y + outer.h + kPixelTolerance;
+            const bool inside = LiesIn(inner, outer);
             const float offsetX = (inner.x + inner.w * 0.5f) - (outer.x + outer.w * 0.5f);
             const float offsetY = (inner.y + inner.h * 0.5f) - (outer.y + outer.h * 0.5f);
             if (inside && std::abs(offsetX) <= kPixelTolerance && std::abs(offsetY) <= kPixelTolerance) {
@@ -419,14 +424,8 @@ namespace BECore::Chess::Tests {
         constexpr int kMostCaptured = 8;                // the longest count word is "x8": the most a row can show is the eight pawns (a test holds it to the summary of two bare kings)
         constexpr const char* kMaterialGroups[] = {"Top", "Bottom"};
 
-        /// The rect lies inside the other one
-        bool LiesIn(const Rect& inner, const Rect& outer) {
-            return inner.x >= outer.x - kPixelTolerance && inner.y >= outer.y - kPixelTolerance && inner.x + inner.w <= outer.x + outer.w + kPixelTolerance &&
-                   inner.y + inner.h <= outer.y + outer.h + kPixelTolerance;
-        }
-
-        /// Sets the twelve variables of the display to the words of round @p round: every count word "x1".."x15" stands at every row and every sign "+1".."+99" at both balances once over the
-        /// kMaterialRounds rounds
+        /// Sets the twelve variables of the display to the words of round @p round: every count word "x1".."x8" (kMostCaptured) stands at every row and every sign "+1".."+99" at both balances once
+        /// over the kMaterialRounds rounds
         void PublishMaterialRound(size_t round) {
             UIVars& vars = CoreManager::GetUIVars();
             size_t row = 0;
@@ -2233,10 +2232,6 @@ namespace BECore::Chess::Tests {
             return call.kind == DrawKind::Texture && (SameColor(call.color, kLightSquareColor) || SameColor(call.color, kDarkSquareColor));
         }
 
-        bool Inside(const Rect& inner, const Rect& outer) {
-            return inner.x >= outer.x - 1.0f && inner.y >= outer.y - 1.0f && inner.x + inner.w <= outer.x + outer.w + 1.0f && inner.y + inner.h <= outer.y + outer.h + 1.0f;
-        }
-
     }  // namespace
 
     TEST_F(ChessUiTest, TheBoardCoordinatesPassTheSizeMatrixWithEveryLetterAndDigit) {
@@ -2398,10 +2393,10 @@ namespace BECore::Chess::Tests {
                 const Rect box = OutputRect(label.rect);
                 size_t inBox = 0;
                 for (const DrawCall& call : _renderer->calls) {
-                    if (call.kind == DrawKind::Texture && Inside(call.rect, box)) {
+                    if (call.kind == DrawKind::Texture && LiesIn(call.rect, box, kGlyphTolerance)) {
                         ++inBox;
                         EXPECT_TRUE(SameColor(call.color, label.textColor));
-                        EXPECT_TRUE(Inside(call.rect, cell)) << "inside the cell it labels";
+                        EXPECT_TRUE(LiesIn(call.rect, cell, kGlyphTolerance)) << "inside the cell it labels";
                     }
                 }
                 EXPECT_EQ(inBox, 1u) << "one glyph in the box";
@@ -5242,8 +5237,9 @@ namespace BECore::Chess::Tests {
             }
         }
         layout.Invalidate();
-        // The inset is 9 % of the short side in pixels: in a window as wide as the view it is 75.6 units whatever the size, in a wider window the bars at the sides of the view are wider than the
-        // inset
+        // The side inset is 9 % of the short side in pixels. Where the short side is the width (1:1 and the three portrait shapes: all 19 hidden cases) the view fills the width and the inset is 9 %
+        // of the 840 units, 75.6, whatever the size. In a landscape window the view is fitted to the height, the inset is 72 units at most, and the bars at the sides of the view (113 units or more,
+        // at 4:3) are wider than that
         EXPECT_GT(hidden, 0u) << "the narrowest window of the matrix is one of them";
         EXPECT_GT(shown, hidden);
         std::cout << "[   INFO   ] the lists are hidden in " << hidden << " of " << hidden + shown << " cases of the size matrix:\n" << hiddenCases.c_str();
@@ -5301,7 +5297,14 @@ namespace BECore::Chess::Tests {
             const eastl::string controls = MaterialClearance(material->GetLayout(), hud->GetLayout(), kMinGap);
             if (matrixCase.label.find("notch") != eastl::string::npos) {
                 ++notchCases;
-                notchCasesWithAnOverlap += controls.empty() ? 0 : 1;
+                if (!controls.empty()) {
+                    ++notchCasesWithAnOverlap;
+                    // Not only close: the Turn label lies on top of the balance of the upper group, and of its first rows (CLAUDE.md, "The captured material", limit (b))
+                    const eastl::string touching = MaterialClearance(material->GetLayout(), hud->GetLayout(), 0.0f);
+                    EXPECT_NE(touching.find("MaterialTopBalance ("), eastl::string::npos) << matrixCase.label.c_str() << ":\n" << touching.c_str();
+                    EXPECT_NE(touching.find("MaterialTopQueenRow ("), eastl::string::npos) << matrixCase.label.c_str() << ":\n" << touching.c_str();
+                    EXPECT_NE(touching.find(") and Turn ("), eastl::string::npos) << matrixCase.label.c_str() << ":\n" << touching.c_str();
+                }
             } else {
                 EXPECT_TRUE(controls.empty()) << matrixCase.label.c_str() << ":\n" << controls.c_str();
             }
@@ -5309,7 +5312,8 @@ namespace BECore::Chess::Tests {
         material->GetLayout().Invalidate();
         hud->GetLayout().Invalidate();
         coordinates->GetLayout().Invalidate();
-        // The HUD keeps clear of the safe area, and a notch pushes its top row down by 7 % of the short side, onto the first row of the margin (as it does onto the board: CLAUDE.md, "The HUD")
+        // The HUD keeps clear of the safe area, and a notch pushes its top row down by 7 % of the short side, onto the first rows and the balance of the upper group (as it does onto the board:
+        // CLAUDE.md, "The HUD")
         std::cout << "[   INFO   ] the HUD reaches the top group in " << notchCasesWithAnOverlap << " of " << notchCases << " notch cases\n";
     }
 
