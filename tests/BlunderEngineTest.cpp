@@ -305,4 +305,46 @@ namespace BECore::Chess::Tests {
         EXPECT_NE(random, plain) << "100 percent plays its own moves";
     }
 
+    TEST(BlunderEngineTest, AnalyseIsForwardedUnchangedAtEveryPercent) {
+        const auto own = eastl::make_shared<OwnEngine>();
+        const SearchRequest request = SearchRequest::FromPosition(PositionFromFen("6k1/5ppp/8/8/8/8/8/R3K3 w - - 0 1"), SearchLimits{0, 2});
+        const auto plain = own->Analyse(request, CancellationToken::Create());
+        ASSERT_TRUE(plain.has_value());
+
+        for (const int percent : {0, 15, 100}) {
+            BlunderEngine engine(own, percent);
+            const auto wrapped = engine.Analyse(request, CancellationToken::Create());
+
+            ASSERT_TRUE(wrapped.has_value()) << percent;
+            EXPECT_EQ(wrapped->Best().move, plain->Best().move) << percent;
+            EXPECT_EQ(wrapped->Best().score, plain->Best().score) << percent;
+            EXPECT_EQ(wrapped->Best().depth, plain->Best().depth) << percent;
+        }
+    }
+
+    TEST(BlunderEngineTest, AnalyseIsNeverHandicappedOverAPositionWhereTheBlunderWouldDiffer) {
+        // At 100 percent FindMove answers a random move, and Analyse the best one: the hint is not spoilt by the handicap
+        const auto own = eastl::make_shared<OwnEngine>();
+        BlunderEngine alwaysBlunders(own, 100);
+        const SearchRequest request = SearchRequest::FromPosition(PositionFromFen("6k1/5ppp/8/8/8/8/8/R3K3 w - - 0 1"), SearchLimits{0, 2});
+
+        const auto analysis = alwaysBlunders.Analyse(request, CancellationToken::Create());
+
+        ASSERT_TRUE(analysis.has_value());
+        EXPECT_EQ(analysis->Best().move, Mv("a1a8")) << "the mating move, not a random one";
+    }
+
+    TEST(BlunderEngineTest, AnalyseOverAnEngineThatDoesNotAnalyseIsUnsupported) {
+        const auto inner = eastl::make_shared<InstantEngine>();
+        for (const int percent : {0, 100}) {
+            BlunderEngine engine(inner, percent);
+
+            const auto answer = engine.Analyse(SearchRequest::FromPosition(Position::Start(), kLimits), CancellationToken::Create());
+
+            ASSERT_FALSE(answer.has_value()) << percent;
+            EXPECT_EQ(answer.error().kind, EngineErrorKind::Unsupported) << percent;
+        }
+        EXPECT_EQ(inner->Calls(), 0) << "the double has no Analyse, so FindMove was not asked either";
+    }
+
 }  // namespace BECore::Chess::Tests

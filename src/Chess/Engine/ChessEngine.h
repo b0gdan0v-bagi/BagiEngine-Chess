@@ -11,7 +11,7 @@ namespace BECore::Chess {
     /// Why an engine gave no move. BadRequest: the request itself is wrong (limits, FEN, a move that is not legal). LaunchFailed: the program could not be started.
     /// Timeout: no answer in time. ProcessDied: the child ended or its pipe broke. ProtocolError: the engine did not speak UCI. NoMove: the side to move has no move,
     /// or the engine says it has none. IllegalMove: the engine's move is not legal in the position. Cancelled: the caller's token was cancelled.
-    /// Unsupported: this platform cannot do it.
+    /// Unsupported: this platform cannot do it, or this engine does not do it (the default IChessEngine::Analyse()).
     CORE_ENUM(EngineErrorKind, uint8_t, BadRequest, LaunchFailed, Timeout, ProcessDied, ProtocolError, NoMove, IllegalMove, Cancelled, Unsupported)
 
     /// A failure of an engine call: the kind to branch on and a sentence for the log. Only the code that owns the player logs it
@@ -27,7 +27,7 @@ namespace BECore::Chess {
     };
 
     /**
-     * @brief An opponent that picks a move: Stockfish over UCI, or an engine of our own later.
+     * @brief An engine that picks a move and analyses a position: Stockfish over UCI, the engine of our own (OwnEngine), or a handicap over either.
      *
      * The call is synchronous and blocking: it returns when the engine has answered, was cancelled or failed, so a caller that must not
      * wait (the main thread) runs it on a worker. It takes a SearchRequest (the start FEN and the moves played), not a Position,

@@ -29,6 +29,11 @@ namespace BECore::Chess {
     class OwnEngine final : public IChessEngine {
     public:
         [[nodiscard]] std::expected<Move, EngineError> FindMove(const SearchRequest& request, const CancellationToken& token) override;
+
+        /// One line: the best move of the last iteration that finished, with its score from the side to move (ScoreFromSearch()) and the depth of that iteration.
+        /// The contract of FindMove() in everything else (the same private search runs under both, so they give the same move for the same request, and the
+        /// errors are the same), also deterministic for a depth, a deadline is not an error and the object may be asked from several threads at once.
+        [[nodiscard]] std::expected<Analysis, EngineError> Analyse(const SearchRequest& request, const CancellationToken& token) override;
     };
 
 }  // namespace BECore::Chess

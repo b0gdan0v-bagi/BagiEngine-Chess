@@ -1,5 +1,6 @@
 #include "GamePlay.h"
 
+#include <Chess/Engine/Analysis.h>
 #include <Chess/Engine/OpponentController.h>
 #include <Chess/Engine/OwnEngine.h>
 #include <Chess/Engine/Search.h>
@@ -17,10 +18,13 @@ namespace BECore::Chess::Tests {
         constexpr const char* kMateInOneForWhite = "6k1/5ppp/8/8/8/8/8/R3K3 w - - 0 1";  // Ra8#
         constexpr const char* kMateInOneForBlack = "r3k3/8/8/8/8/8/5PPP/6K1 b - - 0 1";  // Ra1#
         constexpr const char* kHangingQueen = "k7/8/8/8/3q4/8/8/3RK3 w - - 0 1";         // Rxd4: nothing guards the queen
+        constexpr const char* kMateInTwo = "kbK5/pp6/1P6/8/8/8/8/R7 w - - 0 1";          // Ra6! and bxa6 b7#, else Rxa7#
+        constexpr const char* kMatedInOne = "kbK5/pp6/RP6/8/8/8/8/8 b - - 0 1";          // every Black move loses to a mate in one
         constexpr const char* kMated = "7k/6Q1/6K1/8/8/8/8/8 b - - 0 1";
         constexpr const char* kStalemated = "7k/5Q2/6K1/8/8/8/8/8 b - - 0 1";
 
         constexpr int kShallow = 2;
+        constexpr int kMateInTwoDepth = 4;
         constexpr int kSelfPlayDepth = 2;
         constexpr int kFloorDepth = 3;
         constexpr int kDepthThatNeverEnds = 64;
@@ -44,6 +48,19 @@ namespace BECore::Chess::Tests {
 
         std::expected<Move, EngineError> AskFen(IChessEngine& engine, eastl::string_view fen, SearchLimits limits) {
             return Ask(engine, SearchRequest::FromPosition(PositionFromFen(fen), limits));
+        }
+
+        std::expected<Analysis, EngineError> Analyse(IChessEngine& engine, const SearchRequest& request, const CancellationToken& token = CancellationToken::Create()) {
+            return engine.Analyse(request, token);
+        }
+
+        std::expected<Analysis, EngineError> AnalyseFen(IChessEngine& engine, eastl::string_view fen, SearchLimits limits) {
+            return Analyse(engine, SearchRequest::FromPosition(PositionFromFen(fen), limits));
+        }
+
+        /// The kind of an error, or nothing for a value: a form that EXPECT_EQ can compare and print
+        std::optional<EngineErrorKind> KindOf(const std::expected<Analysis, EngineError>& answer) {
+            return answer ? std::nullopt : std::optional<EngineErrorKind>(answer.error().kind);
         }
 
         /// The move of an answer, or nothing for an error: a form that EXPECT_EQ can compare and print
@@ -313,6 +330,163 @@ namespace BECore::Chess::Tests {
         EXPECT_LT(took, kStopBudget);
         EXPECT_TRUE(WaitUntil([&] { return engine->Answered() == 1; }, kStopBudget)) << "the token was cancelled and the search left its loop";
         EXPECT_EQ(model.GetMoves().size(), 1u) << "a late answer is never played";
+    }
+
+    // -- Analyse ---------------------------------------------------------------------------------------------------------------
+
+    TEST_F(OwnEngineTest, AnalyseAMateInOneForEitherColorGivesTheMovingMateAndAMateScore) {
+        const auto white = AnalyseFen(_engine, kMateInOneForWhite, Depth(kShallow));
+        const auto black = AnalyseFen(_engine, kMateInOneForBlack, Depth(kShallow));
+
+        ASSERT_TRUE(white.has_value());
+        ASSERT_TRUE(black.has_value());
+        ASSERT_EQ(white->lines.size(), 1u);
+        EXPECT_EQ(white->Best().move, Mv("a1a8"));
+        EXPECT_EQ(white->Best().score, (AnalysisScore{AnalysisScoreKind::Mate, 1}));
+        EXPECT_EQ(black->Best().move, Mv("a8a1"));
+        EXPECT_EQ(black->Best().score, (AnalysisScore{AnalysisScoreKind::Mate, 1})) << "the side to move mates: positive for Black too";
+        EXPECT_GE(white->Best().depth, 1);
+    }
+
+    TEST_F(OwnEngineTest, AnalyseAMateInTwoGivesTheKeyMoveAndTwoMoves) {
+        const auto answer = AnalyseFen(_engine, kMateInTwo, Depth(kMateInTwoDepth));
+
+        ASSERT_TRUE(answer.has_value());
+        EXPECT_EQ(answer->Best().move, Mv("a1a6"));
+        EXPECT_EQ(answer->Best().score, (AnalysisScore{AnalysisScoreKind::Mate, 2}));
+    }
+
+    TEST_F(OwnEngineTest, AnalyseTheSideToBeMatedHasANegativeMate) {
+        const auto answer = AnalyseFen(_engine, kMatedInOne, Depth(kMateInTwoDepth));
+
+        ASSERT_TRUE(answer.has_value());
+        EXPECT_EQ(answer->Best().score, (AnalysisScore{AnalysisScoreKind::Mate, -1}));
+        EXPECT_TRUE(IsLegalIn(PositionFromFen(kMatedInOne), answer->Best().move));
+    }
+
+    TEST_F(OwnEngineTest, AnalyseAHangingQueenIsTheCaptureAndARookUp) {
+        const auto answer = AnalyseFen(_engine, kHangingQueen, Depth(kShallow));
+
+        ASSERT_TRUE(answer.has_value());
+        EXPECT_EQ(answer->Best().move, Mv("d1d4"));
+        EXPECT_EQ(answer->Best().score.kind, AnalysisScoreKind::Centipawns);
+        // The queen is the only piece Black has: after the capture White is a rook up (500 plus the tables), so the bound is a rook and not a queen
+        EXPECT_GT(answer->Best().score.value, 400);
+    }
+
+    TEST_F(OwnEngineTest, AnalyseTheStartPositionIsNearZero) {
+        const auto answer = AnalyseFen(_engine, Position::kStartFen, Depth(kFloorDepth));
+
+        ASSERT_TRUE(answer.has_value());
+        EXPECT_EQ(answer->Best().score.kind, AnalysisScoreKind::Centipawns);
+        EXPECT_EQ(answer->Best().depth, kFloorDepth);
+        // The value was computed once (depth 3, Evaluation.h as it is) and is written out: +50 (the piece-square tables favour the side to move a little).
+        // The window of 40 around it is the guard against a change of the evaluation that nobody meant
+        EXPECT_GE(answer->Best().score.value, 10);
+        EXPECT_LE(answer->Best().score.value, 90);
+    }
+
+    TEST_F(OwnEngineTest, AnalyseAtADepthIsTheSameLineTwiceAndFindMoveGivesItsMove) {
+        const SearchRequest request = SearchRequest::FromPosition(PositionFromFen(kKiwipeteFen), Depth(kFloorDepth));
+
+        const auto first = Analyse(_engine, request);
+        const auto second = Analyse(_engine, request);
+        OwnEngine other;
+        const auto third = Analyse(other, request);
+        const auto played = Ask(_engine, request);
+
+        ASSERT_TRUE(first.has_value());
+        ASSERT_TRUE(second.has_value());
+        ASSERT_TRUE(third.has_value());
+        ASSERT_TRUE(played.has_value());
+        const auto same = [&](const Analysis& a, const Analysis& b) { return a.Best().move == b.Best().move && a.Best().score == b.Best().score && a.Best().depth == b.Best().depth; };
+        EXPECT_TRUE(same(*first, *second));
+        EXPECT_TRUE(same(*first, *third)) << "another object, the same line: nothing is kept between calls";
+        EXPECT_EQ(first->Best().move, *played) << "FindMove and Analyse run the same search";
+    }
+
+    TEST_F(OwnEngineTest, AnalyseFollowsTheHistoryOfAGame) {
+        ChessGameModel model;
+        for (const char* uci : {"e2e4", "e7e5", "g1f3", "d8h4"}) {
+            ASSERT_TRUE(Play(model, uci)) << uci;
+        }
+
+        const auto answer = Analyse(_engine, SearchRequest::FromModel(model, Depth(kShallow)));
+
+        ASSERT_TRUE(answer.has_value());
+        EXPECT_EQ(answer->Best().move, Mv("f3h4"));
+        EXPECT_GT(answer->Best().score.value, 600) << "a queen up, from the side to move";
+    }
+
+    TEST_F(OwnEngineTest, AnalyseLimitsThatAskForNothingAndAnIllegalMoveAreBadRequests) {
+        SearchRequest illegal = SearchRequest::FromPosition(Position::Start(), Depth(kShallow));
+        illegal.moves.push_back(Mv("e2e5"));
+
+        for (const SearchLimits limits : {SearchLimits{0, 0}, SearchLimits{-1, 0}, SearchLimits{0, -3}}) {
+            EXPECT_EQ(KindOf(AnalyseFen(_engine, Position::kStartFen, limits)), EngineErrorKind::BadRequest) << limits.moveTimeMs << "/" << limits.depth;
+        }
+        EXPECT_EQ(KindOf(Analyse(_engine, illegal)), EngineErrorKind::BadRequest);
+    }
+
+    TEST_F(OwnEngineTest, AnalyseIsNoMoveInAMateAndInAStalemate) {
+        for (const char* fen : {kMated, kStalemated}) {
+            EXPECT_EQ(KindOf(AnalyseFen(_engine, fen, Depth(kShallow))), EngineErrorKind::NoMove) << fen;
+        }
+    }
+
+    TEST_F(OwnEngineTest, AnalyseATokenCancelledBeforeTheCallIsCancelled) {
+        CancellationToken token = CancellationToken::Create();
+        token.Cancel();
+
+        EXPECT_EQ(KindOf(Analyse(_engine, SearchRequest::FromPosition(Position::Start(), Depth(kShallow)), token)), EngineErrorKind::Cancelled);
+    }
+
+    TEST_F(OwnEngineTest, AnalyseCancelledFromAnotherThreadReturnsCancelledSoon) {
+        CancellationToken token = CancellationToken::Create();
+        std::thread canceller([token]() mutable {
+            std::this_thread::sleep_for(kCancelAfter);
+            token.Cancel();
+        });
+
+        const auto started = std::chrono::steady_clock::now();
+        const auto answer = Analyse(_engine, SearchRequest::FromPosition(PositionFromFen(kKiwipeteFen), Depth(kDepthThatNeverEnds)), token);
+        const auto took = std::chrono::steady_clock::now() - started;
+        canceller.join();
+
+        EXPECT_EQ(KindOf(answer), EngineErrorKind::Cancelled);
+        EXPECT_LT(took, kStopBudget);
+    }
+
+    TEST_F(OwnEngineTest, AnalyseAMoveTimeAloneGivesALegalMoveInTime) {
+        const SearchRequest request = SearchRequest::FromPosition(PositionFromFen(kKiwipeteFen), SearchLimits{kMoveTimeMs, 0});
+
+        const auto started = std::chrono::steady_clock::now();
+        const auto answer = Analyse(_engine, request);
+        const auto took = std::chrono::steady_clock::now() - started;
+
+        ASSERT_TRUE(answer.has_value());
+        EXPECT_TRUE(IsLegalIn(*request.FinalPosition(), answer->Best().move));
+        EXPECT_GE(answer->Best().depth, 1);
+        EXPECT_LT(took, std::chrono::milliseconds(kMoveTimeMs) + kTimeTolerance);
+    }
+
+    TEST_F(OwnEngineTest, TwoThreadsMayAnalyseWithTheSameObject) {
+        const SearchRequest request = SearchRequest::FromPosition(PositionFromFen(kKiwipeteFen), Depth(kFloorDepth));
+        const auto expected = Analyse(_engine, request);
+        std::expected<Analysis, EngineError> a = std::unexpected(EngineError{});
+        std::expected<Analysis, EngineError> b = std::unexpected(EngineError{});
+
+        std::thread other([&] { b = Analyse(_engine, request); });
+        a = Analyse(_engine, request);
+        other.join();
+
+        ASSERT_TRUE(expected.has_value());
+        ASSERT_TRUE(a.has_value());
+        ASSERT_TRUE(b.has_value());
+        EXPECT_EQ(a->Best().move, expected->Best().move);
+        EXPECT_EQ(a->Best().score, expected->Best().score);
+        EXPECT_EQ(b->Best().move, expected->Best().move);
+        EXPECT_EQ(b->Best().score, expected->Best().score);
     }
 
 }  // namespace BECore::Chess::Tests

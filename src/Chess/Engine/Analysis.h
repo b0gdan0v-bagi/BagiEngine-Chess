@@ -49,7 +49,8 @@ namespace BECore::Chess {
      *
      * A mate that falls @p ply plies from the root is `moves = (ply + 1) / 2`: a win lands on an odd ply (our move, then theirs, ...:
      * 1 ply = mate in 1, 3 = 2, 5 = 3) and a loss on an even one (2 plies = mated in 1, 4 = 2, 6 = 3). The sign of @p searchScore is the sign of the value.
-     * Anything that is not a mate score is centipawns as it is.
+     * Anything that is not a mate score is centipawns as it is. A mate at ply 0 (kMateScore itself: the root is mated) is not a score to convert:
+     * the root of an analysis has a move, so a search never gives it (an engine answers NoMove first); it is asserted.
      */
     [[nodiscard]] AnalysisScore ScoreFromSearch(int searchScore) noexcept;
 

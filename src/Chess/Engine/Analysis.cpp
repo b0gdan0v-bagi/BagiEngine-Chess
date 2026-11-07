@@ -15,6 +15,7 @@ namespace BECore::Chess {
             return {AnalysisScoreKind::Centipawns, searchScore};
         }
         const int plies = kMateScore - (searchScore < 0 ? -searchScore : searchScore);
+        ASSERT(plies > 0, "ScoreFromSearch: a mate at the root (ply 0) is a finished game, which no analysis is asked of");
         const int moves = (plies + 1) / 2;
         return {AnalysisScoreKind::Mate, searchScore < 0 ? -moves : moves};
     }
