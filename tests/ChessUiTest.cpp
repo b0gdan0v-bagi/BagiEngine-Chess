@@ -23,6 +23,7 @@
 #include <Chess/Components/ChessPieceComponent.h>
 #include <Chess/Engine/OpponentChoice.h>
 #include <Chess/Engine/OpponentText.h>
+#include <Chess/Game/BoardCoordinates.h>
 #include <Chess/Game/MoveGenerator.h>
 #include <Chess/Game/PromotionChoices.h>
 #include <Common/EngineEnvironment.h>
@@ -176,7 +177,7 @@ namespace BECore::Chess::Tests {
             UIScreenContent content;
             UICanvasLayout layout;
 
-            explicit CanvasCopy(const std::string& xml) {
+            explicit CanvasCopy(const std::string& xml, bool useSafeArea = true) {
                 XmlDeserializer deserializer;
                 EXPECT_TRUE(deserializer.LoadFromString(eastl::string_view(xml.data(), xml.size())));
                 content.Deserialize(deserializer);
@@ -189,7 +190,7 @@ namespace BECore::Chess::Tests {
                 layout.params.referenceHeight = 720.0f;
                 layout.params.match = 0.5f;
                 layout.params.minScale = 0.7f;
-                layout.params.useSafeArea = true;
+                layout.params.useSafeArea = useSafeArea;
                 layout.Invalidate();
             }
         };
@@ -315,6 +316,84 @@ namespace BECore::Chess::Tests {
             return segments;
         }
 
+        // The squares of the board (ChessBoardComponent.cpp)
+        const Color kLightSquareColor{240, 217, 181, 255};
+        const Color kDarkSquareColor{181, 136, 99, 255};
+
+        // The letters and numbers at the edges of the board (the node BoardCoordinates of SceneConfig.xml): a label sits in the corner of an edge cell that a piece does not reach
+        constexpr float kCellSize = 80.0f;
+        constexpr float kBoardLeft = 100.0f;
+        constexpr size_t kBoardEdgeCells = kLastBoardIndex + 1;
+        constexpr float kPieceWidth = kCellSize * kCellWidth / kCellHeight;  // a piece fitted by Contain is as high as its cell, as wide as the aspect of its atlas cell, and centered
+        constexpr float kPieceLeft = (kCellSize - kPieceWidth) * 0.5f;       // 15.5 units from the left edge of the cell
+        constexpr float kPieceRight = kPieceLeft + kPieceWidth;              // 64.5 units
+
+        /// One label of the board coordinates: its name and the drawn cell it sits in (the rank labels are in the left column, one per row; the file labels in the bottom row, one per column)
+        struct BoardLabel {
+            eastl::string name;
+            bool file = false;
+            int column = 0;
+            int row = 0;
+        };
+
+        eastl::vector<BoardLabel> ExpectedBoardLabels() {
+            eastl::vector<BoardLabel> labels;
+            for (int row = 0; row <= kLastBoardIndex; ++row) {
+                labels.push_back({Format("RankLabel{}", row), false, kLabelColumn, row});
+            }
+            for (int column = 0; column <= kLastBoardIndex; ++column) {
+                labels.push_back({Format("FileLabel{}", column), true, column, kLabelRow});
+            }
+            return labels;
+        }
+
+        /// The color of a cell as the board paints it, written out here: (column + row) even is light, a1 (column 0, row 7) is dark; the same in both orientations
+        const Color& CellColor(int column, int row) {
+            return (column + row) % 2 == 0 ? kLightSquareColor : kDarkSquareColor;
+        }
+
+        /// The color of the text of a label: the other color of the board than its cell has, so it reads on the cell
+        const Color& ContrastColor(int column, int row) {
+            return (column + row) % 2 == 0 ? kDarkSquareColor : kLightSquareColor;
+        }
+
+        /// What is wrong with the labels of the board as they are laid out, one problem to a line, nothing when it is right: a label that is missing or not shown, a glyph the box cuts
+        /// (the validator does not see it for a label that clips), a box that is not in the corner of its edge cell (the left of the piece for a rank, the right of it for a file) or leaves the
+        /// board, and a text color that does not read on the cell
+        eastl::string BoardLabelProblems(const UICanvasLayout& layout) {
+            eastl::string problems;
+            const float scale = layout.GetResolved().scale;
+            for (const BoardLabel& spec : ExpectedBoardLabels()) {
+                const UIElement* element = layout.root->FindByName(PoolString::Intern(spec.name));
+                if (element == nullptr) {
+                    problems += Format("{} is missing\n", spec.name.c_str());
+                    continue;
+                }
+                const Rect& rect = element->rect;
+                if (rect.IsEmpty()) {
+                    problems += Format("{} has an empty rect\n", spec.name.c_str());
+                    continue;
+                }
+                const UIContentFit fit = element->CheckContent(rect.w, rect.h, scale);
+                if (fit.hasContent && !fit.fits) {
+                    problems += Format("{} cuts '{}': {:.1f} x {:.1f} units at scale {:.3f}\n", spec.name.c_str(), ShownText(*element).c_str(), rect.w, rect.h, scale);
+                }
+                const float cellX = kBoardLeft + static_cast<float>(spec.column) * kCellSize;
+                const float cellY = kBoardTop + static_cast<float>(spec.row) * kCellSize;
+                const float low = spec.file ? cellX + kPieceRight : cellX;
+                const float high = spec.file ? cellX + kCellSize : cellX + kPieceLeft;
+                if (rect.x < low - kPixelTolerance || rect.x + rect.w > high + kPixelTolerance || rect.y < cellY - kPixelTolerance || rect.y + rect.h > cellY + kCellSize + kPixelTolerance) {
+                    problems += Format("{} ({:.1f}, {:.1f}, {:.1f}, {:.1f}) is not in the corner x {:.1f}..{:.1f}, y {:.1f}..{:.1f} of its cell\n", spec.name.c_str(), rect.x, rect.y, rect.w, rect.h,
+                                       low, high, cellY, cellY + kCellSize);
+                }
+                const UILabel* label = element->Cast<UILabel>();
+                const Color& expected = ContrastColor(spec.column, spec.row);
+                if (label == nullptr || !SameColor(label->textColor, expected)) {
+                    problems += Format("{} has not the color {},{},{} that reads on its cell\n", spec.name.c_str(), expected.r, expected.g, expected.b);
+                }
+            }
+            return problems;
+        }
     }  // namespace
 
     class ChessUiTest : public ::testing::Test {
@@ -558,7 +637,7 @@ namespace BECore::Chess::Tests {
         eastl::string Coordinates(bool files) {
             Draw();
             eastl::string text;
-            for (int index = 0; index < 8; ++index) {
+            for (int index = 0; index <= kLastBoardIndex; ++index) {
                 const eastl::string name = files ? "coordFile{}"_format(index) : "coordRank{}"_format(index);
                 const eastl::string_view value = CoreManager::GetUIVars().Get(PoolString::Intern(eastl::string_view(name.data(), name.size())));
                 text.append(value.data(), value.size());
@@ -828,6 +907,53 @@ namespace BECore::Chess::Tests {
             context.outputHeight = kNarrowestHeight;
             context.safeArea = UIPreview::SimulatedSafeArea(SafeAreaSimulation::SideInsets, kNarrowestWidth, kNarrowestHeight);
             layout.Update(context);
+        }
+
+        /// The canvas of the letters and numbers at the edges of the board: the node `BoardCoordinates`
+        IntrusivePtr<UICanvasComponent> Coordinate() const {
+            return CanvasOf("BoardCoordinates");
+        }
+
+        /// A label of the board coordinates by name (the test fails when it is not there)
+        UILabel& CoordinateLabel(const char* name) const {
+            UILabel* label = ElementOf("BoardCoordinates", name).Cast<UILabel>();
+            if (label == nullptr) {
+                ADD_FAILURE() << name << " is not a label";
+                std::abort();
+            }
+            return *label;
+        }
+
+        /// A rect of the view in output pixels, for the fit of the view into the current output
+        Rect OutputRect(const Rect& view) const {
+            return ViewTransform::Fit(kViewWidth, kViewHeight, _renderer->width, _renderer->height).ToOutput(view.x, view.y, view.w, view.h);
+        }
+
+        /// Sets the 16 variables of the labels to round @p round of the 8: every letter and every digit stands at every label once over the rounds, so the widest one is laid out in each box
+        static void PublishCoordinateRound(size_t round) {
+            const eastl::string_view letters = kFileLetters;
+            const eastl::string_view digits = kRankDigits;
+            for (int index = 0; index <= kLastBoardIndex; ++index) {
+                const size_t at = (static_cast<size_t>(index) + round) % letters.size();
+                CoreManager::GetUIVars().Set(PoolString::Intern(eastl::string("coordFile{}"_format(index))), letters.substr(at, 1));
+                CoreManager::GetUIVars().Set(PoolString::Intern(eastl::string("coordRank{}"_format(index))), digits.substr(at, 1));
+            }
+        }
+
+        /// BoardLabelProblems() on every case of the matrix for each of the 8 rounds of letters: the lines of the first @p reportedCases cases that have any
+        eastl::string BoardLabelProblemsOnMatrix(UICanvasLayout& layout, size_t reportedCases = kReportedCases) const {
+            eastl::string report;
+            size_t reported = 0;
+            for (size_t round = 0; round < kBoardEdgeCells; ++round) {
+                PublishCoordinateRound(round);
+                OnEveryCaseOfTheMatrix(layout, [&](const eastl::string& label, const UICanvasLayout& laidOut) {
+                    const eastl::string problems = BoardLabelProblems(laidOut);
+                    if (!problems.empty() && reported++ < reportedCases) {
+                        report += Format("round {}, {}:\n{}", round, label.c_str(), problems.c_str());
+                    }
+                });
+            }
+            return report;
         }
 
         void DrawAt(float width, float height) {
@@ -1398,8 +1524,6 @@ namespace BECore::Chess::Tests {
 
     namespace {
 
-        const Color kLightSquareColor{240, 217, 181, 255};  // the squares of the board (ChessBoardComponent.cpp)
-        const Color kDarkSquareColor{181, 136, 99, 255};
         const Color kBoardDimColor{0, 0, 0, 140};      // the dim of the result (ChessResultComponent.cpp)
         const Color kResultBarColor{25, 25, 25, 245};  // the bar of the winner (ChessResultComponent.cpp)
 
@@ -1807,6 +1931,395 @@ namespace BECore::Chess::Tests {
         _manager->UpdateAll();
         EXPECT_EQ(Coordinates(true), "abcdefgh");
         EXPECT_EQ(Coordinates(false), "87654321");
+    }
+
+    // ---- the board coordinates: the labels in the scene ---------------------------------------------------------------------------
+    // The node BoardCoordinates of the shipped scene is a canvas of 16 UILabels at the edges of the board (SceneConfig.xml has the reasons for its numbers). They are checked the way the HUD
+    // is: the validator and CheckContent() on the size matrix, then the geometry against the board and the pieces, the colors against the squares that are drawn, the order of a frame, and that
+    // a click goes through them to the board
+
+    namespace {
+
+        /// A glyph of a label: a texture drawn with one of the two colors of the squares as its tint (the pieces are drawn white, and the text of the HUD too)
+        bool IsLabelGlyph(const DrawCall& call) {
+            return call.kind == DrawKind::Texture && (SameColor(call.color, kLightSquareColor) || SameColor(call.color, kDarkSquareColor));
+        }
+
+        bool Inside(const Rect& inner, const Rect& outer) {
+            return inner.x >= outer.x - 1.0f && inner.y >= outer.y - 1.0f && inner.x + inner.w <= outer.x + outer.w + 1.0f && inner.y + inner.h <= outer.y + outer.h + 1.0f;
+        }
+
+    }  // namespace
+
+    TEST_F(ChessUiTest, TheBoardCoordinatesPassTheSizeMatrixWithEveryLetterAndDigit) {
+        Draw();  // the board publishes the variables
+        auto canvas = Coordinate();
+        ASSERT_TRUE(canvas) << "the shipped scene has the node BoardCoordinates";
+        canvas->UpdateLayout(1280.0f, 720.0f);  // the reflected fields of the component reach the layout on its first update
+
+        UILayoutValidatorOptions options;
+        options.minTouchSize = CoreManager::GetUIEnvironment().GetSettings().minTouchSize;
+        for (size_t round = 0; round < kBoardEdgeCells; ++round) {
+            PublishCoordinateRound(round);
+            const auto failures = ValidateOnMatrix(canvas->GetLayout(), options, ViewContext());
+            EXPECT_TRUE(failures.empty()) << "round " << round << ": " << DescribeMatrixFailures(failures).c_str();
+        }
+        const eastl::string problems = BoardLabelProblemsOnMatrix(canvas->GetLayout());
+        EXPECT_TRUE(problems.empty()) << problems.c_str();
+    }
+
+    TEST_F(ChessUiTest, NoCoordinateLabelIsCutInTheNarrowestWindow) {
+        Draw();
+        auto canvas = Coordinate();
+        ASSERT_TRUE(canvas);
+        canvas->UpdateLayout(1280.0f, 720.0f);
+        UICanvasLayout& layout = canvas->GetLayout();
+        LayOutInTheNarrowestWindow(layout);
+        EXPECT_NEAR(layout.GetResolved().scale, kNarrowestWidth / kViewWidth, 0.01f) << "about 10 px for a font of 18 units";
+
+        for (size_t round = 0; round < kBoardEdgeCells; ++round) {
+            PublishCoordinateRound(round);
+            const eastl::string problems = BoardLabelProblems(layout);
+            EXPECT_TRUE(problems.empty()) << "round " << round << ":\n" << problems.c_str();
+        }
+        layout.Invalidate();
+    }
+
+    TEST_F(ChessUiTest, TheCoordinateCanvasHasNoSafeAreaAndNoControl) {
+        const auto canvas = Coordinate();
+        ASSERT_TRUE(canvas);
+        EXPECT_FALSE(canvas->_useSafeArea) << "the board is at fixed scene units: an inset must not move a label";
+        EXPECT_FALSE(canvas->_modal);
+        EXPECT_TRUE(canvas->_visible) << "shown by default";
+        size_t labels = 0;
+        for (const BoardLabel& spec : ExpectedBoardLabels()) {
+            const UIElement* element = canvas->GetRoot().FindByName(PoolString::Intern(spec.name));
+            ASSERT_NE(element, nullptr) << spec.name.c_str();
+            ++labels;
+            EXPECT_FALSE(element->blocksInput) << spec.name.c_str();
+            EXPECT_FALSE(element->interactive) << spec.name.c_str();
+            EXPECT_NE(element->Cast<UILabel>(), nullptr) << spec.name.c_str();
+        }
+        EXPECT_EQ(labels, 2 * kBoardEdgeCells);
+        EXPECT_EQ(canvas->GetRoot().children.size(), 2 * kBoardEdgeCells) << "nothing else is in the canvas";
+    }
+
+    TEST_F(ChessUiTest, EveryCoordinateLabelIsInTheCornerOfItsEdgeCellOnTheShippedScene) {
+        Draw();
+        for (const BoardLabel& spec : ExpectedBoardLabels()) {
+            SCOPED_TRACE(spec.name.c_str());
+            const UILabel& label = CoordinateLabel(spec.name.c_str());
+            const float cellX = kBoardLeft + static_cast<float>(spec.column) * kCellSize;
+            const float cellY = kBoardTop + static_cast<float>(spec.row) * kCellSize;
+            const auto [expectedX, expectedY] = CellOrigin(spec.column, spec.row);
+            EXPECT_FLOAT_EQ(cellX, expectedX);
+            EXPECT_FLOAT_EQ(cellY, expectedY);
+            EXPECT_GE(label.rect.x, spec.file ? cellX + kPieceRight : cellX) << "the rank numbers are left of the piece, the file letters right of it";
+            EXPECT_LE(label.rect.x + label.rect.w, spec.file ? cellX + kCellSize : cellX + kPieceLeft);
+            EXPECT_GE(label.rect.y, cellY);
+            EXPECT_LE(label.rect.y + label.rect.h, cellY + kCellSize);
+            EXPECT_GE(label.rect.x, kBoardLeft) << "inside the board";
+            EXPECT_LE(label.rect.x + label.rect.w, kBoardLeft + 8.0f * kCellSize);
+            EXPECT_GE(label.rect.y, kBoardTop);
+            EXPECT_LE(label.rect.y + label.rect.h, kBoardBottom);
+        }
+        EXPECT_EQ(BoardLabelProblems(Coordinate()->GetLayout()), "") << "the same checks the matrix runs";
+    }
+
+    TEST_F(ChessUiTest, NoCoordinateGlyphReachesAPieceInEitherOrientation) {
+        // The width the labels keep clear is the width of a piece that Contain fits into a cell: the real draw of a rook says so
+        const auto whiteA1 = GiveAtlasCell("WhiteRook_a1");
+        const auto whiteH1 = GiveAtlasCell("WhiteRook_h1");
+        const auto blackA8 = GiveAtlasCell("BlackRook_a8");
+        const auto blackH8 = GiveAtlasCell("BlackRook_h8");
+        const ITexture* const rooks[] = {whiteA1.Get(), whiteH1.Get(), blackA8.Get(), blackH8.Get()};
+        CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
+        Opponent().SetEngineFactory(factory.AsFactory());
+
+        for (const bool turned : {false, true}) {
+            SCOPED_TRACE(turned ? "the program plays White: the board is turned" : "two people");
+            ControlPlays(turned ? "white" : nullptr);
+            _manager->UpdateAll();
+            Draw();
+
+            size_t pieces = 0;
+            size_t glyphs = 0;
+            for (const DrawCall& call : _renderer->calls) {
+                if (call.kind != DrawKind::Texture || std::find(std::begin(rooks), std::end(rooks), call.texture) == std::end(rooks)) {
+                    continue;
+                }
+                ++pieces;
+                // a rook is as wide as its atlas cell says, and the corner cells are the ones whose labels are closest
+                EXPECT_NEAR(call.rect.w / call.rect.h, kCellWidth / kCellHeight, 1e-4f);
+                for (const DrawCall& other : _renderer->calls) {
+                    if (IsLabelGlyph(other)) {
+                        EXPECT_FALSE(Touch(call.rect, other.rect, 0.0f))
+                            << "a glyph at (" << other.rect.x << ", " << other.rect.y << ") is on a piece at (" << call.rect.x << ", " << call.rect.y << ")";
+                    }
+                }
+            }
+            for (const DrawCall& call : _renderer->calls) {
+                glyphs += IsLabelGlyph(call) ? 1 : 0;
+            }
+            EXPECT_EQ(pieces, 4u) << "a rook in each corner";
+            EXPECT_EQ(glyphs, 2 * kBoardEdgeCells) << "one glyph for each of the 16 labels";
+
+            // the constants of the test are the piece of the game: a rook is drawn between kPieceLeft and kPieceRight of its corner cell, whole height
+            const DrawCall* rook = TextureCall(*whiteA1);
+            ASSERT_NE(rook, nullptr);
+            const auto [column, row] = CellOfSquare(Sq("a1"), turned);
+            const auto [x, y] = CellOrigin(column, row);
+            EXPECT_TRUE(SameRect(rook->rect, OutputRect(Rect{x + kPieceLeft, y, kPieceWidth, kCellSize})));
+        }
+    }
+
+    TEST_F(ChessUiTest, TheCoordinateColorsReadOnTheSquaresThatAreDrawnInBothOrientations) {
+        CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
+        Opponent().SetEngineFactory(factory.AsFactory());
+
+        for (const bool turned : {false, true}) {
+            SCOPED_TRACE(turned ? "the program plays White: the board is turned" : "two people");
+            ControlPlays(turned ? "white" : nullptr);
+            _manager->UpdateAll();
+            Draw();
+
+            for (const BoardLabel& spec : ExpectedBoardLabels()) {
+                SCOPED_TRACE(spec.name.c_str());
+                const UILabel& label = CoordinateLabel(spec.name.c_str());
+                const Rect cell = CellRect(spec.column, spec.row);
+                const bool light = (spec.column + spec.row) % 2 == 0;
+
+                // the square the board really fills there
+                const DrawCall* square = nullptr;
+                for (const DrawCall& call : _renderer->calls) {
+                    if (call.kind == DrawKind::Rect && SameRect(call.rect, cell)) {
+                        square = &call;
+                        break;
+                    }
+                }
+                ASSERT_NE(square, nullptr);
+                EXPECT_TRUE(SameColor(square->color, light ? kLightSquareColor : kDarkSquareColor)) << (light ? "a light cell" : "a dark cell");
+                EXPECT_EQ(IsLightCell(spec.column, spec.row), light) << "BoardCoordinates.h says what the board paints";
+                EXPECT_TRUE(SameColor(label.textColor, light ? kDarkSquareColor : kLightSquareColor)) << "dark brown on a light cell, cream on a dark one";
+
+                // and the glyph that is drawn in the label's box has that color
+                const Rect box = OutputRect(label.rect);
+                size_t inBox = 0;
+                for (const DrawCall& call : _renderer->calls) {
+                    if (call.kind == DrawKind::Texture && Inside(call.rect, box)) {
+                        ++inBox;
+                        EXPECT_TRUE(SameColor(call.color, label.textColor));
+                        EXPECT_TRUE(Inside(call.rect, cell)) << "inside the cell it labels";
+                    }
+                }
+                EXPECT_EQ(inBox, 1u) << "one glyph in the box";
+            }
+        }
+    }
+
+    TEST_F(ChessUiTest, TheCoordinatesAreDrawnAfterTheSquaresAndBeforeThePiecesTheResultAndTheHud) {
+        // The order of the scene: Board and BoardCoordinates share the layer -1 and the second is written after the first; the pieces are on 0, the result on 1, the HUD on 10, the panels on 20
+        const auto& nodes = GetScene().GetRootNode().GetChildren();
+        const auto indexOf = [&](const char* name) -> int {
+            for (size_t i = 0; i < nodes.size(); ++i) {
+                if (nodes[i]->GetName() == PoolString::Intern(name)) {
+                    return static_cast<int>(i);
+                }
+            }
+            return -1;
+        };
+        const auto layerOf = [&](const char* name) { return nodes[static_cast<size_t>(indexOf(name))]->GetLayer(); };
+        ASSERT_GE(indexOf("Board"), 0);
+        ASSERT_GE(indexOf("BoardCoordinates"), 0);
+        EXPECT_EQ(indexOf("BoardCoordinates"), indexOf("Board") + 1) << "written right after the Board";
+        EXPECT_EQ(layerOf("Board"), -1);
+        EXPECT_EQ(layerOf("BoardCoordinates"), -1);
+        EXPECT_GT(layerOf("Result"), 0);
+        EXPECT_GT(layerOf("Hud"), layerOf("Result"));
+        EXPECT_GT(layerOf("OpponentPanel"), layerOf("Hud"));
+
+        // and the frame says the same: squares, then glyphs, then a piece, then the dim of a finished game and the buttons of the HUD
+        const auto king = GiveAtlasCell("WhiteKing_e1");  // a piece that is still on the board in this position (at g1)
+        StartFrom(kBlackMatesOnA1);
+        ASSERT_TRUE(Play(Model(), "a8a1"));
+        ASSERT_TRUE(Model().IsGameOver());
+        _manager->UpdateAll();
+        Draw();
+
+        const auto& calls = _renderer->calls;
+        long lastSquare = -1;
+        long firstGlyph = -1;
+        long lastGlyph = -1;
+        long firstPiece = -1;
+        long dim = -1;
+        long resetButton = -1;
+        for (size_t i = 0; i < calls.size(); ++i) {
+            const DrawCall& call = calls[i];
+            const long at = static_cast<long>(i);
+            if (call.kind == DrawKind::Rect && (SameColor(call.color, kLightSquareColor) || SameColor(call.color, kDarkSquareColor))) {
+                lastSquare = at;
+            } else if (IsLabelGlyph(call)) {
+                firstGlyph = firstGlyph < 0 ? at : firstGlyph;
+                lastGlyph = at;
+            } else if (call.kind == DrawKind::Texture && call.texture == king.Get()) {
+                firstPiece = firstPiece < 0 ? at : firstPiece;
+            } else if (call.kind == DrawKind::Rect && SameColor(call.color, kBoardDimColor)) {
+                dim = at;
+            } else if (call.kind == DrawKind::Rect && SameColor(call.color, kResetColor)) {
+                resetButton = at;
+            }
+        }
+        ASSERT_GE(lastSquare, 0);
+        ASSERT_GE(firstGlyph, 0);
+        ASSERT_GE(firstPiece, 0) << "the king is drawn";
+        ASSERT_GE(dim, 0) << "the game is over: the board is dimmed";
+        ASSERT_GE(resetButton, 0);
+        EXPECT_LT(lastSquare, firstGlyph) << "the labels are over the squares";
+        EXPECT_LT(lastGlyph, firstPiece) << "and under the pieces";
+        EXPECT_LT(firstPiece, dim);
+        EXPECT_LT(lastGlyph, dim) << "and under the dim of a finished game";
+        EXPECT_LT(lastGlyph, resetButton) << "and under the HUD";
+    }
+
+    TEST_F(ChessUiTest, TheCoordinateLabelsTakeNoClickAndTheBoardGetsItInTheirCells) {
+        Draw();
+        const auto canvas = Coordinate();
+        ASSERT_TRUE(canvas);
+        for (const BoardLabel& spec : ExpectedBoardLabels()) {
+            const Rect& rect = CoordinateLabel(spec.name.c_str()).rect;  // canvas units: the view units of a SceneView canvas
+            EXPECT_EQ(canvas->GetLayout().HitTest(rect.x + rect.w * 0.5f, rect.y + rect.h * 0.5f), nullptr) << spec.name.c_str() << " is not found by a hit test";
+        }
+
+        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        StartFrom(kFourRooks);  // a rook of Black in each corner, Black to move
+        ASSERT_EQ(Model().GetTurn(), PieceColor::Black);
+        const struct {
+            bool turned;
+            const char* label;
+            const char* square;
+        } presses[] = {{false, "RankLabel0", "a8"}, {false, "FileLabel0", "a1"}, {false, "FileLabel7", "h1"}, {false, "RankLabel7", "a1"},
+                       {true, "RankLabel0", "h1"},  {true, "FileLabel0", "h8"},  {true, "FileLabel7", "a8"},  {true, "RankLabel7", "h8"}};
+        for (const auto& press : presses) {
+            SCOPED_TRACE(Format("{} with the board {}", press.label, press.turned ? "turned" : "upright").c_str());
+            ControlPlays(press.turned ? "white" : nullptr);
+            _manager->UpdateAll();
+            Model().ClearSelection();
+            Draw();
+            const auto [x, y] = ScreenCenter(CoordinateLabel(press.label));
+            EXPECT_FALSE(CoreManager::GetUIInput().DispatchMouseButtonDown(Button(x, y, true))) << "the canvas does not take the press";
+            EXPECT_FALSE(CoreManager::GetUIInput().DispatchMouseButtonUp(Button(x, y, false)));
+            ASSERT_TRUE(Model().HasSelection()) << "the board got it";
+            EXPECT_EQ(Model().GetSelected(), Sq(press.square)) << "the square drawn in that cell";
+        }
+    }
+
+    TEST_F(ChessUiTest, TheCoordinateLabelsTurnTheirTextAndKeepTheirPlaceOnTheScreen) {
+        CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        const auto read = [&](bool files) {
+            Draw();
+            eastl::string text;
+            for (int index = 0; index <= kLastBoardIndex; ++index) {
+                text += ShownText(CoordinateLabel((files ? "FileLabel{}"_format(index) : "RankLabel{}"_format(index)).c_str()));
+            }
+            return text;
+        };
+        const auto rects = [&] {
+            eastl::vector<Rect> found;
+            for (const BoardLabel& spec : ExpectedBoardLabels()) {
+                found.push_back(CoordinateLabel(spec.name.c_str()).rect);
+            }
+            return found;
+        };
+
+        EXPECT_EQ(read(true), "abcdefgh") << "White at the bottom: a..h from the left";
+        EXPECT_EQ(read(false), "87654321") << "8 at the top";
+        const eastl::vector<Rect> upright = rects();
+
+        ControlPlays("white");
+        _manager->UpdateAll();
+        EXPECT_EQ(read(true), "hgfedcba") << "the board is turned by 180 degrees: h..a from the left";
+        EXPECT_EQ(read(false), "12345678") << "1 at the top";
+        const eastl::vector<Rect> turned = rects();
+        ASSERT_EQ(turned.size(), upright.size());
+        for (size_t i = 0; i < turned.size(); ++i) {
+            EXPECT_TRUE(SameRect(turned[i], upright[i])) << "label " << i << " is fixed on the screen";
+        }
+
+        ControlPlays("black");
+        _manager->UpdateAll();
+        EXPECT_EQ(read(true), "abcdefgh");
+        EXPECT_EQ(read(false), "87654321");
+    }
+
+    TEST_F(ChessUiTest, TheCoordinateColorsAreTheSameWhenTheBoardIsTurned) {
+        // The turn by 180 degrees keeps the color of every cell, which is why the colors of the labels are fixed in the XML
+        CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        Draw();
+        eastl::vector<Color> before;
+        for (const BoardLabel& spec : ExpectedBoardLabels()) {
+            before.push_back(CoordinateLabel(spec.name.c_str()).textColor);
+        }
+        ControlPlays("white");
+        _manager->UpdateAll();
+        Draw();
+        size_t index = 0;
+        for (const BoardLabel& spec : ExpectedBoardLabels()) {
+            EXPECT_TRUE(SameColor(CoordinateLabel(spec.name.c_str()).textColor, before[index++])) << spec.name.c_str();
+        }
+    }
+
+    // ---- the board coordinates: broken copies, so that the checks can fail ---------------------------------------------------------------------
+
+    TEST_F(ChessUiTest, ABrokenCopyOfTheCoordinateLabelsIsCaughtByTheChecks) {
+        Draw();  // the variables the labels show
+        const std::string shipped = ShippedElementsXml("BoardCoordinates");
+        ASSERT_FALSE(shipped.empty());
+        const auto problemsOf = [&](const std::string& xml) {
+            CanvasCopy copy(xml, false);
+            return BoardLabelProblemsOnMatrix(copy.layout, 100000);
+        };
+
+        EXPECT_EQ(problemsOf(shipped), "") << "the same checks pass on the shipped labels";
+
+        std::string bigFont = shipped;
+        Replace(bigFont, "fontSize=\"18\"", "fontSize=\"60\"");
+        EXPECT_NE(problemsOf(bigFont).find("RankLabel0 cuts"), eastl::string::npos) << "a font of 60 does not fit the box";
+
+        std::string narrow = shipped;
+        Replace(narrow, "name=\"RankLabel0\" x=\"102\" y=\"82\" width=\"13\"", "name=\"RankLabel0\" x=\"102\" y=\"82\" width=\"3\"");
+        EXPECT_NE(problemsOf(narrow).find("RankLabel0 cuts"), eastl::string::npos) << "a box of 3 units cuts the glyph";
+
+        std::string wide = shipped;
+        Replace(wide, "name=\"RankLabel0\" x=\"102\" y=\"82\" width=\"13\"", "name=\"RankLabel0\" x=\"102\" y=\"82\" width=\"30\"");
+        EXPECT_NE(problemsOf(wide).find("RankLabel0 (102.0, 82.0, 30.0, 26.0) is not in the corner"), eastl::string::npos) << "a box that reaches the piece";
+
+        std::string inside = shipped;
+        Replace(inside, "name=\"RankLabel3\" x=\"102\"", "name=\"RankLabel3\" x=\"182\"");
+        EXPECT_NE(problemsOf(inside).find("RankLabel3 (182.0"), eastl::string::npos) << "a label under a cell that is not at the edge";
+
+        std::string wrongColor = shipped;
+        Replace(wrongColor, "textColor=\"181,136,99,255\"", "textColor=\"240,217,181,255\"");
+        EXPECT_NE(problemsOf(wrongColor).find("RankLabel0 has not the color"), eastl::string::npos) << "cream on a light cell";
+
+        std::string missing = shipped;
+        Replace(missing, "name=\"FileLabel7\"", "name=\"FileLabelX\"");
+        EXPECT_NE(problemsOf(missing).find("FileLabel7 is missing"), eastl::string::npos);
+
+        EXPECT_TRUE(ShippedElementsXml("NoSuchNode").empty()) << "a scene without the canvas has no elements to check";
+    }
+
+    TEST_F(ChessUiTest, TheHudStillStaysOutsideTheBoardWithTheCoordinatesOnIt) {
+        // The labels are over the board and the HUD is in its margins; neither is moved by the other (the HUD tests above are unchanged)
+        ExpectTheHudSurvivesTheMatrix();
+        Draw();
+        const auto hud = Hud();
+        ASSERT_TRUE(hud);
+        for (const char* name : {"Turn", "Menu", "Reset"}) {
+            EXPECT_LE(hud->GetRoot().FindByName(PoolString::Intern(name))->rect.y + hud->GetRoot().FindByName(PoolString::Intern(name))->rect.h, kBoardTop + 0.01f) << name;
+        }
     }
 
     TEST_F(ChessUiTest, TheStateOfTheControlApiIsTheSameWhateverSideIsAtTheBottom) {
@@ -3741,19 +4254,20 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, NoElementNameIsInTwoCanvasesOfTheScene) {
-        // Elements are found by name in every canvas of the scene (SetVisibleByName and the lookups of the tests): the HUD, the opponent panel and the promotion panel keep their own names
+        // Elements are found by name in every canvas of the scene (SetVisibleByName and the lookups of the tests): the HUD, the board coordinates, the opponent panel and the promotion panel keep
+        // their own names
         const struct {
             const char* node;
             IntrusivePtr<UICanvasComponent> canvas;
-        } canvases[] = {{"Hud", Hud()}, {"OpponentPanel", Panel()}, {"PromotionPanel", Promotion()}};
-        eastl::vector<PoolString> names[3];
-        for (size_t i = 0; i < 3; ++i) {
+        } canvases[] = {{"Hud", Hud()}, {"BoardCoordinates", Coordinate()}, {"OpponentPanel", Panel()}, {"PromotionPanel", Promotion()}};
+        eastl::vector<PoolString> names[4];
+        for (size_t i = 0; i < 4; ++i) {
             ASSERT_TRUE(canvases[i].canvas) << canvases[i].node;
             CollectNames(canvases[i].canvas->GetRoot(), names[i]);
             EXPECT_FALSE(names[i].empty()) << canvases[i].node;
         }
-        for (size_t first = 0; first < 3; ++first) {
-            for (size_t second = first + 1; second < 3; ++second) {
+        for (size_t first = 0; first < 4; ++first) {
+            for (size_t second = first + 1; second < 4; ++second) {
                 for (const PoolString& name : names[first]) {
                     EXPECT_EQ(eastl::find(names[second].begin(), names[second].end(), name), names[second].end())
                         << name.CStr() << " is in both " << canvases[first].node << " and " << canvases[second].node;

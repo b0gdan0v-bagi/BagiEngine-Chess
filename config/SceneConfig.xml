@@ -14,6 +14,40 @@
           </components>
         </node>
 
+        <!-- The letters and numbers at the edges of the board. A canvas of UILabels (the renderer has no text primitive) on the same layer as the Board, written right after it:
+             same layer, scene order, so it is drawn after the squares and the highlights of ChessBoardComponent and before the pieces (layer 0), the result bar (1), the HUD (10) and
+             the panels (20). The canvas has no safe area: the board stands at fixed scene units (view 840 x 800, the board 640 x 640 at (100, 80)) and an inset must not move a label.
+             The labels take no click (no blocksInput, not interactive), so the board gets every press. Rank numbers sit in the left column of cells (RankLabel<row>, row from the
+             top), top-left in the cell; file letters in the bottom row (FileLabel<column>), bottom-right in the cell. The rects are fixed on the screen; the text is a variable that
+             ChessBoardComponent publishes from Game/BoardCoordinates.h (coordRank<row>, coordFile<column>), so it turns with the board (h..a and 1..8 while the program plays White).
+             A box is 13 x 26 units (the line of an 18-unit font is about 24 units high, and a box under it cuts the glyph) in the 13-unit corner (x 2..15 or 65..78 of the 80-unit cell) that a piece never reaches: a Contain-fitted piece covers about 15.5..64.5.
+             The contrast is static: a turn by 180 degrees keeps the color of a cell, so a label has the dark brown of the dark squares on a light cell and the cream on a dark one
+             (a cell is light when column + row is even; the rank labels are in column 0, the file labels in row 7). Font 18: about 10 px at the narrowest fit scale (0.57). -->
+        <node name="BoardCoordinates" layer="-1">
+          <components>
+            <component type="UICanvasComponent" space="SceneView" useSafeArea="false">
+              <elements>
+                <element type="UILabel" name="RankLabel0" x="102" y="82" width="13" height="26" text="{coordRank0}" fontSize="18" align="Left" verticalAlign="Top" overflow="Clip" wrap="false" textColor="181,136,99,255" />
+                <element type="UILabel" name="RankLabel1" x="102" y="162" width="13" height="26" text="{coordRank1}" fontSize="18" align="Left" verticalAlign="Top" overflow="Clip" wrap="false" textColor="240,217,181,255" />
+                <element type="UILabel" name="RankLabel2" x="102" y="242" width="13" height="26" text="{coordRank2}" fontSize="18" align="Left" verticalAlign="Top" overflow="Clip" wrap="false" textColor="181,136,99,255" />
+                <element type="UILabel" name="RankLabel3" x="102" y="322" width="13" height="26" text="{coordRank3}" fontSize="18" align="Left" verticalAlign="Top" overflow="Clip" wrap="false" textColor="240,217,181,255" />
+                <element type="UILabel" name="RankLabel4" x="102" y="402" width="13" height="26" text="{coordRank4}" fontSize="18" align="Left" verticalAlign="Top" overflow="Clip" wrap="false" textColor="181,136,99,255" />
+                <element type="UILabel" name="RankLabel5" x="102" y="482" width="13" height="26" text="{coordRank5}" fontSize="18" align="Left" verticalAlign="Top" overflow="Clip" wrap="false" textColor="240,217,181,255" />
+                <element type="UILabel" name="RankLabel6" x="102" y="562" width="13" height="26" text="{coordRank6}" fontSize="18" align="Left" verticalAlign="Top" overflow="Clip" wrap="false" textColor="181,136,99,255" />
+                <element type="UILabel" name="RankLabel7" x="102" y="642" width="13" height="26" text="{coordRank7}" fontSize="18" align="Left" verticalAlign="Top" overflow="Clip" wrap="false" textColor="240,217,181,255" />
+                <element type="UILabel" name="FileLabel0" x="165" y="692" width="13" height="26" text="{coordFile0}" fontSize="18" align="Right" verticalAlign="Bottom" overflow="Clip" wrap="false" textColor="240,217,181,255" />
+                <element type="UILabel" name="FileLabel1" x="245" y="692" width="13" height="26" text="{coordFile1}" fontSize="18" align="Right" verticalAlign="Bottom" overflow="Clip" wrap="false" textColor="181,136,99,255" />
+                <element type="UILabel" name="FileLabel2" x="325" y="692" width="13" height="26" text="{coordFile2}" fontSize="18" align="Right" verticalAlign="Bottom" overflow="Clip" wrap="false" textColor="240,217,181,255" />
+                <element type="UILabel" name="FileLabel3" x="405" y="692" width="13" height="26" text="{coordFile3}" fontSize="18" align="Right" verticalAlign="Bottom" overflow="Clip" wrap="false" textColor="181,136,99,255" />
+                <element type="UILabel" name="FileLabel4" x="485" y="692" width="13" height="26" text="{coordFile4}" fontSize="18" align="Right" verticalAlign="Bottom" overflow="Clip" wrap="false" textColor="240,217,181,255" />
+                <element type="UILabel" name="FileLabel5" x="565" y="692" width="13" height="26" text="{coordFile5}" fontSize="18" align="Right" verticalAlign="Bottom" overflow="Clip" wrap="false" textColor="181,136,99,255" />
+                <element type="UILabel" name="FileLabel6" x="645" y="692" width="13" height="26" text="{coordFile6}" fontSize="18" align="Right" verticalAlign="Bottom" overflow="Clip" wrap="false" textColor="240,217,181,255" />
+                <element type="UILabel" name="FileLabel7" x="725" y="692" width="13" height="26" text="{coordFile7}" fontSize="18" align="Right" verticalAlign="Bottom" overflow="Clip" wrap="false" textColor="181,136,99,255" />
+              </elements>
+            </component>
+          </components>
+        </node>
+
         <!-- The HUD is in the margins of the view (space="SceneView"): it scales and moves with the board and never covers it, whatever the shape of the window.
              The board is 640 x 640 at (100, 80); the margin is 80 units above and below, so one row of 56-unit controls fits in each (12 units from the edge of the
              safe area), and a 56-unit button is still a 32 px touch target at the smallest fit scale of the size matrix (0.57, the 840 units of the width in a 480 px window).

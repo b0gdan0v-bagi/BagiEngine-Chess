@@ -55,8 +55,9 @@ namespace BECore::Chess {
      * The pieces, the highlights and the clicks all go through SquareToPixel() / OnMouseDown() and BoardOrientation.h; only the geometry turns, the model and the control API do not.
      *
      * It also publishes the letters and numbers at the edges of the board (`coordFile0..7`, the file drawn in the bottom-row cell of each column, and `coordRank0..7`, the rank drawn in the
-     * left-column cell of each row; Game/BoardCoordinates.h) to `CoreManager::GetUIVars()` from the orientation it draws, also when no game is active. The labels are the UI elements of the scene;
-     * they stay at the same cells of the screen and their text turns with the board.
+     * left-column cell of each row; Game/BoardCoordinates.h) to `CoreManager::GetUIVars()` from the orientation it draws, also when no game is active. The labels are the 16 `UILabel`s of the canvas
+     * of the node `BoardCoordinates` in SceneConfig.xml (RankLabel0..7, FileLabel0..7), which show these variables; their boxes stay at the same cells of the screen and their text turns with the
+     * board.
      *
      * Its node sits on a layer below the pieces (`layer` in SceneConfig.xml), so the
      * squares and highlights are drawn first and the piece sprites on top.

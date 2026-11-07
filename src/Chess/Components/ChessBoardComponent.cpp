@@ -255,7 +255,7 @@ namespace BECore::Chess {
                 float px = 0.0f;
                 float py = 0.0f;
                 SquareToPixel(file, rank, bottom, px, py);
-                const bool isLight = ((file + rank) % 2) != 0;
+                const bool isLight = IsLightSquare(file, rank);
                 renderer.DrawFilledRect(px, py, _squareSize, _squareSize, isLight ? kLightSquare : kDarkSquare);
             }
         }
