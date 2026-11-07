@@ -5312,6 +5312,9 @@ namespace BECore::Chess::Tests {
         material->GetLayout().Invalidate();
         hud->GetLayout().Invalidate();
         coordinates->GetLayout().Invalidate();
+        // The count is pinned: CLAUDE.md names 32 of 46 notch cases, and each of them was asserted above
+        EXPECT_EQ(notchCases, 46u);
+        EXPECT_EQ(notchCasesWithAnOverlap, 32u);
         // The HUD keeps clear of the safe area, and a notch pushes its top row down by 7 % of the short side, onto the first rows and the balance of the upper group (as it does onto the board:
         // CLAUDE.md, "The HUD")
         std::cout << "[   INFO   ] the HUD reaches the top group in " << notchCasesWithAnOverlap << " of " << notchCases << " notch cases\n";

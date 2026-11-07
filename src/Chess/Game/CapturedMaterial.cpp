@@ -12,12 +12,14 @@ namespace BECore::Chess {
             int startCount;
         };
 
+        constexpr int kPawnStartCount = 8;
+
         constexpr eastl::array<CapturableEntry, 5> kCapturable{{
             {PieceType::Queen, "queen", 1},
             {PieceType::Rook, "rook", 2},
             {PieceType::Bishop, "bishop", 2},
             {PieceType::Knight, "knight", 2},
-            {PieceType::Pawn, "pawn", 8},
+            {PieceType::Pawn, "pawn", kPawnStartCount},
         }};
 
         constexpr eastl::array<PieceType, 5> kCapturableTypes{kCapturable[0].type, kCapturable[1].type, kCapturable[2].type, kCapturable[3].type, kCapturable[4].type};
@@ -91,19 +93,17 @@ namespace BECore::Chess {
         for (const PieceColor color : {PieceColor::White, PieceColor::Black}) {
             int promoted = 0;  // pieces beyond the starting set: each one is a pawn that is not a pawn any more
             int pawns = 0;
-            int pawnStart = 0;
             for (const CapturableEntry& entry : kCapturable) {
                 const int onBoard = PopCount(position.Pieces(color, entry.type));
                 summary._points[Index(color)] += onBoard * MaterialPoints(entry.type);
                 if (entry.type == PieceType::Pawn) {
                     pawns = onBoard;
-                    pawnStart = entry.startCount;
                     continue;
                 }
                 summary._missing[Index(color)][Index(entry.type)] = eastl::max(0, entry.startCount - onBoard);
                 promoted += eastl::max(0, onBoard - entry.startCount);
             }
-            summary._missing[Index(color)][Index(PieceType::Pawn)] = eastl::max(0, pawnStart - pawns - promoted);
+            summary._missing[Index(color)][Index(PieceType::Pawn)] = eastl::max(0, kPawnStartCount - pawns - promoted);
         }
         return summary;
     }
