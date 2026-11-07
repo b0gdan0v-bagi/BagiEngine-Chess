@@ -7,6 +7,7 @@
 #include <BECore/UI/UICanvasComponent.h>
 #include <Chess/ChessGame.h>
 #include <Chess/Engine/OpponentText.h>
+#include <Chess/Game/BoardCoordinates.h>
 #include <Chess/Game/BoardOrientation.h>
 #include <Chess/Game/PromotionChoices.h>
 #include <Chess/Game/StatusText.h>
@@ -35,6 +36,24 @@ namespace BECore::Chess {
             } else {
                 LOG_INFO("Game over: {}"_format(status));
             }
+        }
+
+        // The interned names of the variables of the labels at the edges of the board, built on the first use (an interned name is not made per frame)
+        struct CoordinateVars {
+            eastl::array<PoolString, kLastBoardIndex + 1> files;  // coordFile0..7, by column
+            eastl::array<PoolString, kLastBoardIndex + 1> ranks;  // coordRank0..7, by row from the top
+        };
+
+        const CoordinateVars& GetCoordinateVars() {
+            static const CoordinateVars vars = [] {
+                CoordinateVars made;
+                for (int index = 0; index <= kLastBoardIndex; ++index) {
+                    made.files[index] = PoolString::Intern("coordFile{}"_format(index).c_str());
+                    made.ranks[index] = PoolString::Intern("coordRank{}"_format(index).c_str());
+                }
+                return made;
+            }();
+            return vars;
         }
 
     }  // namespace
@@ -84,6 +103,19 @@ namespace BECore::Chess {
         _loggedModel = &model;
         _loggedVersion = model.GetVersion();
         LogResult(model);
+    }
+
+    void ChessBoardComponent::PublishCoordinates(PieceColor bottom) {
+        if (_publishedBottom == bottom) {
+            return;
+        }
+        _publishedBottom = bottom;
+        const CoordinateVars& names = GetCoordinateVars();
+        UIVars& vars = CoreManager::GetUIVars();
+        for (int index = 0; index <= kLastBoardIndex; ++index) {
+            vars.Set(names.files[index], FileLabel(index, bottom));
+            vars.Set(names.ranks[index], RankLabel(index, bottom));
+        }
     }
 
     void ChessBoardComponent::PublishUiVars() {
@@ -215,6 +247,7 @@ namespace BECore::Chess {
         PublishUiVars();
         auto& renderer = *CoreManager::GetRenderer();
         const PieceColor bottom = GetBottomColor();  // once per draw: every square of this frame is placed for the same orientation
+        PublishCoordinates(bottom);                  // before the model check: the labels show also when no game is active
 
         // Checkered base.
         for (int rank = 0; rank < 8; ++rank) {
@@ -222,7 +255,7 @@ namespace BECore::Chess {
                 float px = 0.0f;
                 float py = 0.0f;
                 SquareToPixel(file, rank, bottom, px, py);
-                const bool isLight = ((file + rank) % 2) != 0;
+                const bool isLight = IsLightSquare(file, rank);
                 renderer.DrawFilledRect(px, py, _squareSize, _squareSize, isLight ? kLightSquare : kDarkSquare);
             }
         }
