@@ -4,7 +4,7 @@
 #include <Chess/Game/ChessGameModel.h>
 #include <Chess/Game/MoveGenerator.h>
 
-/// The UCI text: pure, the commands we send and the one line we read. The texts are those of position_command in tools/stockfish_bridge.py
+/// The UCI text: pure, the commands we send and the lines we read (bestmove, info). The texts are those of position_command in tools/stockfish_bridge.py
 namespace BECore::Chess::Tests {
 
     namespace {
@@ -30,6 +30,22 @@ namespace BECore::Chess::Tests {
 
         void ExpectNotBestMove(eastl::string_view line) {
             EXPECT_FALSE(UciProtocol::ParseBestMove(line).has_value()) << eastl::string(line.data(), line.size()).c_str();
+        }
+
+        std::optional<UciProtocol::Info> ParsedInfo(eastl::string_view line) {
+            return UciProtocol::ParseInfo(line);
+        }
+
+        void ExpectNotInfo(eastl::string_view line) {
+            EXPECT_FALSE(UciProtocol::ParseInfo(line).has_value()) << eastl::string(line.data(), line.size()).c_str();
+        }
+
+        constexpr AnalysisScore Cp(int value) {
+            return {AnalysisScoreKind::Centipawns, value};
+        }
+
+        constexpr AnalysisScore Mate(int moves) {
+            return {AnalysisScoreKind::Mate, moves};
         }
 
     }  // namespace
@@ -136,6 +152,188 @@ namespace BECore::Chess::Tests {
         ExpectNotBestMove("bestmoves e2e4");
         ExpectNotBestMove("bestmovee2e4");
         ExpectNotBestMove("Bestmove e2e4");
+    }
+
+    TEST(UciProtocolTest, ARealStockfishInfoLineIsRead) {
+        const auto info = ParsedInfo("info depth 18 seldepth 24 multipv 1 score cp 34 nodes 123 nps 4 hashfull 0 tbhits 0 time 5 pv e2e4 e7e5 g1f3");
+
+        ASSERT_TRUE(info.has_value());
+        EXPECT_EQ(info->depth, 18);
+        EXPECT_EQ(info->multiPv, 1);
+        ASSERT_TRUE(info->score.has_value());
+        EXPECT_EQ(*info->score, Cp(34));
+        EXPECT_FALSE(info->lowerBound);
+        EXPECT_FALSE(info->upperBound);
+        EXPECT_EQ(info->firstPvMove, "e2e4");
+    }
+
+    TEST(UciProtocolTest, AMateScoreIsReadWithItsSign) {
+        const auto win = ParsedInfo("info depth 5 score mate 3 nodes 10 pv e2e4");
+        const auto loss = ParsedInfo("info depth 4 score mate -2 pv a1a2");
+
+        ASSERT_TRUE(win.has_value() && win->score.has_value());
+        EXPECT_EQ(*win->score, Mate(3));
+        ASSERT_TRUE(loss.has_value() && loss->score.has_value());
+        EXPECT_EQ(*loss->score, Mate(-2));
+    }
+
+    TEST(UciProtocolTest, ANegativeCentipawnScoreIsRead) {
+        const auto info = ParsedInfo("info depth 9 score cp -153 pv d7d5");
+
+        ASSERT_TRUE(info.has_value() && info->score.has_value());
+        EXPECT_EQ(*info->score, Cp(-153));
+    }
+
+    TEST(UciProtocolTest, ABoundIsFlaggedAndKeepsItsScore) {
+        const auto lower = ParsedInfo("info depth 12 score cp 80 lowerbound nodes 5 pv e2e4");
+        const auto upper = ParsedInfo("info depth 12 score cp -10 upperbound pv e2e4");
+
+        ASSERT_TRUE(lower.has_value() && lower->score.has_value());
+        EXPECT_TRUE(lower->lowerBound);
+        EXPECT_FALSE(lower->upperBound);
+        EXPECT_EQ(*lower->score, Cp(80));
+        ASSERT_TRUE(upper.has_value() && upper->score.has_value());
+        EXPECT_TRUE(upper->upperBound);
+        EXPECT_FALSE(upper->lowerBound);
+        EXPECT_EQ(*upper->score, Cp(-10));
+    }
+
+    TEST(UciProtocolTest, TheLineOfAMultiPvSearchSaysWhichLineItIs) {
+        const auto second = ParsedInfo("info depth 10 multipv 2 score cp 12 pv d2d4 d7d5");
+
+        ASSERT_TRUE(second.has_value());
+        EXPECT_EQ(second->multiPv, 2);
+        EXPECT_EQ(second->firstPvMove, "d2d4");
+    }
+
+    TEST(UciProtocolTest, WithoutMultiPvTheLineIsTheFirstOne) {
+        const auto info = ParsedInfo("info depth 3 score cp 5 pv e2e4");
+
+        ASSERT_TRUE(info.has_value());
+        EXPECT_EQ(info->multiPv, 1);
+    }
+
+    TEST(UciProtocolTest, OnlyTheFirstMoveOfTheLineIsKept) {
+        EXPECT_EQ(ParsedInfo("info depth 3 score cp 5 pv e7e8q a1a2 b2b3")->firstPvMove, "e7e8q");
+        EXPECT_EQ(ParsedInfo("info depth 3 score cp 5 pv e2e4")->firstPvMove, "e2e4");
+        EXPECT_TRUE(ParsedInfo("info depth 3 score cp 5 pv")->firstPvMove.empty());
+        EXPECT_TRUE(ParsedInfo("info depth 3 score cp 5")->firstPvMove.empty());
+    }
+
+    TEST(UciProtocolTest, WhatFollowsThePvIsNotReadAsKeywords) {
+        const auto info = ParsedInfo("info depth 3 pv e2e4 score cp 77 depth 99");
+
+        ASSERT_TRUE(info.has_value());
+        EXPECT_FALSE(info->score.has_value());
+        EXPECT_EQ(info->depth, 3);
+    }
+
+    TEST(UciProtocolTest, AnInfoStringIsTextAndHasNoScore) {
+        const auto info = ParsedInfo("info string score cp 999 depth 40 pv a1a2");
+
+        ASSERT_TRUE(info.has_value());
+        EXPECT_FALSE(info->score.has_value());
+        EXPECT_EQ(info->depth, 0);
+        EXPECT_TRUE(info->firstPvMove.empty());
+        EXPECT_FALSE(ParsedInfo("info string")->score.has_value());
+    }
+
+    TEST(UciProtocolTest, TheFieldsBeforeAnInfoStringAreKept) {
+        const auto info = ParsedInfo("info depth 7 score cp 3 string NNUE evaluation using something");
+
+        ASSERT_TRUE(info.has_value() && info->score.has_value());
+        EXPECT_EQ(info->depth, 7);
+        EXPECT_EQ(*info->score, Cp(3));
+    }
+
+    TEST(UciProtocolTest, AMateInZeroIsNoScore) {
+        const auto info = ParsedInfo("info depth 0 score mate 0");
+
+        ASSERT_TRUE(info.has_value());
+        EXPECT_EQ(info->depth, 0);
+        EXPECT_FALSE(info->score.has_value());
+    }
+
+    TEST(UciProtocolTest, ALineWithoutAScoreHasNone) {
+        const auto info = ParsedInfo("info depth 4 currmove e2e4 currmovenumber 1");
+
+        ASSERT_TRUE(info.has_value());
+        EXPECT_EQ(info->depth, 4);
+        EXPECT_FALSE(info->score.has_value());
+        EXPECT_TRUE(ParsedInfo("info")->firstPvMove.empty());
+        EXPECT_FALSE(ParsedInfo("info")->score.has_value());
+    }
+
+    TEST(UciProtocolTest, ATruncatedOrBrokenScoreIsNoScoreAndNeverACrash) {
+        for (const char* line : {"info depth 3 score", "info depth 3 score cp", "info depth 3 score mate", "info score cp abc", "info score cp 1x", "info score mate -",
+                                 "info score cp 99999999999999999999", "info score foo 12", "info score cp lowerbound", "info score cp --5", "info score cp 3.5"}) {
+            const auto info = ParsedInfo(line);
+            ASSERT_TRUE(info.has_value()) << line;
+            EXPECT_FALSE(info->score.has_value()) << line;
+        }
+    }
+
+    TEST(UciProtocolTest, AKeywordAfterAMissingValueIsStillSeen) {
+        const auto info = ParsedInfo("info score cp lowerbound pv e2e4");
+
+        ASSERT_TRUE(info.has_value());
+        EXPECT_FALSE(info->score.has_value());
+        EXPECT_TRUE(info->lowerBound);
+        EXPECT_EQ(info->firstPvMove, "e2e4");
+    }
+
+    TEST(UciProtocolTest, ABrokenDepthOrMultiPvKeepsTheDefault) {
+        const auto info = ParsedInfo("info depth x multipv -3 score cp 1");
+
+        ASSERT_TRUE(info.has_value());
+        EXPECT_EQ(info->depth, 0);
+        EXPECT_EQ(info->multiPv, 1);
+        ASSERT_TRUE(info->score.has_value());
+        EXPECT_EQ(*info->score, Cp(1));
+        EXPECT_EQ(ParsedInfo("info depth")->depth, 0);
+        EXPECT_EQ(ParsedInfo("info multipv")->multiPv, 1);
+        EXPECT_EQ(ParsedInfo("info depth -4 multipv 0")->depth, 0);
+    }
+
+    TEST(UciProtocolTest, UnknownTokensAreSkipped) {
+        const auto info = ParsedInfo("info wdl 100 900 0 depth 6 foo bar score cp 20 baz pv e2e4");
+
+        ASSERT_TRUE(info.has_value() && info->score.has_value());
+        EXPECT_EQ(info->depth, 6);
+        EXPECT_EQ(*info->score, Cp(20));
+        EXPECT_EQ(info->firstPvMove, "e2e4");
+    }
+
+    TEST(UciProtocolTest, AnInfoLineKeepsItsFieldsWithAnEndOfLineAndSpaces) {
+        const auto info = ParsedInfo("  info  depth 8   score  cp  15  pv  e2e4\r\n");
+
+        ASSERT_TRUE(info.has_value() && info->score.has_value());
+        EXPECT_EQ(info->depth, 8);
+        EXPECT_EQ(*info->score, Cp(15));
+        EXPECT_EQ(info->firstPvMove, "e2e4");
+        EXPECT_EQ(*ParsedInfo("info depth 1 score mate 2\r")->score, Mate(2));
+        EXPECT_TRUE(ParsedInfo("info depth 1 score cp 5 upperbound\r")->upperBound);
+    }
+
+    TEST(UciProtocolTest, OtherLinesAreNotInfo) {
+        ExpectNotInfo("bestmove e2e4");
+        ExpectNotInfo("bestmove e2e4 ponder e7e5");
+        ExpectNotInfo("uciok");
+        ExpectNotInfo("readyok");
+        ExpectNotInfo("");
+        ExpectNotInfo("\r");
+        ExpectNotInfo("   ");
+        ExpectNotInfo("information depth 1");
+        ExpectNotInfo("Info depth 1");
+        ExpectNotInfo("score cp 10");
+        ExpectNotInfo("option name Skill Level type spin default 20 min 0 max 20");
+    }
+
+    TEST(UciProtocolTest, AnInfoLineIsNotABestMove) {
+        const eastl::string_view line = "info depth 1 score cp 10 pv e2e4";
+
+        EXPECT_TRUE(UciProtocol::ParseInfo(line).has_value());
+        EXPECT_FALSE(UciProtocol::ParseBestMove(line).has_value());
     }
 
     TEST(UciProtocolTest, TrimLineTakesSpacesAndLineEndsFromBothEnds) {

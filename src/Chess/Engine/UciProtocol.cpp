@@ -11,6 +11,16 @@ namespace BECore::Chess {
             constexpr eastl::string_view kBestMoveToken = "bestmove";
             constexpr eastl::string_view kNoMoveText = "(none)";
             constexpr eastl::string_view kNullMoveText = "0000";
+            constexpr eastl::string_view kInfoToken = "info";
+            constexpr eastl::string_view kStringToken = "string";
+            constexpr eastl::string_view kDepthToken = "depth";
+            constexpr eastl::string_view kMultiPvToken = "multipv";
+            constexpr eastl::string_view kScoreToken = "score";
+            constexpr eastl::string_view kCentipawnsToken = "cp";
+            constexpr eastl::string_view kMateToken = "mate";
+            constexpr eastl::string_view kLowerBoundToken = "lowerbound";
+            constexpr eastl::string_view kUpperBoundToken = "upperbound";
+            constexpr eastl::string_view kPvToken = "pv";
 
             /// The text up to the next separator, cut off @p rest (which then starts at the separator or is empty)
             eastl::string_view TakeToken(eastl::string_view& rest) {
@@ -24,6 +34,38 @@ namespace BECore::Chess {
                 const eastl::string_view token = rest.substr(0, length);
                 rest.remove_prefix(length);
                 return token;
+            }
+
+            /// Reads @p text as a whole decimal number (a leading '-' allowed); false for an empty token, any other character or a value out of int
+            bool ParseInt(eastl::string_view text, int& out) {
+                if (text.empty()) {
+                    return false;
+                }
+                const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), out);
+                return error == std::errc{} && end == text.data() + text.size();
+            }
+
+            /// Reads the number that follows in @p rest and takes it off only when it is one, so a keyword that follows a missing value (`score cp lowerbound`) is still seen
+            bool TakeInt(eastl::string_view& rest, int& out) {
+                eastl::string_view after = rest;
+                if (!ParseInt(TakeToken(after), out)) {
+                    return false;
+                }
+                rest = after;
+                return true;
+            }
+
+            /// `cp N` or `mate N` after `score`. Nothing for a kind we do not know, a missing or non-numeric value, and for a mate in 0
+            std::optional<AnalysisScore> TakeScore(eastl::string_view& rest) {
+                const eastl::string_view kind = TakeToken(rest);
+                int value = 0;
+                if (kind == kCentipawnsToken && TakeInt(rest, value)) {
+                    return AnalysisScore{AnalysisScoreKind::Centipawns, value};
+                }
+                if (kind == kMateToken && TakeInt(rest, value) && value != 0) {
+                    return AnalysisScore{AnalysisScoreKind::Mate, value};
+                }
+                return std::nullopt;
             }
 
         }  // namespace
@@ -67,6 +109,42 @@ namespace BECore::Chess {
             }
             const eastl::string_view move = TakeToken(rest);
             return BestMove{eastl::string(move.data(), move.size())};
+        }
+
+        std::optional<Info> ParseInfo(eastl::string_view line) {
+            eastl::string_view rest = TrimLine(line);
+            if (TakeToken(rest) != kInfoToken) {
+                return std::nullopt;
+            }
+            Info info;
+            for (eastl::string_view token = TakeToken(rest); !token.empty(); token = TakeToken(rest)) {
+                if (token == kStringToken) {
+                    break;  // the rest of the line is text for a person, whatever words are in it
+                }
+                if (token == kPvToken) {
+                    const eastl::string_view move = TakeToken(rest);
+                    info.firstPvMove = eastl::string(move.data(), move.size());
+                    break;  // the other moves of the line are of no use here
+                }
+                if (token == kDepthToken) {
+                    int depth = 0;
+                    if (TakeInt(rest, depth) && depth > 0) {
+                        info.depth = depth;
+                    }
+                } else if (token == kMultiPvToken) {
+                    int multiPv = 0;
+                    if (TakeInt(rest, multiPv) && multiPv > 0) {
+                        info.multiPv = multiPv;
+                    }
+                } else if (token == kScoreToken) {
+                    info.score = TakeScore(rest);
+                } else if (token == kLowerBoundToken) {
+                    info.lowerBound = true;
+                } else if (token == kUpperBoundToken) {
+                    info.upperBound = true;
+                }
+            }
+            return info;
         }
 
         eastl::string_view TrimLine(eastl::string_view text) {

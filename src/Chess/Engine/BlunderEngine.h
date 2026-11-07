@@ -31,6 +31,11 @@ namespace BECore::Chess {
 
         [[nodiscard]] std::expected<Move, EngineError> FindMove(const SearchRequest& request, const CancellationToken& token) override;
 
+        /// Forwarded to the wrapped engine with the request and the token as they came, at any percent: a handicap is for the moves the program plays, and
+        /// a hint or an evaluation of the position must never be spoilt by it (nor must a random move be shown as the best one). An engine that does not
+        /// analyse answers Unsupported through this class as well.
+        [[nodiscard]] std::expected<Analysis, EngineError> Analyse(const SearchRequest& request, const CancellationToken& token) override;
+
         /// The share after clamping
         [[nodiscard]] int Percent() const {
             return _percent;

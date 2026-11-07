@@ -4,7 +4,7 @@
 
 namespace BECore::Chess {
 
-    /// The text of the UCI protocol (the commands we send, the one line we read). Pure: no process, no thread, nothing to log
+    /// The text of the UCI protocol (the commands we send, the lines we read: `bestmove` and `info`). Pure: no process, no thread, nothing to log
     namespace UciProtocol {
 
         /// The answer of an engine to `go`: `bestmove e2e4`, `bestmove e2e4 ponder e7e5` (the ponder move is dropped)
@@ -14,6 +14,26 @@ namespace BECore::Chess {
 
             /// The engine has no move to give: `(none)` (mate or stalemate), `0000`, or no token at all
             [[nodiscard]] bool IsNone() const noexcept;
+        };
+
+        /// One `info` line of an engine, as far as an analysis needs it. Every field has a value when the line did not say: the line is read tolerantly
+        struct Info {
+            /// `depth`; 0 when absent or not a number
+            int depth = 0;
+
+            /// `multipv`; 1 when absent (a single-line search does not send it) or not a number
+            int multiPv = 1;
+
+            /// `score cp N` or `score mate N` (a negative number allowed), from the side to move. Nothing when the line has no score, or a truncated or non-numeric one,
+            /// and for `score mate 0` (the position is already mated: no move, no distance, see AnalysisScore)
+            std::optional<AnalysisScore> score;
+
+            /// `lowerbound` / `upperbound` after the score: the score is a bound, not the exact value
+            bool lowerBound = false;
+            bool upperBound = false;
+
+            /// The first move after `pv` (the rest of the line is dropped); empty when there is none
+            eastl::string firstPvMove;
         };
 
         /// `position fen <startFen>`, and ` moves m1 m2 ...` when the request has moves. The same text as `position_command` of tools/stockfish_bridge.py.
@@ -29,6 +49,10 @@ namespace BECore::Chess {
 
         /// The answer in @p line when it is a `bestmove` line (an end of line left on it does no harm), nothing for any other line (`info ...`, an empty one)
         [[nodiscard]] std::optional<BestMove> ParseBestMove(eastl::string_view line);
+
+        /// The fields of @p line when it is an `info` line, nothing for any other line (`bestmove ...`, an empty one). Tolerant: `info string ...` is text to the end of
+        /// the line (a `score` inside it is not read), unknown tokens are skipped, and a missing or non-numeric value leaves its field as it was and never fails the line
+        [[nodiscard]] std::optional<Info> ParseInfo(eastl::string_view line);
 
         /// @p text without the spaces, `\r` and `\n` at both ends: a child on Windows ends its lines with `\r\n`. A view into @p text
         [[nodiscard]] eastl::string_view TrimLine(eastl::string_view text);

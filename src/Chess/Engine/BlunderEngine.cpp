@@ -61,4 +61,8 @@ namespace BECore::Chess {
         return legal[Mix(seed ^ kMoveSalt) % legal.size()];
     }
 
+    std::expected<Analysis, EngineError> BlunderEngine::Analyse(const SearchRequest& request, const CancellationToken& token) {
+        return _inner->Analyse(request, token);
+    }
+
 }  // namespace BECore::Chess

@@ -48,12 +48,40 @@ namespace BECore::Chess {
             return UciProtocol::ParseBestMove(line).has_value();
         }
 
+        /// Keeps the `info` line an analysis is read from while the lines before `bestmove` go by: a line with a score of the main line (`multipv` 1).
+        /// The latest exact score wins; a bound (`lowerbound` / `upperbound`) is the answer only when no exact score came. `info string ...` is text, ParseInfo reads no score from it
+        class InfoCollector {
+        public:
+            void Offer(eastl::string_view line) {
+                const std::optional<UciProtocol::Info> info = UciProtocol::ParseInfo(line);
+                if (!info || !info->score || info->multiPv != 1) {
+                    return;
+                }
+                if (info->lowerBound || info->upperBound) {
+                    _bound = info;
+                } else {
+                    _exact = info;
+                }
+            }
+
+            /// The line to analyse from, nothing when no usable one was seen
+            [[nodiscard]] std::optional<UciProtocol::Info> Best() const {
+                return _exact ? _exact : _bound;
+            }
+
+        private:
+            std::optional<UciProtocol::Info> _exact;
+            std::optional<UciProtocol::Info> _bound;
+        };
+
         /**
          * Reads the lines of @p process until @p wanted likes one (the trimmed line is the answer), skipping `info` and every line it does not know.
          * Cancelled as soon as @p token is, Timeout after @p timeoutMs; the failures of the process (ProcessDied, ProtocolError) come back with
-         * what was waited for in the sentence. A token that was never made (the default one) is never cancelled.
+         * what was waited for in the sentence. A token that was never made (the default one) is never cancelled. @p skipped, when given, sees every
+         * line that is skipped (the wait for `bestmove` passes one; the handshake and the answer to `stop` pass none).
          */
-        std::expected<eastl::string, EngineError> ReadUntil(UciProcess& process, LinePredicate wanted, eastl::string_view what, int timeoutMs, const CancellationToken& token) {
+        std::expected<eastl::string, EngineError> ReadUntil(UciProcess& process, LinePredicate wanted, eastl::string_view what, int timeoutMs, const CancellationToken& token,
+                                                            InfoCollector* skipped = nullptr) {
             const Clock::time_point deadline = Clock::now() + milliseconds(std::max(timeoutMs, 0));
             for (;;) {
                 if (token.IsCancelled()) {
@@ -69,6 +97,9 @@ namespace BECore::Chess {
                     const eastl::string_view text = UciProtocol::TrimLine(eastl::string_view(line->data(), line->size()));
                     if (wanted(text)) {
                         return eastl::string(text.data(), text.size());
+                    }
+                    if (skipped != nullptr) {
+                        skipped->Offer(text);
                     }
                 } else if (line.error().kind != EngineErrorKind::Timeout) {  // a timeout of one slice is the loop's pace, not an error
                     return Fail(line.error().kind, Format("while waiting for '{}': {}", what, line.error().detail));
@@ -148,7 +179,28 @@ namespace BECore::Chess {
 
     std::expected<Move, EngineError> UciEngine::FindMove(const SearchRequest& request, const CancellationToken& token) {
         const std::lock_guard lock(_mutex);
+        auto searched = RunSearch(request, token);
+        if (!searched) {
+            return std::unexpected(std::move(searched.error()));
+        }
+        return searched->move;
+    }
 
+    std::expected<Analysis, EngineError> UciEngine::Analyse(const SearchRequest& request, const CancellationToken& token) {
+        const std::lock_guard lock(_mutex);
+        auto searched = RunSearch(request, token);
+        if (!searched) {
+            return std::unexpected(std::move(searched.error()));
+        }
+        // The process is in step: it answered. A missing score is the engine's fault, not a reason to throw the process away
+        if (!searched->info) {
+            return Fail(EngineErrorKind::ProtocolError, "the engine sent no score before its bestmove");
+        }
+        const UciProtocol::Info& info = *searched->info;
+        return Analysis{{AnalysisLine{searched->move, *info.score, info.depth}}};
+    }
+
+    std::expected<UciEngine::Searched, EngineError> UciEngine::RunSearch(const SearchRequest& request, const CancellationToken& token) {
         if (auto valid = request.Validate(); !valid) {
             return std::unexpected(std::move(valid.error()));
         }
@@ -168,7 +220,8 @@ namespace BECore::Chess {
         }
         const SearchLimits& limits = request.limits;
         const int timeoutMs = limits.moveTimeMs > 0 ? AnswerDeadlineMs(limits.moveTimeMs, _settings.answerSlackMs) : _settings.depthOnlyTimeoutMs;
-        const auto answer = ReadUntil(*_process, IsBestMove, kBestMoveReply, timeoutMs, token);
+        InfoCollector infos;
+        const auto answer = ReadUntil(*_process, IsBestMove, kBestMoveReply, timeoutMs, token, &infos);
         if (!answer) {
             if (answer.error().kind == EngineErrorKind::Cancelled) {
                 return StopSearch();
@@ -185,7 +238,7 @@ namespace BECore::Chess {
         if (!move) {
             return Fail(EngineErrorKind::IllegalMove, Format("the engine answered '{}', which is not legal in {}", best->move, position->ToFen()));
         }
-        return *move;
+        return Searched{*move, infos.Best()};
     }
 
     std::expected<void, EngineError> UciEngine::Begin(const SearchRequest& request, const CancellationToken& token) {

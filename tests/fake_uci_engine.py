@@ -11,6 +11,11 @@ It answers `uci` with `id name`, `id author`, one option (`Skill Level`) and `uc
 
     --log FILE           append every line received to FILE, flushed at once (the file is created when the program starts)
     --moves m1,m2,...    the moves answered to the 1st, 2nd, ... `go` (default: e2e4)
+    --scores s1,s2,...   the score in the `info` line of the 1st, 2nd, ... `go`: `cp:35`, `mate:3`, `mate:-2` (default and after the list: cp:10)
+    --noisy-info         around the final `info` line (depth 2, the score of --scores) print lines an analysis must not take: an earlier depth
+                         (cp -321), the same depth as a bound (cp 654 lowerbound), a second line of the search (multipv 2, mate 7), a text
+                         line (`info string score cp 999`) and, after the final line, a bound again (mate -9 upperbound)
+    --no-score           the final `info` line carries no `score` (the noise lines of --noisy-info keep theirs)
     --think-ms N         wait N milliseconds before answering `go`; a `stop` line ends the wait at once (an `isready` is answered meanwhile)
     --think-first-only   --think-ms applies to the 1st `go` only (a search that is stopped, then one that answers at once)
     --ignore-stop        a `stop` line does not end the wait
@@ -40,6 +45,7 @@ from types import FrameType
 from typing import TextIO
 
 DEFAULT_MOVES = "e2e4"
+DEFAULT_SCORE = "cp:10"
 PONDER_MOVE = "e7e5"
 NO_MOVE = "(none)"
 DIE_EXIT_CODE = 9
@@ -47,6 +53,10 @@ SPLIT_PAUSE_SECONDS = 0.02
 SLEEP_FOREVER_SECONDS = 3600
 LOG_FILE_MODE = 0o644
 GARBAGE_LINES = ("this line is not UCI", "", "info string noise", "xyzzy")
+NOISE_EARLIER_CP = -321
+NOISE_BOUND_CP = 654
+NOISE_SECOND_LINE_MATE = 7
+NOISE_UPPER_BOUND_MATE = -9
 OPTION_LINE = "option name Skill Level type spin default 20 min 0 max 20"
 TERM_NOTE = "<SIGTERM ignored>"
 
@@ -63,6 +73,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--log", metavar="FILE")
     parser.add_argument("--moves", default=DEFAULT_MOVES)
+    parser.add_argument("--scores", default=DEFAULT_SCORE)
+    parser.add_argument("--noisy-info", action="store_true")
+    parser.add_argument("--no-score", action="store_true")
     parser.add_argument("--think-ms", type=int, default=0)
     parser.add_argument("--think-first-only", action="store_true")
     parser.add_argument("--ignore-stop", action="store_true")
@@ -93,6 +106,7 @@ class FakeEngine:
         self._lines = lines
         self._out = out
         self._moves = [move for move in options.moves.split(",") if move]
+        self._scores = [score for score in options.scores.split(",") if score]
         self._go_count = 0
         # A raw descriptor in append mode: every line is in the file when `log` returns, and a signal handler may write too
         self._log_fd = os.open(options.log, os.O_WRONLY | os.O_APPEND | os.O_CREAT, LOG_FILE_MODE) if options.log else None
@@ -179,8 +193,29 @@ class FakeEngine:
             self.say("info depth 0 score mate 0")
             self.say(f"bestmove {NO_MOVE}")
         else:
-            self.say(f"info depth 1 score cp 10 pv {move}")
+            self.say_info(index, move)
             self.say(f"bestmove {move} ponder {PONDER_MOVE}")
+
+    def score_words(self, index: int) -> str:
+        """The `score ...` words of the `go` number `index` (from --scores); empty with --no-score."""
+        if self._options.no_score:
+            return ""
+        text = self._scores[index] if index < len(self._scores) else DEFAULT_SCORE
+        kind, _, value = text.partition(":")
+        return f" score {kind} {value}"
+
+    def say_info(self, index: int, move: str) -> None:
+        """The `info` line(s) before `bestmove`: one line, or with --noisy-info the final line (depth 2) among lines that must not be taken."""
+        score = self.score_words(index)
+        if not self._options.noisy_info:
+            self.say(f"info depth 1{score} pv {move}")
+            return
+        self.say(f"info depth 1 score cp {NOISE_EARLIER_CP} pv {move}")
+        self.say(f"info depth 2 score cp {NOISE_BOUND_CP} lowerbound pv {move}")
+        self.say(f"info depth 2 multipv 2 score mate {NOISE_SECOND_LINE_MATE} pv {move}")
+        self.say("info string score cp 999")
+        self.say(f"info depth 2{score} pv {move}")
+        self.say(f"info depth 2 score mate {NOISE_UPPER_BOUND_MATE} upperbound pv {move}")
 
     def should_die_once(self) -> bool:
         marker = self._options.die_once
