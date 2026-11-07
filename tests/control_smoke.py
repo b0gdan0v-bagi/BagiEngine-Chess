@@ -397,6 +397,90 @@ def check_the_board_turns_with_the_program(client: BagiControlClient) -> None:
     client.call("set_state", {"opponent": {"plays": None}})
 
 
+# The left margin of the view, where the node Material draws the captured pieces and the balance (SceneConfig.xml): x 0 to 100 of the 840 units
+MARGIN_WIDTH = 100
+MARGIN_INSET = 2  # columns and rows kept away from the edges of the margin, against rounding
+CAPTURE_MOVES = ["e2e4", "d7d5", "e4d5"]  # White takes a pawn of Black
+CHIP_COLOR = (232, 210, 170)  # the fill of a row of the display
+MATERIAL_PIECES = ["queen", "rook", "bishop", "knight", "pawn"]
+
+
+def get_material(client: BagiControlClient) -> dict:
+    return client.call("get_state")["state"]["material"]
+
+
+def margin_band(image) -> list:
+    """The part of a screenshot that only the left margin covers: the rows of the board, the columns from the left edge of the view to the board. The HUD above and below
+    the board and the board itself are left out, so what differs between two pictures of it is the display of the captured material."""
+    scale = min(image.width / VIEW_WIDTH, image.height / VIEW_HEIGHT)
+    left = (image.width - VIEW_WIDTH * scale) / 2
+    top = (image.height - VIEW_HEIGHT * scale) / 2
+    first_row = int(top + BOARD_TOP * scale) + BOARD_BAND_INSET
+    last_row = int(top + BOARD_BOTTOM * scale) - BOARD_BAND_INSET
+    first_column = int(left) + MARGIN_INSET
+    last_column = int(left + MARGIN_WIDTH * scale) - MARGIN_INSET
+    check(0 <= first_row < last_row <= image.height and 0 <= first_column < last_column <= image.width, f"the margin band is outside a picture {image.width}x{image.height}")
+    return [row[first_column * image.channels : last_column * image.channels] for row in image.rows[first_row:last_row]]
+
+
+def band_has_color(band: list, channels: int, color: tuple) -> bool:
+    for row in band:
+        for start in range(0, len(row), channels):
+            if tuple(row[start : start + 3]) == color:
+                return True
+    return False
+
+
+def check_material(material: dict, balance: int, by_white: dict, by_black: dict, when: str) -> None:
+    check(set(material) == {"balance", "capturedByWhite", "capturedByBlack"}, f"{when}: unexpected members of material: {sorted(material)}")
+    for side, expected in (("capturedByWhite", by_white), ("capturedByBlack", by_black)):
+        check(sorted(material[side]) == sorted(MATERIAL_PIECES), f"{when}: {side} has the pieces {sorted(material[side])}")
+        check(material[side] == {piece: expected.get(piece, 0) for piece in MATERIAL_PIECES}, f"{when}: {side} is {material[side]}, expected {expected}")
+    check(material["balance"] == balance, f"{when}: the balance is {material['balance']}, expected {balance}")
+
+
+def run_material_scenario(client: BagiControlClient, headless: bool) -> None:
+    """The captured material: get_state reports it from the position, and on the headless run the left margin of the picture shows it.
+
+    Two people play e2e4 d7d5 e4d5, so White has taken a pawn: the balance is +1 for White and `capturedByWhite` has one pawn. The margin band of a screenshot
+    (the rows of the board, the columns left of it) is compared, not the whole picture: the HUD says other words in each picture. A reset brings back the band and
+    the zeros."""
+    if client.call("status")["manualClock"]:
+        client.call("step")  # the scene registers its pieces in the first frame
+    client.call("reset")
+    client.call("set_state", {"opponent": {"plays": None}})
+    check_material(get_material(client), 0, {}, {}, "the start position")
+    start_band = None
+    if headless:
+        let_frames_pass(client, 2)  # the display waits for the first layout of its canvas
+        start_band = margin_band(take_screenshot(client))
+
+    for uci in CAPTURE_MOVES:
+        client.call("perform_action", move(uci))
+    check_material(get_material(client), 1, {"pawn": 1}, {}, "after e2e4 d7d5 e4d5")
+    check(client.call("get_state")["version"] >= 3, "the version did not grow with the moves")
+
+    # The material is derived from the position, so a position set from outside has it too: two kings and a white rook
+    client.call("set_state", {"fen": "4k3/8/8/8/8/8/8/R3K3 w - - 0 1"})
+    check_material(get_material(client), 5, {"queen": 1, "bishop": 2, "knight": 2, "pawn": 8, "rook": 2}, {"queen": 1, "rook": 1, "bishop": 2, "knight": 2, "pawn": 8}, "two kings and a rook")
+
+    client.call("reset")
+    client.call("perform_action", move("e2e4"))
+    client.call("perform_action", move("d7d5"))
+    client.call("perform_action", move("e4d5"))
+    if headless:
+        let_frames_pass(client, 2)
+        captured_band = margin_band(take_screenshot(client))
+        check(captured_band != start_band, "the left margin did not change after White took a pawn")
+        check(band_has_color(captured_band, 3, CHIP_COLOR) or band_has_color(captured_band, 4, CHIP_COLOR), "no row of the display is drawn in the left margin after the capture")
+
+    client.call("reset")
+    check_material(get_material(client), 0, {}, {}, "after a reset")
+    if headless:
+        let_frames_pass(client, 2)
+        check(margin_band(take_screenshot(client)) == start_band, "the left margin after a reset is not the one of the start position")
+
+
 def find_ui_canvas(tree: dict, node: str) -> dict:
     """The canvas of the node of that name in a `ui_tree` answer."""
     for canvas in tree["canvases"]:
@@ -545,6 +629,8 @@ BASE_SCENARIOS = [
     ("own engine, manual clock", ["--manual-clock"], run_own_engine_scenario),
     ("opponent panel, real clock", [], run_opponent_panel_scenario),
     ("opponent panel, manual clock", ["--manual-clock"], run_opponent_panel_scenario),
+    ("captured material, real clock", [], run_material_scenario),
+    ("captured material, manual clock", ["--manual-clock"], run_material_scenario),
 ]
 
 OPPONENT_SCENARIOS = [

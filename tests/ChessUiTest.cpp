@@ -238,6 +238,18 @@ namespace BECore::Chess::Tests {
             }
         }
 
+        /// @p root and every element below it, depth first
+        eastl::vector<const UIElement*> AllElements(const UIElement& root) {
+            eastl::vector<const UIElement*> found;
+            found.push_back(&root);
+            for (const auto& child : root.children) {
+                for (const UIElement* below : AllElements(*child)) {
+                    found.push_back(below);
+                }
+            }
+            return found;
+        }
+
         /// What is wrong with a modal panel as it is laid out (the plate is the element @p plateName), one problem to a line, nothing when it is right: a control that is not shown at all (an empty
         /// rect: a segment without a `height`), text that its control cuts (the validator does not see it for an ellipsis label; a button keeps kButtonAir between its text and the edge of its fill),
         /// a button under kSegmentHeight, and a plate that leaves the safe area
@@ -395,6 +407,162 @@ namespace BECore::Chess::Tests {
                 const Color& expected = ContrastColor(spec.column, spec.row);
                 if (label == nullptr || !SameColor(label->textColor, expected)) {
                     problems += Format("{} has not the color {},{},{} that reads on its cell\n", spec.name.c_str(), expected.r, expected.g, expected.b);
+                }
+            }
+            return problems;
+        }
+
+        // ---- the node Material of SceneConfig.xml: the layout checks (the behavior tests are further down) ----
+        constexpr float kMaterialMarginRight = 100.0f;  // the left margin ends where the board begins
+        constexpr float kMaterialRowHeight = 40.0f;     // a row is at least this high
+        constexpr size_t kMaterialRounds = 99;          // one round per sign, "+1" to "+99"
+        constexpr int kMostCaptured = 8;                // the longest count word is "x8": the most a row can show is the eight pawns (a test holds it to the summary of two bare kings)
+        constexpr const char* kMaterialGroups[] = {"Top", "Bottom"};
+
+        /// The rect lies inside the other one
+        bool LiesIn(const Rect& inner, const Rect& outer) {
+            return inner.x >= outer.x - kPixelTolerance && inner.y >= outer.y - kPixelTolerance && inner.x + inner.w <= outer.x + outer.w + kPixelTolerance &&
+                   inner.y + inner.h <= outer.y + outer.h + kPixelTolerance;
+        }
+
+        /// Sets the twelve variables of the display to the words of round @p round: every count word "x1".."x15" stands at every row and every sign "+1".."+99" at both balances once over the
+        /// kMaterialRounds rounds
+        void PublishMaterialRound(size_t round) {
+            UIVars& vars = CoreManager::GetUIVars();
+            size_t row = 0;
+            for (const char* group : kMaterialGroups) {
+                for (const char* piece : kMaterialPieces) {
+                    const eastl::string word = Format("x{}", static_cast<int>((round + row++) % kMostCaptured) + 1);
+                    vars.Set(PoolString::Intern(Format("material{}{}", group, piece).c_str()), eastl::string_view(word.data(), word.size()));
+                }
+                const size_t shift = group == kMaterialGroups[0] ? 0 : kMaterialRounds / 2;
+                const eastl::string sign = BalanceText(static_cast<int>((round + shift) % kMaterialRounds) + 1);
+                vars.Set(PoolString::Intern(Format("material{}Balance", group).c_str()), eastl::string_view(sign.data(), sign.size()));
+            }
+        }
+
+        /// Shows the ten rows of the canvas (the component shows only the rows of the pieces that are gone), so the layout holds the lists at their full size
+        void ShowEveryMaterialRow(UICanvasComponent& canvas) {
+            for (const char* group : kMaterialGroups) {
+                for (const char* piece : kMaterialPieces) {
+                    EXPECT_TRUE(canvas.SetElementVisible(PoolString::Intern(Format("Material{}{}Row", group, piece).c_str()), true)) << group << piece;
+                }
+            }
+        }
+
+        /// What is wrong with the canvas Material as it is laid out with all ten rows shown, one problem to a line, nothing when it is right: an element that is missing or has no rect, a list, row,
+        /// count or balance outside the margin (x 0 to 100, the rows of the board) or on top of one another, a row under kMaterialRowHeight, a count or a sign that its box cuts (the validator
+        /// does not see a Clip label's cut), and, while the box of the lists lies inside the safe area (the rule of Game/MaterialLayout.h, so the rows would be shown), a list that is not inside
+        /// the safe area; a balance box must always be inside it
+        eastl::string MaterialProblems(const UICanvasLayout& layout) {
+            eastl::string problems;
+            const float scale = layout.GetResolved().scale;
+            const Rect safe = layout.GetResolved().safeBounds;
+            const bool listsFit = MaterialListFits(safe.x, safe.y, safe.x + safe.w, safe.y + safe.h);
+            const Rect margin{0.0f, kBoardTop, kMaterialMarginRight, kBoardBottom - kBoardTop};
+
+            const auto find = [&](const eastl::string& name) -> const UIElement* {
+                const UIElement* element = layout.root->FindByName(PoolString::Intern(name.c_str()));
+                if (element == nullptr) {
+                    problems += Format("{} is missing\n", name.c_str());
+                } else if (element->rect.IsEmpty()) {
+                    problems += Format("{} has an empty rect\n", name.c_str());
+                    return nullptr;
+                }
+                return element;
+            };
+            const auto place = [&](const UIElement& element, bool inSafeArea) {
+                if (!LiesIn(element.rect, margin)) {
+                    problems += Format("{} ({:.1f}, {:.1f}, {:.1f}, {:.1f}) leaves the margin (x 0 to {:.0f}, y {:.0f} to {:.0f})\n", element.name.ToStringView(), element.rect.x, element.rect.y,
+                                       element.rect.w, element.rect.h, margin.w, margin.y, margin.y + margin.h);
+                }
+                if (inSafeArea && !LiesIn(element.rect, safe)) {
+                    problems += Format("{} ({:.1f}, {:.1f}, {:.1f}, {:.1f}) leaves the safe area ({:.1f}, {:.1f}, {:.1f}, {:.1f})\n", element.name.ToStringView(), element.rect.x, element.rect.y,
+                                       element.rect.w, element.rect.h, safe.x, safe.y, safe.w, safe.h);
+                }
+            };
+            const auto fits = [&](const UIElement& element) {
+                const UIContentFit fit = element.CheckContent(element.rect.w, element.rect.h, scale);
+                if (fit.hasContent && !fit.fits) {
+                    problems += Format("{} cuts '{}': {:.1f} x {:.1f} units at scale {:.3f}\n", element.name.ToStringView(), ShownText(element).c_str(), element.rect.w, element.rect.h, scale);
+                }
+            };
+
+            float previousListBottom = -1.0f;
+            for (const char* group : kMaterialGroups) {
+                const UIElement* list = find(Format("Material{}List", group));
+                if (list != nullptr) {
+                    place(*list, listsFit);
+                    if (list->rect.y < previousListBottom) {
+                        problems += Format("{} ({:.1f}) starts above the end of the list before it ({:.1f})\n", list->name.ToStringView(), list->rect.y, previousListBottom);
+                    }
+                    previousListBottom = list->rect.y + list->rect.h;
+                }
+                float previousRowBottom = -1.0f;
+                for (const char* piece : kMaterialPieces) {
+                    const UIElement* row = find(Format("Material{}{}Row", group, piece));
+                    const UIElement* icon = find(Format("Material{}{}Icon", group, piece));
+                    const UIElement* count = find(Format("Material{}{}Count", group, piece));
+                    if (row == nullptr) {
+                        continue;
+                    }
+                    place(*row, listsFit);
+                    if (row->rect.h < kMaterialRowHeight - kPixelTolerance) {
+                        problems += Format("{} is {:.1f} units high, under {:.0f}\n", row->name.ToStringView(), row->rect.h, kMaterialRowHeight);
+                    }
+                    if (row->rect.y < previousRowBottom - kPixelTolerance) {
+                        problems += Format("{} starts at {:.1f}, above the end of the row before it ({:.1f})\n", row->name.ToStringView(), row->rect.y, previousRowBottom);
+                    }
+                    previousRowBottom = row->rect.y + row->rect.h;
+                    if (list != nullptr && !LiesIn(row->rect, list->rect)) {
+                        problems += Format("{} is not inside its list\n", row->name.ToStringView());
+                    }
+                    for (const UIElement* part : {icon, count}) {
+                        if (part != nullptr && !LiesIn(part->rect, row->rect)) {
+                            problems += Format("{} is not inside its row\n", part->name.ToStringView());
+                        }
+                    }
+                    if (icon != nullptr && count != nullptr && icon->rect.x + icon->rect.w > count->rect.x + kPixelTolerance) {
+                        problems += Format("{} and {} overlap\n", icon->name.ToStringView(), count->name.ToStringView());
+                    }
+                    if (icon != nullptr && icon->Cast<UIImage>() == nullptr) {
+                        problems += Format("{} is not a UIImage\n", icon->name.ToStringView());
+                    }
+                    if (count != nullptr) {
+                        fits(*count);
+                    }
+                }
+                if (const UIElement* balance = find(Format("Material{}Balance", group))) {
+                    place(*balance, true);
+                    fits(*balance);
+                    if (list != nullptr && balance->rect.x < list->rect.x + list->rect.w) {
+                        problems += Format("{} touches {}\n", balance->name.ToStringView(), list->name.ToStringView());
+                    }
+                }
+            }
+            return problems;
+        }
+
+        /// The rects of the canvas Material that are on the screen (a row with a rect, a balance) against the controls of the canvas @p other (a label or a button with a rect): the pairs closer than
+        /// @p gap, one to a line
+        eastl::string MaterialClearance(const UICanvasLayout& material, const UICanvasLayout& other, float gap) {
+            eastl::string problems;
+            eastl::vector<const UIElement*> mine;
+            for (const char* group : kMaterialGroups) {
+                for (const char* piece : kMaterialPieces) {
+                    mine.push_back(material.root->FindByName(PoolString::Intern(Format("Material{}{}Row", group, piece).c_str())));
+                }
+                mine.push_back(material.root->FindByName(PoolString::Intern(Format("Material{}Balance", group).c_str())));
+            }
+            for (const UIElement* element : mine) {
+                if (element == nullptr || element->rect.IsEmpty()) {
+                    continue;
+                }
+                for (const UIElement* control : AllElements(*other.root)) {
+                    if ((control->Cast<UILabel>() || control->Cast<UIButton>()) && !control->rect.IsEmpty() && Touch(element->rect, control->rect, gap)) {
+                        problems += Format("{} ({:.1f}, {:.1f}, {:.1f}, {:.1f}) and {} ({:.1f}, {:.1f}, {:.1f}, {:.1f}) are closer than {:.0f} units\n", element->name.ToStringView(), element->rect.x,
+                                           element->rect.y, element->rect.w, element->rect.h, control->name.ToStringView(), control->rect.x, control->rect.y, control->rect.w, control->rect.h, gap);
+                    }
                 }
             }
             return problems;
@@ -1043,6 +1211,31 @@ namespace BECore::Chess::Tests {
                 PublishCoordinateRound(round);
                 OnEveryCaseOfTheMatrix(layout, [&](const eastl::string& label, const UICanvasLayout& laidOut) {
                     const eastl::string problems = BoardLabelProblems(laidOut);
+                    if (!problems.empty() && reported++ < reportedCases) {
+                        report += Format("round {}, {}:\n{}", round, label.c_str(), problems.c_str());
+                    }
+                });
+            }
+            return report;
+        }
+
+        /// The context a case of the size matrix lays a canvas out in: the view of the scene, and the window and the safe area of the case
+        UILayoutContext ContextOf(const UIMatrixCase& matrixCase) const {
+            UILayoutContext context = ViewContext();
+            context.outputWidth = matrixCase.context.outputWidth;
+            context.outputHeight = matrixCase.context.outputHeight;
+            context.safeArea = matrixCase.context.safeArea;
+            return context;
+        }
+
+        /// MaterialProblems() on every case of the matrix for the first @p rounds rounds of words (rows already shown): the lines of the first @p reportedCases cases that have any
+        eastl::string MaterialProblemsOnMatrix(UICanvasLayout& layout, size_t rounds = kMaterialRounds, size_t reportedCases = kReportedCases) const {
+            eastl::string report;
+            size_t reported = 0;
+            for (size_t round = 0; round < rounds; ++round) {
+                PublishMaterialRound(round);
+                OnEveryCaseOfTheMatrix(layout, [&](const eastl::string& label, const UICanvasLayout& laidOut) {
+                    const eastl::string problems = MaterialProblems(laidOut);
                     if (!problems.empty() && reported++ < reportedCases) {
                         report += Format("round {}, {}:\n{}", round, label.c_str(), problems.c_str());
                     }
@@ -4225,7 +4418,7 @@ namespace BECore::Chess::Tests {
 
     // ---- the promotion panel: the layout ---------------------------------------------------------------------------------------------
     // The checks of the opponent panel on the node PromotionPanel: the validator on the size matrix, no word cut on any case and in the narrowest window, the touch targets, the plate
-    // inside the view, the words and ids held to the table of PromotionChoices, the names of the four canvases apart and broken copies. The panel has no HTML + CSS twin in
+    // inside the view, the words and ids held to the table of PromotionChoices, the names of the five canvases apart and broken copies. The panel has no HTML + CSS twin in
     // ChessHudWebTest: that file holds the HUD and the opponent panel, and the web front end has no entry for this panel yet
 
     TEST_F(ChessUiTest, ThePromotionPanelPassesTheSizeMatrix) {
@@ -4458,7 +4651,6 @@ namespace BECore::Chess::Tests {
         constexpr const char* kEightPawnsAgainstNothing = "4k3/8/8/8/8/8/PPPPPPPP/4K3 w - - 0 1";                   // White: king and eight pawns, Black: a bare king
         constexpr const char* kEmptyMaterialWords = "||||||||||||";                                                 // twelve variables, each followed by "|"
         const Color kMaterialChipColor{232, 210, 170, 255};                                                         // the fill of a row (SceneConfig.xml)
-        constexpr float kMaterialMarginRight = 100.0f;                                                              // the left margin ends where the board begins
 
         bool FenSetsTheState(const char* fen) {
             Json request = Json::object();
@@ -4478,8 +4670,10 @@ namespace BECore::Chess::Tests {
             }
             return -1;
         };
+        for (const char* name : {"Board", "BoardCoordinates", "Material", "Result", "Hud", "OpponentPanel", "PromotionPanel"}) {
+            ASSERT_GE(indexOf(name), 0) << "the scene has the node " << name;
+        }
         const auto layerOf = [&](const char* name) { return nodes[static_cast<size_t>(indexOf(name))]->GetLayer(); };
-        ASSERT_GE(indexOf("Material"), 0);
         EXPECT_EQ(layerOf("Material"), 5);
         EXPECT_GT(indexOf("Material"), indexOf("BoardCoordinates")) << "written after the coordinates";
         EXPECT_GT(layerOf("Material"), 0) << "over the pieces (layer 0)";
@@ -4509,15 +4703,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(canvas);
         const UIElement& root = canvas->GetRoot();
         ASSERT_EQ(root.children.size(), 4u) << "two lists and two balances";
-        eastl::vector<const UIElement*> everything;
-        const std::function<void(const UIElement&)> collect = [&](const UIElement& element) {
-            everything.push_back(&element);
-            for (const auto& child : element.children) {
-                collect(*child);
-            }
-        };
-        collect(root);
-        for (const UIElement* element : everything) {
+        for (const UIElement* element : AllElements(root)) {
             EXPECT_FALSE(element->blocksInput) << element->name.CStr();
             EXPECT_FALSE(element->interactive) << element->name.CStr();
             if (element != &root) {
@@ -4791,15 +4977,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(canvas);
 
         // a hit test of the canvas finds nothing at the middle of any element, whether it is shown or not
-        eastl::vector<const UIElement*> everything;
-        const std::function<void(const UIElement&)> collect = [&](const UIElement& element) {
-            everything.push_back(&element);
-            for (const auto& child : element.children) {
-                collect(*child);
-            }
-        };
-        collect(canvas->GetRoot());
-        for (const UIElement* element : everything) {
+        for (const UIElement* element : AllElements(canvas->GetRoot())) {
             const Rect& rect = element->rect;
             EXPECT_EQ(canvas->GetLayout().HitTest(rect.x + rect.w * 0.5f, rect.y + rect.h * 0.5f), nullptr) << element->name.CStr();
         }
@@ -4906,7 +5084,7 @@ namespace BECore::Chess::Tests {
             EXPECT_FALSE(drawn.overflowed) << lead;
             EXPECT_FALSE(drawn.truncated) << lead;
             EXPECT_LE(drawn.width, balance.rect.w * scale + kPixelTolerance) << lead << " is inside its box";
-            EXPECT_GE(drawn.fontSize, std::floor(balance.minFontSize * scale)) << lead << " is not under the smallest size";
+            EXPECT_GE(drawn.fontSize, std::ceil(balance.minFontSize * scale)) << lead << " is not under the smallest whole size (AutoFit rounds the smallest up: 7 px for 12 units at 0.571)";
             EXPECT_LE(drawn.fontSize, std::ceil(balance.GetFontSize() * scale)) << lead;
         }
 
@@ -4956,6 +5134,304 @@ namespace BECore::Chess::Tests {
         }
         EXPECT_EQ(checked, 198u);
         layout.Invalidate();
+    }
+
+    // ---- the captured material: the layout ---------------------------------------------------------------------------------------------
+    // The checks of the coordinates and of the panels on the node Material: the validator on the size matrix and the content of every box, with every count word and every sign, the narrowest
+    // window alone, the shown rects against the margin, the HUD and the coordinate labels, the aspect of an icon, and broken copies built from the text of the shipped XML. The rows are shown
+    // by hand for the matrix (the component shows only the rows of the pieces that are gone), so the lists are laid out at their full size
+
+    namespace {
+
+        /// The elements of the canvas Material as the shipped XML has them, with the rows shown (the copies of the tests start from this text)
+        std::string ShownMaterialXml() {
+            std::string xml = ShippedElementsXml("Material");
+            const std::string hidden = " visible=\"false\"";
+            for (size_t at = xml.find(hidden); at != std::string::npos; at = xml.find(hidden)) {
+                xml.erase(at, hidden.size());
+            }
+            return xml;
+        }
+
+    }  // namespace
+
+    TEST_F(ChessUiTest, TheMaterialCanvasHasTheElementsAndTheOrderOfTheScene) {
+        const auto canvas = Material();
+        ASSERT_TRUE(canvas);
+        eastl::vector<eastl::string> expected;
+        for (const char* group : kMaterialGroups) {
+            expected.push_back(Format("Material{}List", group));
+            for (const char* piece : kMaterialPieces) {
+                expected.push_back(Format("Material{}{}Row", group, piece));
+                expected.push_back(Format("Material{}{}Icon", group, piece));
+                expected.push_back(Format("Material{}{}Count", group, piece));
+            }
+            expected.push_back(Format("Material{}Balance", group));
+        }
+        const eastl::vector<const UIElement*> elements = AllElements(canvas->GetRoot());
+        ASSERT_EQ(elements.size(), 35u) << "the root and 2 lists, 10 rows, 10 icons, 10 counts and 2 balances";
+        size_t stacks = 0;
+        size_t images = 0;
+        size_t labels = 0;
+        for (size_t index = 0; index < expected.size(); ++index) {
+            const UIElement& element = *elements[index + 1];
+            EXPECT_EQ(element.name, PoolString::Intern(expected[index].c_str())) << "element " << index << " in the order of the scene: list, rows (row, icon, count), balance";
+            stacks += element.Cast<UIStack>() != nullptr ? 1 : 0;
+            images += element.Cast<UIImage>() != nullptr ? 1 : 0;
+            labels += element.Cast<UILabel>() != nullptr ? 1 : 0;
+        }
+        EXPECT_EQ(stacks, 12u) << "two lists and ten rows";
+        EXPECT_EQ(images, 10u);
+        EXPECT_EQ(labels, 12u) << "ten counts and two balances";
+    }
+
+    TEST_F(ChessUiTest, TheMaterialCanvasPassesTheSizeMatrixWithEveryCountAndEverySign) {
+        Draw();
+        auto canvas = Material();
+        ASSERT_TRUE(canvas);
+        canvas->UpdateLayout(1280.0f, 720.0f);  // the reflected fields of the component reach the layout on its first update
+        ShowEveryMaterialRow(*canvas);
+
+        UILayoutValidatorOptions options;
+        options.minTouchSize = CoreManager::GetUIEnvironment().GetSettings().minTouchSize;
+        for (size_t round = 0; round < kMaterialRounds; ++round) {
+            PublishMaterialRound(round);
+            const auto failures = ValidateOnMatrix(canvas->GetLayout(), options, ViewContext());
+            ASSERT_TRUE(failures.empty()) << "round " << round << ": " << DescribeMatrixFailures(failures).c_str();
+        }
+        const eastl::string problems = MaterialProblemsOnMatrix(canvas->GetLayout());
+        EXPECT_TRUE(problems.empty()) << problems.c_str();
+    }
+
+    TEST_F(ChessUiTest, TheLongestCountWordOfTheMatrixIsTheMostARowCanShow) {
+        // Two bare kings: everything else is gone. The summary is where the largest count comes from; the matrix lays out every word up to it
+        const Position bare = PositionFromFen("4k3/8/8/8/8/8/8/4K3 w - - 0 1");
+        const MaterialSummary summary = SummarizeMaterial(bare);
+        int most = 0;
+        for (const PieceColor color : {PieceColor::White, PieceColor::Black}) {
+            for (const PieceType type : CapturableTypes()) {
+                most = std::max(most, summary.GetMissing(color, type));
+            }
+        }
+        EXPECT_EQ(most, kMostCaptured) << "the pawns: the longest count word is 'x" << most << "'";
+    }
+
+    TEST_F(ChessUiTest, TheListsAreHiddenOnlyInTheWindowsWhoseSideInsetsTakeTheMarginOfTheView) {
+        Draw();
+        auto canvas = Material();
+        ASSERT_TRUE(canvas);
+        canvas->UpdateLayout(1280.0f, 720.0f);
+        UICanvasLayout& layout = canvas->GetLayout();
+
+        size_t hidden = 0;
+        size_t shown = 0;
+        eastl::string hiddenCases;
+        for (const UIMatrixCase& matrixCase : UILayoutMatrix()) {
+            layout.Update(ContextOf(matrixCase));
+            const Rect safe = layout.GetResolved().safeBounds;
+            const bool fits = MaterialListFits(safe.x, safe.y, safe.x + safe.w, safe.y + safe.h);
+            const bool sideInsets = matrixCase.label.find("side insets") != eastl::string::npos;
+            if (!fits) {
+                EXPECT_TRUE(sideInsets) << matrixCase.label.c_str() << ": only side insets take the margin (a notch takes the top 7 % of the short side, which is above the lists)";
+                EXPECT_GT(safe.x, kMaterialListLeft) << matrixCase.label.c_str();
+                ++hidden;
+                hiddenCases += Format("  {} (safe area from x = {:.1f})\n", matrixCase.label.c_str(), safe.x);
+            } else {
+                ++shown;
+                EXPECT_LE(safe.x, kMaterialListLeft) << matrixCase.label.c_str();
+            }
+        }
+        layout.Invalidate();
+        // The inset is 9 % of the short side in pixels: in a window as wide as the view it is 75.6 units whatever the size, in a wider window the bars at the sides of the view are wider than the
+        // inset
+        EXPECT_GT(hidden, 0u) << "the narrowest window of the matrix is one of them";
+        EXPECT_GT(shown, hidden);
+        std::cout << "[   INFO   ] the lists are hidden in " << hidden << " of " << hidden + shown << " cases of the size matrix:\n" << hiddenCases.c_str();
+    }
+
+    TEST_F(ChessUiTest, NoMaterialElementIsCutOrOutOfPlaceInTheNarrowestWindow) {
+        Draw();
+        auto canvas = Material();
+        ASSERT_TRUE(canvas);
+        canvas->UpdateLayout(1280.0f, 720.0f);
+        ShowEveryMaterialRow(*canvas);
+        UICanvasLayout& layout = canvas->GetLayout();
+        LayOutInTheNarrowestWindow(layout);
+        const Rect safe = layout.GetResolved().safeBounds;
+        EXPECT_NEAR(safe.x, 75.6f, 0.2f) << "9 % of 480 px at the fit scale 0.571";
+        EXPECT_FALSE(MaterialListFits(safe.x, safe.y, safe.x + safe.w, safe.y + safe.h)) << "the lists are hidden here: the component shows no row";
+
+        for (size_t round = 0; round < kMaterialRounds; ++round) {
+            PublishMaterialRound(round);
+            const eastl::string problems = MaterialProblems(layout);
+            ASSERT_TRUE(problems.empty()) << "round " << round << ":\n" << problems.c_str();
+        }
+        // The balance boxes are the part that stays: inside the safe area, inside the margin, clear of the board (x 100) and of the coordinate labels (x 102)
+        for (const char* group : kMaterialGroups) {
+            const UIElement& balance = MaterialElement(Format("Material{}Balance", group).c_str());
+            EXPECT_GE(balance.rect.x, safe.x) << group;
+            EXPECT_LE(balance.rect.x + balance.rect.w, kMaterialMarginRight) << group;
+        }
+        layout.Invalidate();
+    }
+
+    TEST_F(ChessUiTest, TheShownMaterialIsClearOfTheHudAndTheCoordinateLabelsOnTheSizeMatrix) {
+        Draw();
+        auto material = Material();
+        auto hud = Hud();
+        auto coordinates = Coordinate();
+        ASSERT_TRUE(material);
+        ASSERT_TRUE(hud);
+        ASSERT_TRUE(coordinates);
+        material->UpdateLayout(1280.0f, 720.0f);
+        hud->UpdateLayout(1280.0f, 720.0f);
+        coordinates->UpdateLayout(1280.0f, 720.0f);
+        ShowEveryMaterialRow(*material);
+        PublishMaterialRound(0);
+
+        size_t notchCasesWithAnOverlap = 0;
+        size_t notchCases = 0;
+        for (const UIMatrixCase& matrixCase : UILayoutMatrix()) {
+            const UILayoutContext context = ContextOf(matrixCase);
+            material->GetLayout().Update(context);
+            hud->GetLayout().Update(context);
+            coordinates->GetLayout().Update(context);
+            const eastl::string labels = MaterialClearance(material->GetLayout(), coordinates->GetLayout(), 1.0f);
+            EXPECT_TRUE(labels.empty()) << matrixCase.label.c_str() << ":\n" << labels.c_str();
+            const eastl::string controls = MaterialClearance(material->GetLayout(), hud->GetLayout(), kMinGap);
+            if (matrixCase.label.find("notch") != eastl::string::npos) {
+                ++notchCases;
+                notchCasesWithAnOverlap += controls.empty() ? 0 : 1;
+            } else {
+                EXPECT_TRUE(controls.empty()) << matrixCase.label.c_str() << ":\n" << controls.c_str();
+            }
+        }
+        material->GetLayout().Invalidate();
+        hud->GetLayout().Invalidate();
+        coordinates->GetLayout().Invalidate();
+        // The HUD keeps clear of the safe area, and a notch pushes its top row down by 7 % of the short side, onto the first row of the margin (as it does onto the board: CLAUDE.md, "The HUD")
+        std::cout << "[   INFO   ] the HUD reaches the top group in " << notchCasesWithAnOverlap << " of " << notchCases << " notch cases\n";
+    }
+
+    TEST_F(ChessUiTest, TheShownMaterialStaysInTheMarginAndClearOfTheHudAndTheCoordinatesInFiveWindowShapes) {
+        StartFrom("4k3/8/8/8/8/8/8/4K3 w - - 0 1");
+        for (const auto& size : {std::pair{1280.0f, 720.0f}, std::pair{720.0f, 1280.0f}, std::pair{1024.0f, 768.0f}, std::pair{800.0f, 800.0f}, std::pair{2560.0f, 1080.0f}}) {
+            SCOPED_TRACE(Format("{}x{}", size.first, size.second).c_str());
+            DrawAt(size.first, size.second);
+            DrawAt(size.first, size.second);  // the rows wait for the first layout
+            ASSERT_EQ(ShownMaterialRows(), "TopQueen TopRook TopBishop TopKnight TopPawn BottomQueen BottomRook BottomBishop BottomKnight BottomPawn") << "two bare kings: everything is gone";
+            const UICanvasLayout& material = Material()->GetLayout();
+            EXPECT_EQ(MaterialProblems(material), "");
+            EXPECT_EQ(MaterialClearance(material, Hud()->GetLayout(), kMinGap), "") << "no safe area: the HUD is in the margins above and below the board";
+            EXPECT_EQ(MaterialClearance(material, Coordinate()->GetLayout(), 1.0f), "");
+            for (const char* group : kMaterialGroups) {
+                for (const char* piece : kMaterialPieces) {
+                    const Rect& rect = MaterialRow(group, piece).rect;
+                    EXPECT_LE(rect.x + rect.w, kMaterialMarginRight) << group << piece << " does not reach the board";
+                    EXPECT_GE(rect.x, 0.0f) << group << piece;
+                }
+            }
+        }
+    }
+
+    TEST_F(ChessUiTest, AnIconKeepsTheAspectOfItsAtlasCellCenteredInsideItsRow) {
+        // The library is empty in the test, so every icon is given the atlas of the pieces and a cell of it by hand; UIImage fits the cell into its rect
+        StartFrom("4k3/8/8/8/8/8/8/4K3 w - - 0 1");
+        const eastl::vector<uint8_t> pixels(static_cast<size_t>(kAtlasWidth) * kAtlasHeight * 4, 0);
+        const IntrusivePtr<ITexture> atlas = _renderer->CreateTexture(pixels.data(), kAtlasWidth, kAtlasHeight);
+        for (const char* group : kMaterialGroups) {
+            for (const char* piece : kMaterialPieces) {
+                UIImage* icon = MaterialElement(Format("Material{}{}Icon", group, piece).c_str()).Cast<UIImage>();
+                ASSERT_NE(icon, nullptr) << group << piece;
+                icon->GetSprite().SetTexture(atlas, Rect{kCellX, 0.0f, kCellWidth, kCellHeight});
+            }
+        }
+
+        for (const auto& size : {std::pair{1280.0f, 720.0f}, std::pair{720.0f, 1280.0f}}) {
+            SCOPED_TRACE(Format("{}x{}", size.first, size.second).c_str());
+            DrawAt(size.first, size.second);
+            _renderer->calls.clear();
+            DrawAt(size.first, size.second);
+            ASSERT_NE(ShownMaterialRows(), "");
+            eastl::vector<const DrawCall*> drawn;
+            for (const DrawCall& call : _renderer->calls) {
+                if (call.kind == DrawKind::Texture && call.texture == atlas.Get()) {
+                    drawn.push_back(&call);
+                }
+            }
+            ASSERT_EQ(drawn.size(), 10u) << "one picture per icon, in the order of the scene";
+            size_t index = 0;
+            for (const char* group : kMaterialGroups) {
+                for (const char* piece : kMaterialPieces) {
+                    SCOPED_TRACE(Format("{}{}", group, piece).c_str());
+                    const Rect& call = drawn[index++]->rect;
+                    const Rect box = OutputRect(MaterialElement(Format("Material{}{}Icon", group, piece).c_str()).rect);
+                    EXPECT_NEAR(call.w / call.h, kCellWidth / kCellHeight, 0.01f) << "the aspect of the atlas cell, not of the 26-unit box";
+                    EXPECT_GE(call.x, box.x - 0.5f);
+                    EXPECT_GE(call.y, box.y - 0.5f);
+                    EXPECT_LE(call.x + call.w, box.x + box.w + 0.5f) << "inside its box";
+                    EXPECT_LE(call.y + call.h, box.y + box.h + 0.5f);
+                    EXPECT_NEAR(call.x + call.w * 0.5f, box.x + box.w * 0.5f, 0.5f) << "centered";
+                    EXPECT_NEAR(call.y + call.h * 0.5f, box.y + box.h * 0.5f, 0.5f);
+                    EXPECT_NEAR(call.h, box.h, 0.5f) << "the cell is tall: the height of the box is the limit, and the picture fills it";
+                }
+            }
+        }
+    }
+
+    TEST_F(ChessUiTest, ABrokenCopyOfTheMaterialCanvasIsCaughtByTheChecks) {
+        Draw();
+        const std::string shipped = ShownMaterialXml();
+        ASSERT_FALSE(shipped.empty());
+        auto hud = Hud();
+        ASSERT_TRUE(hud);
+        hud->UpdateLayout(1280.0f, 720.0f);
+        const auto problemsOf = [&](const std::string& xml) {
+            CanvasCopy copy(xml, false);
+            return MaterialProblemsOnMatrix(copy.layout, 3, 100000);
+        };
+
+        EXPECT_EQ(problemsOf(shipped), "") << "the same checks pass on the shipped canvas";
+
+        std::string wide = shipped;
+        ASSERT_NO_FATAL_FAILURE(Replace(wide, R"(name="MaterialTopList" x="8" y="84" width="64")", R"(name="MaterialTopList" x="8" y="84" width="104")"));
+        EXPECT_NE(problemsOf(wide).find("MaterialTopList (8.0, 84.0, 104.0"), eastl::string::npos) << "a list that reaches the board leaves the margin";
+
+        std::string bigFont = shipped;
+        ASSERT_NO_FATAL_FAILURE(Replace(bigFont, R"(text="{materialTopQueen}" fontSize="20")", R"(text="{materialTopQueen}" fontSize="60")"));
+        EXPECT_NE(problemsOf(bigFont).find("MaterialTopQueenCount cuts"), eastl::string::npos) << "a font of 60 does not fit the count box";
+
+        std::string smallBox = shipped;
+        ASSERT_NO_FATAL_FAILURE(Replace(smallBox, R"(name="MaterialTopBalance" x="77" y="84" width="23")", R"(name="MaterialTopBalance" x="77" y="84" width="8")"));
+        EXPECT_NE(problemsOf(smallBox).find("MaterialTopBalance cuts"), eastl::string::npos) << "a balance box of 8 units cuts the sign even at the smallest size";
+
+        std::string lowRow = shipped;
+        ASSERT_NO_FATAL_FAILURE(Replace(lowRow, R"(name="MaterialTopQueenRow" height="40")", R"(name="MaterialTopQueenRow" height="20")"));
+        EXPECT_NE(problemsOf(lowRow).find("MaterialTopQueenRow is 20.0 units high"), eastl::string::npos);
+
+        std::string missing = shipped;
+        ASSERT_NO_FATAL_FAILURE(Replace(missing, R"(name="MaterialTopPawnRow")", R"(name="MaterialTopPawnRowX")"));
+        EXPECT_NE(problemsOf(missing).find("MaterialTopPawnRow is missing"), eastl::string::npos);
+
+        // A list that moved up under the first row of the HUD: the clearance against the HUD finds it, in a window without insets
+        std::string underTheHud = shipped;
+        ASSERT_NO_FATAL_FAILURE(Replace(underTheHud, R"(name="MaterialTopList" x="8" y="84")", R"(name="MaterialTopList" x="8" y="20")"));
+        CanvasCopy moved(underTheHud, false);
+        EXPECT_NE(problemsOf(underTheHud).find("MaterialTopList (8.0, 20.0"), eastl::string::npos) << "above the rows of the board";
+        const UIMatrixCase* plain = nullptr;
+        for (const UIMatrixCase& matrixCase : UILayoutMatrix()) {
+            if (matrixCase.label == "16:9 1280x720 no insets") {
+                plain = &matrixCase;
+            }
+        }
+        ASSERT_NE(plain, nullptr);
+        moved.layout.Update(ContextOf(*plain));
+        hud->GetLayout().Update(ContextOf(*plain));
+        EXPECT_NE(MaterialClearance(moved.layout, hud->GetLayout(), kMinGap).find("MaterialTopQueenRow"), eastl::string::npos) << "the first row is on the Turn label";
+        CanvasCopy fine(shipped, false);
+        fine.layout.Update(ContextOf(*plain));
+        EXPECT_EQ(MaterialClearance(fine.layout, hud->GetLayout(), kMinGap), "");
+        hud->GetLayout().Invalidate();
     }
 
 }  // namespace BECore::Chess::Tests
