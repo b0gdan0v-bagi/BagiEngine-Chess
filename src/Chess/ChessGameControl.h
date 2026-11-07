@@ -39,8 +39,9 @@ namespace BECore::Chess {
      * material is {"balance", "capturedByWhite", "capturedByBlack"}, derived from the position at every call (it has no version of its own; a move that
      * changes it changes the state version anyway): balance is White's points minus Black's on the board (pawn 1, knight 3, bishop 3, rook 5, queen 9; a
      * piece made by a promotion counts, so it is not a count of what was taken), positive when White is ahead; capturedByWhite is the Black pieces that are gone
-     * and capturedByBlack the White ones, each {"queen", "rook", "bishop", "knight", "pawn"} with a count (never negative). Position-only: a pawn that
-     * promoted counts as a pawn that is gone, and a promoted piece that is taken later shows as a missing pawn.
+     * and capturedByBlack the White ones, each {"queen", "rook", "bishop", "knight", "pawn"} with a count (never negative). Position-only: a piece beyond
+     * the starting set is a promoted pawn (it counts in the points and is not a missing pawn), a pawn that promoted into a piece that was missing shows as
+     * a pawn gone, and a promoted piece that is taken later shows as a missing pawn.
      *
      * Actions: {"type": "move", "uci": "e2e4"}, every legal move once; none once the game is over. The list does not change with the opponent: the program's
      * side is listed and accepted like the other (a controller may play for it; a search that the move makes stale is dropped). Castling is the king's move

@@ -21,13 +21,14 @@ namespace BECore::Chess {
     /**
      * @brief What a position says about the material: which pieces of each color are gone and how many points each side has on the board.
      *
-     * Position-only: the history is not known, so a promoted pawn is a pawn that is gone (and the new piece is on the board), and a promoted piece that is
-     * taken later shows as a missing pawn, not as a missing queen. Counts are never negative, also for a position the rules cannot reach.
+     * Position-only: the history is not known, so a piece beyond the starting set is a promoted pawn (it counts in the points and is not a missing pawn),
+     * a pawn that promoted into a piece that was missing shows as a pawn that is gone, and a promoted piece that is taken later shows as a missing pawn, not
+     * as a missing queen. Counts are never negative, also for a position the rules cannot reach.
      */
     class MaterialSummary {
     public:
-        /// How many pieces of @p type of @p color are gone (taken, or turned into another piece by a promotion; for a pawn the promotions are not counted twice).
-        /// 0 for a type that is not capturable
+        /// How many pieces of @p type of @p color are gone: the starting set minus the board (for a pawn also minus the promoted pawns, the pieces beyond
+        /// the starting set of the other types). 0 for a type that is not capturable
         [[nodiscard]] int GetMissing(PieceColor color, PieceType type) const;
 
         /// The points of the pieces @p color has on the board (the king does not count; a piece made by a promotion does)

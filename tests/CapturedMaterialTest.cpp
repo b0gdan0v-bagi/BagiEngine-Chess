@@ -25,38 +25,6 @@ namespace BECore::Chess::Tests {
             return SummarizeMaterial(PositionFromFen(fen));
         }
 
-        /// The same position with the colors swapped: ranks flipped, case swapped, the other side to move; castling rights and en passant dropped
-        /// (they play no part in the material)
-        std::string MirrorFen(eastl::string_view fen) {
-            const std::string text(fen.data(), fen.size());
-            const size_t end = text.find(' ');
-            std::vector<std::string> ranks;
-            size_t begin = 0;
-            while (true) {
-                const size_t slash = text.find('/', begin);
-                if (slash == std::string::npos || slash > end) {
-                    ranks.push_back(text.substr(begin, end - begin));
-                    break;
-                }
-                ranks.push_back(text.substr(begin, slash - begin));
-                begin = slash + 1;
-            }
-
-            std::string placement;
-            for (auto rank = ranks.rbegin(); rank != ranks.rend(); ++rank) {
-                if (!placement.empty()) {
-                    placement.push_back('/');
-                }
-                for (const char c : *rank) {
-                    const bool upper = c >= 'A' && c <= 'Z';
-                    const bool lower = c >= 'a' && c <= 'z';
-                    placement.push_back(upper ? static_cast<char>(c - 'A' + 'a') : lower ? static_cast<char>(c - 'a' + 'A') : c);
-                }
-            }
-            const char side = text[end + 1] == 'w' ? 'b' : 'w';
-            return placement + " " + side + " - - 0 1";
-        }
-
         /// The move of the mirrored position: ranks flipped ("a7a8q" -> "a2a1q")
         std::string MirrorUci(eastl::string_view uci) {
             std::string mirrored(uci.data(), uci.size());
@@ -97,7 +65,7 @@ namespace BECore::Chess::Tests {
 
     // ---- Values and ids ----
 
-    TEST(CapturedMaterialTest, MaterialPointssArePinned) {
+    TEST(CapturedMaterialTest, MaterialPointsArePinned) {
         EXPECT_EQ(MaterialPoints(PieceType::Pawn), 1);
         EXPECT_EQ(MaterialPoints(PieceType::Knight), 3);
         EXPECT_EQ(MaterialPoints(PieceType::Bishop), 3);

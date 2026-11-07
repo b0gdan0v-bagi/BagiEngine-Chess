@@ -102,7 +102,8 @@ namespace BECore::Chess {
             const auto captured = [&](PieceColor gone) {
                 Json counts = Json::object();
                 for (const PieceType type : CapturableTypes()) {
-                    counts[std::string(CapturedId(type).data(), CapturedId(type).size())] = summary.GetMissing(gone, type);
+                    const eastl::string_view id = CapturedId(type);
+                    counts[std::string(id.data(), id.size())] = summary.GetMissing(gone, type);
                 }
                 return counts;
             };

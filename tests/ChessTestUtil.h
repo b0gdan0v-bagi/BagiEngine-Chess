@@ -79,4 +79,79 @@ namespace BECore::Chess::Tests {
     inline constexpr eastl::string_view kPosition5Fen = "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8";
     inline constexpr eastl::string_view kPosition6Fen = "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10";
 
+    namespace MirrorDetail {
+
+        inline char SwapCase(char c) {
+            if (c >= 'a' && c <= 'z') {
+                return static_cast<char>(c - 'a' + 'A');
+            }
+            if (c >= 'A' && c <= 'Z') {
+                return static_cast<char>(c - 'A' + 'a');
+            }
+            return c;
+        }
+
+        inline std::vector<std::string> SplitOn(const std::string& text, char separator) {
+            std::vector<std::string> parts;
+            std::string current;
+            for (const char c : text) {
+                if (c == separator) {
+                    parts.push_back(current);
+                    current.clear();
+                } else {
+                    current.push_back(c);
+                }
+            }
+            parts.push_back(current);
+            return parts;
+        }
+
+    }  // namespace MirrorDetail
+
+    /// The same game seen from the other side of the table: ranks flipped, colors swapped, the other side to move,
+    /// the castling rights and the en passant square swapped with them
+    inline std::string MirrorFen(eastl::string_view fen) {
+        const std::vector<std::string> fields = MirrorDetail::SplitOn(std::string(fen.data(), fen.size()), ' ');
+        EXPECT_GE(fields.size(), 4U);
+
+        std::vector<std::string> ranks = MirrorDetail::SplitOn(fields[0], '/');
+        std::string placement;
+        for (auto rank = ranks.rbegin(); rank != ranks.rend(); ++rank) {
+            if (!placement.empty()) {
+                placement.push_back('/');
+            }
+            for (const char c : *rank) {
+                placement.push_back(MirrorDetail::SwapCase(c));
+            }
+        }
+
+        const std::string side = fields[1] == "w" ? "b" : "w";
+
+        std::string castling;
+        for (const char c : fields[2]) {
+            castling.push_back(MirrorDetail::SwapCase(c));
+        }
+        if (castling != "-") {
+            // The order of the letters is the FEN's: KQkq
+            std::string ordered;
+            for (const char c : std::string("KQkq")) {
+                if (castling.find(c) != std::string::npos) {
+                    ordered.push_back(c);
+                }
+            }
+            castling = ordered;
+        }
+
+        std::string enPassant = fields[3];
+        if (enPassant != "-") {
+            enPassant[1] = static_cast<char>('1' + '8' - enPassant[1]);
+        }
+
+        std::string mirrored = placement + " " + side + " " + castling + " " + enPassant;
+        for (size_t i = 4; i < fields.size(); ++i) {
+            mirrored += " " + fields[i];
+        }
+        return mirrored;
+    }
+
 }  // namespace BECore::Chess::Tests

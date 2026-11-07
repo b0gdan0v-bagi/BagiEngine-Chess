@@ -91,17 +91,19 @@ namespace BECore::Chess {
         for (const PieceColor color : {PieceColor::White, PieceColor::Black}) {
             int promoted = 0;  // pieces beyond the starting set: each one is a pawn that is not a pawn any more
             int pawns = 0;
+            int pawnStart = 0;
             for (const CapturableEntry& entry : kCapturable) {
                 const int onBoard = PopCount(position.Pieces(color, entry.type));
                 summary._points[Index(color)] += onBoard * MaterialPoints(entry.type);
                 if (entry.type == PieceType::Pawn) {
                     pawns = onBoard;
+                    pawnStart = entry.startCount;
                     continue;
                 }
                 summary._missing[Index(color)][Index(entry.type)] = eastl::max(0, entry.startCount - onBoard);
                 promoted += eastl::max(0, onBoard - entry.startCount);
             }
-            summary._missing[Index(color)][Index(PieceType::Pawn)] = eastl::max(0, 8 - pawns - promoted);
+            summary._missing[Index(color)][Index(PieceType::Pawn)] = eastl::max(0, pawnStart - pawns - promoted);
         }
         return summary;
     }

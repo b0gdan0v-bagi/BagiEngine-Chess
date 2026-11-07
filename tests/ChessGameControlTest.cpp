@@ -272,9 +272,10 @@ namespace BECore::Chess::Tests {
     TEST_F(ChessGameControlTest, MaterialDoesNotMoveTheStateVersion) {
         Perform("e2e4");
         const uint64_t before = control.GetStateVersion();
-        (void)State();
-        (void)State();
+        const Json first = State();
+        const Json second = State();
         EXPECT_EQ(control.GetStateVersion(), before);
+        EXPECT_EQ(first.dump(), second.dump()) << "reading the state twice gives the same state";
     }
 
     TEST_F(ChessGameControlTest, BoardIsEightRowsWithRankEightFirst) {
