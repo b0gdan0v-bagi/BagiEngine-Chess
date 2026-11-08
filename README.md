@@ -147,8 +147,11 @@ Stockfish is your own install (it is not shipped and no code of it is here): the
 # macOS
 python3 tools/uci_match.py --referee build/ClangmacOS/BagiChess --own build/ClangmacOS/BagiChessUci \
     --opponent /opt/homebrew/bin/stockfish --opponent-elo 1400 --opponent-elo 1700 --opponent-elo 2000 --games 20 --out match.json
+```
 
-# Windows (the interpreter is `python`)
+Windows (the interpreter is `python`; cmd syntax, `^` continues the line):
+
+```bat
 python tools/uci_match.py --referee build/MSVCWindows/Release/BagiChess.exe --own build/MSVCWindows/Release/BagiChessUci.exe ^
     --opponent C:/tools/stockfish/stockfish.exe --games 20 --out match.json
 ```

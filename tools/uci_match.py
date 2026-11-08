@@ -91,6 +91,7 @@ DEFAULT_OPPONENT_ELOS = ("1400", "1700", "2000")
 STATUS_CHECKMATE = "checkmate"
 STATUS_STALEMATE = "stalemate"
 STATUS_DRAW_PREFIX = "draw_"
+UCI_UNKNOWN_OPTION_PREFIX = "no such option"  # Stockfish answers an unknown option with `No such option: X` (no `info` prefix)
 UCI_REFUSED_MARKER = "refused"  # the server says `info string option refused: ...` and changes nothing
 
 _ELO_RANGE = re.compile(r"^option name (?P<name>.+?) type spin default (?P<default>-?\d+) min (?P<min>-?\d+) max (?P<max>-?\d+)\s*$")
@@ -167,10 +168,11 @@ def parse_own_steps(texts: list[str]) -> list[OwnStep]:
 
 
 def set_options(engine: UciEngine, options: dict[str, str], who: str) -> None:
-    """Sets the options one by one; MatchError when the engine says `info string ... refused`. An option it does not know is not checked."""
+    """Sets the options one by one; MatchError when the engine says `info string ... refused` (our server) or `No such option` (Stockfish)."""
     for name, value in options.items():
         for line in engine.set_option(name, value):
-            if line.startswith("info") and UCI_REFUSED_MARKER in line:
+            text = line.strip()
+            if (text.startswith("info") and UCI_REFUSED_MARKER in text) or text.lower().startswith(UCI_UNKNOWN_OPTION_PREFIX):
                 raise MatchError(f"the {who} engine refused 'setoption name {name} value {value}': {line}")
 
 
@@ -406,6 +408,8 @@ def run(args: argparse.Namespace) -> int:
             return fail(f"there is no own engine at {args.own}")
     if args.referee is not None and not args.referee.is_file():
         return fail(f"there is no game executable at {args.referee}")
+    if args.out is not None and args.out.is_dir():
+        return fail(f"--out {args.out} is a folder, not a file")
     if args.out is not None and not args.out.resolve().parent.is_dir():
         return fail(f"the folder of --out {args.out} does not exist")
 

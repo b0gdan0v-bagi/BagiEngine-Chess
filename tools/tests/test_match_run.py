@@ -399,6 +399,21 @@ class UciEngineTest(RunnerTestCase):
         engine.search(AFTER_OPENING, "", 5.0)
         self.assertIn("go", log.read_text().splitlines())
 
+    def test_set_options_refuses_an_unknown_option_and_a_refusal_but_not_other_lines(self):
+        class Said:
+            def __init__(self, lines):
+                self.lines = lines
+
+            def set_option(self, name, value):
+                return self.lines
+
+        uci_match.set_options(Said(["info string something else"]), {"Skill Level": "3"}, "opponent")
+        for line in ("No such option: Skil Level", "  no such option: Skil Level  ", "info string option refused: Hash"):
+            with self.assertRaises(MatchError) as caught:
+                uci_match.set_options(Said([line]), {"Skil Level": "3"}, "opponent")
+            self.assertIn("Skil Level", str(caught.exception))
+            self.assertIn(line.strip(), str(caught.exception))
+
     def test_no_move_is_none(self):
         engine, _ = self.start_engine("one", {AFTER_OPENING: None})
         self.assertIsNone(engine.search(AFTER_OPENING, "depth 1", 5.0))
@@ -432,6 +447,14 @@ class CommandLineTest(RunnerTestCase):
         code, _, err = self.run_main("--own", str(engine), "--opponent", str(engine), "--out", str(self.directory / "no-such-folder" / "match.json"))
         self.assertEqual(code, 1)
         self.assertIn("--out", err)
+
+    def test_an_out_that_is_an_existing_folder_exits_1_before_any_engine_starts(self):
+        engine = self.directory / "engine"
+        engine.write_text("")
+        code, _, err = self.run_main("--own", str(engine), "--opponent", str(engine), "--out", str(self.directory))
+        self.assertEqual(code, 1)
+        self.assertIn("--out", err)
+        self.assertIn("folder", err)
 
     def test_a_missing_opponent_engine_exits_77(self):
         own = self.directory / "own"
