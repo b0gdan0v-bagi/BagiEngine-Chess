@@ -22,6 +22,7 @@
 #include <BECore/UI/UIStack.h>
 #include <Chess/ChessGame.h>
 #include <Chess/ChessGameControl.h>
+#include <Chess/Components/ChessBoardComponent.h>
 #include <Chess/Components/ChessMaterialComponent.h>
 #include <Chess/Components/ChessPieceComponent.h>
 #include <Chess/Engine/OpponentChoice.h>
@@ -79,7 +80,8 @@ namespace BECore::Chess::Tests {
         constexpr size_t kPieceCount = 32;
         constexpr const char* kMaterialPieces[] = {"Queen", "Rook", "Bishop", "Knight", "Pawn"};  // the rows of a group of the captured material, in the order of the scene
         constexpr float kPixelTolerance = 0.01f;
-        constexpr float kGlyphTolerance = 1.0f;  // a glyph of a label is laid out to the pixel of the font, not to the unit
+        constexpr float kDragStepPixels = 20.0f;  // a first motion of a drag: well past the threshold of the board (6 view units, about 5 px here)
+        constexpr float kGlyphTolerance = 1.0f;   // a glyph of a label is laid out to the pixel of the font, not to the unit
 
         constexpr int kManyFrames = 200;                            // frames that must pass with nothing happening
         constexpr std::chrono::milliseconds kShutdownBudget{3000};  // a gated engine gives up after 10 s (kGateGiveUp): a shutdown that waited for it would not fit
@@ -908,6 +910,61 @@ namespace BECore::Chess::Tests {
         void ClickMove(const char* from, const char* to) {
             Click(from);
             Click(to);
+        }
+
+        /// A move of the pointer with the left button held or not, the way the window reports it (the UI first, then the game)
+        static void MouseMove(float x, float y, bool held) {
+            SDL_MouseMotionEvent event{};
+            event.type = SDL_EVENT_MOUSE_MOTION;
+            event.state = held ? SDL_BUTTON_LMASK : 0;
+            event.x = x;
+            event.y = y;
+            CoreManager::GetUIInput().DispatchMouseMotion(event);
+        }
+
+        /// The release of the left button at a point of the screen
+        static void Release(float x, float y) {
+            CoreManager::GetUIInput().DispatchMouseButtonUp(Button(x, y, false));
+        }
+
+        /// The release of the left button on the middle of a square
+        void ReleaseOn(const char* square) const {
+            const auto at = SquareCenter(square);
+            Release(at.first, at.second);
+        }
+
+        /// The output pixel of a point of the view in scene units, for the fit of the view into the current output
+        std::pair<float, float> PixelOf(float sceneX, float sceneY) const {
+            const Rect at = ViewTransform::Fit(kViewWidth, kViewHeight, _renderer->width, _renderer->height).ToOutput(sceneX, sceneY, 0.0f, 0.0f);
+            return {at.x, at.y};
+        }
+
+        /// A drag between two points of the screen: the press, a held motion well past the threshold, a held motion at the target and the release there
+        void DragBetween(std::pair<float, float> from, std::pair<float, float> to) {
+            Draw();
+            CoreManager::GetUIInput().DispatchMouseButtonDown(Button(from.first, from.second, true));
+            MouseMove(from.first + kDragStepPixels, from.second, true);
+            MouseMove(to.first, to.second, true);
+            Release(to.first, to.second);
+        }
+
+        /// A drag of the piece on a square to the middle of another one
+        void Drag(const char* from, const char* to) {
+            DragBetween(SquareCenter(from), SquareCenter(to));
+        }
+
+        /// The same by drawn cells (column from the left, row from the top), for the turned board
+        void DragCells(int fromColumn, int fromRow, int toColumn, int toRow) {
+            const Rect from = CellRect(fromColumn, fromRow);
+            const Rect to = CellRect(toColumn, toRow);
+            DragBetween({from.x + from.w * 0.5f, from.y + from.h * 0.5f}, {to.x + to.w * 0.5f, to.y + to.h * 0.5f});
+        }
+
+        /// What the board holds in the pointer now: none when no piece is lifted
+        static std::optional<ChessBoardComponent::LiftedPiece> Lifted() {
+            const ChessBoardComponent* board = ChessBoardComponent::GetActive();
+            EXPECT_NE(board, nullptr);
+            return board ? board->GetLiftedPiece() : std::nullopt;
         }
 
         /// What a game loop does: one frame (the update of every scene) after the other until @p done, or until the time limit; false when it ran out
@@ -5957,6 +6014,365 @@ namespace BECore::Chess::Tests {
         EXPECT_FALSE(Model().HasSelection());
         EXPECT_TRUE(Model().GetMoves().empty());
         EXPECT_EQ(Model().GetVersion(), version);
+    }
+
+    // ---- the drag --------------------------------------------------------------------------------------------------------------
+    // A press acts as a click and arms a drag; the release over a legal target plays the move through the path of a second click, a release anywhere else calls nothing on the
+    // model (the piece goes back and stays selected). Pointer events are dispatched through UIInput, like the window does, so the canvases get them first
+
+    TEST_F(ChessUiTest, ADragPlaysWhatTwoClicksPlay) {
+        const uint64_t start = Model().GetVersion();
+        ClickMove("e2", "e4");
+        const eastl::string byClicks = Model().GetPosition().ToFen();
+        ASSERT_EQ(Model().GetMoves().size(), 1u);
+        const eastl::string clickedMove = Model().GetMoves().back().ToUci();
+        EXPECT_EQ(Model().GetVersion(), start + 1);
+
+        Model().Reset();
+        const uint64_t again = Model().GetVersion();
+        Drag("e2", "e4");
+
+        EXPECT_EQ(Model().GetPosition().ToFen(), byClicks);
+        ASSERT_EQ(Model().GetMoves().size(), 1u);
+        EXPECT_EQ(Model().GetMoves().back().ToUci(), clickedMove);
+        EXPECT_EQ(Model().GetVersion(), again + 1);
+        EXPECT_FALSE(Model().HasSelection());
+        EXPECT_EQ(Model().GetTurn(), PieceColor::Black);
+        EXPECT_FALSE(Lifted().has_value());
+    }
+
+    TEST_F(ChessUiTest, ADragToTheStartSquareAndAReleaseWithoutMotionPlayNothingAndKeepTheSelection) {
+        const uint64_t version = Model().GetVersion();
+
+        Drag("e2", "e2");
+        EXPECT_TRUE(Model().GetMoves().empty());
+        ASSERT_TRUE(Model().HasSelection());
+        EXPECT_EQ(Model().GetSelected(), Sq("e2"));
+        EXPECT_EQ(Model().GetLegalMoves().size(), 2u);
+
+        Model().ClearSelection();
+        Click("e2");
+        ReleaseOn("e2");
+        EXPECT_TRUE(Model().GetMoves().empty());
+        ASSERT_TRUE(Model().HasSelection());
+        EXPECT_EQ(Model().GetSelected(), Sq("e2"));
+        EXPECT_EQ(Model().GetLegalMoves().size(), 2u);
+        EXPECT_EQ(Model().GetVersion(), version);
+    }
+
+    TEST_F(ChessUiTest, ADragOffTheBoardPlaysNothingKeepsTheSelectionAndAClickFinishesTheMove) {
+        Draw();
+        const uint64_t version = Model().GetVersion();
+        const std::pair<float, float> places[] = {
+            PixelOf(50.0f, 400.0f),   // the left margin, where the material chips are
+            PixelOf(420.0f, 770.0f),  // under the board
+            PixelOf(420.0f, 40.0f),   // above it
+            PixelOf(800.0f, 400.0f),  // the right margin
+            {5.0f, 5.0f},             // outside the view altogether
+        };
+        for (const auto& place : places) {
+            SCOPED_TRACE(place.first);
+            DragBetween(SquareCenter("e2"), place);
+            EXPECT_TRUE(Model().GetMoves().empty());
+            EXPECT_EQ(Model().GetVersion(), version);
+            ASSERT_TRUE(Model().HasSelection());
+            EXPECT_EQ(Model().GetSelected(), Sq("e2"));
+            EXPECT_EQ(Model().GetLegalMoves().size(), 2u);
+            EXPECT_FALSE(Lifted().has_value());
+        }
+
+        Click("e4");
+        ASSERT_EQ(Model().GetMoves().size(), 1u);
+        EXPECT_EQ(Model().GetMoves().back().ToUci(), "e2e4");
+    }
+
+    TEST_F(ChessUiTest, ADragToASquareThatIsNotATargetOrOntoAnotherOwnPieceKeepsTheSelectionOnTheStartSquare) {
+        const uint64_t version = Model().GetVersion();
+        for (const char* to : {"e5", "d2", "b1", "e7", "h8"}) {
+            SCOPED_TRACE(to);
+            Drag("e2", to);
+            EXPECT_TRUE(Model().GetMoves().empty());
+            EXPECT_EQ(Model().GetVersion(), version);
+            ASSERT_TRUE(Model().HasSelection());
+            EXPECT_EQ(Model().GetSelected(), Sq("e2")) << "the release did not select the piece it landed on";
+            EXPECT_EQ(Model().GetLegalMoves().size(), 2u);
+        }
+    }
+
+    TEST_F(ChessUiTest, ADragCapturesLikeTwoClicks) {
+        Drag("e2", "e4");
+        Drag("d7", "d5");
+        Drag("e4", "d5");
+
+        ASSERT_EQ(Model().GetMoves().size(), 3u);
+        EXPECT_EQ(Model().GetMoves().back().ToUci(), "e4d5");
+        EXPECT_EQ(Model().GetPieceAt(Sq("d5")).type, PieceType::Pawn);
+        EXPECT_EQ(Model().GetPieceAt(Sq("d5")).color, PieceColor::White);
+        EXPECT_TRUE(Model().GetPieceAt(Sq("e4")).IsEmpty());
+    }
+
+    TEST_F(ChessUiTest, APressOnAnotherPieceOfTheSideToMoveArmsTheDragOfThatPieceAndOtherPressesArmNothing) {
+        Click("d2");
+        ASSERT_EQ(Model().GetSelected(), Sq("d2"));
+        Draw();
+        const auto e2 = SquareCenter("e2");
+        const auto e4 = SquareCenter("e4");
+        CoreManager::GetUIInput().DispatchMouseButtonDown(Button(e2.first, e2.second, true));
+        ASSERT_EQ(Model().GetSelected(), Sq("e2"));
+        MouseMove(e2.first + kDragStepPixels, e2.second, true);
+        const auto lifted = Lifted();
+        ASSERT_TRUE(lifted.has_value());
+        EXPECT_EQ(lifted->from, Sq("e2"));
+        Release(e4.first, e4.second);
+        ASSERT_EQ(Model().GetMoves().size(), 1u);
+        EXPECT_EQ(Model().GetMoves().back().ToUci(), "e2e4");
+
+        Model().Reset();
+        // A piece of the side that is not to move, an empty square and (with a piece selected) an enemy piece arm nothing
+        Drag("e7", "e5");
+        Drag("e4", "e5");
+        Click("e2");
+        Drag("e7", "e4");
+        EXPECT_TRUE(Model().GetMoves().empty());
+        EXPECT_FALSE(Model().HasSelection()) << "the press on the enemy piece dropped the selection and the release did not make a move";
+    }
+
+    TEST_F(ChessUiTest, TheProgramsTurnTakesNoDragAndDoesNotCancelItsSearch) {
+        const auto engine = eastl::make_shared<GatedEngine>(true);
+        CountingFactory factory({engine});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        ASSERT_TRUE(Opponent().SetSide(PieceColor::Black).has_value());
+        Drag("e2", "e4");
+        ASSERT_TRUE(FramesUntil([&] { return engine->Calls() == 1; })) << "Black's program has the search and waits at its gate";
+        const uint64_t version = Model().GetVersion();
+
+        Drag("e7", "e5");
+        Drag("d7", "d5");
+        Drag("g8", "f6");
+        IdleFrames(5);
+
+        EXPECT_FALSE(Model().HasSelection());
+        EXPECT_EQ(Model().GetMoves().size(), 1u);
+        EXPECT_EQ(Model().GetVersion(), version);
+        EXPECT_TRUE(Opponent().IsThinking());
+        EXPECT_FALSE(engine->WasCancelled());
+        EXPECT_EQ(engine->Calls(), 1);
+        EXPECT_FALSE(Lifted().has_value());
+    }
+
+    TEST_F(ChessUiTest, WatchTheBoardTakesNoDragOnEitherTurn) {
+        const auto white = eastl::make_shared<GatedEngine>(true);
+        const auto black = eastl::make_shared<GatedEngine>(true);
+        CountingFactory factory({white, black});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        ASSERT_TRUE(Opponent().ChooseSeats(kWatchBoth, {}, {}).has_value());
+        ASSERT_TRUE(FramesUntil([&] { return white->Calls() == 1; }));
+        const uint64_t version = Model().GetVersion();
+
+        Drag("e2", "e4");
+        Drag("d2", "d4");
+        IdleFrames(5);
+        EXPECT_FALSE(Model().HasSelection());
+        EXPECT_TRUE(Model().GetMoves().empty());
+        EXPECT_EQ(Model().GetVersion(), version);
+        EXPECT_FALSE(white->WasCancelled());
+
+        StartFrom(kWatchBlackToMove);
+        ASSERT_TRUE(FramesUntil([&] { return black->Calls() == 1; }));
+        const uint64_t blackVersion = Model().GetVersion();
+        Drag("e7", "e5");
+        Drag("d7", "d6");
+        IdleFrames(5);
+        EXPECT_FALSE(Model().HasSelection());
+        EXPECT_TRUE(Model().GetMoves().empty());
+        EXPECT_EQ(Model().GetVersion(), blackVersion);
+        EXPECT_FALSE(black->WasCancelled());
+    }
+
+    TEST_F(ChessUiTest, ThePressAfterTheGameEndedStartsANewGameAndItsReleasePlaysNothing) {
+        StartFrom(kWatchWhiteIsMated);
+        ASSERT_TRUE(Model().IsGameOver());
+
+        Drag("e2", "e4");
+
+        EXPECT_FALSE(Model().IsGameOver());
+        EXPECT_EQ(Model().GetPosition().ToFen(), eastl::string(Position::kStartFen));
+        EXPECT_TRUE(Model().GetMoves().empty());
+        EXPECT_FALSE(Model().HasSelection());
+        EXPECT_FALSE(Lifted().has_value());
+    }
+
+    TEST_F(ChessUiTest, WhileAPanelIsShownADragOnTheBoardArmsNothing) {
+        ASSERT_TRUE(OpenThePanel());
+        Drag("e2", "e4");
+        EXPECT_FALSE(Model().HasSelection()) << "the opponent panel took the press";
+        EXPECT_TRUE(Model().GetMoves().empty());
+        EXPECT_FALSE(Lifted().has_value());
+        Press("ChessCloseOpponent");
+        ASSERT_FALSE(Panel()->_visible);
+
+        StartFrom(kPromotionFen);
+        ClickMove("a7", "a8");
+        ASSERT_TRUE(PromotionShown());
+        const uint64_t version = Model().GetVersion();
+        Drag("a7", "a8");
+        Drag("a7", "a6");
+        EXPECT_TRUE(PromotionShown());
+        EXPECT_TRUE(Model().HasPendingPromotion());
+        EXPECT_EQ(Model().GetSelected(), Sq("a7"));
+        EXPECT_TRUE(Model().GetMoves().empty());
+        EXPECT_EQ(Model().GetVersion(), version);
+        EXPECT_FALSE(Lifted().has_value());
+    }
+
+    TEST_F(ChessUiTest, ADragToTheLastRankOpensThePromotionPanelAndMovesNothingUntilAPieceIsPicked) {
+        StartFrom(kPromotionFen);
+        const uint64_t version = Model().GetVersion();
+        const eastl::string fen = Model().GetPosition().ToFen();
+
+        Drag("a7", "a8");
+
+        EXPECT_TRUE(Model().HasPendingPromotion());
+        EXPECT_TRUE(PromotionShown());
+        EXPECT_EQ(Model().GetPosition().ToFen(), fen) << "nothing has moved";
+        EXPECT_EQ(Model().GetVersion(), version);
+        ASSERT_TRUE(Model().HasSelection());
+        EXPECT_EQ(Model().GetSelected(), Sq("a7"));
+
+        ASSERT_TRUE(ClickPromotion("PromotionCancel").Both());
+        EXPECT_FALSE(PromotionShown());
+        EXPECT_TRUE(Model().HasSelection()) << "Cancel keeps the pawn selected";
+        EXPECT_EQ(Model().GetSelected(), Sq("a7"));
+
+        Drag("a7", "a8");
+        EXPECT_TRUE(PromotionShown()) << "a second drag asks again";
+        ASSERT_TRUE(ClickPromotion("PromoteQueen").Both());
+        ASSERT_EQ(Model().GetMoves().size(), 1u);
+        EXPECT_EQ(Model().GetMoves().back().ToUci(), "a7a8q");
+    }
+
+    TEST_F(ChessUiTest, ADragInTheTurnedBoardGoesByTheDrawnCells) {
+        CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        ControlPlays("white");
+        StartFrom(kBlackToMoveAfterE4);
+        ASSERT_TRUE(BlackIsAtTheBottom());
+        const uint64_t version = Model().GetVersion();
+
+        // Where e5 would be with White at the bottom (fifth column, fourth row from the top) is d4 on this board, not a target of the pawn on e7
+        DragCells(3, 6, 4, 3);
+        EXPECT_TRUE(Model().GetMoves().empty());
+        EXPECT_EQ(Model().GetVersion(), version);
+        ASSERT_TRUE(Model().HasSelection());
+        EXPECT_EQ(Model().GetSelected(), Sq("e7"));
+
+        DragCells(3, 6, 3, 4);  // e7 to e5 as it is drawn
+        ASSERT_EQ(Model().GetMoves().size(), 1u);
+        EXPECT_EQ(Model().GetMoves().back().ToUci(), "e7e5");
+    }
+
+    TEST_F(ChessUiTest, ADragThatWentStaleBetweenPressAndReleaseIsDropped) {
+        Draw();
+        const auto e2 = SquareCenter("e2");
+        const auto e4 = SquareCenter("e4");
+        const auto press = [&] {
+            CoreManager::GetUIInput().DispatchMouseButtonDown(Button(e2.first, e2.second, true));
+            MouseMove(e2.first + kDragStepPixels, e2.second, true);
+            EXPECT_TRUE(Lifted().has_value());
+        };
+
+        // After each change the piece is selected again by hand, so only the check of the drag (not the selection) can keep the release from playing e2e4
+        press();
+        Model().SetPosition(PositionFromFen(Position::kStartFen));
+        Model().OnSquareClicked(Sq("e2"));
+        EXPECT_FALSE(Lifted().has_value()) << "SetPosition";
+        Release(e4.first, e4.second);
+        EXPECT_TRUE(Model().GetMoves().empty());
+
+        press();
+        Model().Reset();
+        Model().OnSquareClicked(Sq("e2"));
+        EXPECT_FALSE(Lifted().has_value()) << "Reset";
+        Release(e4.first, e4.second);
+        EXPECT_TRUE(Model().GetMoves().empty());
+
+        Model().Reset();
+        press();
+        ASSERT_TRUE(Play(Model(), "g1f3"));  // the control API plays a move of its own
+        EXPECT_FALSE(Lifted().has_value()) << "a move of someone else";
+        Release(e4.first, e4.second);
+        EXPECT_EQ(Model().GetMoves().size(), 1u);
+    }
+
+    TEST_F(ChessUiTest, ALostReleaseIsCleanedUpByTheNextMotionWithoutTheButton) {
+        Draw();
+        const auto e2 = SquareCenter("e2");
+        const auto reset = ScreenCenter(*HudElement("Reset"));
+        CoreManager::GetUIInput().DispatchMouseButtonDown(Button(e2.first, e2.second, true));
+        MouseMove(e2.first + kDragStepPixels, e2.second, true);
+        MouseMove(reset.first, reset.second, true);
+        EXPECT_TRUE(Lifted().has_value()) << "the button is still held";
+        // The release over the Reset button is taken by the HUD: the board gets nothing. The next motion has no button held
+        const auto board = SquareCenter("e3");
+        MouseMove(board.first, board.second, false);
+        EXPECT_FALSE(Lifted().has_value());
+
+        ReleaseOn("e4");
+        EXPECT_TRUE(Model().GetMoves().empty());
+        ASSERT_TRUE(Model().HasSelection());
+        EXPECT_EQ(Model().GetSelected(), Sq("e2"));
+    }
+
+    TEST_F(ChessUiTest, TheLiftedPieceIsTheSquareItCameFromAndTheTopLeftIsThePointerMinusHalfASquare) {
+        CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        for (const bool turned : {false, true}) {
+            SCOPED_TRACE(turned ? "turned" : "White at the bottom");
+            ControlPlays(turned ? "white" : nullptr);
+            StartFrom(turned ? kBlackToMoveAfterE4 : "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+            ASSERT_EQ(BlackIsAtTheBottom(), turned);
+            const char* piece = turned ? "e7" : "e2";
+            Draw();
+            const auto at = SquareCenter(piece);
+
+            CoreManager::GetUIInput().DispatchMouseButtonDown(Button(at.first, at.second, true));
+            EXPECT_FALSE(Lifted().has_value()) << "right after the press";
+            MouseMove(at.first + 3.0f, at.second, true);
+            EXPECT_FALSE(Lifted().has_value()) << "under the threshold";
+
+            const float pointerX = at.first + 60.0f;
+            const float pointerY = at.second - 50.0f;
+            MouseMove(pointerX, pointerY, true);
+            const auto lifted = Lifted();
+            ASSERT_TRUE(lifted.has_value());
+            EXPECT_EQ(lifted->from, Sq(piece));
+            EXPECT_NEAR(lifted->x, GetScene().ScreenToSceneX(pointerX) - 40.0f, kPixelTolerance);
+            EXPECT_NEAR(lifted->y, GetScene().ScreenToSceneY(pointerY) - 40.0f, kPixelTolerance);
+
+            MouseMove(at.first + 1.0f, at.second, true);
+            EXPECT_TRUE(Lifted().has_value()) << "once lifted the piece stays lifted";
+            Release(pointerX, pointerY);
+            EXPECT_FALSE(Lifted().has_value()) << "after the release";
+        }
+    }
+
+    TEST_F(ChessUiTest, TwoClicksStillPlayAndAClickWithItsReleaseLeavesThePieceSelected) {
+        ClickMove("e2", "e4");
+        ASSERT_EQ(Model().GetMoves().size(), 1u);
+        EXPECT_FALSE(Model().HasSelection());
+
+        // A click as a mouse makes it: the press, then the release at the same place
+        Click("e7");
+        ReleaseOn("e7");
+        ASSERT_TRUE(Model().HasSelection());
+        EXPECT_EQ(Model().GetSelected(), Sq("e7"));
+        Click("e5");
+        ReleaseOn("e5");
+        ASSERT_EQ(Model().GetMoves().size(), 2u);
+        EXPECT_EQ(Model().GetMoves().back().ToUci(), "e7e5");
+        EXPECT_FALSE(Model().HasSelection());
     }
 
 }  // namespace BECore::Chess::Tests

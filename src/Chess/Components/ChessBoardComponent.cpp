@@ -33,6 +33,9 @@ namespace BECore::Chess {
         constexpr Color kHintFromSquare{60, 130, 230, 110};
         constexpr Color kHintToSquare{60, 130, 230, 200};
 
+        // How far, in scene units, the pointer must go from the press before the piece is lifted: a click with a shaky hand never lifts one. It decides only the picture, not the move
+        constexpr float kDragThreshold = 6.0f;
+
         // One line in the log when a game ends; the board has no text to show it in.
         void LogResult(const ChessGameModel& model) {
             const auto status = EnumUtils<GameStatus>::ToString(model.GetStatus());
@@ -74,6 +77,8 @@ namespace BECore::Chess {
     void ChessBoardComponent::OnAttached() {
         s_active = this;
         SubscribeInScene<SDLEvents::MouseButtonDownEvent, &ChessBoardComponent::OnMouseDown>(this);
+        SubscribeInScene<SDLEvents::MouseButtonUpEvent, &ChessBoardComponent::OnMouseUp>(this);
+        SubscribeInScene<SDLEvents::MouseMotionEvent, &ChessBoardComponent::OnMouseMotion>(this);
         SubscribeInScene<InputEvents::ActionEvent, &ChessBoardComponent::OnAction>(this);
         SubscribeInScene<SceneEvents::SceneUpdateEvent, &ChessBoardComponent::OnUpdate>(this);
     }
@@ -308,20 +313,24 @@ namespace BECore::Chess {
         }
     }
 
+    std::optional<Square> ChessBoardComponent::SquareUnder(float screenX, float screenY) const {
+        const float boardSize = _squareSize * 8.0f;
+        const float localX = GetScene().ScreenToSceneX(screenX) - _originX;
+        const float localY = GetScene().ScreenToSceneY(screenY) - _originY;
+        if (localX < 0.0f || localY < 0.0f || localX >= boardSize || localY >= boardSize) {
+            return std::nullopt;
+        }
+        return SquareAt(static_cast<int>(localX / _squareSize), static_cast<int>(localY / _squareSize), GetBottomColor());
+    }
+
     void ChessBoardComponent::OnMouseDown(const SDLEvents::MouseButtonDownEvent& e) {
+        _drag.reset();  // any press ends a drag that is still armed (a lost release); the press below may arm a new one
         ChessGameModel* model = ChessGame::GetActiveModel();
         if (!model) {
             return;
         }
 
-        const float boardSize = _squareSize * 8.0f;
-        const float localX = GetScene().ScreenToSceneX(e.button.x) - _originX;
-        const float localY = GetScene().ScreenToSceneY(e.button.y) - _originY;
-        if (localX < 0.0f || localY < 0.0f || localX >= boardSize || localY >= boardSize) {
-            return;
-        }
-
-        const std::optional<Square> clicked = SquareAt(static_cast<int>(localX / _squareSize), static_cast<int>(localY / _squareSize), GetBottomColor());
+        const std::optional<Square> clicked = SquareUnder(e.button.x, e.button.y);
         if (!clicked) {
             return;
         }
@@ -344,6 +353,69 @@ namespace BECore::Chess {
         }
         // The click may have left a promotion pending (the panel asks for the piece) or dropped one
         SyncPromotionPanel(*model);
+
+        // The press has acted as a click. When it left the piece on the pressed square selected (it selected or re-selected a piece of the side to move; a press that played a move
+        // leaves no selection) the left button also arms a drag; the release decides whether it plays a move
+        if (e.button.button == SDL_BUTTON_LEFT && !model->IsGameOver() && !model->HasPendingPromotion() && model->HasSelection() && model->GetSelected() == *clicked) {
+            const float sceneX = GetScene().ScreenToSceneX(e.button.x);
+            const float sceneY = GetScene().ScreenToSceneY(e.button.y);
+            _drag = Drag{*clicked, model, model->GetVersion(), sceneX, sceneY, sceneX, sceneY, false};
+        }
+    }
+
+    bool ChessBoardComponent::IsDragValid(const Drag& drag, const ChessGameModel* model) {
+        if (model != drag.model || model->GetVersion() != drag.version || model->IsGameOver() || !model->HasSelection() || model->GetSelected() != drag.from || model->HasPendingPromotion()) {
+            return false;
+        }
+        const OpponentController* opponent = ChessGame::GetActiveOpponent();
+        return !(opponent && opponent->PlaysFor(model->GetTurn()));
+    }
+
+    void ChessBoardComponent::OnMouseMotion(const SDLEvents::MouseMotionEvent& e) {
+        if (!_drag) {
+            return;
+        }
+        // The button is no longer held: its release went to a canvas (over a HUD button, say) and never reached the board
+        if ((e.motion.state & SDL_BUTTON_LMASK) == 0 || !IsDragValid(*_drag, ChessGame::GetActiveModel())) {
+            _drag.reset();
+            return;
+        }
+        _drag->pointerX = GetScene().ScreenToSceneX(e.motion.x);
+        _drag->pointerY = GetScene().ScreenToSceneY(e.motion.y);
+        const float dx = _drag->pointerX - _drag->pressX;
+        const float dy = _drag->pointerY - _drag->pressY;
+        if (dx * dx + dy * dy > kDragThreshold * kDragThreshold) {
+            _drag->lifted = true;
+        }
+    }
+
+    void ChessBoardComponent::OnMouseUp(const SDLEvents::MouseButtonUpEvent& e) {
+        if (e.button.button != SDL_BUTTON_LEFT) {
+            return;
+        }
+        const std::optional<Drag> drag = std::exchange(_drag, std::nullopt);  // a release ends the drag in every case below
+        ChessGameModel* model = ChessGame::GetActiveModel();
+        if (!drag || !model || !IsDragValid(*drag, model)) {
+            return;
+        }
+        // Only a legal target of the selected piece plays. Anywhere else nothing is called on the model: the piece goes back and the selection stays with its legal moves (and a release
+        // on another own piece must not select it)
+        const std::optional<Square> target = SquareUnder(e.button.x, e.button.y);
+        if (!target || eastl::find(model->GetLegalMoves().begin(), model->GetLegalMoves().end(), *target) == model->GetLegalMoves().end()) {
+            return;
+        }
+        if (model->OnSquareClicked(*target)) {
+            LogResultOnce(*model);
+        }
+        SyncPromotionPanel(*model);
+    }
+
+    std::optional<ChessBoardComponent::LiftedPiece> ChessBoardComponent::GetLiftedPiece() const {
+        if (!_drag || !_drag->lifted || !IsDragValid(*_drag, ChessGame::GetActiveModel())) {
+            return std::nullopt;
+        }
+        const float half = _squareSize * 0.5f;
+        return LiftedPiece{_drag->from, _drag->pointerX - half, _drag->pointerY - half};
     }
 
 }  // namespace BECore::Chess
