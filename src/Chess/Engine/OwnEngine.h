@@ -22,7 +22,7 @@ namespace BECore::Chess {
      * with a time is not: where the clock stops the search decides the depth reached, hence the move.
      *
      * The object has no state between calls and no process, so FindMove() may be called from several threads at once, each with its
-     * own request and token. It logs nothing (only EngineOpponent, OpponentController and PositionAnalyst log). The search runs on the thread that
+     * own request and token. It logs nothing (only EngineOpponent, OpponentController, PositionAnalyst and MoveRater log). The search runs on the thread that
      * calls, which is a worker of the Background pool in the game: Search() keeps a few KB of move lists per ply (see Search.cpp,
      * kMaxPly), which a worker's stack of 512 KB holds.
      */

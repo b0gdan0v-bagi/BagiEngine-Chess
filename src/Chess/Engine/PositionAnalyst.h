@@ -72,7 +72,7 @@ namespace BECore::Chess {
      * arrives and an error that appears or goes, never with a search that starts or ends (IsThinking()), and never goes back; a display that publishes the analysis adds it to the version of
      * the model.
      *
-     * Logging: with EngineOpponent and OpponentController, one of the classes of Engine/ that log (LOG_ERROR once per failed search, LOG_INFO for a dropped one).
+     * Logging: with EngineOpponent, OpponentController and MoveRater, one of the classes of Engine/ that log (LOG_ERROR once per failed search, LOG_INFO for a dropped one).
      */
     class PositionAnalyst {
     public:
