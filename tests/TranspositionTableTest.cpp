@@ -178,9 +178,12 @@ namespace BECore::Chess::Tests {
             EXPECT_GE(stored, INT16_MIN);
             EXPECT_LE(stored, INT16_MAX);
         }
-        // The shortest mate at the deepest node and the mate score nearest to an evaluation
+        // The largest stored mate (a mate on the spot at the deepest node, the farthest from an evaluation) and the
+        // smallest one (the farthest mate at ply 0)
         EXPECT_LE(ScoreToTable(MateIn(0), 64), INT16_MAX);
         EXPECT_GE(ScoreToTable(-MateIn(0), 64), INT16_MIN);
+        EXPECT_LE(ScoreToTable(MateIn(kMaxMatePly), 0), INT16_MAX);
+        EXPECT_GE(ScoreToTable(-MateIn(kMaxMatePly), 0), INT16_MIN);
 
         TranspositionTable table(2);
         table.Store(kKeyA, kMoveE2E4, ScoreToTable(kMateScore, 64), 3, TableBound::Exact);

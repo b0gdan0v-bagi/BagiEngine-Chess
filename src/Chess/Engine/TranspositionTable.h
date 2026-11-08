@@ -6,22 +6,17 @@
 
 namespace BECore::Chess {
 
-    /// What a stored score says about the true value of the position.
-    enum class TableBound : uint8_t {
-        /// The score is the value of the position
-        Exact,
-        /// The value is at least the score (the search cut off: a move was as good as that)
-        Lower,
-        /// The value is at most the score (no move reached alpha)
-        Upper,
-    };
+    /// What a stored score says about the true value of the position. Exact: the score is the value of the position.
+    /// Lower: the value is at least the score (the search cut off: a move was as good as that). Upper: the value is at
+    /// most the score (no move reached alpha).
+    CORE_ENUM(TableBound, uint8_t, Exact, Lower, Upper)
 
     /// One slot of the table. An empty slot has a depth of -1.
     struct TableEntry {
         ZobristKey key = 0;
         /// The best move found, or the move that cut off; the null move when there is none. Only a hint for the ordering
         Move move;
-        /// The score as TableScore() made it (the distance of a mate counted from this position), not from the root
+        /// The score as ScoreToTable() made it (the distance of a mate counted from this position), not from the root
         int16_t score = 0;
         /// The depth in plies of the search that gave the score; -1 for an empty slot
         int8_t depth = -1;
