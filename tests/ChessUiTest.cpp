@@ -69,6 +69,7 @@ namespace BECore::Chess::Tests {
         const Color kCheckColor{230, 60, 60, 210};
         const Color kHintFromColor{60, 130, 230, 110};  // the two squares of the hint: the one the piece leaves and the one it goes to
         const Color kHintToColor{60, 130, 230, 200};
+        const Color kLastMoveColor{245, 205, 50, 140};  // the two squares of the last move, one color for both
 
         // The tall cell of a pawn in the piece atlas (TextureLibrary.xml, assets/chess_test.png is 700 x 381).
         // The library is empty in the test environment, so the test gives a sprite its cell.
@@ -1013,6 +1014,17 @@ namespace BECore::Chess::Tests {
             return {RectCalls(kHintFromColor), RectCalls(kHintToColor)};
         }
 
+        /// The recorded fills of the last move in the last frame, in drawing order (the square it leaves, then the one it goes to)
+        [[nodiscard]] eastl::vector<const DrawCall*> LastMoveFills() const {
+            return RectCalls(kLastMoveColor);
+        }
+
+        /// The two rects the last move is meant to fill (the squares of the last move of the model, where they are drawn now): from, to
+        [[nodiscard]] std::pair<Rect, Rect> LastMoveRects() const {
+            const Move last = Model().GetMoves().back();
+            return {SquareRect(last.From()), SquareRect(last.To())};
+        }
+
         /// Frames in which nothing is meant to happen
         void IdleFrames(int count = kManyFrames) {
             for (int frame = 0; frame < count; ++frame) {
@@ -1370,7 +1382,11 @@ namespace BECore::Chess::Tests {
 
         /// A square of the board in output pixels, for the fit of the view into the current output and the orientation the opponent gives
         Rect SquareRect(const char* square) const {
-            const auto [column, row] = CellOfSquare(Sq(square), BlackIsAtTheBottom());
+            return SquareRect(Sq(square));
+        }
+
+        Rect SquareRect(const Square& square) const {
+            const auto [column, row] = CellOfSquare(square, BlackIsAtTheBottom());
             return CellRect(column, row);
         }
 
@@ -5768,6 +5784,229 @@ namespace BECore::Chess::Tests {
         EXPECT_TRUE(HintFills().first.empty());
         EXPECT_TRUE(HintFills().second.empty());
         EXPECT_EQ(RectCalls(kLightSquareColor).size() + RectCalls(kDarkSquareColor).size(), 64u) << "the squares are still drawn";
+    }
+
+    // ---- the last move on the board -----------------------------------------------------------------------------------------------
+    // The board fills the from and to squares of GetMoves().back() in one color of its own, under the check, the hint and the selection; it keeps nothing, so a new game has no mark
+
+    TEST_F(ChessUiTest, ANewGameMarksNoLastMove) {
+        Draw();
+        EXPECT_TRUE(LastMoveFills().empty());
+        EXPECT_EQ(RectCalls(kLightSquareColor).size() + RectCalls(kDarkSquareColor).size(), 64u);
+    }
+
+    TEST_F(ChessUiTest, AMoveByClicksMarksItsTwoSquaresAndTheNextMoveReplacesThem) {
+        for (const auto& size : {std::pair{1280.0f, 720.0f}, std::pair{720.0f, 1280.0f}}) {
+            SCOPED_TRACE(Format("output {}x{}", size.first, size.second).c_str());
+            Model().Reset();
+            ClickMove("e2", "e4");
+            ASSERT_EQ(Model().GetMoves().size(), 1u);
+            DrawAt(size.first, size.second);
+            auto fills = LastMoveFills();
+            ASSERT_EQ(fills.size(), 2u);
+            EXPECT_TRUE(SameRect(fills[0]->rect, SquareRect("e2"))) << "the square the piece left";
+            EXPECT_TRUE(SameRect(fills[1]->rect, SquareRect("e4"))) << "the square it went to";
+
+            ClickMove("e7", "e5");  // two people: the other side moves, and the mark follows
+            ASSERT_EQ(Model().GetMoves().size(), 2u);
+            DrawAt(size.first, size.second);
+            fills = LastMoveFills();
+            ASSERT_EQ(fills.size(), 2u);
+            EXPECT_TRUE(SameRect(fills[0]->rect, SquareRect("e7")));
+            EXPECT_TRUE(SameRect(fills[1]->rect, SquareRect("e5")));
+        }
+    }
+
+    TEST_F(ChessUiTest, AMoveByTheControlApiAndAMoveByDragMarkTheirSquares) {
+        Json action = Json::object();
+        action["type"] = "move";
+        action["uci"] = "g1f3";
+        ASSERT_TRUE(ChessGame::GetActive()->AsControllable()->PerformAction(action).has_value());
+        Draw();
+        auto fills = LastMoveFills();
+        ASSERT_EQ(fills.size(), 2u);
+        EXPECT_TRUE(SameRect(fills[0]->rect, SquareRect("g1")));
+        EXPECT_TRUE(SameRect(fills[1]->rect, SquareRect("f3")));
+
+        Drag("e7", "e5");
+        ASSERT_EQ(Model().GetMoves().size(), 2u);
+        Draw();
+        fills = LastMoveFills();
+        ASSERT_EQ(fills.size(), 2u);
+        EXPECT_TRUE(SameRect(fills[0]->rect, SquareRect("e7")));
+        EXPECT_TRUE(SameRect(fills[1]->rect, SquareRect("e5")));
+    }
+
+    TEST_F(ChessUiTest, TheProgramsAnswerMarksItsSquares) {
+        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        ASSERT_TRUE(Opponent().SetSide(PieceColor::Black).has_value());
+        ClickMove("e2", "e4");
+        ASSERT_TRUE(FramesUntil([&] { return Model().GetMoves().size() == 2; }));
+        Draw();
+        const auto [from, to] = LastMoveRects();
+        const auto fills = LastMoveFills();
+        ASSERT_EQ(fills.size(), 2u);
+        EXPECT_TRUE(SameRect(fills[0]->rect, from));
+        EXPECT_TRUE(SameRect(fills[1]->rect, to));
+        EXPECT_EQ(Model().GetPieceAt(Model().GetMoves().back().To()).color, PieceColor::Black) << "it is the black move that is marked, not the person's e2e4";
+        EXPECT_FALSE(SameRect(from, SquareRect("e2")));
+    }
+
+    TEST_F(ChessUiTest, AResetASetPositionAndSetStateWithAFenTakeTheMarkOff) {
+        const auto expectMarked = [&](bool marked) {
+            Draw();
+            EXPECT_EQ(LastMoveFills().size(), marked ? 2u : 0u);
+        };
+        ClickMove("e2", "e4");
+        expectMarked(true);
+        Model().Reset();
+        expectMarked(false);
+
+        ClickMove("d2", "d4");
+        expectMarked(true);
+        Model().SetPosition(PositionFromFen(kBlackToMoveAfterE4));
+        expectMarked(false);
+
+        ClickMove("e7", "e5");
+        expectMarked(true);
+        Json request = Json::object();
+        request["fen"] = "k7/8/8/8/8/8/4K3/7R w - - 0 1";
+        ASSERT_TRUE(ChessGame::GetActive()->AsControllable()->SetState(request).has_value());
+        expectMarked(false);
+
+        ASSERT_TRUE(Play(Model(), "h1h2"));
+        expectMarked(true);
+        ASSERT_TRUE(ChessGame::GetActive()->AsControllable()->Reset(Json::object()).has_value());
+        expectMarked(false);
+    }
+
+    TEST_F(ChessUiTest, CastlingMarksTheKingsMoveEnPassantAndPromotionThePawnsSquares) {
+        const auto expectMarks = [&](const char* from, const char* to) {
+            SCOPED_TRACE(Format("{}{}", from, to).c_str());
+            Draw();
+            const auto fills = LastMoveFills();
+            ASSERT_EQ(fills.size(), 2u);
+            EXPECT_TRUE(SameRect(fills[0]->rect, SquareRect(from)));
+            EXPECT_TRUE(SameRect(fills[1]->rect, SquareRect(to)));
+        };
+
+        StartFrom("r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1");
+        ASSERT_TRUE(Play(Model(), "e1g1"));  // the rook goes to f1 and is not marked
+        expectMarks("e1", "g1");
+        ASSERT_TRUE(Play(Model(), "e8c8"));
+        expectMarks("e8", "c8");
+
+        StartFrom("4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 1");
+        ASSERT_TRUE(Play(Model(), "e5d6"));  // the pawn taken on d5 is not marked
+        expectMarks("e5", "d6");
+
+        StartFrom("8/P6k/8/8/8/8/8/K7 w - - 0 1");
+        ASSERT_TRUE(Play(Model(), "a7a8q"));
+        expectMarks("a7", "a8");
+        StartFrom("8/P6k/8/8/8/8/8/K7 w - - 0 1");
+        Click("a7");
+        Click("a8");
+        ASSERT_TRUE(Model().HasPendingPromotion());
+        Draw();
+        EXPECT_TRUE(LastMoveFills().empty()) << "a promotion still waiting for its piece is no move yet";
+        PressWith(kPromoteAction, "knight");
+        ASSERT_EQ(Model().GetMoves().size(), 1u);
+        expectMarks("a7", "a8");
+    }
+
+    TEST_F(ChessUiTest, TheTurnedBoardMarksTheTurnedCells) {
+        CountingFactory opponentFactory({eastl::make_shared<GatedEngine>(true)});  // the program opens and holds its answer: the board stays as it is
+        Opponent().SetEngineFactory(opponentFactory.AsFactory());
+        _manager->UpdateAll();
+        ControlPlays("white");
+        _manager->UpdateAll();
+        ASSERT_TRUE(BlackIsAtTheBottom());
+        ASSERT_TRUE(Play(Model(), "e2e4"));
+        Draw();
+        const auto fills = LastMoveFills();
+        ASSERT_EQ(fills.size(), 2u);
+        EXPECT_TRUE(SameRect(fills[0]->rect, SquareRect("e2")));
+        EXPECT_TRUE(SameRect(fills[1]->rect, SquareRect("e4")));
+        // written out: e2 is the cell column 3, row 1 of the turned grid, e4 column 3, row 3
+        EXPECT_TRUE(SameRect(fills[0]->rect, CellRect(3, 1)));
+        EXPECT_TRUE(SameRect(fills[1]->rect, CellRect(3, 3)));
+    }
+
+    TEST_F(ChessUiTest, TheLastMoveIsDrawnOverTheSquaresAndUnderTheCheckTheHintTheSelectionAndTheLegalMoves) {
+        CountingAnalysisFactory factory({eastl::make_shared<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e8d8"))});
+        Analyst().SetEngineFactory(factory.AsFactory());
+        StartFrom("4k3/8/8/8/8/8/8/3R1K2 w - - 0 1");
+        ASSERT_TRUE(Play(Model(), "d1e1"));  // check: the rook's squares are marked and the king's square is red
+        ASSERT_TRUE(Model().IsInCheck());
+        ASSERT_TRUE(ShowTheHint());
+        Click("e8");  // a selection of the king: its own square and the squares it can go to
+        ASSERT_TRUE(Model().HasSelection());
+        Draw();
+
+        long lastSquare = -1;
+        long firstMark = -1;
+        long lastMark = -1;
+        long check = -1;
+        long hintFrom = -1;
+        long selection = -1;
+        long legal = -1;
+        const auto& calls = _renderer->calls;
+        for (size_t i = 0; i < calls.size(); ++i) {
+            const DrawCall& call = calls[i];
+            if (call.kind != DrawKind::Rect) {
+                continue;
+            }
+            const long at = static_cast<long>(i);
+            if (SameColor(call.color, kLightSquareColor) || SameColor(call.color, kDarkSquareColor)) {
+                lastSquare = at;
+            } else if (SameColor(call.color, kLastMoveColor)) {
+                firstMark = firstMark < 0 ? at : firstMark;
+                lastMark = at;
+            } else if (SameColor(call.color, kCheckColor)) {
+                check = at;
+            } else if (SameColor(call.color, kHintFromColor)) {
+                hintFrom = at;
+            } else if (SameColor(call.color, kSelectedColor)) {
+                selection = at;
+            } else if (SameColor(call.color, kLegalMoveColor)) {
+                legal = at;
+            }
+        }
+        ASSERT_GE(firstMark, 0);
+        ASSERT_GE(check, 0);
+        ASSERT_GE(hintFrom, 0);
+        ASSERT_GE(selection, 0);
+        ASSERT_GE(legal, 0);
+        EXPECT_EQ(LastMoveFills().size(), 2u);
+        EXPECT_LT(lastSquare, firstMark) << "over the squares";
+        EXPECT_LT(lastMark, check) << "under the check";
+        EXPECT_LT(lastMark, hintFrom) << "under the hint";
+        EXPECT_LT(lastMark, selection) << "under the selection";
+        EXPECT_LT(lastMark, legal) << "and under the legal moves";
+    }
+
+    TEST_F(ChessUiTest, TheMarkOfTheLastMoveStaysAfterTheGameEnds) {
+        StartFrom(kBlackMatesOnA1);
+        ASSERT_TRUE(Play(Model(), "a8a1"));
+        ASSERT_TRUE(Model().IsGameOver());
+        Draw();
+        const auto fills = LastMoveFills();
+        ASSERT_EQ(fills.size(), 2u);
+        EXPECT_TRUE(SameRect(fills[0]->rect, SquareRect("a8")));
+        EXPECT_TRUE(SameRect(fills[1]->rect, SquareRect("a1")));
+    }
+
+    TEST_F(ChessUiTest, WithNoGameActiveTheBoardMarksNoLastMove) {
+        ClickMove("e2", "e4");
+        Draw();
+        ASSERT_EQ(LastMoveFills().size(), 2u);
+        GameManager::GetInstance().Shutdown();
+        ASSERT_EQ(ChessGame::GetActive(), nullptr);
+        Draw();
+        EXPECT_TRUE(LastMoveFills().empty());
+        EXPECT_EQ(RectCalls(kLightSquareColor).size() + RectCalls(kDarkSquareColor).size(), 64u);
     }
 
     // A watch: both colors are programs (OpponentController::ChooseSeats). Gated engines that never answer keep the turn where it is, so the guard of the board is what is looked at.

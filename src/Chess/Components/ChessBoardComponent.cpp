@@ -32,6 +32,10 @@ namespace BECore::Chess {
         // red of check nor the green of the selection, drawn under the selection so that one stays readable on top of it
         constexpr Color kHintFromSquare{60, 130, 230, 110};
         constexpr Color kHintToSquare{60, 130, 230, 200};
+        // The last move (both squares, one color): an amber that is neither the green of the selection and the legal moves, nor the red of check, nor the blue of the hint. At alpha 140 it
+        // turns the light square (240,217,181) to about (243,211,111) and the dark one (181,136,99) to about (214,171,76), so it reads on both; drawn under all of them. A first guess nobody has seen
+        // on screen
+        constexpr Color kLastMoveSquare{245, 205, 50, 140};
 
         // How far, in scene units, the pointer must go from the press before the piece is lifted: a click with a shaky hand never lifts one. It decides only the picture, not the move
         constexpr float kDragThreshold = 6.0f;
@@ -274,6 +278,18 @@ namespace BECore::Chess {
         const ChessGameModel* model = ChessGame::GetActiveModel();
         if (!model) {
             return;
+        }
+
+        // The last move, read from the model's history (the component keeps nothing): the two squares of the move, under the check, the hint and the selection. Castling is the king's
+        // move, en passant and a promotion the pawn's; no move yet (a new game, a reset, a position set from a FEN) marks nothing
+        if (!model->GetMoves().empty()) {
+            const Move last = model->GetMoves().back();
+            float mx = 0.0f;
+            float my = 0.0f;
+            SquareToPixel(last.From().file, last.From().rank, bottom, mx, my);
+            renderer.DrawFilledRect(mx, my, _squareSize, _squareSize, kLastMoveSquare);
+            SquareToPixel(last.To().file, last.To().rank, bottom, mx, my);
+            renderer.DrawFilledRect(mx, my, _squareSize, _squareSize, kLastMoveSquare);
         }
 
         // The king that is attacked: bright red while the game goes on, dark red once it is mate.
