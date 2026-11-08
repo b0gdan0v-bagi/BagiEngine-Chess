@@ -15,7 +15,8 @@ namespace BECore::Chess {
         /// No line is searched further from the root than this many plies, quiescence included: the deepest full-width line is
         /// kMaxSearchDepth plus the extensions, and what is left at that ply is judged by the static score. The move lists of a node
         /// live on the stack: a Negamax or Quiescence frame takes about 3 KB in a Debug build (measured, macOS), so 96 plies are
-        /// about 300 KB, which fits the 512 KB that a std::thread of the Background pool gets on macOS (Linux gives 8 MB, Windows 1 MB)
+        /// about 300 KB, which fits the 512 KB that a std::thread of the Background pool gets on macOS (Linux gives 8 MB, Windows 1 MB).
+        /// The killers and the history of Search() (QuietMoves, about 33 KB) are on that stack too; the second static_assert below counts them
         constexpr int kMaxPly = kMaxSearchDepth + kMaxExtensionPly;
         /// The size of a Negamax or Quiescence frame in a Debug build (measured on macOS) and the stack of a Background pool thread there (a std::thread with the default
         /// 512 KB); the assert keeps the comment above honest if kMaxSearchDepth or the extension grows
@@ -43,6 +44,8 @@ namespace BECore::Chess {
         /// Order() is given this ply by the nodes that do not use killers and history
         constexpr int kNoKillerPly = -1;
         constexpr int kKillersPerPly = 2;
+        /// The history is kept per color of the mover
+        constexpr size_t kColorCount = 2;
 
         struct ScoredMove {
             Move move;
@@ -123,7 +126,7 @@ namespace BECore::Chess {
             }
 
         private:
-            /// Keeps the order of the entries and makes room: the whole table, so the entries stay comparable
+            /// Keeps the order of the entries (up to ties, which halving makes) and makes room: the whole table, so the entries stay comparable
             void Halve() noexcept {
                 for (auto& perColor : _history) {
                     for (auto& perFrom : perColor) {
@@ -135,8 +138,10 @@ namespace BECore::Chess {
             }
 
             Move _killers[kMaxPly + 1][kKillersPerPly] = {};
-            int _history[2][kSquareCount][kSquareCount] = {};
+            int _history[kColorCount][kSquareCount][kSquareCount] = {};
         };
+        static_assert(static_cast<size_t>(kMaxPly) * kApproxFrameBytes + sizeof(QuietMoves) < kBackgroundStackBytes,
+                      "the deepest line and the killers and the history must fit the stack of a Background thread");
 
         class Searcher {
         public:
@@ -230,12 +235,12 @@ namespace BECore::Chess {
             }
 
             ScoredMoves scored = Order(moves, Move{}, ply);
+            const PieceColor mover = _position.SideToMove();
             int best = -kInfinity;
             for (size_t i = 0; i < scored.size(); ++i) {
                 PickBest(scored, i);
                 const Move move = scored[i].move;
                 const bool quiet = !IsCapture(_position, move) && !move.IsPromotion();
-                const PieceColor mover = _position.SideToMove();
                 _position.DoMove(move);
                 const int score = -Negamax(depth - 1, -beta, -alpha, ply + 1);
                 _position.UndoMove();

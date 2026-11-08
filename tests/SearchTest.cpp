@@ -372,8 +372,9 @@ namespace BECore::Chess::Tests {
     TEST(SearchTest, QuietOrderingSearchesFewerNodes) {
         // The killers and the history put the quiet moves that cut off before the ones that do not: the same depth in fewer nodes.
         // Measured at depth 4 (ordered / plain): start 4228 / 25970, position 3 9204 / 16556, position 5 26448 / 26566, position 6
-        // 83208 / 83837. Kiwipete and position 4 are so tactical that a capture cuts every node a quiet move could: the two orders
-        // search them the same. So: never more nodes, fewer on the other four, fewer in the sum
+        // 83208 / 83837. Kiwipete and position 4 are so tactical that a capture cuts almost every node (3 and 4 quiet cutoffs at
+        // depth 4, counted), too few to change the order of any later node: the two orders search them the same. So: never more
+        // nodes, fewer on the other four, fewer in the sum
         uint64_t orderedTotal = 0;
         uint64_t plainTotal = 0;
         int better = 0;
@@ -432,7 +433,7 @@ namespace BECore::Chess::Tests {
 
     TEST(SearchTest, TheNumbersAreTheSameOnEveryPlatform) {
         // Pinned: the order of equal moves is the generator's, so these do not change with the compiler, the library or the machine.
-        // Kiwipete at depth 3 is the same as before the killers and the history (no quiet move cuts a node there); the start position
+        // Kiwipete at depth 3 is the same as before the killers and the history (one quiet cutoff there, which changes no later order); the start position
         // has 1246 nodes (2845 with the old order). They are not a measure of strength; a change of the evaluation or of the ordering moves them, and then they are rewritten
         const SearchResult start = SearchFen(Position::kStartFen, 3);
         const SearchResult kiwipete = SearchFen(kKiwipeteFen, 3);
