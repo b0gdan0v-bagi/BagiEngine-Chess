@@ -86,7 +86,7 @@ namespace BECore::Chess {
          * @brief Tells the analyst which engine the person has picked, at once. Update() does the same with its argument, so a caller that changes the pick between two frames and then reads
          * (the control adapter: `set_state` of the engine, then `get_state`) calls this to have the reads right without waiting for the next Update().
          *
-         * A pick that differs from the one the analyst knows cancels the search of the other engine, drops its engine object, its result and its error (the revision grows when
+         * What belongs to another engine than the pick is cancelled or dropped: the search, the engine object, the result and the error (the revision grows when
          * something shown goes). The same pick does nothing.
          */
         void SetPicked(OpponentEngine picked);
@@ -171,7 +171,6 @@ namespace BECore::Chess {
         AnalysisEngineFactory _factory;  ///< empty: MakeAnalysisEngine over empty settings
         eastl::shared_ptr<IChessEngine> _engine;
         OpponentEngine _engineKind = kDefaultOpponentEngine;  ///< what _engine was made for; meaningless while it is null
-        OpponentEngine _picked = kDefaultOpponentEngine;      ///< the pick the analyst knows (SetPicked, Update)
 
         bool _evaluationOn = false;
         std::optional<uint64_t> _hintVersion;  ///< the version of the model a hint was asked at

@@ -371,12 +371,15 @@ def run_analysis_scenario(client: BagiControlClient, headless: bool) -> None:
     check(analysis["evaluationOn"] is False and analysis["hintRequested"] is False and analysis["thinking"] is False, f"unexpected default analysis {analysis}")
     check(analysis["evaluation"] is None and analysis["hint"] is None and analysis["error"] is None, f"the default analysis is not empty {analysis}")
 
-    # A hint is for the person: on the turn of the side the program plays it is refused, and nothing changes (no frame between the move and the request: the reply takes at least one)
+    # A hint is for the person: on the turn of the side the program plays it is refused, and nothing changes. Only the manual clock has no frame between the move and the
+    # request, so the program is surely still to answer; on the real clock the own engine may answer first (ChessGameControlTest checks this deterministically)
+    manual = client.call("status")["manualClock"]
     client.call("set_state", {"opponent": {"engine": "own", "plays": "black", "level": "max"}})
     client.call("perform_action", move("e2e4"))
-    version = client.call("get_state")["version"]
-    expect_error("not_your_turn", lambda: client.call("set_state", {"analysis": {"evaluation": True, "hint": True}}), "a hint on the program's turn")
-    check(get_analysis(client)["evaluationOn"] is False and client.call("get_state")["version"] == version, "a refused hint changed something")
+    if manual:
+        version = client.call("get_state")["version"]
+        expect_error("not_your_turn", lambda: client.call("set_state", {"analysis": {"evaluation": True, "hint": True}}), "a hint on the program's turn")
+        check(get_analysis(client)["evaluationOn"] is False and client.call("get_state")["version"] == version, "a refused hint changed something")
     wait_until_the_program_played(client, lambda moves: len(moves) == 2, "two moves")
     client.call("set_state", {"opponent": {"plays": None}})
 
@@ -413,7 +416,8 @@ def run_analysis_scenario(client: BagiControlClient, headless: bool) -> None:
     client.call("perform_action", move("g1h1"))
     analysis = get_analysis(client)
     check(analysis["hint"] is None and analysis["hintRequested"] is False, f"the hint outlived the move: {analysis}")
-    check(analysis["evaluation"] is None, f"the evaluation of the old position outlived the move: {analysis}")
+    if manual:  # on the real clock a fast search may arrive before this read
+        check(analysis["evaluation"] is None, f"the evaluation of the old position outlived the move: {analysis}")
     wait_for_the_analysis(client, lambda a: a["evaluation"] is not None, "the evaluation of the next position")
 
     # A hint can be taken back; the game then ends with the analyst running (after quit the game must exit by itself, with no search holding it)

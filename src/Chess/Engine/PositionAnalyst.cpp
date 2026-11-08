@@ -45,7 +45,6 @@ namespace BECore::Chess {
     }
 
     void PositionAnalyst::SetPicked(OpponentEngine picked) {
-        _picked = picked;
         if (_search && _searchEngine != picked && !_search->token.IsCancelled()) {
             LOG_INFO("Position analyst ({}): the engine pick changed while the engine was analysing, the search is cancelled"_format(OpponentEngineId(_searchEngine)));
             _search->token.Cancel();

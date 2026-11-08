@@ -62,7 +62,7 @@ namespace BECore::Chess {
      *
      * SetState takes {"fen": ".."} (any position that Position::FromFen() accepts, which may be a finished game), {"opponent": {"plays": .., "level": ..,
      * "engine": ..}} (inside it a missing member means unchanged; plays is "white", "black" or null; level and engine an id, "stockfish" or "own" for the engine,
-     * exactly as written) or both; neither is invalid_params. Everything is checked before anything changes, so a refused call (invalid_params) changes nothing.
+     * exactly as written) or both; none of fen, opponent, analysis is invalid_params. Everything is checked before anything changes, so a refused call (invalid_params) changes nothing.
      * The opponent is applied first, then the position. SetState also takes {"analysis": {"evaluation": bool, "hint": bool}} (a missing member means unchanged; {} changes
      * nothing; "evaluation" switches the evaluation on or off, "hint": true asks for a hint for the position now on the board and "hint": false drops it); a wrong type or a member
      * that is not one of the two is invalid_params. **analysis cannot be combined with fen or opponent in one call** (invalid_params: the hint belongs to the position after them,
