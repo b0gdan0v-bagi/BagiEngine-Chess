@@ -39,8 +39,9 @@ namespace BECore::Chess {
      * Two things are wanted of the engine: the score of the position (the evaluation, switched on with SetEvaluation() and then kept up to date as the game goes) and the
      * best move (the hint, asked for the position now on the board with RequestHint()). One search serves both: IChessEngine::Analyse() answers a line, its move is the hint and
      * its score is the evaluation, so asking for both costs one search. The search asks for kAnalysisLines = 2 lines (MultiPV): the second line is kept next to the best one for GetLines() and
-     * changes neither the evaluation nor the hint (the best line is the first one, as for one line); a position with one legal move has one line. The owner of the model calls Update() once per frame
-     * on the main thread. When something is wanted and no answer is held for the position, Update() copies the game into a SearchRequest (SearchRequest::FromModel) and hands Analyse() to TaskManager
+     * changes neither the evaluation nor the hint (the best line is the first one, as for one line; exact for the own engine at its fixed
+     * depth, while Stockfish with MultiPV 2 in the same 2 s may search it a little shallower); a position with one legal move has one line. The owner of the model calls Update() once per frame on the
+     * main thread. When something is wanted and no answer is held for the position, Update() copies the game into a SearchRequest (SearchRequest::FromModel) and hands Analyse() to TaskManager
      * (the Background pool, where a call that blocks for seconds belongs); a later Update() finds the answer. One search runs at a time. TaskManager must be running (CoreManager starts it). Nothing
      * starts while nothing is switched on or asked, and never for a finished game.
      *
