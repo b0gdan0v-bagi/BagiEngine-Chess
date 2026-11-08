@@ -16,7 +16,7 @@ namespace BECore::Chess {
         eastl::string startFen;
         eastl::vector<Move> moves;
         SearchLimits limits;
-        /// How many lines IChessEngine::Analyse() returns (1..kMaxAnalysisLines, best first); FindMove() ignores it and always gives one move. The factories give 1
+        /// How many lines IChessEngine::Analyse() returns (1..kMaxAnalysisLines, best first); FindMove() always gives one move, but still validates it. The factories give 1
         int lines = 1;
 
         /// The game of @p model: its start FEN and its moves, repetitions included.

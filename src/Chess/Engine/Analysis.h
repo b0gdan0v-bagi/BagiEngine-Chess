@@ -35,10 +35,10 @@ namespace BECore::Chess {
      * @brief The answer to IChessEngine::Analyse(): the lines of the position, best first.
      *
      * Every line is a different legal move of the position with its own score, **all scores from the side to move** (line 2 is "the second best move
-     * and how the position stands if it is played"). Line 1 is the answer a request for one line gets (the same move; for OwnEngine also the same score
-     * and depth). There are as many lines as SearchRequest::lines asks for, but fewer when the position has fewer legal moves (a position with one legal
-     * move has one line, whatever was asked) or when the engine sent fewer: that is not an error. A successful analysis is never empty. The scores of
-     * the lines are not forced to fall: an engine that searches each line on its own (OwnEngine) may give line 2 a score a little above line 1's.
+     * and how the position stands if it is played"). Line 1 is the answer a request for one line gets at a fixed depth (the same move; for OwnEngine also the same score
+     * and depth; under a move time the searches are not repeatable, so neither are their lines). There are as many lines as SearchRequest::lines asks for, but fewer when the position has fewer legal
+     * moves (a position with one legal move has one line, whatever was asked) or when the engine sent fewer: that is not an error. A successful analysis is never empty. The scores of the lines are
+     * not forced to fall: an engine that searches each line on its own (OwnEngine) may give line 2 a score a little above line 1's.
      */
     struct Analysis {
         eastl::vector<AnalysisLine> lines;

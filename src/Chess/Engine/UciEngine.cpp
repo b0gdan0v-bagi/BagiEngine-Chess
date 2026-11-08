@@ -21,6 +21,8 @@ namespace BECore::Chess {
         constexpr eastl::string_view kUciOkReply = "uciok";
         constexpr eastl::string_view kReadyOkReply = "readyok";
         constexpr eastl::string_view kBestMoveReply = "bestmove";
+        constexpr eastl::string_view kMultiPvOption = "MultiPV";
+        constexpr int kSingleLine = 1;  // the lines of FindMove, and the value of `MultiPV` a new process has
 
         constexpr const char* kStockfishVariable = "STOCKFISH";
         constexpr const char* kPathVariable = "PATH";
@@ -48,32 +50,6 @@ namespace BECore::Chess {
             return UciProtocol::ParseBestMove(line).has_value();
         }
 
-        /// Keeps the `info` line an analysis is read from while the lines before `bestmove` go by: a line with a score of the main line (`multipv` 1).
-        /// The latest exact score wins; a bound (`lowerbound` / `upperbound`) is the answer only when no exact score came. `info string ...` is text, ParseInfo reads no score from it
-        class InfoCollector {
-        public:
-            void Offer(eastl::string_view line) {
-                const std::optional<UciProtocol::Info> info = UciProtocol::ParseInfo(line);
-                if (!info || !info->score || info->multiPv != 1) {
-                    return;
-                }
-                if (info->lowerBound || info->upperBound) {
-                    _bound = info;
-                } else {
-                    _exact = info;
-                }
-            }
-
-            /// The line to analyse from, nothing when no usable one was seen
-            [[nodiscard]] std::optional<UciProtocol::Info> Best() const {
-                return _exact ? _exact : _bound;
-            }
-
-        private:
-            std::optional<UciProtocol::Info> _exact;
-            std::optional<UciProtocol::Info> _bound;
-        };
-
         /**
          * Reads the lines of @p process until @p wanted likes one (the trimmed line is the answer), skipping `info` and every line it does not know.
          * Cancelled as soon as @p token is, Timeout after @p timeoutMs; the failures of the process (ProcessDied, ProtocolError) come back with
@@ -81,7 +57,7 @@ namespace BECore::Chess {
          * line that is skipped (the wait for `bestmove` passes one; the handshake and the answer to `stop` pass none).
          */
         std::expected<eastl::string, EngineError> ReadUntil(UciProcess& process, LinePredicate wanted, eastl::string_view what, int timeoutMs, const CancellationToken& token,
-                                                            InfoCollector* skipped = nullptr) {
+                                                            UciProtocol::LineCollector* skipped = nullptr) {
             const Clock::time_point deadline = Clock::now() + milliseconds(std::max(timeoutMs, 0));
             for (;;) {
                 if (token.IsCancelled()) {
@@ -179,7 +155,7 @@ namespace BECore::Chess {
 
     std::expected<Move, EngineError> UciEngine::FindMove(const SearchRequest& request, const CancellationToken& token) {
         const std::lock_guard lock(_mutex);
-        auto searched = RunSearch(request, token);
+        auto searched = RunSearch(request, kSingleLine, token);
         if (!searched) {
             return std::unexpected(std::move(searched.error()));
         }
@@ -188,19 +164,37 @@ namespace BECore::Chess {
 
     std::expected<Analysis, EngineError> UciEngine::Analyse(const SearchRequest& request, const CancellationToken& token) {
         const std::lock_guard lock(_mutex);
-        auto searched = RunSearch(request, token);
+        auto searched = RunSearch(request, request.lines, token);
         if (!searched) {
             return std::unexpected(std::move(searched.error()));
         }
         // The process is in step: it answered. A missing score is the engine's fault, not a reason to throw the process away
-        if (!searched->info) {
+        if (searched->infos.empty() || searched->infos.front().multiPv != 1) {
             return Fail(EngineErrorKind::ProtocolError, "the engine sent no score before its bestmove");
         }
-        const UciProtocol::Info& info = *searched->info;
-        return Analysis{{AnalysisLine{searched->move, *info.score, info.depth}}};
+        const UciProtocol::Info& main = searched->infos.front();
+        Analysis analysis{{AnalysisLine{searched->move, *main.score, main.depth}}};
+
+        // The other lines: the first move of the `pv` of their index, in the order of the index. A move that is not legal is the engine's fault (the process is kept, as for
+        // the `bestmove`); a repeat of a move already in the answer, and an index whose `pv` named nothing, are dropped, so the lines are always different moves
+        for (size_t at = 1; at < searched->infos.size(); ++at) {
+            const UciProtocol::Info& info = searched->infos[at];
+            if (info.firstPvMove.empty()) {
+                continue;
+            }
+            const std::optional<Move> move = MoveGenerator::ParseUci(searched->position, eastl::string_view(info.firstPvMove.data(), info.firstPvMove.size()));
+            if (!move) {
+                return Fail(EngineErrorKind::IllegalMove, Format("the engine answered '{}' for line {}, which is not legal in {}", info.firstPvMove, info.multiPv, searched->position.ToFen()));
+            }
+            const bool repeated = std::any_of(analysis.lines.begin(), analysis.lines.end(), [&move](const AnalysisLine& line) { return line.move == *move; });
+            if (!repeated) {
+                analysis.lines.push_back(AnalysisLine{*move, *info.score, info.depth});
+            }
+        }
+        return analysis;
     }
 
-    std::expected<UciEngine::Searched, EngineError> UciEngine::RunSearch(const SearchRequest& request, const CancellationToken& token) {
+    std::expected<UciEngine::Searched, EngineError> UciEngine::RunSearch(const SearchRequest& request, int lineCount, const CancellationToken& token) {
         if (auto valid = request.Validate(); !valid) {
             return std::unexpected(std::move(valid.error()));
         }
@@ -215,12 +209,12 @@ namespace BECore::Chess {
             return Fail(EngineErrorKind::Cancelled, "cancelled before the search started");
         }
 
-        if (auto begun = Begin(request, token); !begun) {
+        if (auto begun = Begin(request, lineCount, token); !begun) {
             return CloseAndFail(std::move(begun.error()));
         }
         const SearchLimits& limits = request.limits;
         const int timeoutMs = limits.moveTimeMs > 0 ? AnswerDeadlineMs(limits.moveTimeMs, _settings.answerSlackMs) : _settings.depthOnlyTimeoutMs;
-        InfoCollector infos;
+        UciProtocol::LineCollector infos(lineCount);
         const auto answer = ReadUntil(*_process, IsBestMove, kBestMoveReply, timeoutMs, token, &infos);
         if (!answer) {
             if (answer.error().kind == EngineErrorKind::Cancelled) {
@@ -238,10 +232,10 @@ namespace BECore::Chess {
         if (!move) {
             return Fail(EngineErrorKind::IllegalMove, Format("the engine answered '{}', which is not legal in {}", best->move, position->ToFen()));
         }
-        return Searched{*move, infos.Best()};
+        return Searched{*move, *position, infos.Lines()};
     }
 
-    std::expected<void, EngineError> UciEngine::Begin(const SearchRequest& request, const CancellationToken& token) {
+    std::expected<void, EngineError> UciEngine::Begin(const SearchRequest& request, int lineCount, const CancellationToken& token) {
         if (_process && !_process->IsRunning()) {
             CloseProcess();  // it left while nobody was asking: the next one is a new process
         }
@@ -263,6 +257,15 @@ namespace BECore::Chess {
             if (auto ready = WaitUntilReady(token); !ready) {
                 return ready;
             }
+        }
+        // The engine reads its input in order, so the option needs no `isready` of its own. A process has 1 line until told otherwise (the handshake does not touch the option),
+        // and a search for one line puts it back, so the opponent's own search is never slowed by a line count an analysis left
+        if (lineCount != _multiPv) {
+            const eastl::string value = Format("{}", lineCount);
+            if (auto sent = Send(UciProtocol::SetOptionCommand(kMultiPvOption, eastl::string_view(value.data(), value.size()))); !sent) {
+                return sent;
+            }
+            _multiPv = lineCount;
         }
         if (auto sent = Send(UciProtocol::PositionCommand(request)); !sent) {
             return sent;
@@ -334,6 +337,7 @@ namespace BECore::Chess {
         _process->Close(milliseconds(std::max(_settings.quitGraceMs, 0)));
         _process.reset();
         _previous.reset();
+        _multiPv = kSingleLine;
     }
 
     std::optional<eastl::string> FindStockfish(eastl::string_view explicitPath) {

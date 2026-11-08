@@ -50,7 +50,7 @@ namespace BECore::Chess {
          *
          * The contract of FindMove(): the request is validated (BadRequest), a finished game is NoMove before any search or process, a cancelled
          * @p token is Cancelled, and a returned move is legal in the position (IllegalMove otherwise). The score is from the side to move.
-         * SearchRequest::lines asks for several lines (the best moves, best first, see Analysis): one by default, and FindMove() never reads it.
+         * SearchRequest::lines asks for several lines (the best moves, best first, see Analysis): one by default; FindMove() gives one move whatever it says, but still validates it.
          * Not pure: an engine that does not analyse keeps this default, which answers Unsupported, so the doubles of the tests and every other
          * implementation stay as they are. An engine that wraps another one forwards the call.
          */

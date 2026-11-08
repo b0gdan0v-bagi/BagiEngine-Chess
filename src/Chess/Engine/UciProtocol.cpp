@@ -156,6 +156,31 @@ namespace BECore::Chess {
             return text.substr(first, last - first + 1);
         }
 
+        LineCollector::LineCollector(int lineCount) : _exact(static_cast<size_t>(std::max(lineCount, 1))), _bound(static_cast<size_t>(std::max(lineCount, 1))) {}
+
+        void LineCollector::Offer(eastl::string_view line) {
+            const std::optional<Info> info = ParseInfo(line);
+            if (!info || !info->score || info->multiPv < 1 || static_cast<size_t>(info->multiPv) > _exact.size()) {
+                return;
+            }
+            const size_t slot = static_cast<size_t>(info->multiPv) - 1;
+            if (info->lowerBound || info->upperBound) {
+                _bound[slot] = info;
+            } else {
+                _exact[slot] = info;
+            }
+        }
+
+        eastl::vector<Info> LineCollector::Lines() const {
+            eastl::vector<Info> lines;
+            for (size_t slot = 0; slot < _exact.size(); ++slot) {
+                if (const std::optional<Info>& kept = _exact[slot] ? _exact[slot] : _bound[slot]) {
+                    lines.push_back(*kept);
+                }
+            }
+            return lines;
+        }
+
     }  // namespace UciProtocol
 
 }  // namespace BECore::Chess

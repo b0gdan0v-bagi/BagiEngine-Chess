@@ -341,6 +341,83 @@ namespace BECore::Chess::Tests {
         EXPECT_LT(line->score.value, 0) << "from the side to move, White here: " << ScoreText(line->score).c_str();
     }
 
+    // -- Several lines (MultiPV) ------------------------------------------------------------------------------------------------
+
+    TEST(StockfishPositionTest, ThreeLinesFromTheStartAreThreeLegalMovesWithScoresThatDoNotRise) {
+        SKIP_WITHOUT_STOCKFISH(stockfish);
+        SearchRequest request = RequestFor(Position::kStartFen);
+        request.lines = 3;
+
+        const auto result = Analyse(*stockfish, request);
+
+        ASSERT_TRUE(result.has_value()) << Describe(result.error()).c_str();
+        ASSERT_EQ(result->LineCount(), 3u);
+        const Position start = PositionFromFen(Position::kStartFen);
+        for (size_t at = 0; at < result->lines.size(); ++at) {
+            const AnalysisLine& line = result->lines[at];
+            EXPECT_TRUE(MoveGenerator::ParseUci(start, line.move.ToUci()).has_value()) << line.move.ToUci().c_str();
+            EXPECT_EQ(line.score.kind, AnalysisScoreKind::Centipawns) << ScoreText(line.score).c_str();
+            EXPECT_GE(line.depth, 1);
+            for (size_t before = 0; before < at; ++before) {
+                EXPECT_NE(line.move, result->lines[before].move) << "line " << at + 1 << " repeats line " << before + 1;
+            }
+            if (at > 0) {
+                EXPECT_LE(line.score.value, result->lines[at - 1].score.value) << "line " << at + 1 << " " << ScoreText(line.score).c_str();
+            }
+        }
+    }
+
+    TEST(StockfishPositionTest, WithAHangingQueenLineOneTakesItAndLineTwoIsWorseByAClearMargin) {
+        SKIP_WITHOUT_STOCKFISH(stockfish);
+        SearchRequest request = RequestFor(kHangingQueenFen);
+        request.lines = 2;
+
+        const auto result = Analyse(*stockfish, request);
+
+        ASSERT_TRUE(result.has_value()) << Describe(result.error()).c_str();
+        ASSERT_NE(result->Second(), nullptr);
+        EXPECT_EQ(result->Best().move.ToUci(), "d1d5");
+        EXPECT_EQ(result->Best().score.kind, AnalysisScoreKind::Centipawns);
+        EXPECT_EQ(result->Second()->score.kind, AnalysisScoreKind::Centipawns) << ScoreText(result->Second()->score).c_str();
+        // Both from the side to move, White: not taking the queen leaves the rook to it, about a queen and a rook of difference
+        EXPECT_GT(result->Best().score.value - result->Second()->score.value, 300) << ScoreText(result->Best().score).c_str() << " against " << ScoreText(result->Second()->score).c_str();
+    }
+
+    TEST(StockfishPositionTest, APositionWithTwoLegalMovesGivesTwoLinesForFourAsked) {
+        SKIP_WITHOUT_STOCKFISH(stockfish);
+        // The white king on a1 is checked by the bishop on d4; it steps to a2 or b1 and nothing else is legal
+        constexpr eastl::string_view kTwoMovesFen = "7k/p7/8/8/3b4/8/7P/K7 w - - 0 1";
+        ASSERT_EQ(MoveGenerator::GenerateLegal(PositionFromFen(kTwoMovesFen)).size(), 2u);
+        SearchRequest request = RequestFor(kTwoMovesFen);
+        request.lines = 4;
+
+        const auto result = Analyse(*stockfish, request);
+
+        ASSERT_TRUE(result.has_value()) << Describe(result.error()).c_str();
+        ASSERT_EQ(result->LineCount(), 2u);
+        EXPECT_NE(result->Best().move, result->Second()->move);
+    }
+
+    TEST(StockfishPositionTest, ARealEngineTakesMultiPVAndThenOneLineAgainOnOneProcess) {
+        SKIP_WITHOUT_STOCKFISH(stockfish);
+        UciEngine engine(StockfishSettings(*stockfish));
+        SearchRequest request = RequestFor(kMateInOneFen);
+        request.lines = 3;
+
+        const auto many = engine.Analyse(request, CancellationToken());
+        request.lines = 1;
+        const auto one = engine.Analyse(request, CancellationToken());
+        const auto played = engine.FindMove(request, CancellationToken());
+
+        ASSERT_TRUE(many.has_value()) << Describe(many.error()).c_str();
+        ASSERT_TRUE(one.has_value()) << Describe(one.error()).c_str();
+        ASSERT_TRUE(played.has_value()) << Describe(played.error()).c_str();
+        EXPECT_EQ(many->Best().move.ToUci(), "a1a8");
+        EXPECT_EQ(one->LineCount(), 1u);
+        EXPECT_EQ(one->Best().move.ToUci(), "a1a8");
+        EXPECT_EQ(played->ToUci(), "a1a8");
+    }
+
     TEST(StockfishPositionTest, AnalysisOfAMatedGameHasNoLineToGive) {
         SKIP_WITHOUT_STOCKFISH(stockfish);
 

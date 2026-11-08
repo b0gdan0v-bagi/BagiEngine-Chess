@@ -82,7 +82,7 @@ namespace BECore::Chess {
             return prepared.start + std::chrono::milliseconds(shareMs);
         }
 
-        /// The search of FindMove() and of a one-line Analyse(): the whole move time, no root move excluded
+        /// The search of FindMove(): the whole move time, no root move excluded (Analyse() prepares and searches by itself, line by line)
         std::expected<SearchResult, EngineError> RunSearch(const SearchRequest& request, const CancellationToken& token) {
             auto prepared = Prepare(request, token);
             if (!prepared) {

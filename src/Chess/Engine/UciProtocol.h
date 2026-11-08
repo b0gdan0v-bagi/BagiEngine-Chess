@@ -57,6 +57,28 @@ namespace BECore::Chess {
         /// @p text without the spaces, `\r` and `\n` at both ends: a child on Windows ends its lines with `\r\n`. A view into @p text
         [[nodiscard]] eastl::string_view TrimLine(eastl::string_view text);
 
+        /**
+         * @brief Keeps, from the `info` lines an engine sends while it searches, the line of each `multipv` index 1..N that an analysis is read from. Pure: no process.
+         *
+         * Offer() every line that is not `bestmove` (any line, in the order it came: what is not an `info` line, has no score, is `info string` text or has an index above N is
+         * ignored). Per index the latest exact score wins (the engine deepens: a later line is the deeper one); a bound (`lowerbound` / `upperbound`) is the answer for an index only
+         * when no exact score came for it. An index that never had a usable line is missing from Lines(). A single-line search sends no `multipv` word, which ParseInfo reads as 1.
+         */
+        class LineCollector {
+        public:
+            /// @p lineCount is how many lines the search was asked for (the value of `MultiPV`), at least 1
+            explicit LineCollector(int lineCount);
+
+            void Offer(eastl::string_view line);
+
+            /// The kept lines, in the order of their `multipv` index (Info::multiPv, from 1), the indices that had no usable line left out
+            [[nodiscard]] eastl::vector<Info> Lines() const;
+
+        private:
+            eastl::vector<std::optional<Info>> _exact;  ///< by index - 1
+            eastl::vector<std::optional<Info>> _bound;
+        };
+
     }  // namespace UciProtocol
 
 }  // namespace BECore::Chess

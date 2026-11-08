@@ -72,14 +72,20 @@ namespace BECore::Chess {
         [[nodiscard]] std::expected<Move, EngineError> FindMove(const SearchRequest& request, const CancellationToken& token) override;
 
         /**
-         * @brief The best move and how the position stands, one line.
+         * @brief The best move and how the position stands: `request.lines` lines (Analysis.h), best first, one by default.
          *
          * The same search as FindMove(): the same `position` and `go` (so the limits are the same: a `movetime` has the deadline `moveTimeMs + answerSlackMs`, a
-         * depth without time `depthOnlyTimeoutMs`), the same errors and the same effect on the process (what closes it, what keeps it, `ucinewgame`). The line is the
+         * depth without time `depthOnlyTimeoutMs`), the same errors and the same effect on the process (what closes it, what keeps it, `ucinewgame`). Line 1 is the
          * `bestmove` (checked against the position like FindMove's) with the score and the depth of the last `info` line before it that carries a score of the main line
-         * (`multipv` 1; `info string` text and other lines of a `MultiPV` search are not read); a `lowerbound` / `upperbound` score is used only when no exact one came.
-         * The score is from the side to move already, as UCI sends it, and is not turned. An engine that answers `bestmove` with no scored `info` line before it is
+         * (`multipv` 1; `info string` text is not read); a `lowerbound` / `upperbound` score is used only when no exact one came. The score is from the side to move
+         * already, as UCI sends it, and is not turned. An engine that answers `bestmove` with no scored `info` line of index 1 before it is
          * ProtocolError ("sent no score"); the process is kept, it is in step.
+         *
+         * More than one line: `setoption name MultiPV value N` is sent before `position` when the process has another value (a new process has 1; a search for one line,
+         * `FindMove()` included, sends `MultiPV 1` again, so the opponent's search is never slowed by an analysis on the same object), and each index 2..N gives its line
+         * from the last scored `info` line of that index: the first move of its `pv` with its score and depth. A move that is not legal is IllegalMove (the process is kept);
+         * a move that is already a line, and an index with no usable line, are dropped, so the answer may have fewer lines than asked (an engine sends fewer when the
+         * position has fewer legal moves; that is not an error).
          *
          * One search at a time, FindMove() and Analyse() share the mutex: a game that must analyse while the program plays gives the analysis an engine object of its own
          * (a second process), or the opponent's search would wait for it.
@@ -87,17 +93,20 @@ namespace BECore::Chess {
         [[nodiscard]] std::expected<Analysis, EngineError> Analyse(const SearchRequest& request, const CancellationToken& token) override;
 
     private:
-        /// What a finished search leaves: the move (legal in the position of the request) and the `info` line to analyse from, when one was seen
+        /// What a finished search leaves: the move (legal in @p position, the position of the request) and the `info` lines to analyse from, one per `multipv` index
+        /// that had a usable score, in the order of the index (UciProtocol::LineCollector)
         struct Searched {
             Move move;
-            std::optional<UciProtocol::Info> info;
+            Position position;
+            eastl::vector<UciProtocol::Info> infos;
         };
 
-        /// The whole of FindMove() and Analyse(), with the mutex already held: validation, NoMove, Cancelled, Begin(), the wait for `bestmove` (StopSearch(), CloseAndFail()), the move checked
-        [[nodiscard]] std::expected<Searched, EngineError> RunSearch(const SearchRequest& request, const CancellationToken& token);
-        /// Everything up to and including `go`: the process (started and shaken hands with when there is none), a new game when it is one, `position`, `go`.
-        /// On an error the process is in an unknown state; the caller closes it
-        [[nodiscard]] std::expected<void, EngineError> Begin(const SearchRequest& request, const CancellationToken& token);
+        /// The whole of FindMove() and Analyse(), with the mutex already held: validation, NoMove, Cancelled, Begin(), the wait for `bestmove` (StopSearch(), CloseAndFail()), the move checked.
+        /// @p lineCount is the `MultiPV` of the search: 1 for FindMove(), `request.lines` for Analyse()
+        [[nodiscard]] std::expected<Searched, EngineError> RunSearch(const SearchRequest& request, int lineCount, const CancellationToken& token);
+        /// Everything up to and including `go`: the process (started and shaken hands with when there is none), a new game when it is one, `MultiPV` when @p lineCount is not
+        /// what the process has, `position`, `go`. On an error the process is in an unknown state; the caller closes it
+        [[nodiscard]] std::expected<void, EngineError> Begin(const SearchRequest& request, int lineCount, const CancellationToken& token);
         [[nodiscard]] std::expected<void, EngineError> Handshake(const CancellationToken& token);
         [[nodiscard]] std::expected<void, EngineError> WaitUntilReady(const CancellationToken& token);
         [[nodiscard]] std::expected<void, EngineError> Send(eastl::string_view command);
@@ -112,6 +121,7 @@ namespace BECore::Chess {
         std::mutex _mutex;                       ///< held for the whole of FindMove() and Analyse(): everything below is touched under it only
         eastl::unique_ptr<UciProcess> _process;  ///< null until the first search and after an error closed it
         std::optional<SearchRequest> _previous;  ///< the request the running process was last given; none for a process that has had no search
+        int _multiPv = 1;                        ///< the `MultiPV` the running process has been told (1 for a new one, and again once it is closed)
     };
 
     /**
