@@ -34,6 +34,15 @@ namespace BECore::Chess {
         /// "Most valuable victim, least valuable attacker": the victim's kind counts kVictimWeight times, the attacker's kind once
         /// (the kinds are 1..6, so the weight is above the largest)
         constexpr int kVictimWeight = 8;
+        // Quiet moves, below the promotions: the two killers of the ply, then the history, which is kept under kHistoryMax so
+        // that it never reaches the second killer
+        constexpr int kFirstKillerScore = 1 << 15;
+        constexpr int kSecondKillerScore = kFirstKillerScore - 1;
+        constexpr int kHistoryMax = 1 << 14;
+        static_assert(kHistoryMax < kSecondKillerScore && kSecondKillerScore < kFirstKillerScore && kFirstKillerScore < kPromotionScore);
+        /// Order() is given this ply by the nodes that do not use killers and history
+        constexpr int kNoKillerPly = -1;
+        constexpr int kKillersPerPly = 2;
 
         struct ScoredMove {
             Move move;
@@ -82,6 +91,53 @@ namespace BECore::Chess {
             return IsMateScore(score) && kMateScore - (score > 0 ? score : -score) <= depth;
         }
 
+        /// The killers and the history of one search, zeroed per call; no heap
+        class QuietMoves {
+        public:
+            /// The order score of a quiet move of @p color at @p ply: a killer of the ply, else its history
+            [[nodiscard]] int Score(Move move, PieceColor color, int ply) const noexcept {
+                const Move* killers = _killers[ply];
+                if (move == killers[0]) {
+                    return kFirstKillerScore;
+                }
+                if (move == killers[1]) {
+                    return kSecondKillerScore;
+                }
+                return _history[static_cast<size_t>(color)][move.FromIndex()][move.ToIndex()];
+            }
+
+            /// A quiet @p move cut off a node of @p depth plies at @p ply: it becomes the first killer (the one it pushes aside
+            /// the second) and its history grows by depth squared
+            void Reward(Move move, PieceColor color, int ply, int depth) noexcept {
+                Move* killers = _killers[ply];
+                if (killers[0] != move) {
+                    killers[1] = killers[0];
+                    killers[0] = move;
+                }
+                int& entry = _history[static_cast<size_t>(color)][move.FromIndex()][move.ToIndex()];
+                const int bonus = eastl::min(depth * depth, kHistoryMax);
+                if (entry + bonus > kHistoryMax) {
+                    Halve();
+                }
+                entry += bonus;
+            }
+
+        private:
+            /// Keeps the order of the entries and makes room: the whole table, so the entries stay comparable
+            void Halve() noexcept {
+                for (auto& perColor : _history) {
+                    for (auto& perFrom : perColor) {
+                        for (int& entry : perFrom) {
+                            entry /= 2;
+                        }
+                    }
+                }
+            }
+
+            Move _killers[kMaxPly + 1][kKillersPerPly] = {};
+            int _history[2][kSquareCount][kSquareCount] = {};
+        };
+
         class Searcher {
         public:
             Searcher(Position& position, const SearchSettings& settings, const SearchControl& control) : _position(position), _settings(settings), _control(control) {}
@@ -92,7 +148,8 @@ namespace BECore::Chess {
             /// Counts a node and looks at the limits: the node limit in every node, the clock and the token every kSearchPollInterval
             void CountNode() noexcept;
             [[nodiscard]] bool LimitsReached() const;
-            [[nodiscard]] ScoredMoves Order(const MoveList& moves, Move preferred) const;
+            /// @p ply is where the killers are looked up; kNoKillerPly orders the quiet moves as the generator gave them
+            [[nodiscard]] ScoredMoves Order(const MoveList& moves, Move preferred, int ply = kNoKillerPly) const;
 
             int SearchRoot(int depth, const MoveList& rootMoves, Move& best);
             int Negamax(int depth, int alpha, int beta, int ply);
@@ -105,6 +162,7 @@ namespace BECore::Chess {
             bool _stopped = false;
             /// Off during the first iteration, which must finish
             bool _stopEnabled = false;
+            QuietMoves _quiet;
         };
 
         void Searcher::CountNode() noexcept {
@@ -129,10 +187,16 @@ namespace BECore::Chess {
             return _control.nodeLimit != 0 && _nodes >= _control.nodeLimit;
         }
 
-        ScoredMoves Searcher::Order(const MoveList& moves, Move preferred) const {
+        ScoredMoves Searcher::Order(const MoveList& moves, Move preferred, int ply) const {
+            const bool useQuiet = _settings.quietOrdering && ply != kNoKillerPly;
+            const PieceColor color = _position.SideToMove();
             ScoredMoves scored;
             for (const Move move : moves) {
-                scored.push_back(ScoredMove{move, OrderScore(_position, move, preferred)});
+                int score = OrderScore(_position, move, preferred);
+                if (useQuiet && score == 0) {
+                    score = _quiet.Score(move, color, ply);
+                }
+                scored.push_back(ScoredMove{move, score});
             }
             return scored;
         }
@@ -165,11 +229,14 @@ namespace BECore::Chess {
                 return kDrawScore;
             }
 
-            ScoredMoves scored = Order(moves, Move{});
+            ScoredMoves scored = Order(moves, Move{}, ply);
             int best = -kInfinity;
             for (size_t i = 0; i < scored.size(); ++i) {
                 PickBest(scored, i);
-                _position.DoMove(scored[i].move);
+                const Move move = scored[i].move;
+                const bool quiet = !IsCapture(_position, move) && !move.IsPromotion();
+                const PieceColor mover = _position.SideToMove();
+                _position.DoMove(move);
                 const int score = -Negamax(depth - 1, -beta, -alpha, ply + 1);
                 _position.UndoMove();
                 if (_stopped) {
@@ -180,6 +247,9 @@ namespace BECore::Chess {
                     if (score > alpha) {
                         alpha = score;
                         if (alpha >= beta) {
+                            if (quiet && _settings.quietOrdering) {
+                                _quiet.Reward(move, mover, ply, depth);
+                            }
                             break;
                         }
                     }

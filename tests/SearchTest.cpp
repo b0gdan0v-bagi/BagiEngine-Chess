@@ -16,6 +16,7 @@ namespace BECore::Chess::Tests {
         constexpr int kMateInOneDepth = 2;
         constexpr int kMateInTwoDepth = 4;
         constexpr int kMinimaxDepth = 3;
+        constexpr int kOrderingDepth = 4;
         /// A queen is worth well over this, so a score above it is "a queen up"
         constexpr int kQueenUpScore = 500;
         constexpr int kDeepDepth = 64;
@@ -368,6 +369,50 @@ namespace BECore::Chess::Tests {
         }
     }
 
+    TEST(SearchTest, QuietOrderingSearchesFewerNodes) {
+        // The killers and the history put the quiet moves that cut off before the ones that do not: the same depth in fewer nodes.
+        // Measured at depth 4 (ordered / plain): start 4228 / 25970, position 3 9204 / 16556, position 5 26448 / 26566, position 6
+        // 83208 / 83837. Kiwipete and position 4 are so tactical that a capture cuts every node a quiet move could: the two orders
+        // search them the same. So: never more nodes, fewer on the other four, fewer in the sum
+        uint64_t orderedTotal = 0;
+        uint64_t plainTotal = 0;
+        int better = 0;
+        for (const eastl::string_view fen : kPerftFens) {
+            Position position = PositionFromFen(fen);
+            SearchSettings settings;
+            settings.maxDepth = kOrderingDepth;
+            const SearchResult ordered = Search(position, settings);
+            settings.quietOrdering = false;
+            const SearchResult plain = Search(position, settings);
+
+            EXPECT_LE(ordered.nodes, plain.nodes) << fen.data();
+            EXPECT_TRUE(IsLegalIn(position, ordered.best)) << fen.data();
+            better += ordered.nodes < plain.nodes ? 1 : 0;
+            orderedTotal += ordered.nodes;
+            plainTotal += plain.nodes;
+        }
+        EXPECT_EQ(better, 4);
+        EXPECT_LT(orderedTotal, plainTotal);
+    }
+
+    TEST(SearchTest, QuietOrderingKeepsTheScoreOfPlainAlphaBeta) {
+        // Without the quiescence search and the extension every score is exact whatever the order of the moves, so the two
+        // orders must agree on it (the best move may differ between equal moves)
+        for (const eastl::string_view fen : kPerftFens) {
+            Position position = PositionFromFen(fen);
+            SearchSettings settings;
+            settings.maxDepth = kOrderingDepth;
+            settings.quiescence = false;
+            settings.checkExtension = false;
+            const SearchResult ordered = Search(position, settings);
+            settings.quietOrdering = false;
+            const SearchResult plain = Search(position, settings);
+
+            EXPECT_EQ(ordered.score, plain.score) << fen.data();
+            EXPECT_EQ(ordered.depth, plain.depth) << fen.data();
+        }
+    }
+
     // -- determinism and hand-back -------------------------------------------------------------------------------------------
 
     TEST(SearchTest, TheSameSearchGivesTheSameResult) {
@@ -387,13 +432,14 @@ namespace BECore::Chess::Tests {
 
     TEST(SearchTest, TheNumbersAreTheSameOnEveryPlatform) {
         // Pinned: the order of equal moves is the generator's, so these do not change with the compiler, the library or the machine.
-        // They are not a measure of strength; a change of the evaluation or of the ordering moves them, and then they are rewritten
+        // Kiwipete at depth 3 is the same as before the killers and the history (no quiet move cuts a node there); the start position
+        // has 1246 nodes (2845 with the old order). They are not a measure of strength; a change of the evaluation or of the ordering moves them, and then they are rewritten
         const SearchResult start = SearchFen(Position::kStartFen, 3);
         const SearchResult kiwipete = SearchFen(kKiwipeteFen, 3);
 
         EXPECT_EQ(start.best, Mv("b1c3"));
         EXPECT_EQ(start.score, 50);
-        EXPECT_EQ(start.nodes, 2845U);
+        EXPECT_EQ(start.nodes, 1246U);
         EXPECT_EQ(kiwipete.best, Mv("e2a6"));
         EXPECT_EQ(kiwipete.score, 45);
         EXPECT_EQ(kiwipete.nodes, 32789U);

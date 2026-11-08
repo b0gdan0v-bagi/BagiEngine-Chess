@@ -22,6 +22,9 @@ namespace BECore::Chess {
         bool quiescence = true;
         /// Whether a node in check is searched one ply deeper. Switched off for the same comparison
         bool checkExtension = true;
+        /// Whether the quiet moves of a node are tried in the order of the killer moves and the history table (below) instead of the
+        /// generator's. Switched off, the order is the old one (captures, promotions, generator order); the tests compare the two
+        bool quietOrdering = true;
     };
 
     /// When to stop. A search with the default control runs to SearchSettings::maxDepth.
@@ -57,8 +60,11 @@ namespace BECore::Chess {
      * Iteration d searches every line d plies deep (a check does not use up a ply, up to a ply limit), then captures and
      * promotions until the position is quiet (quiescence, with the static score as a stand-pat), and the best move of the
      * last finished iteration is the answer. Moves are tried best-first: the move that was best in the previous iteration at the
-     * root, then captures by "most valuable victim, least valuable attacker", then promotions, then the rest in the order of
-     * MoveGenerator; the order is stable, so ties never depend on the platform.
+     * root, then captures by "most valuable victim, least valuable attacker", then promotions, then the two killer moves of the
+     * ply (quiet moves that cut off a sibling node at the same ply), then the other quiet moves by their history score (how
+     * often and how deep a quiet move from square to square has cut off, per color), then the rest in the order of
+     * MoveGenerator; the order is stable, so ties never depend on the platform. Killers and history are learned in the one
+     * call and used in the full-width nodes only (not at the root, not in quiescence).
      *
      * Scores are from the side to move. Being mated at a ply p from the root scores -MateIn(p), so a shorter mate is
      * preferred and a longer defense. Inside the tree, a stalemate, insufficient material, 50 moves without progress and a
