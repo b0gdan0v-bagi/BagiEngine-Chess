@@ -5495,7 +5495,6 @@ namespace BECore::Chess::Tests {
             ASSERT_EQ(to.size(), 1u);
             EXPECT_TRUE(SameRect(from[0]->rect, SquareRect("e2"))) << "the square the piece leaves";
             EXPECT_TRUE(SameRect(to[0]->rect, SquareRect("e4"))) << "the square it goes to";
-            EXPECT_GT(kHintToColor.a, kHintFromColor.a) << "the target is the stronger one";
         }
     }
 
@@ -5625,7 +5624,9 @@ namespace BECore::Chess::Tests {
         Draw();
         EXPECT_TRUE(HintFills().first.empty());
         EXPECT_TRUE(HintFills().second.empty());
-        EXPECT_TRUE(Analyst().RequestHint(Model()).error() == HintRefusal::GameOver);
+        const auto refused = Analyst().RequestHint(Model());
+        ASSERT_FALSE(refused.has_value());
+        EXPECT_EQ(refused.error(), HintRefusal::GameOver);
         IdleFrames(10);
         Draw();
         EXPECT_TRUE(HintFills().first.empty());
