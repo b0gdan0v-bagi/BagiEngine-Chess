@@ -521,7 +521,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(lines[1].score, Mate(-2));
     }
 
-    TEST(UciProtocolTest, AMultiPvIndexBelowOneIsNeverKept) {
+    TEST(UciProtocolTest, AMultiPvIndexBelowOneIsReadAsTheMainLine) {
         // ParseInfo keeps the default 1 for a zero or negative index, so such a line is the main line
         const eastl::vector<UciProtocol::Info> lines = Collect(2, {"info depth 2 multipv 0 score cp 7 pv e2e4"}).Lines();
 

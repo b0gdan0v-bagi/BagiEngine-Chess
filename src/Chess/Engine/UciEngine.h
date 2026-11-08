@@ -93,6 +93,8 @@ namespace BECore::Chess {
         [[nodiscard]] std::expected<Analysis, EngineError> Analyse(const SearchRequest& request, const CancellationToken& token) override;
 
     private:
+        static constexpr int kSingleLine = 1;  ///< the lines of FindMove(), and the value of `MultiPV` a new process has
+
         /// What a finished search leaves: the move (legal in @p position, the position of the request) and the `info` lines to analyse from, one per `multipv` index
         /// that had a usable score, in the order of the index (UciProtocol::LineCollector)
         struct Searched {
@@ -121,7 +123,7 @@ namespace BECore::Chess {
         std::mutex _mutex;                       ///< held for the whole of FindMove() and Analyse(): everything below is touched under it only
         eastl::unique_ptr<UciProcess> _process;  ///< null until the first search and after an error closed it
         std::optional<SearchRequest> _previous;  ///< the request the running process was last given; none for a process that has had no search
-        int _multiPv = 1;                        ///< the `MultiPV` the running process has been told (1 for a new one, and again once it is closed)
+        int _multiPv = kSingleLine;              ///< the `MultiPV` the running process has been told (1 for a new one, and again once it is closed)
     };
 
     /**

@@ -22,7 +22,6 @@ namespace BECore::Chess {
         constexpr eastl::string_view kReadyOkReply = "readyok";
         constexpr eastl::string_view kBestMoveReply = "bestmove";
         constexpr eastl::string_view kMultiPvOption = "MultiPV";
-        constexpr int kSingleLine = 1;  // the lines of FindMove, and the value of `MultiPV` a new process has
 
         constexpr const char* kStockfishVariable = "STOCKFISH";
         constexpr const char* kPathVariable = "PATH";

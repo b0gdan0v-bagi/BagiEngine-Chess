@@ -15,7 +15,7 @@ It answers `uci` with `id name`, `id author`, one option (`Skill Level`) and `uc
     --noisy-info         around the final `info` line (depth 2, the score of --scores) print lines an analysis must not take: an earlier depth
                          (cp -321), the same depth as a bound (cp 654 lowerbound), a second line of the search (multipv 2, mate 7), a text
                          line (`info string score cp 999`) and, after the final line, a bound again (mate -9 upperbound)
-    --no-score           the final `info` line carries no `score` (the noise lines of --noisy-info keep theirs)
+    --no-score           the final `info` line carries no `score`; with --lines and `MultiPV` above 1 no line of either depth does (the noise lines of --noisy-info keep theirs)
     --lines m:k:v,...    a search with several lines, the same for every `go`: `e2e4:cp:30,d2d4:cp:20,g1f3:mate:3` (move, then the score as in --scores). The
                          `bestmove` is the first move (--moves is not used) and its score is the first score (--scores is not used). With `MultiPV` 1 (the
                          start, and after `setoption name MultiPV value 1`) the `info` line is the one of today, `info depth 1 score <first score> pv <first move>`.
@@ -238,7 +238,8 @@ class FakeEngine:
     def say_multipv_lines(self) -> None:
         """--lines with `MultiPV` above 1: an earlier depth whose scores must not be taken, then the scripted lines, each depth in the order of the index."""
         count = min(self._multipv, len(self._script))
-        for depth, score_of in ((1, lambda _: f" score cp {NOISE_EARLIER_CP}"), (2, lambda text: self.words_of(text))):
+        earlier = "" if self._options.no_score else f" score cp {NOISE_EARLIER_CP}"
+        for depth, score_of in ((1, lambda _: earlier), (2, lambda text: self.words_of(text))):
             for number, (move, score) in enumerate(self._script[:count], start=1):
                 self.say(f"info depth {depth} multipv {number}{score_of(score)} pv {move}")
 

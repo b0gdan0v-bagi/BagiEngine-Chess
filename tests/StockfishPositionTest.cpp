@@ -379,7 +379,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(result->Best().move.ToUci(), "d1d5");
         EXPECT_EQ(result->Best().score.kind, AnalysisScoreKind::Centipawns);
         EXPECT_EQ(result->Second()->score.kind, AnalysisScoreKind::Centipawns) << ScoreText(result->Second()->score).c_str();
-        // Both from the side to move, White: not taking the queen leaves the rook to it, about a queen and a rook of difference
+        // Both from the side to move, White: line 2 leaves the queen on the board, so White is a queen-for-rook down at best, far below the capture
         EXPECT_GT(result->Best().score.value - result->Second()->score.value, 300) << ScoreText(result->Best().score).c_str() << " against " << ScoreText(result->Second()->score).c_str();
     }
 
