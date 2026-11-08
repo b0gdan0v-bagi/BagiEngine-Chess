@@ -47,7 +47,7 @@ ENGINE_TESTS_DIR = find_engine_tests_dir()
 sys.path.insert(0, str(ENGINE_TESTS_DIR))  # smoke.py
 sys.path.insert(0, str(ENGINE_TESTS_DIR.parent))  # bagi_control_client.py
 
-from bagi_control_client import BagiControlClient  # noqa: E402
+from bagi_control_client import BagiControlClient, ControlError  # noqa: E402
 from smoke import BOARD_COLORS, check, check_state_push, expect_error, find_ui_element, run_smoke, take_screenshot  # noqa: E402
 
 START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
@@ -398,9 +398,23 @@ def check_the_watch_is_set(client: BagiControlClient, plays) -> None:
     check(opponent["seats"] == WATCH_SEATS, f"the seats were not kept: {opponent['seats']}")
 
 
-def check_a_hint_is_refused(client: BagiControlClient) -> None:
-    """A hint is for the person: while a program plays the side to move it is refused, and the switch of that call is not applied either."""
-    expect_error("not_your_turn", lambda: client.call("set_state", {"analysis": {"evaluation": True, "hint": True}}), "a hint while the programs play")
+def check_a_hint_is_refused(client: BagiControlClient, may_be_over: bool = False) -> None:
+    """A hint is for the person: while the programs play it is refused (`not_your_turn`), and the switch of that call is not applied either.
+    `may_be_over`: the programs keep playing between the previous read and this call, so on the real clock the game may have ended in the meantime;
+    then `game_over` is the right answer, but only when the state really says the game is not ongoing."""
+    request = {"analysis": {"evaluation": True, "hint": True}}
+    if may_be_over:
+        try:
+            client.call("set_state", request)
+            check(False, "a hint while the programs play was accepted")
+        except ControlError as error:
+            if error.code == "game_over":
+                status = client.call("get_state")["state"]["status"]
+                check(status != "ongoing", f"a hint was refused as game_over while the game is {status}")
+            else:
+                check(error.code == "not_your_turn", f"a hint while the programs play was refused as {error.code}: {error.message}")
+    else:
+        expect_error("not_your_turn", lambda: client.call("set_state", request), "a hint while the programs play")
     analysis = get_analysis(client)
     check(analysis["evaluationOn"] is False and analysis["hintRequested"] is False, f"a refused hint changed the analysis: {analysis}")
 
@@ -421,12 +435,12 @@ def run_watch_scenario(client: BagiControlClient, headless: bool) -> None:
     check(opponent["engine"] == "own" and opponent["level"] == "easy", f"the single-seat answer is not White's seat: {opponent}")
     if manual:
         check(get_moves(client) == [], "picking the programs played a move")  # no frame has run since the pick
-    check_a_hint_is_refused(client)  # White to move on the manual clock, whoever is to move on the real one
+    check_a_hint_is_refused(client)  # the programs are playing and the game cannot be over yet
 
     first = game.play_to_the_plies()
     check(len(first) >= 1, "the programs played nothing")
     check_the_watch_is_set(client, "both")
-    check_a_hint_is_refused(client)  # after moves: Black or White to move, a hint is refused on either turn
+    check_a_hint_is_refused(client, may_be_over=True)  # after moves: the programs may have ended the game since the last read
 
     # A reset starts a new game and keeps both programs; on the manual clock the same two programs play the same game
     client.call("reset")

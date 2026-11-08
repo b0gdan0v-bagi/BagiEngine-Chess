@@ -658,10 +658,9 @@ namespace BECore::Chess::Tests {
         const eastl::vector<eastl::string> first = playedTheGame();
         ASSERT_FALSE(first.empty());
 
-        // Every move is legal in its position and the turns alternate: the moves replayed on a model of our own
+        // Every move is legal in its position (so the turns alternate): the moves replayed on a model of our own
         ChessGameModel replay;
         for (size_t ply = 0; ply < first.size(); ++ply) {
-            EXPECT_EQ(replay.GetTurn(), ply % 2 == 0 ? PieceColor::White : PieceColor::Black) << "ply " << ply;
             ASSERT_TRUE(Play(replay, first[ply])) << "ply " << ply << " " << first[ply].c_str() << " is not legal";
         }
 
