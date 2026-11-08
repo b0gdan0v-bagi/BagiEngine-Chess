@@ -184,7 +184,7 @@ namespace BECore::Chess::Tests {
      *
      * It counts how often it is asked, keeps the latest request and can hold its answer at a gate until Open(): a gate that honors the CancellationToken returns Cancelled at once when the
      * token is cancelled (WasCancelled()), one that ignores it stays and answers when it is opened, which is how the tests show that a stale answer is thrown away. A gate that is never
-     * opened gives up with a Timeout after kGateGiveUp. FailWith() makes every Analyse() fail. Configure it before the first search; the reads are thread safe (a search runs on a pool worker).
+     * opened gives up with a Timeout after kGateGiveUp. FailWith() makes every Analyse() fail. Configure it while no search runs; the reads are thread safe (a search runs on a pool worker).
      */
     class AnalysingEngine final : public IChessEngine {
     public:
