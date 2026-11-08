@@ -19,6 +19,13 @@ An engine entry's branch `todo/<id>` is cut in `engine/` from `games/chess`; its
 - Read first: `CLAUDE.md` of this repository (the game) and `engine/CLAUDE.md` (style, DO and DON'T, the engine's contract), the nested `CLAUDE.md` of the touched directories, the matching `.claude/rules/` file of `<R>`.
 - Format: `python3 engine/CI/scripts/format_sources.py --changed --root <R>` and `strip_pch_includes.py --root <R>` (`<R>` is `.` for the game, `engine` for the engine); see the developer agent; the full commands and the facts of this repository are in `.claude/rules/build-project.md`.
 
+## Workers
+
+Parallel loops run in worker folders (`engine/.claude/skills/todo-loop/SKILL.md`, "Parallel workers"; `engine/tools/todo/CLAUDE.md`, "Workers"): `python3 engine/tools/todo/worker.py create 3` in the main checkout makes `../BagiEngine-Chess.workers/w1` ... `w3`, each with its own `engine/` (a worktree of the main checkout's engine module, so engine branches are shared too) and its own `build/`; `worker.py run <k>` starts a session in one. The main checkout stays the owner's: trying branches and `/todo-merge`. Three suit the owner's machine (14 cores; a full build takes about 17 s there, and `worker.py run` gives each session a share of the cores).
+
+- **Shared files**, which do not count alone when the loop compares busy files: `CLAUDE.md`, `README.md` (every entry touches them a little; the developer keeps its edits to its own lines).
+- Everything else counts as it is. `config/SceneConfig.xml`, `tests/ChessUiTest.cpp` and `tests/ChessHudWebTest.cpp` are where most UI entries meet, so two entries that change the scene wait for each other, while an entry of `src/Chess/Engine/` or of the engine area runs beside them.
+
 ## Zones nobody edits
 
 The vendored code of the engine: `engine/src/Modules/EABase/`, `EnTT/`, `fmt/`, `imgui/`, `nlohmann/`, `pugixml/`, `RmlUi/`, `stb/`, and `engine/external/`. The rest of `engine/` is editable through an entry of the engine area, in its own branch.
