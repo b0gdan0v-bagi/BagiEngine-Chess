@@ -655,7 +655,7 @@ namespace BECore::Chess::Tests {
         // where the bound lets the table in (a node with the clock c and d plies left is allowed when c + d + 32 is under 100), so the sweep
         // crosses the bound in the middle of the tree. Measured equal at each of these clocks; a guard on one position, not a proof
         for (const int clock : {0, 40, 60, 64, 68, 72, 80, 90, 96, 99}) {
-            const std::string fen = "4k3/8/8/8/8/8/8/R3K3 w - - " + std::to_string(clock) + " 80";
+            const eastl::string fen = Format("4k3/8/8/8/8/8/8/R3K3 w - - {} 80", clock);
             Position withTable = PositionFromFen(fen.c_str());
             Position withoutTable = PositionFromFen(fen.c_str());
 
@@ -674,13 +674,13 @@ namespace BECore::Chess::Tests {
             Position first = PositionFromFen(fen);
             Position second = PositionFromFen(fen);
 
-            const SearchResult a = SearchDepth(first, 3);
-            const SearchResult b = SearchDepth(second, 3);
+            const SearchResult a = SearchDepth(first, kMinimaxDepth);
+            const SearchResult b = SearchDepth(second, kMinimaxDepth);
 
             EXPECT_EQ(a.best, b.best) << fen.data();
             EXPECT_EQ(a.score, b.score) << fen.data();
             EXPECT_EQ(a.nodes, b.nodes) << fen.data();
-            EXPECT_EQ(a.depth, 3) << fen.data();
+            EXPECT_EQ(a.depth, kMinimaxDepth) << fen.data();
         }
     }
 
@@ -689,10 +689,10 @@ namespace BECore::Chess::Tests {
         // do not change with the compiler, the library or the machine. With the table off the numbers are the ones from before the table
         // (the start position 1246 nodes, Kiwipete 32789 at depth 3). They are not a measure of strength; a change of the evaluation,
         // of the ordering or of the table moves them, and then they are rewritten
-        const SearchResult start = SearchFen(Position::kStartFen, 3);
-        const SearchResult kiwipete = SearchFen(kKiwipeteFen, 3);
-        const SearchResult startDeep = SearchFen(Position::kStartFen, 5);
-        const SearchResult kiwipeteDeep = SearchFen(kKiwipeteFen, 5);
+        const SearchResult start = SearchFen(Position::kStartFen, kMinimaxDepth);
+        const SearchResult kiwipete = SearchFen(kKiwipeteFen, kMinimaxDepth);
+        const SearchResult startDeep = SearchFen(Position::kStartFen, kDeeperTableDepth);
+        const SearchResult kiwipeteDeep = SearchFen(kKiwipeteFen, kDeeperTableDepth);
 
         EXPECT_EQ(start.best, Mv("b1c3"));
         EXPECT_EQ(start.score, 50);
@@ -713,8 +713,8 @@ namespace BECore::Chess::Tests {
         Position start = Position::Start();
         Position kiwipete = PositionFromFen(kKiwipeteFen);
 
-        const SearchResult startResult = SearchWithTable(start, 3, 0);
-        const SearchResult kiwipeteResult = SearchWithTable(kiwipete, 3, 0);
+        const SearchResult startResult = SearchWithTable(start, kMinimaxDepth, 0);
+        const SearchResult kiwipeteResult = SearchWithTable(kiwipete, kMinimaxDepth, 0);
 
         EXPECT_EQ(startResult.best, Mv("b1c3"));
         EXPECT_EQ(startResult.score, 50);

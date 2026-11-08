@@ -20,7 +20,7 @@ namespace BECore::Chess {
         /// The killers and the history of Search() (QuietMoves, about 33 KB) are on that stack too; the static_assert after QuietMoves counts them
         constexpr int kMaxPly = kMaxSearchDepth + kMaxExtensionPly;
         /// The size of a Negamax or Quiescence frame in a Debug build (measured on macOS) and the stack of a Background pool thread there (a std::thread with the default
-        /// 512 KB); the assert keeps the comment above honest if kMaxSearchDepth or the extension grows
+        /// 512 KB); the static_assert right below fails if kMaxSearchDepth or the extension grows past it (the one after QuietMoves adds the killers and the history)
         constexpr size_t kApproxFrameBytes = 3072;
         constexpr size_t kBackgroundStackBytes = 512 * 1024;
         static_assert(static_cast<size_t>(kMaxPly) * kApproxFrameBytes < kBackgroundStackBytes, "the deepest line must fit the stack of a Background thread");
@@ -36,8 +36,9 @@ namespace BECore::Chess {
         /// "Most valuable victim, least valuable attacker": the victim's kind counts kVictimWeight times, the attacker's kind once
         /// (the kinds are 1..6, so the weight is above the largest)
         constexpr int kVictimWeight = 8;
-        // Quiet moves, below the promotions: the two killers of the ply, then the history, which is kept under kHistoryMax so
-        // that it never reaches the second killer
+        // Quiet moves, below the promotions: the two killers of the ply, then the history. An entry is halved when a bonus would take it
+        // past kHistoryMax, so it stays in the band below the killers (a single bonus at a depth over 90 can overshoot kHistoryMax, still
+        // far under kSecondKillerScore)
         constexpr int kFirstKillerScore = 1 << 15;
         constexpr int kSecondKillerScore = kFirstKillerScore - 1;
         constexpr int kHistoryMax = 1 << 14;

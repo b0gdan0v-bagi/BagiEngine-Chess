@@ -85,7 +85,9 @@ namespace BECore::Chess {
      * deep (an exact score, or a bound that cuts or narrows the window) or else as the first move to try. A mate score is kept as
      * "mate in m plies from this node", so an entry read at another ply gives the right distance from the root. The table is
      * private to the call: tableEntries x 16 bytes, allocated once at the start, so equal requests give equal answers and an
-     * object that calls Search() from several threads has nothing to share.
+     * object that calls Search() from several threads has nothing to share. The score at a fixed depth may differ with the table on
+     * (a deeper entry can answer a shallower node), but it is the same on every run; and the table is not always fewer nodes (it is on
+     * deep middlegames, not on every position and depth).
      *
      * Draws that depend on the history are not stored: a node whose subtree returned a draw because a position had occurred
      * before (or the 50-move clock) stores nothing, and a table result is taken (not just its move) only where the 50-move clock
