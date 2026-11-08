@@ -30,9 +30,13 @@ namespace BECore::Chess {
     public:
         [[nodiscard]] std::expected<Move, EngineError> FindMove(const SearchRequest& request, const CancellationToken& token) override;
 
-        /// One line: the best move of the last iteration that finished, with its score from the side to move (ScoreFromSearch()) and the depth of that iteration.
-        /// The contract of FindMove() in everything else (the same private search runs under both, so they give the same move for the same request, and the
-        /// errors are the same), also deterministic for a depth, a deadline is not an error and the object may be asked from several threads at once.
+        /// SearchRequest::lines lines (at most as many as the position has legal moves), best first. Line 1 is the best move of the last iteration that finished, with its
+        /// score from the side to move (ScoreFromSearch()) and the depth of that iteration: what a request for one line gives (exactly so for a fixed depth; a move time is not repeatable). Line k (k
+        /// = 2..) is a search of its own, at the same depth, with the moves of the lines before it excluded at the root (SearchSettings::excludedRootMoves), so each line has its own table, killers
+        /// and history and line 1 and the determinism for a depth are untouched. The scores of the lines are not forced to fall (separate searches). A move time is shared out: line k of N must end by
+        /// k / N of it. Cancelled when the token is cancelled during any of the searches (the whole answer is dropped). The contract of FindMove() in everything else (the same private code validates
+        /// and searches under both, so they give the same move for the same request, and the errors are the same), also deterministic for a depth, a deadline is not an error and the object may be
+        /// asked from several threads at once.
         [[nodiscard]] std::expected<Analysis, EngineError> Analyse(const SearchRequest& request, const CancellationToken& token) override;
     };
 

@@ -336,6 +336,199 @@ namespace BECore::Chess::Tests {
         EXPECT_FALSE(UciProtocol::ParseBestMove(line).has_value());
     }
 
+    // -- LineCollector: the lines of a search for N lines ------------------------------------------------------------------------
+
+    namespace {
+
+        UciProtocol::LineCollector Collect(int lineCount, std::initializer_list<const char*> lines) {
+            UciProtocol::LineCollector collector(lineCount);
+            for (const char* line : lines) {
+                collector.Offer(line);
+            }
+            return collector;
+        }
+
+        /// A few lines of a Stockfish transcript with `MultiPV 3`: three lines per depth, each depth after the one before
+        constexpr const char* kThreeLineTranscript[] = {
+            "info string NNUE evaluation using nn-1111111111.nnue",
+            "info depth 1 seldepth 1 multipv 1 score cp 18 nodes 20 nps 20000 hashfull 0 tbhits 0 time 1 pv e2e4",
+            "info depth 1 seldepth 1 multipv 2 score cp 12 nodes 20 nps 20000 hashfull 0 tbhits 0 time 1 pv d2d4",
+            "info depth 1 seldepth 1 multipv 3 score cp 5 nodes 20 nps 20000 hashfull 0 tbhits 0 time 1 pv g1f3",
+            "info depth 2 seldepth 2 multipv 1 score cp 32 nodes 90 nps 90000 hashfull 0 tbhits 0 time 1 pv e2e4 e7e5",
+            "info depth 2 seldepth 2 multipv 2 score cp 20 nodes 90 nps 90000 hashfull 0 tbhits 0 time 1 pv d2d4 d7d5",
+            "info depth 2 seldepth 2 multipv 3 score cp 11 nodes 90 nps 90000 hashfull 0 tbhits 0 time 1 pv g1f3 d7d5",
+        };
+
+        UciProtocol::LineCollector CollectTranscript(int lineCount, size_t offered = std::size(kThreeLineTranscript)) {
+            UciProtocol::LineCollector collector(lineCount);
+            for (size_t at = 0; at < offered; ++at) {
+                collector.Offer(kThreeLineTranscript[at]);
+            }
+            return collector;
+        }
+
+    }  // namespace
+
+    TEST(UciProtocolTest, TheCollectorKeepsTheLastDepthOfEachOfThreeLines) {
+        const eastl::vector<UciProtocol::Info> lines = CollectTranscript(3).Lines();
+
+        ASSERT_EQ(lines.size(), 3u);
+        EXPECT_EQ(lines[0].multiPv, 1);
+        EXPECT_EQ(lines[0].firstPvMove, "e2e4");
+        EXPECT_EQ(lines[0].score, Cp(32));
+        EXPECT_EQ(lines[0].depth, 2);
+        EXPECT_EQ(lines[1].multiPv, 2);
+        EXPECT_EQ(lines[1].firstPvMove, "d2d4");
+        EXPECT_EQ(lines[1].score, Cp(20));
+        EXPECT_EQ(lines[1].depth, 2);
+        EXPECT_EQ(lines[2].multiPv, 3);
+        EXPECT_EQ(lines[2].firstPvMove, "g1f3");
+        EXPECT_EQ(lines[2].score, Cp(11));
+        EXPECT_EQ(lines[2].depth, 2);
+    }
+
+    TEST(UciProtocolTest, TheCollectorOfOneLineTakesOnlyIndexOne) {
+        const eastl::vector<UciProtocol::Info> lines = CollectTranscript(1).Lines();
+
+        ASSERT_EQ(lines.size(), 1u);
+        EXPECT_EQ(lines[0].multiPv, 1);
+        EXPECT_EQ(lines[0].firstPvMove, "e2e4");
+        EXPECT_EQ(lines[0].score, Cp(32));
+    }
+
+    TEST(UciProtocolTest, TheCollectorOfOneLineReadsALineWithoutMultiPvAsTheFirst) {
+        // A search for one line sends no `multipv` word at all
+        const eastl::vector<UciProtocol::Info> lines = Collect(1, {"info depth 1 score cp 10 pv e2e4", "info depth 2 score cp 14 pv e2e4 e7e5"}).Lines();
+
+        ASSERT_EQ(lines.size(), 1u);
+        EXPECT_EQ(lines[0].multiPv, 1);
+        EXPECT_EQ(lines[0].score, Cp(14));
+        EXPECT_EQ(lines[0].depth, 2);
+    }
+
+    TEST(UciProtocolTest, TheCollectorOfTwoLinesLeavesIndexThreeOut) {
+        const eastl::vector<UciProtocol::Info> lines = CollectTranscript(2).Lines();
+
+        ASSERT_EQ(lines.size(), 2u);
+        EXPECT_EQ(lines[0].firstPvMove, "e2e4");
+        EXPECT_EQ(lines[1].firstPvMove, "d2d4");
+    }
+
+    TEST(UciProtocolTest, ACollectorForNoLinesActsAsOneForOne) {
+        EXPECT_EQ(CollectTranscript(0).Lines().size(), 1u);
+        EXPECT_EQ(CollectTranscript(-4).Lines().size(), 1u);
+    }
+
+    TEST(UciProtocolTest, TheCollectorWithNothingOfferedHasNoLines) {
+        EXPECT_TRUE(UciProtocol::LineCollector(3).Lines().empty());
+    }
+
+    TEST(UciProtocolTest, ABoundIsKeptOnlyForAnIndexThatNeverHadAnExactScore) {
+        const eastl::vector<UciProtocol::Info> lines = Collect(3,
+                                                               {
+                                                                   "info depth 3 multipv 1 score cp 30 pv e2e4",
+                                                                   "info depth 4 multipv 1 score cp 80 lowerbound pv e2e4",  // later, but only a bound: the exact one stays
+                                                                   "info depth 3 multipv 2 score cp 20 upperbound pv d2d4",
+                                                                   "info depth 4 multipv 2 score cp 25 upperbound pv d2d4",  // no exact one for index 2: the latest bound
+                                                                   "info depth 3 multipv 3 score cp 10 pv g1f3",
+                                                               })
+                                                           .Lines();
+
+        ASSERT_EQ(lines.size(), 3u);
+        EXPECT_EQ(lines[0].score, Cp(30));
+        EXPECT_FALSE(lines[0].lowerBound);
+        EXPECT_EQ(lines[1].score, Cp(25));
+        EXPECT_TRUE(lines[1].upperBound);
+        EXPECT_EQ(lines[1].depth, 4);
+        EXPECT_EQ(lines[2].score, Cp(10));
+    }
+
+    TEST(UciProtocolTest, ALaterExactScoreReplacesABoundAndAnEarlierExactOne) {
+        const eastl::vector<UciProtocol::Info> lines = Collect(2,
+                                                               {
+                                                                   "info depth 3 multipv 2 score cp 20 lowerbound pv d2d4",
+                                                                   "info depth 3 multipv 2 score cp 22 pv d2d4",
+                                                                   "info depth 4 multipv 2 score cp 24 pv d2d4",
+                                                                   "info depth 5 multipv 2 score cp 50 upperbound pv d2d4",
+                                                               })
+                                                           .Lines();
+
+        ASSERT_EQ(lines.size(), 1u) << "index 1 never came";
+        EXPECT_EQ(lines[0].multiPv, 2);
+        EXPECT_EQ(lines[0].score, Cp(24));
+        EXPECT_EQ(lines[0].depth, 4);
+        EXPECT_FALSE(lines[0].upperBound);
+    }
+
+    TEST(UciProtocolTest, TheCollectorIgnoresWhatIsNotAScoredInfoLine) {
+        const eastl::vector<UciProtocol::Info> lines = Collect(2,
+                                                               {
+                                                                   "info depth 4 multipv 1 score cp 30 pv e2e4",
+                                                                   "info depth 5 multipv 1 pv e2e4",               // no score
+                                                                   "info depth 5 multipv 1 score cp",              // a truncated one
+                                                                   "info string multipv 1 score cp 999 pv a2a3",   // text
+                                                                   "info depth 5 multipv 2 score mate 0 pv d2d4",  // no usable score
+                                                                   "info currmove d2d4 currmovenumber 2",          // no score
+                                                                   "bestmove e2e4 ponder e7e5",                    // not info
+                                                                   "readyok",
+                                                                   "",
+                                                               })
+                                                           .Lines();
+
+        ASSERT_EQ(lines.size(), 1u);
+        EXPECT_EQ(lines[0].depth, 4);
+        EXPECT_EQ(lines[0].score, Cp(30));
+        EXPECT_EQ(lines[0].firstPvMove, "e2e4");
+    }
+
+    TEST(UciProtocolTest, WhenTheLastDepthIsCutShortAnIndexKeepsTheDepthBefore) {
+        // A search stopped by its time: depth 2 reached the first two lines only
+        const eastl::vector<UciProtocol::Info> lines = CollectTranscript(3, 6).Lines();
+
+        ASSERT_EQ(lines.size(), 3u);
+        EXPECT_EQ(lines[0].depth, 2);
+        EXPECT_EQ(lines[1].depth, 2);
+        EXPECT_EQ(lines[2].depth, 1);
+        EXPECT_EQ(lines[2].score, Cp(5));
+        EXPECT_EQ(lines[2].firstPvMove, "g1f3");
+    }
+
+    TEST(UciProtocolTest, AMissingIndexLeavesTheOthersInOrder) {
+        const eastl::vector<UciProtocol::Info> lines = Collect(3,
+                                                               {
+                                                                   "info depth 2 multipv 3 score cp 11 pv g1f3",
+                                                                   "info depth 2 multipv 1 score cp 32 pv e2e4",
+                                                               })
+                                                           .Lines();
+
+        ASSERT_EQ(lines.size(), 2u);
+        EXPECT_EQ(lines[0].multiPv, 1);
+        EXPECT_EQ(lines[1].multiPv, 3);
+        EXPECT_EQ(lines[1].firstPvMove, "g1f3");
+    }
+
+    TEST(UciProtocolTest, TheCollectorReadsLinesWithAnEndOfLineLeftOnThem) {
+        const eastl::vector<UciProtocol::Info> lines = Collect(2,
+                                                               {
+                                                                   "info depth 2 multipv 1 score cp 32 pv e2e4\r",
+                                                                   "info depth 2 multipv 2 score mate -2 pv d2d4\r\n",
+                                                               })
+                                                           .Lines();
+
+        ASSERT_EQ(lines.size(), 2u);
+        EXPECT_EQ(lines[0].firstPvMove, "e2e4");
+        EXPECT_EQ(lines[1].firstPvMove, "d2d4");
+        EXPECT_EQ(lines[1].score, Mate(-2));
+    }
+
+    TEST(UciProtocolTest, AMultiPvIndexBelowOneIsReadAsTheMainLine) {
+        // ParseInfo keeps the default 1 for a zero or negative index, so such a line is the main line
+        const eastl::vector<UciProtocol::Info> lines = Collect(2, {"info depth 2 multipv 0 score cp 7 pv e2e4"}).Lines();
+
+        ASSERT_EQ(lines.size(), 1u);
+        EXPECT_EQ(lines[0].multiPv, 1);
+    }
+
     TEST(UciProtocolTest, TrimLineTakesSpacesAndLineEndsFromBothEnds) {
         EXPECT_EQ(UciProtocol::TrimLine("uciok"), eastl::string_view("uciok"));
         EXPECT_EQ(UciProtocol::TrimLine("uciok\n"), eastl::string_view("uciok"));

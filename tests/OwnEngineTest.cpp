@@ -22,6 +22,8 @@ namespace BECore::Chess::Tests {
         constexpr const char* kMatedInOne = "kbK5/pp6/RP6/8/8/8/8/8 b - - 0 1";          // every Black move loses to a mate in one
         constexpr const char* kMated = "7k/6Q1/6K1/8/8/8/8/8 b - - 0 1";
         constexpr const char* kStalemated = "7k/5Q2/6K1/8/8/8/8/8 b - - 0 1";
+        constexpr const char* kOneLegalMove = "k7/8/2K5/8/8/8/8/1R6 b - - 0 1";  // Black has Ka7 and nothing else
+        constexpr const char* kTwoLegalMoves = "k7/8/2K5/8/8/8/8/7R b - - 0 1";  // Ka7 or Kb8
 
         constexpr int kShallow = 2;
         constexpr int kMateInTwoDepth = 4;
@@ -66,6 +68,12 @@ namespace BECore::Chess::Tests {
         /// The move of an answer, or nothing for an error: a form that EXPECT_EQ can compare and print
         std::optional<Move> Found(const std::expected<Move, EngineError>& answer) {
             return answer ? std::optional<Move>(*answer) : std::nullopt;
+        }
+
+        /// @p request asking for @p lines lines
+        SearchRequest WithLines(SearchRequest request, int lines) {
+            request.lines = lines;
+            return request;
         }
 
         bool Play(ChessGameModel& model, eastl::string_view uci) {
@@ -487,6 +495,220 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(a->Best().score, expected->Best().score);
         EXPECT_EQ(b->Best().move, expected->Best().move);
         EXPECT_EQ(b->Best().score, expected->Best().score);
+    }
+
+    // -- Analyse with several lines ----------------------------------------------------------------------------------------------
+
+    TEST_F(OwnEngineTest, ThreeLinesFromTheStartAreThreeDifferentLegalMovesAndLineOneIsTheOneLineAnswer) {
+        const SearchRequest one = SearchRequest::FromPosition(Position::Start(), Depth(kFloorDepth));
+
+        const auto single = Analyse(_engine, one);
+        const auto played = Ask(_engine, one);
+        const auto several = Analyse(_engine, WithLines(one, 3));
+
+        ASSERT_TRUE(single.has_value());
+        ASSERT_TRUE(played.has_value());
+        ASSERT_TRUE(several.has_value());
+        ASSERT_EQ(several->LineCount(), 3u);
+        for (size_t i = 0; i < several->lines.size(); ++i) {
+            EXPECT_TRUE(IsLegalIn(Position::Start(), several->lines[i].move)) << i;
+            EXPECT_EQ(several->lines[i].depth, kFloorDepth) << i;
+            for (size_t j = 0; j < i; ++j) {
+                EXPECT_NE(several->lines[i].move, several->lines[j].move) << i << " and " << j;
+            }
+        }
+        EXPECT_EQ(several->Best().move, single->Best().move);
+        EXPECT_EQ(several->Best().score, single->Best().score);
+        EXPECT_EQ(several->Best().depth, single->Best().depth);
+        EXPECT_EQ(several->Best().move, *played) << "line 1 is the move FindMove plays";
+        EXPECT_EQ(single->LineCount(), 1u);
+    }
+
+    TEST_F(OwnEngineTest, AnalyseOneLineByNameIsTheDefault) {
+        const SearchRequest request = SearchRequest::FromPosition(PositionFromFen(kKiwipeteFen), Depth(kFloorDepth));
+
+        const auto byDefault = Analyse(_engine, request);
+        const auto named = Analyse(_engine, WithLines(request, 1));
+
+        ASSERT_TRUE(byDefault.has_value());
+        ASSERT_TRUE(named.has_value());
+        EXPECT_EQ(byDefault->LineCount(), 1u);
+        EXPECT_EQ(named->LineCount(), 1u);
+        EXPECT_EQ(byDefault->Second(), nullptr);
+        EXPECT_EQ(named->Best().move, byDefault->Best().move);
+        EXPECT_EQ(named->Best().score, byDefault->Best().score);
+    }
+
+    TEST_F(OwnEngineTest, AHangingQueenIsLineOneAndTheSecondLineIsClearlyWorse) {
+        const auto answer = Analyse(_engine, WithLines(SearchRequest::FromPosition(PositionFromFen(kHangingQueen), Depth(kShallow)), 2));
+
+        ASSERT_TRUE(answer.has_value());
+        ASSERT_EQ(answer->LineCount(), 2u);
+        const AnalysisLine* second = answer->Second();
+        ASSERT_NE(second, nullptr);
+        EXPECT_EQ(answer->Best().move, Mv("d1d4"));
+        EXPECT_EQ(answer->Best().score.kind, AnalysisScoreKind::Centipawns);
+        EXPECT_EQ(second->score.kind, AnalysisScoreKind::Centipawns);
+        // Both from the side to move: taking the queen leaves a rook up, any other move leaves the rook against the queen
+        EXPECT_GT(answer->Best().score.value, 400);
+        EXPECT_LT(second->score.value, answer->Best().score.value - 400);
+    }
+
+    TEST_F(OwnEngineTest, AMateInOneIsLineOneAndTheSecondLineIsNotAMateInOne) {
+        for (const char* fen : {kMateInOneForWhite, kMateInOneForBlack}) {
+            const auto answer = Analyse(_engine, WithLines(SearchRequest::FromPosition(PositionFromFen(fen), Depth(kMateInTwoDepth)), 2));
+
+            ASSERT_TRUE(answer.has_value()) << fen;
+            ASSERT_EQ(answer->LineCount(), 2u) << fen;
+            EXPECT_EQ(answer->Best().score, (AnalysisScore{AnalysisScoreKind::Mate, 1})) << fen;
+            const AnalysisScore second = answer->Second()->score;
+            EXPECT_FALSE(second.kind == AnalysisScoreKind::Mate && second.value == 1) << fen << ": only one move mates";
+            EXPECT_NE(answer->Second()->move, answer->Best().move) << fen;
+        }
+    }
+
+    TEST_F(OwnEngineTest, APositionWithOneLegalMoveGivesOneLineWhateverWasAsked) {
+        ASSERT_EQ(MoveGenerator::GenerateLegal(PositionFromFen(kOneLegalMove)).size(), 1u);
+
+        for (const int lines : {1, 2, 4, kMaxAnalysisLines}) {
+            const auto answer = Analyse(_engine, WithLines(SearchRequest::FromPosition(PositionFromFen(kOneLegalMove), Depth(kShallow)), lines));
+
+            ASSERT_TRUE(answer.has_value()) << lines;
+            EXPECT_EQ(answer->LineCount(), 1u) << lines;
+            EXPECT_EQ(answer->Second(), nullptr) << lines;
+            EXPECT_EQ(answer->Best().move, Mv("a8a7")) << lines;
+        }
+    }
+
+    TEST_F(OwnEngineTest, AFewLegalMovesGiveAsManyLinesAsThereAreMoves) {
+        ASSERT_EQ(MoveGenerator::GenerateLegal(PositionFromFen(kTwoLegalMoves)).size(), 2u);
+
+        const auto answer = Analyse(_engine, WithLines(SearchRequest::FromPosition(PositionFromFen(kTwoLegalMoves), Depth(kShallow)), 4));
+
+        ASSERT_TRUE(answer.has_value());
+        ASSERT_EQ(answer->LineCount(), 2u);
+        EXPECT_NE(answer->lines[0].move, answer->lines[1].move);
+        EXPECT_TRUE(IsLegalIn(PositionFromFen(kTwoLegalMoves), answer->lines[0].move));
+        EXPECT_TRUE(IsLegalIn(PositionFromFen(kTwoLegalMoves), answer->lines[1].move));
+    }
+
+    TEST_F(OwnEngineTest, EightLinesFromTheStartAreEightDifferentMoves) {
+        const auto answer = Analyse(_engine, WithLines(SearchRequest::FromPosition(Position::Start(), Depth(kShallow)), kMaxAnalysisLines));
+
+        ASSERT_TRUE(answer.has_value());
+        ASSERT_EQ(answer->LineCount(), static_cast<size_t>(kMaxAnalysisLines));
+        for (size_t i = 0; i < answer->lines.size(); ++i) {
+            for (size_t j = 0; j < i; ++j) {
+                EXPECT_NE(answer->lines[i].move, answer->lines[j].move) << i << " and " << j;
+            }
+        }
+    }
+
+    TEST_F(OwnEngineTest, SeveralLinesAreTheSameOnEveryRunAndFromAnotherObject) {
+        const SearchRequest request = WithLines(SearchRequest::FromPosition(PositionFromFen(kKiwipeteFen), Depth(kFloorDepth)), 3);
+
+        const auto first = Analyse(_engine, request);
+        const auto second = Analyse(_engine, request);
+        OwnEngine other;
+        const auto third = Analyse(other, request);
+
+        ASSERT_TRUE(first.has_value());
+        ASSERT_TRUE(second.has_value());
+        ASSERT_TRUE(third.has_value());
+        ASSERT_EQ(first->LineCount(), 3u);
+        ASSERT_EQ(second->LineCount(), 3u);
+        ASSERT_EQ(third->LineCount(), 3u);
+        for (size_t i = 0; i < 3; ++i) {
+            EXPECT_EQ(second->lines[i].move, first->lines[i].move) << i;
+            EXPECT_EQ(second->lines[i].score, first->lines[i].score) << i;
+            EXPECT_EQ(second->lines[i].depth, first->lines[i].depth) << i;
+            EXPECT_EQ(third->lines[i].move, first->lines[i].move) << i;
+            EXPECT_EQ(third->lines[i].score, first->lines[i].score) << i;
+        }
+    }
+
+    TEST_F(OwnEngineTest, TwoThreadsMayAnalyseSeveralLinesWithTheSameObject) {
+        const SearchRequest request = WithLines(SearchRequest::FromPosition(PositionFromFen(kKiwipeteFen), Depth(kFloorDepth)), 3);
+        const auto expected = Analyse(_engine, request);
+        std::expected<Analysis, EngineError> a = std::unexpected(EngineError{});
+        std::expected<Analysis, EngineError> b = std::unexpected(EngineError{});
+
+        std::thread other([&] { b = Analyse(_engine, request); });
+        a = Analyse(_engine, request);
+        other.join();
+
+        ASSERT_TRUE(expected.has_value());
+        ASSERT_TRUE(a.has_value());
+        ASSERT_TRUE(b.has_value());
+        ASSERT_EQ(a->LineCount(), expected->LineCount());
+        ASSERT_EQ(b->LineCount(), expected->LineCount());
+        for (size_t i = 0; i < expected->lines.size(); ++i) {
+            EXPECT_EQ(a->lines[i].move, expected->lines[i].move) << i;
+            EXPECT_EQ(a->lines[i].score, expected->lines[i].score) << i;
+            EXPECT_EQ(b->lines[i].move, expected->lines[i].move) << i;
+            EXPECT_EQ(b->lines[i].score, expected->lines[i].score) << i;
+        }
+    }
+
+    TEST_F(OwnEngineTest, SeveralLinesCancelledFromAnotherThreadReturnCancelledSoon) {
+        CancellationToken token = CancellationToken::Create();
+        std::thread canceller([token]() mutable {
+            std::this_thread::sleep_for(kCancelAfter);
+            token.Cancel();
+        });
+
+        const auto started = std::chrono::steady_clock::now();
+        const auto answer = Analyse(_engine, WithLines(SearchRequest::FromPosition(PositionFromFen(kKiwipeteFen), Depth(kDepthThatNeverEnds)), 3), token);
+        const auto took = std::chrono::steady_clock::now() - started;
+        canceller.join();
+
+        EXPECT_EQ(KindOf(answer), EngineErrorKind::Cancelled);
+        EXPECT_LT(took, kStopBudget);
+    }
+
+    TEST_F(OwnEngineTest, SeveralLinesWithAMoveTimeAloneAreLegalAndInTime) {
+        const SearchRequest request = WithLines(SearchRequest::FromPosition(PositionFromFen(kKiwipeteFen), SearchLimits{kMoveTimeMs, 0}), 3);
+
+        const auto started = std::chrono::steady_clock::now();
+        const auto answer = Analyse(_engine, request);
+        const auto took = std::chrono::steady_clock::now() - started;
+
+        ASSERT_TRUE(answer.has_value());
+        ASSERT_EQ(answer->LineCount(), 3u);
+        for (const AnalysisLine& line : answer->lines) {
+            EXPECT_TRUE(IsLegalIn(*request.FinalPosition(), line.move));
+            EXPECT_GE(line.depth, 1);
+        }
+        EXPECT_NE(answer->lines[0].move, answer->lines[1].move);
+        EXPECT_NE(answer->lines[1].move, answer->lines[2].move);
+        EXPECT_NE(answer->lines[0].move, answer->lines[2].move);
+        EXPECT_LT(took, std::chrono::milliseconds(kMoveTimeMs) + kTimeTolerance);
+    }
+
+    TEST_F(OwnEngineTest, ANumberOfLinesOutsideOneToEightIsABadRequest) {
+        for (const int lines : {0, -1, kMaxAnalysisLines + 1, 100}) {
+            const auto answer = Analyse(_engine, WithLines(SearchRequest::FromPosition(Position::Start(), Depth(kShallow)), lines));
+
+            EXPECT_EQ(KindOf(answer), EngineErrorKind::BadRequest) << lines;
+        }
+    }
+
+    TEST_F(OwnEngineTest, SeveralLinesOfAFinishedGameAreNoMoveAndWithACancelledTokenCancelled) {
+        for (const char* fen : {kMated, kStalemated}) {
+            EXPECT_EQ(KindOf(Analyse(_engine, WithLines(SearchRequest::FromPosition(PositionFromFen(fen), Depth(kShallow)), 3))), EngineErrorKind::NoMove) << fen;
+        }
+
+        CancellationToken token = CancellationToken::Create();
+        token.Cancel();
+        EXPECT_EQ(KindOf(Analyse(_engine, WithLines(SearchRequest::FromPosition(Position::Start(), Depth(kShallow)), 3), token)), EngineErrorKind::Cancelled);
+    }
+
+    TEST_F(OwnEngineTest, FindMoveIgnoresTheNumberOfLines) {
+        const SearchRequest request = SearchRequest::FromPosition(PositionFromFen(kKiwipeteFen), Depth(kFloorDepth));
+        SearchRequest many = request;
+        many.lines = 5;
+
+        EXPECT_EQ(Found(Ask(_engine, many)), Found(Ask(_engine, request)));
     }
 
 }  // namespace BECore::Chess::Tests

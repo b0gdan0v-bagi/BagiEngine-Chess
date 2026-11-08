@@ -322,6 +322,44 @@ namespace BECore::Chess::Tests {
         }
     }
 
+    TEST(BlunderEngineTest, SeveralLinesAreForwardedUnchangedAtEveryPercent) {
+        const auto own = eastl::make_shared<OwnEngine>();
+        SearchRequest request = SearchRequest::FromPosition(PositionFromFen(kKiwipeteFen), SearchLimits{0, 2});
+        request.lines = 3;
+        const auto plain = own->Analyse(request, CancellationToken::Create());
+        ASSERT_TRUE(plain.has_value());
+        ASSERT_EQ(plain->LineCount(), 3u);
+
+        for (const int percent : {0, 50, 100}) {
+            BlunderEngine engine(own, percent);
+            const auto wrapped = engine.Analyse(request, CancellationToken::Create());
+
+            ASSERT_TRUE(wrapped.has_value()) << percent;
+            ASSERT_EQ(wrapped->LineCount(), 3u) << percent;
+            for (size_t i = 0; i < 3; ++i) {
+                EXPECT_EQ(wrapped->lines[i].move, plain->lines[i].move) << percent << " line " << i;
+                EXPECT_EQ(wrapped->lines[i].score, plain->lines[i].score) << percent << " line " << i;
+                EXPECT_EQ(wrapped->lines[i].depth, plain->lines[i].depth) << percent << " line " << i;
+            }
+        }
+    }
+
+    TEST(BlunderEngineTest, TheRequestForSeveralLinesReachesTheWrappedEngineAsItIs) {
+        SearchRequest request = SearchRequest::FromPosition(Position::Start(), kLimits);
+        request.lines = 3;
+
+        for (const int percent : {0, 50, 100}) {
+            const auto inner = eastl::make_shared<AnalysingEngine>();
+            BlunderEngine engine(inner, percent);
+
+            const auto answer = engine.Analyse(request, CancellationToken::Create());
+
+            ASSERT_TRUE(answer.has_value()) << percent;
+            EXPECT_EQ(inner->Calls(), 1) << percent;
+            EXPECT_EQ(inner->LastRequest().lines, 3) << percent;
+        }
+    }
+
     TEST(BlunderEngineTest, AnalyseIsNeverHandicappedOverAPositionWhereTheBlunderWouldDiffer) {
         // At 100 percent FindMove answers a random move, and Analyse the best one: the hint is not spoilt by the handicap
         const auto own = eastl::make_shared<OwnEngine>();

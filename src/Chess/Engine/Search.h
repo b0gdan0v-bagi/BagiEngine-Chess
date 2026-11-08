@@ -32,6 +32,11 @@ namespace BECore::Chess {
         /// one call of Search(): it is built when the search starts and freed when it ends, nothing is kept between calls. It
         /// is built only for maxDepth of 3 or more, so the shallow levels pay no allocation. The tests switch it off to compare
         size_t tableEntries = kDefaultTableEntries;
+        /// Moves the root does not try (the earlier lines of a multi-line analysis, see OwnEngine::Analyse()). Only the list of root moves is filtered:
+        /// the table, the killers and the history are not touched, so an empty list is the search of before, bit for bit. The caller leaves at least one
+        /// legal move (the list may name moves that are not legal, they are ignored); a position whose every legal move is excluded has nothing to search
+        /// and the result is not complete
+        eastl::vector<Move> excludedRootMoves;
     };
 
     /// When to stop. A search with the default control runs to SearchSettings::maxDepth.

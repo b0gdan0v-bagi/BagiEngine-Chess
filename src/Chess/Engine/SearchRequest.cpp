@@ -34,6 +34,9 @@ namespace BECore::Chess {
         if (limits.moveTimeMs == 0 && limits.depth == 0) {
             return BadRequest("search limits ask for nothing: give a movetime or a depth");
         }
+        if (lines < 1 || lines > kMaxAnalysisLines) {
+            return BadRequest(Format("the number of lines must be 1 to {} (got {})", kMaxAnalysisLines, lines));
+        }
         return {};
     }
 

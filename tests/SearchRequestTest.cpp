@@ -260,6 +260,31 @@ namespace BECore::Chess::Tests {
         ExpectBadRequest(request.Validate());
     }
 
+    TEST(SearchRequestTest, BothFactoriesAskForOneLine) {
+        const ChessGameModel model;
+
+        EXPECT_EQ(SearchRequest::FromModel(model, kMoveTime100).lines, 1);
+        EXPECT_EQ(SearchRequest::FromPosition(Position::Start(), kMoveTime100).lines, 1);
+        EXPECT_EQ(SearchRequest().lines, 1);
+    }
+
+    TEST(SearchRequestTest, TheNumberOfLinesIsOneToTheMostAnalysisLines) {
+        for (const int lines : {1, 2, kMaxAnalysisLines}) {
+            SearchRequest request = SearchRequest::FromPosition(Position::Start(), kMoveTime100);
+            request.lines = lines;
+
+            EXPECT_TRUE(request.Validate().has_value()) << lines;
+        }
+        for (const int lines : {0, -1, kMaxAnalysisLines + 1}) {
+            SearchRequest request = SearchRequest::FromPosition(Position::Start(), kMoveTime100);
+            request.lines = lines;
+
+            const auto valid = request.Validate();
+            ASSERT_NO_FATAL_FAILURE(ExpectBadRequest(valid)) << lines;
+            EXPECT_NE(valid.error().detail.find(Format("{}", lines).c_str()), eastl::string::npos) << "the sentence names the number";
+        }
+    }
+
     TEST(SearchRequestTest, AnEngineAnswersARequestThroughTheInterface) {
         FirstLegalMoveEngine implementation;
         IChessEngine& engine = implementation;

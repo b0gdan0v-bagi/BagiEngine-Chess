@@ -808,6 +808,190 @@ namespace BECore::Chess::Tests {
         EXPECT_GE(took, 2 * kThink) << "the second analysis waited for the first";
     }
 
+    // -- Analyse with several lines (MultiPV) ----------------------------------------------------------------------------------
+
+    namespace {
+
+        struct ExpectedLine {
+            eastl::string_view move;
+            AnalysisScore score;
+            int depth = 2;  // the final depth the fake prints for --lines with MultiPV above 1
+        };
+
+        SearchRequest WithLines(SearchRequest request, int lines) {
+            request.lines = lines;
+            return request;
+        }
+
+        void ExpectLines(const std::expected<Analysis, EngineError>& result, std::initializer_list<ExpectedLine> expected) {
+            if (!result) {
+                ADD_FAILURE() << "expected an analysis of " << expected.size() << " lines, got " << Describe(result.error()).c_str();
+                return;
+            }
+            ASSERT_EQ(result->lines.size(), expected.size());
+            size_t at = 0;
+            for (const ExpectedLine& line : expected) {
+                const AnalysisLine& got = result->lines[at];
+                EXPECT_EQ(got.move.ToUci(), eastl::string(line.move)) << "line " << at + 1;
+                EXPECT_EQ(got.score, line.score) << "line " << at + 1 << ": " << ScoreText(got.score).c_str();
+                EXPECT_EQ(got.depth, line.depth) << "line " << at + 1;
+                ++at;
+            }
+        }
+
+        size_t CountMultiPvOptions(const eastl::vector<eastl::string>& lines) {
+            return static_cast<size_t>(std::count_if(lines.begin(), lines.end(), [](const eastl::string& line) { return line.find("setoption name MultiPV") == 0; }));
+        }
+
+        constexpr const char* kThreeLines = "e2e4:cp:30,d2d4:cp:20,g1f3:cp:-15";
+
+    }  // namespace
+
+    TEST(UciEngineTest, AnalyseWithTwoLinesAsksForMultiPvBeforePositionAndGivesTheScriptedLines) {
+        SKIP_WITHOUT_FAKE_ENGINE();
+        const TempDirectory directory;
+        const eastl::string log = directory.FileText(kLogName);
+        UciEngine engine(FakeSettings({"--log", log, "--lines", kThreeLines}));
+
+        // The fake prints depth 1 lines with a score that must not be taken, then the depth 2 ones; line 3 is not asked for
+        ExpectLines(engine.Analyse(WithLines(MakeRequest({}), 2), CancellationToken()), {{"e2e4", Cp(30)}, {"d2d4", Cp(20)}});
+
+        EXPECT_EQ(ReadFileLines(directory.File(kLogName)), Lines({"uci", "isready", "ucinewgame", "isready", "setoption name MultiPV value 2", StartPositionCommand(), "go movetime 50"}));
+    }
+
+    TEST(UciEngineTest, AnalyseWithThreeLinesGivesThemBestFirstWithTheirScoresFromTheSideToMove) {
+        SKIP_WITHOUT_FAKE_ENGINE();
+        UciEngine engine(FakeSettings({"--lines", kThreeLines}));
+
+        ExpectLines(engine.Analyse(WithLines(MakeRequest({}), 3), CancellationToken()), {{"e2e4", Cp(30)}, {"d2d4", Cp(20)}, {"g1f3", Cp(-15)}});
+    }
+
+    TEST(UciEngineTest, AnalyseReadsAMateScoreOnALaterLine) {
+        SKIP_WITHOUT_FAKE_ENGINE();
+        UciEngine engine(FakeSettings({"--lines", "e2e4:mate:3,d2d4:mate:-2"}));
+
+        ExpectLines(engine.Analyse(WithLines(MakeRequest({}), 2), CancellationToken()), {{"e2e4", MateOf(3)}, {"d2d4", MateOf(-2)}});
+    }
+
+    TEST(UciEngineTest, AOneLineSearchPutsMultiPvBackAndAFreshProcessGetsNoOption) {
+        SKIP_WITHOUT_FAKE_ENGINE();
+        const TempDirectory directory;
+        const eastl::string log = directory.FileText(kLogName);
+        UciEngine engine(FakeSettings({"--log", log, "--lines", kThreeLines}));
+        const eastl::string position = StartPositionCommand();
+
+        // A fresh process has one line: a search for one line sends no option. Three lines ask for it; a search for one line (Analyse, then FindMove) puts it back once
+        ExpectAnalysis(engine.Analyse(MakeRequest({}), CancellationToken()), "e2e4", Cp(30), 1);
+        EXPECT_EQ(CountMultiPvOptions(ReadFileLines(directory.File(kLogName))), 0u);
+        ExpectLines(engine.Analyse(WithLines(MakeRequest({}), 3), CancellationToken()), {{"e2e4", Cp(30)}, {"d2d4", Cp(20)}, {"g1f3", Cp(-15)}});
+        ExpectAnalysis(engine.Analyse(MakeRequest({}), CancellationToken()), "e2e4", Cp(30), 1);
+        ExpectMove(engine.FindMove(MakeRequest({}), CancellationToken()), "e2e4");
+
+        EXPECT_EQ(ReadFileLines(directory.File(kLogName)), Lines({"uci", "isready", "ucinewgame", "isready", position, "go movetime 50", "setoption name MultiPV value 3", position, "go movetime 50",
+                                                                  "setoption name MultiPV value 1", position, "go movetime 50", position, "go movetime 50"}));
+    }
+
+    TEST(UciEngineTest, FindMoveBringsMultiPvBackToOneAfterAnAnalysisOfThreeLines) {
+        SKIP_WITHOUT_FAKE_ENGINE();
+        const TempDirectory directory;
+        const eastl::string log = directory.FileText(kLogName);
+        UciEngine engine(FakeSettings({"--log", log, "--lines", kThreeLines}));
+
+        ExpectLines(engine.Analyse(WithLines(MakeRequest({}), 3), CancellationToken()), {{"e2e4", Cp(30)}, {"d2d4", Cp(20)}, {"g1f3", Cp(-15)}});
+        ExpectMove(engine.FindMove(MakeRequest({}), CancellationToken()), "e2e4");
+        ExpectMove(engine.FindMove(MakeRequest({}), CancellationToken()), "e2e4");
+
+        const eastl::vector<eastl::string> lines = ReadFileLines(directory.File(kLogName));
+        EXPECT_EQ(CountLines(lines, "setoption name MultiPV value 3"), 1u);
+        EXPECT_EQ(CountLines(lines, "setoption name MultiPV value 1"), 1u) << "once, not before every search";
+        EXPECT_EQ(CountMultiPvOptions(lines), 2u);
+    }
+
+    TEST(UciEngineTest, MultiPvIsSentAgainToTheProcessThatReplacedAClosedOne) {
+        SKIP_WITHOUT_FAKE_ENGINE();
+        const TempDirectory directory;
+        const eastl::string log = directory.FileText(kLogName);
+        const eastl::string marker = directory.FileText("died-once");
+        UciEngine engine(FakeSettings({"--log", log, "--die-once", marker, "--lines", kThreeLines}));
+        const SearchRequest request = WithLines(MakeRequest({}), 2);
+
+        ExpectAnalysisError(engine.Analyse(request, CancellationToken()), EngineErrorKind::ProcessDied);
+        ExpectLines(engine.Analyse(request, CancellationToken()), {{"e2e4", Cp(30)}, {"d2d4", Cp(20)}});
+
+        const eastl::vector<eastl::string> lines = ReadFileLines(directory.File(kLogName));
+        EXPECT_EQ(CountLines(lines, "uci"), 2u);
+        EXPECT_EQ(CountLines(lines, "setoption name MultiPV value 2"), 2u) << "the new process has one line again";
+    }
+
+    TEST(UciEngineTest, AnIllegalMoveOnALaterLineIsIllegalMoveAndTheProcessIsKept) {
+        SKIP_WITHOUT_FAKE_ENGINE();
+        const TempDirectory directory;
+        const eastl::string log = directory.FileText(kLogName);
+        UciEngine engine(FakeSettings({"--log", log, "--lines", "e2e4:cp:30,e2e5:cp:20"}));
+
+        const auto illegal = engine.Analyse(WithLines(MakeRequest({}), 2), CancellationToken());
+        const auto again = engine.Analyse(MakeRequest({}), CancellationToken());
+
+        ExpectAnalysisError(illegal, EngineErrorKind::IllegalMove);
+        if (!illegal) {
+            EXPECT_NE(illegal.error().detail.find("e2e5"), eastl::string::npos) << illegal.error().detail.c_str();
+        }
+        ExpectAnalysis(again, "e2e4", Cp(30), 1);
+        const eastl::vector<eastl::string> lines = ReadFileLines(directory.File(kLogName));
+        EXPECT_EQ(CountLines(lines, "uci"), 1u);
+        EXPECT_EQ(CountLines(lines, "quit"), 0u);
+    }
+
+    TEST(UciEngineTest, ARepeatedMoveOnALaterLineIsDropped) {
+        SKIP_WITHOUT_FAKE_ENGINE();
+        UciEngine engine(FakeSettings({"--lines", "e2e4:cp:30,e2e4:cp:25,d2d4:cp:10"}));
+
+        ExpectLines(engine.Analyse(WithLines(MakeRequest({}), 3), CancellationToken()), {{"e2e4", Cp(30)}, {"d2d4", Cp(10)}});
+    }
+
+    TEST(UciEngineTest, FewerLinesThanAskedForIsNotAnError) {
+        SKIP_WITHOUT_FAKE_ENGINE();
+        UciEngine engine(FakeSettings({"--lines", "e2e4:cp:30,d2d4:cp:20"}));
+
+        ExpectLines(engine.Analyse(WithLines(MakeRequest({}), 4), CancellationToken()), {{"e2e4", Cp(30)}, {"d2d4", Cp(20)}});
+    }
+
+    TEST(UciEngineTest, ALineWithoutAScoreIsNotAnAnalysisEvenWithManyLinesAsked) {
+        SKIP_WITHOUT_FAKE_ENGINE();
+        const TempDirectory directory;
+        const eastl::string log = directory.FileText(kLogName);
+        UciEngine engine(FakeSettings({"--log", log, "--no-score", "--lines", kThreeLines}));
+
+        ExpectAnalysisError(engine.Analyse(WithLines(MakeRequest({}), 3), CancellationToken()), EngineErrorKind::ProtocolError);
+
+        EXPECT_EQ(CountLines(ReadFileLines(directory.File(kLogName)), "quit"), 0u) << "the engine answered: it is in step";
+    }
+
+    TEST(UciEngineTest, AnalyseWithNoLinesOrTooManyIsBadRequestWithoutAProcess) {
+        SKIP_WITHOUT_FAKE_ENGINE();
+        const TempDirectory directory;
+        const eastl::string log = directory.FileText(kLogName);
+        UciEngine engine(FakeSettings({"--log", log}));
+
+        ExpectAnalysisError(engine.Analyse(WithLines(MakeRequest({}), 0), CancellationToken()), EngineErrorKind::BadRequest);
+        ExpectAnalysisError(engine.Analyse(WithLines(MakeRequest({}), -1), CancellationToken()), EngineErrorKind::BadRequest);
+        ExpectAnalysisError(engine.Analyse(WithLines(MakeRequest({}), kMaxAnalysisLines + 1), CancellationToken()), EngineErrorKind::BadRequest);
+        ExpectError(engine.FindMove(WithLines(MakeRequest({}), 0), CancellationToken()), EngineErrorKind::BadRequest);
+
+        EXPECT_FALSE(std::filesystem::exists(directory.File(kLogName)));
+    }
+
+    TEST(UciEngineTest, FindMoveIgnoresTheLinesOfTheRequest) {
+        SKIP_WITHOUT_FAKE_ENGINE();
+        const TempDirectory directory;
+        const eastl::string log = directory.FileText(kLogName);
+        UciEngine engine(FakeSettings({"--log", log, "--lines", kThreeLines}));
+
+        ExpectMove(engine.FindMove(WithLines(MakeRequest({}), 3), CancellationToken()), "e2e4");
+
+        EXPECT_EQ(CountMultiPvOptions(ReadFileLines(directory.File(kLogName))), 0u) << "a move is one line";
+    }
+
 #endif  // defined(_WIN32)
 
     TEST(UciEngineTest, FindStockfishTakesAnExplicitExistingFile) {

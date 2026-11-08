@@ -5,7 +5,7 @@
     python fake_uci_engine.py [--log FILE] [--moves m1,m2,...] [--think-ms N] [...]
 
 It answers `uci` with `id name`, `id author`, one option (`Skill Level`) and `uciok`; `isready` with `readyok`; it consumes
-`setoption`, `ucinewgame` and `position`; on `go ...` it prints one `info depth 1 score cp 10 pv <move>` line and then
+`setoption` (and remembers `MultiPV`, see --lines), `ucinewgame` and `position`; on `go ...` it prints one `info depth 1 score cp 10 pv <move>` line and then
 `bestmove <move> ponder e7e5`; on `quit` or at the end of its input it exits. The answer to the 1st `go` is the 1st move of
 --moves, to the 2nd the 2nd, and so on; when the list is used up it is `bestmove (none)`.
 
@@ -15,7 +15,13 @@ It answers `uci` with `id name`, `id author`, one option (`Skill Level`) and `uc
     --noisy-info         around the final `info` line (depth 2, the score of --scores) print lines an analysis must not take: an earlier depth
                          (cp -321), the same depth as a bound (cp 654 lowerbound), a second line of the search (multipv 2, mate 7), a text
                          line (`info string score cp 999`) and, after the final line, a bound again (mate -9 upperbound)
-    --no-score           the final `info` line carries no `score` (the noise lines of --noisy-info keep theirs)
+    --no-score           the final `info` line carries no `score`; with --lines and `MultiPV` above 1 no line of either depth does (the noise lines of --noisy-info keep theirs)
+    --lines m:k:v,...    a search with several lines, the same for every `go`: `e2e4:cp:30,d2d4:cp:20,g1f3:mate:3` (move, then the score as in --scores). The
+                         `bestmove` is the first move (--moves is not used) and its score is the first score (--scores is not used). With `MultiPV` 1 (the
+                         start, and after `setoption name MultiPV value 1`) the `info` line is the one of today, `info depth 1 score <first score> pv <first move>`.
+                         After `setoption name MultiPV value N` with N > 1 it prints, for the depths 1 and 2, `info depth D multipv i score ... pv <move>` for
+                         i = 1..min(N, number of lines) in order; the lines of depth 1 carry a score (cp -321) that must not be taken, those of depth 2 the scripted
+                         ones (a move is not checked: a test may script an illegal or a repeated one). Not combined with --noisy-info
     --think-ms N         wait N milliseconds before answering `go`; a `stop` line ends the wait at once (an `isready` is answered meanwhile)
     --think-first-only   --think-ms applies to the 1st `go` only (a search that is stopped, then one that answers at once)
     --ignore-stop        a `stop` line does not end the wait
@@ -76,6 +82,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--scores", default=DEFAULT_SCORE)
     parser.add_argument("--noisy-info", action="store_true")
     parser.add_argument("--no-score", action="store_true")
+    parser.add_argument("--lines", default="")
     parser.add_argument("--think-ms", type=int, default=0)
     parser.add_argument("--think-first-only", action="store_true")
     parser.add_argument("--ignore-stop", action="store_true")
@@ -93,6 +100,12 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def parse_line_spec(spec: str) -> tuple[str, str]:
+    """`e2e4:cp:30` is the move `e2e4` and the score text `cp:30`."""
+    move, _, score = spec.partition(":")
+    return move, score
+
+
 def read_input(lines: "queue.Queue[str | None]") -> None:
     """Runs in a thread, so that the engine can look at its input while it waits: None marks the end of the input."""
     for raw in sys.stdin:
@@ -107,6 +120,8 @@ class FakeEngine:
         self._out = out
         self._moves = [move for move in options.moves.split(",") if move]
         self._scores = [score for score in options.scores.split(",") if score]
+        self._script = [parse_line_spec(spec) for spec in options.lines.split(",") if spec]
+        self._multipv = 1
         self._go_count = 0
         # A raw descriptor in append mode: every line is in the file when `log` returns, and a signal handler may write too
         self._log_fd = os.open(options.log, os.O_WRONLY | os.O_APPEND | os.O_CREAT, LOG_FILE_MODE) if options.log else None
@@ -158,11 +173,19 @@ class FakeEngine:
             self.on_uci()
         elif command == "isready":
             self.say("readyok")
+        elif command == "setoption":
+            self.on_setoption(line)
         elif command == "go":
             self.on_go()
         elif command == "quit":
             self.on_quit()
-        # setoption, ucinewgame, position, stop and anything else are consumed
+        # ucinewgame, position, stop and anything else are consumed
+
+    def on_setoption(self, line: str) -> None:
+        """Remembers `setoption name MultiPV value N` (any other option is consumed); a value that is not a number is ignored."""
+        words = line.split()
+        if len(words) == 5 and words[1] == "name" and words[2].lower() == "multipv" and words[3] == "value" and words[4].isdigit():
+            self._multipv = max(int(words[4]), 1)
 
     def on_uci(self) -> None:
         if self._options.no_uciok:
@@ -179,7 +202,10 @@ class FakeEngine:
             raise Leave(DIE_EXIT_CODE)
         if self._options.hang_on_go:
             return
-        move = self._moves[index] if index < len(self._moves) else NO_MOVE
+        if self._script:
+            move = self._script[0][0]
+        else:
+            move = self._moves[index] if index < len(self._moves) else NO_MOVE
 
         self.think(index)
         if self._options.garbage:
@@ -197,15 +223,31 @@ class FakeEngine:
             self.say(f"bestmove {move} ponder {PONDER_MOVE}")
 
     def score_words(self, index: int) -> str:
-        """The `score ...` words of the `go` number `index` (from --scores); empty with --no-score."""
+        """The `score ...` words of the `go` number `index` (from --scores, or the first of --lines); empty with --no-score."""
+        if self._script:
+            return self.words_of(self._script[0][1])
+        return self.words_of(self._scores[index] if index < len(self._scores) else DEFAULT_SCORE)
+
+    def words_of(self, text: str) -> str:
+        """` score cp 35` from `cp:35`; empty with --no-score."""
         if self._options.no_score:
             return ""
-        text = self._scores[index] if index < len(self._scores) else DEFAULT_SCORE
         kind, _, value = text.partition(":")
         return f" score {kind} {value}"
 
+    def say_multipv_lines(self) -> None:
+        """--lines with `MultiPV` above 1: an earlier depth whose scores must not be taken, then the scripted lines, each depth in the order of the index."""
+        count = min(self._multipv, len(self._script))
+        earlier = "" if self._options.no_score else f" score cp {NOISE_EARLIER_CP}"
+        for depth, score_of in ((1, lambda _: earlier), (2, lambda text: self.words_of(text))):
+            for number, (move, score) in enumerate(self._script[:count], start=1):
+                self.say(f"info depth {depth} multipv {number}{score_of(score)} pv {move}")
+
     def say_info(self, index: int, move: str) -> None:
-        """The `info` line(s) before `bestmove`: one line, or with --noisy-info the final line (depth 2) among lines that must not be taken."""
+        """The `info` line(s) before `bestmove`: one line, or with --noisy-info the final line (depth 2) among lines that must not be taken, or the lines of --lines."""
+        if self._script and self._multipv > 1:
+            self.say_multipv_lines()
+            return
         score = self.score_words(index)
         if not self._options.noisy_info:
             self.say(f"info depth 1{score} pv {move}")

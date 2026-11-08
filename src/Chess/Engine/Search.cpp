@@ -406,11 +406,19 @@ namespace BECore::Chess {
                 return result;
             }
 
-            const MoveList rootMoves = MoveGenerator::GenerateLegal(_position);
+            MoveList rootMoves = MoveGenerator::GenerateLegal(_position);
             if (rootMoves.empty()) {
                 result.complete = true;
                 result.score = _position.IsInCheck() ? -MateIn(0) : kDrawScore;
                 return result;
+            }
+            if (!_settings.excludedRootMoves.empty()) {
+                const auto excluded = [this](Move move) { return eastl::find(_settings.excludedRootMoves.begin(), _settings.excludedRootMoves.end(), move) != _settings.excludedRootMoves.end(); };
+                rootMoves.erase(eastl::remove_if(rootMoves.begin(), rootMoves.end(), excluded), rootMoves.end());
+                ASSERT(!rootMoves.empty(), "Search: every legal root move is excluded");
+                if (rootMoves.empty()) {
+                    return result;
+                }
             }
 
             const int maxDepth = eastl::clamp(_settings.maxDepth, 1, kMaxSearchDepth);
