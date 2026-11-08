@@ -724,6 +724,91 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(kiwipeteResult.nodes, 32789U);
     }
 
+    // -- excluded root moves -------------------------------------------------------------------------------------------------
+
+    TEST(SearchTest, NoExcludedRootMovesIsTheSearchOfBefore) {
+        // An empty list is the default: the move, the score and the nodes are the pinned ones of the tests above
+        Position position = Position::Start();
+        SearchSettings settings;
+        settings.maxDepth = kMinimaxDepth;
+        settings.excludedRootMoves.clear();
+
+        const SearchResult result = Search(position, settings);
+
+        EXPECT_EQ(result.best, Mv("b1c3"));
+        EXPECT_EQ(result.score, 50);
+        EXPECT_EQ(result.nodes, 1263U);
+    }
+
+    TEST(SearchTest, ExcludingTheBestMoveGivesAnotherLegalMove) {
+        for (const eastl::string_view fen : kPerftFens) {
+            Position position = PositionFromFen(fen);
+            const SearchResult first = SearchDepth(position, kMinimaxDepth);
+            SearchSettings settings;
+            settings.maxDepth = kMinimaxDepth;
+            settings.excludedRootMoves.push_back(first.best);
+
+            const SearchResult second = Search(position, settings);
+
+            EXPECT_TRUE(second.complete) << fen.data();
+            EXPECT_NE(second.best, first.best) << fen.data();
+            EXPECT_TRUE(IsLegalIn(position, second.best)) << fen.data();
+            EXPECT_EQ(second.depth, kMinimaxDepth) << fen.data();
+        }
+    }
+
+    TEST(SearchTest, ExcludingTheBestMoveOfAHangingQueenLeavesALowerScore) {
+        // White to move takes the queen with the rook; without that move the position is only a quiet one
+        Position position = PositionFromFen("k7/8/8/8/3q4/8/8/3RK3 w - - 0 1");
+        const SearchResult best = SearchDepth(position, kMateInOneDepth);
+        SearchSettings settings;
+        settings.maxDepth = kMateInOneDepth;
+        settings.excludedRootMoves.push_back(best.best);
+
+        const SearchResult other = Search(position, settings);
+
+        EXPECT_EQ(best.best, Mv("d1d4"));
+        EXPECT_NE(other.best, Mv("d1d4"));
+        EXPECT_LT(other.score, best.score - kQueenUpScore / 2);
+    }
+
+    TEST(SearchTest, ExcludingEveryMoveButOneGivesThatMove) {
+        for (const eastl::string_view fen : {eastl::string_view(Position::kStartFen), eastl::string_view(kKiwipeteFen)}) {
+            Position position = PositionFromFen(fen);
+            const MoveList legal = MoveGenerator::GenerateLegal(position);
+            for (size_t keep : {size_t{0}, legal.size() / 2, legal.size() - 1}) {
+                SearchSettings settings;
+                settings.maxDepth = 2;
+                for (size_t i = 0; i < legal.size(); ++i) {
+                    if (i != keep) {
+                        settings.excludedRootMoves.push_back(legal[i]);
+                    }
+                }
+
+                const SearchResult result = Search(position, settings);
+
+                EXPECT_TRUE(result.complete) << fen.data() << " " << keep;
+                EXPECT_EQ(result.best, legal[keep]) << fen.data() << " " << keep;
+            }
+        }
+    }
+
+    TEST(SearchTest, AnExcludedSearchComesBackEqualAndTwiceTheSame) {
+        Position position = PositionFromFen(kKiwipeteFen);
+        const Snapshot before = SnapshotOf(position);
+        SearchSettings settings;
+        settings.maxDepth = kMinimaxDepth;
+        settings.excludedRootMoves.push_back(Mv("e2a6"));
+
+        const SearchResult a = Search(position, settings);
+        const SearchResult b = Search(position, settings);
+
+        EXPECT_EQ(SnapshotOf(position), before);
+        EXPECT_EQ(a.best, b.best);
+        EXPECT_EQ(a.score, b.score);
+        EXPECT_EQ(a.nodes, b.nodes);
+    }
+
     TEST(SearchTest, ThePositionComesBackEqual) {
         for (const eastl::string_view fen : kPerftFens) {
             Position position = PositionFromFen(fen);

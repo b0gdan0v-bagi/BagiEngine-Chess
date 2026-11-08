@@ -156,6 +156,39 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(analysis.Best().depth, 12);
     }
 
+    TEST(AnalysisTest, TheLineCountIsTheNumberOfLines) {
+        Analysis analysis;
+        EXPECT_EQ(analysis.LineCount(), 0u);
+
+        analysis.lines.push_back(AnalysisLine{Mv("e2e4"), Cp(30), 12});
+        EXPECT_EQ(analysis.LineCount(), 1u);
+
+        analysis.lines.push_back(AnalysisLine{Mv("d2d4"), Cp(20), 12});
+        analysis.lines.push_back(AnalysisLine{Mv("g1f3"), Cp(10), 12});
+        EXPECT_EQ(analysis.LineCount(), 3u);
+    }
+
+    TEST(AnalysisTest, TheSecondLineIsNullForOneLineAndTheSecondOtherwise) {
+        Analysis analysis;
+        EXPECT_EQ(analysis.Second(), nullptr) << "no line at all";
+
+        analysis.lines.push_back(AnalysisLine{Mv("e2e4"), Cp(30), 12});
+        EXPECT_EQ(analysis.Second(), nullptr);
+
+        analysis.lines.push_back(AnalysisLine{Mv("d2d4"), Cp(20), 11});
+        analysis.lines.push_back(AnalysisLine{Mv("g1f3"), Cp(10), 10});
+        const AnalysisLine* second = analysis.Second();
+        ASSERT_NE(second, nullptr);
+        EXPECT_EQ(second->move, Mv("d2d4"));
+        EXPECT_EQ(second->score, Cp(20));
+        EXPECT_EQ(second->depth, 11);
+        EXPECT_EQ(analysis.Best().move, Mv("e2e4")) << "Best() is still the first";
+    }
+
+    TEST(AnalysisTest, TheMostLinesAnAnalysisMayAskForIsEight) {
+        EXPECT_EQ(kMaxAnalysisLines, 8);
+    }
+
     TEST(AnalysisTest, AnEngineThatOnlyPlaysDoesNotAnalyse) {
         PlayingEngine engine;
         IChessEngine& asInterface = engine;

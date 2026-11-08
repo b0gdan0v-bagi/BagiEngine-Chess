@@ -16,6 +16,8 @@ namespace BECore::Chess {
         eastl::string startFen;
         eastl::vector<Move> moves;
         SearchLimits limits;
+        /// How many lines IChessEngine::Analyse() returns (1..kMaxAnalysisLines, best first); FindMove() ignores it and always gives one move. The factories give 1
+        int lines = 1;
 
         /// The game of @p model: its start FEN and its moves, repetitions included.
         [[nodiscard]] static SearchRequest FromModel(const ChessGameModel& model, SearchLimits limits);
@@ -23,7 +25,7 @@ namespace BECore::Chess {
         /// The position as it stands, with no moves. The repetition history of a Position is lost (the FEN does not carry it), a model keeps it: use FromModel() for a game.
         [[nodiscard]] static SearchRequest FromPosition(const Position& position, SearchLimits limits);
 
-        /// BadRequest when the limits are negative or ask for nothing (both 0): an engine would search without end.
+        /// BadRequest when the limits are negative or ask for nothing (both 0): an engine would search without end; and when `lines` is outside 1..kMaxAnalysisLines.
         [[nodiscard]] std::expected<void, EngineError> Validate() const;
 
         /// The position the moves lead to, with the history of the game (so that Position::RepetitionCount() counts). BadRequest for a start FEN that
