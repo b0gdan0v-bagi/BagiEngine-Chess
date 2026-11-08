@@ -1264,8 +1264,13 @@ namespace BECore::Chess::Tests {
         const Json analysis = AnalysisOfState();
 
         ASSERT_TRUE(analysis.is_object());
-        EXPECT_EQ(analysis.size(), 7u) << "evaluationOn, hintRequested, thinking, evaluation, hint, lines, error";
+        EXPECT_EQ(analysis.size(), 9u) << "evaluationOn, hintRequested, thinking, evaluation, hint, lines, ratingsOn, ratings, error";
         EXPECT_EQ(GetJsonBool(analysis, "evaluationOn"), false) << "the evaluation costs a process and CPU: it is off until asked for";
+        EXPECT_EQ(GetJsonBool(analysis, "ratingsOn"), false) << "so does the rating of the moves";
+        const Json* ratings = FindJsonMember(analysis, "ratings");
+        ASSERT_NE(ratings, nullptr);
+        EXPECT_TRUE(ratings->is_array());
+        EXPECT_TRUE(ratings->empty()) << "no move, no entry";
         EXPECT_EQ(GetJsonBool(analysis, "hintRequested"), false);
         EXPECT_EQ(GetJsonBool(analysis, "thinking"), false);
         for (const char* key : {"evaluation", "hint", "error"}) {
@@ -1627,12 +1632,20 @@ namespace BECore::Chess::Tests {
         Json unknown = Json::object();
         unknown["evaluation"] = true;
         unknown["hnt"] = true;
+        Json wrongRatings = Json::object();
+        wrongRatings["ratings"] = 1;
+        Json nullRatings = Json::object();
+        nullRatings["ratings"] = Json();
+        Json unknownNextToRatings = Json::object();
+        unknownNextToRatings["ratings"] = true;
+        unknownNextToRatings["rating"] = true;
 
-        for (const Json& analysis : {wrongHint, wrongEvaluation, nullEvaluation, unknown, Json(5), Json("on"), Json(), Json::array(), Json(true)}) {
+        for (const Json& analysis : {wrongHint, wrongEvaluation, nullEvaluation, unknown, wrongRatings, nullRatings, unknownNextToRatings, Json(5), Json("on"), Json(), Json::array(), Json(true)}) {
             EXPECT_EQ(SetStateError(request(analysis)), "invalid_params") << analysis.dump();
             EXPECT_EQ(AnalysisSnapshot(), before) << analysis.dump();
         }
         EXPECT_EQ(GetJsonBool(AnalysisOfState(), "evaluationOn"), false) << "the valid half of a refused call is not applied";
+        EXPECT_EQ(GetJsonBool(AnalysisOfState(), "ratingsOn"), false) << "nor the ratings next to an unknown member";
         Frames();
         EXPECT_EQ(factory.Calls(), 0);
     }
@@ -2178,6 +2191,214 @@ namespace BECore::Chess::Tests {
         AnalyseWith(std::nullopt, true);
         ASSERT_TRUE(FrameUntil([&] { return !AnalysisMember("hint").is_null(); }));
         EXPECT_EQ(StringMember(AnalysisMember("hint"), "move"), "e7e5");
+    }
+
+    // ---- The ratings of the moves (analysis.ratingsOn, analysis.ratings) ----
+
+    namespace {
+
+        /// {"analysis": {"ratings": @p on}}
+        Json RatingsRequest(bool on) {
+            Json analysis = Json::object();
+            analysis["ratings"] = on;
+            Json request = Json::object();
+            request["analysis"] = std::move(analysis);
+            return request;
+        }
+
+        /// The ratings array has @p count entries and none is null
+        bool AllRated(const Json& ratings, size_t count) {
+            if (!ratings.is_array() || ratings.size() != count) {
+                return false;
+            }
+            for (size_t index = 0; index < count; ++index) {
+                if (ratings[index].is_null()) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        /// The reasons of the ratings, in order ("<null>" for a move not rated)
+        eastl::vector<std::string> ReasonsOfRatings(const Json& ratings) {
+            eastl::vector<std::string> reasons;
+            for (size_t index = 0; index < ratings.size(); ++index) {
+                reasons.push_back(ratings[index].is_null() ? std::string("<null>") : StringMember(ratings[index], "reason"));
+            }
+            return reasons;
+        }
+
+    }  // namespace
+
+    TEST_F(ChessGameControlTest, TheRatingsAreOffAndNothingIsSearchedForThemUntilSwitchedOn) {
+        const auto engine = Analyser(kPawnUp, Mv("e2e4"));
+        CountingAnalysisFactory factory{engine};
+        analyst.SetEngineFactory(factory.AsFactory());
+
+        Perform("e2e4");
+        Frames();
+
+        EXPECT_EQ(GetJsonBool(AnalysisOfState(), "ratingsOn"), false);
+        const Json ratings = AnalysisMember("ratings");
+        ASSERT_TRUE(ratings.is_array());
+        ASSERT_EQ(ratings.size(), 1u) << "one entry per move of moves";
+        EXPECT_TRUE(ratings[0].is_null());
+        EXPECT_EQ(factory.Calls(), 0);
+    }
+
+    TEST_F(ChessGameControlTest, TheRatingsHaveOneEntryPerMoveInTheOrderOfMovesWithTheBestMoveBrilliant) {
+        const auto engine = Analyser(kPawnUp, Mv("e2e4"));  // line 1 is e2e4 for every request, a second line 25 centipawns lower
+        CountingAnalysisFactory factory{engine};
+        analyst.SetEngineFactory(factory.AsFactory());
+
+        ASSERT_TRUE(control.SetState(RatingsRequest(true)).has_value());
+        EXPECT_EQ(GetJsonBool(AnalysisOfState(), "ratingsOn"), true);
+        Perform("e2e4");
+        Perform("e7e5");
+        EXPECT_EQ(AnalysisMember("ratings").size(), 2u) << "the list has the length of moves from the first read";
+        ASSERT_TRUE(FrameUntil([&] { return AllRated(AnalysisMember("ratings"), 2); })) << AnalysisOfState().dump().c_str();
+
+        const Json ratings = AnalysisMember("ratings");
+        EXPECT_EQ(ReasonsOfRatings(ratings), (eastl::vector<std::string>{"brilliant", "not_best"}));
+        EXPECT_EQ(GetJsonBool(ratings[0], "brilliant"), true);
+        EXPECT_EQ(GetJsonBool(ratings[1], "brilliant"), false);
+        EXPECT_EQ(ratings[0].size(), 2u) << "brilliant and reason";
+        EXPECT_EQ(MoveCount(), 2u);
+        ASSERT_EQ(factory.Calls(), 1);
+        EXPECT_EQ(factory.Engines()[0], "own");
+        EXPECT_EQ(GetJsonBool(AnalysisOfState(), "thinking"), false) << "the analysis is off, so is its search";
+        EXPECT_TRUE(AnalysisMember("evaluation").is_null());
+        EXPECT_TRUE(AnalysisMember("lines").empty()) << "the rater's lines are not published as the analysis's";
+    }
+
+    TEST_F(ChessGameControlTest, AResetDropsTheRatingsAndKeepsTheSwitch) {
+        const auto engine = Analyser(kPawnUp, Mv("e2e4"));
+        CountingAnalysisFactory factory{engine};
+        analyst.SetEngineFactory(factory.AsFactory());
+        ASSERT_TRUE(control.SetState(RatingsRequest(true)).has_value());
+        Perform("e2e4");
+        ASSERT_TRUE(FrameUntil([&] { return AllRated(AnalysisMember("ratings"), 1); }));
+
+        ASSERT_TRUE(control.Reset(Json::object()).has_value());
+
+        EXPECT_TRUE(AnalysisMember("ratings").empty());
+        EXPECT_EQ(GetJsonBool(AnalysisOfState(), "ratingsOn"), true) << "the switch is the person's, a new game keeps it (as the evaluation's)";
+        Frames();  // the rater sees the empty game and lets go of the old ratings
+        Perform("e2e4");
+        EXPECT_TRUE(AnalysisMember("ratings")[0].is_null()) << "not rated until the new game's own search has answered";
+        ASSERT_TRUE(FrameUntil([&] { return AllRated(AnalysisMember("ratings"), 1); })) << "the next game is rated from its first move";
+        EXPECT_EQ(ReasonsOfRatings(AnalysisMember("ratings")), (eastl::vector<std::string>{"brilliant"}));
+    }
+
+    TEST_F(ChessGameControlTest, AFenDropsTheRatingsAndSwitchingOffKeepsThem) {
+        const auto engine = Analyser(kPawnUp, Mv("e2e4"));
+        CountingAnalysisFactory factory{engine};
+        analyst.SetEngineFactory(factory.AsFactory());
+        ASSERT_TRUE(control.SetState(RatingsRequest(true)).has_value());
+        Perform("e2e4");
+        ASSERT_TRUE(FrameUntil([&] { return AllRated(AnalysisMember("ratings"), 1); }));
+
+        ASSERT_TRUE(control.SetState(RatingsRequest(false)).has_value());
+        Frames();
+        EXPECT_EQ(GetJsonBool(AnalysisOfState(), "ratingsOn"), false);
+        EXPECT_TRUE(AllRated(AnalysisMember("ratings"), 1)) << "off stops the work and keeps what is rated";
+
+        SetFen(kMateInOneFen);
+        EXPECT_TRUE(AnalysisMember("ratings").empty()) << "a position set from outside is not the same game";
+    }
+
+    TEST_F(ChessGameControlTest, TheRatingsCanBeSwitchedOnForAFinishedGame) {
+        const auto engine = Analyser(kPawnUp, Mv("a1a8"));
+        CountingAnalysisFactory factory{engine};
+        analyst.SetEngineFactory(factory.AsFactory());
+        SetFen(kMateInOneFen);
+        Perform("a1a8");
+        ASSERT_EQ(StringMember(State(), "status"), "checkmate");
+
+        ASSERT_TRUE(control.SetState(RatingsRequest(true)).has_value()) << "no refusal: the moves of a finished game are rated like any";
+
+        ASSERT_TRUE(FrameUntil([&] { return AllRated(AnalysisMember("ratings"), 1); }));
+        EXPECT_EQ(ReasonsOfRatings(AnalysisMember("ratings")), (eastl::vector<std::string>{"brilliant"}));
+    }
+
+    TEST_F(ChessGameControlTest, RatingsWithTheRealOwnEngineAreTheSameWhenTheGameIsPlayedTwice) {
+        // No factory: the default one, the OwnEngine at depth 5 (no process); pinned in MoveRaterTest: not_best, brilliant, not_best, brilliant
+        ASSERT_TRUE(control.SetState(RatingsRequest(true)).has_value());
+        const auto playTheGame = [&] {
+            for (const char* uci : {"e2e4", "e7e5", "g1f3", "b8c6"}) {
+                Perform(uci);
+            }
+            EXPECT_TRUE(FrameUntil([&] { return AllRated(AnalysisMember("ratings"), 4); })) << AnalysisOfState().dump().c_str();
+            return ReasonsOfRatings(AnalysisMember("ratings"));
+        };
+
+        const eastl::vector<std::string> first = playTheGame();
+        ASSERT_TRUE(control.Reset(Json::object()).has_value());
+        const eastl::vector<std::string> second = playTheGame();
+
+        EXPECT_EQ(first, (eastl::vector<std::string>{"not_best", "brilliant", "not_best", "brilliant"}));
+        EXPECT_EQ(second, first) << "a fixed depth: the same game, the same ratings";
+        EXPECT_TRUE(AnalysisMember("error").is_null());
+    }
+
+    TEST_F(ChessGameControlTest, ABadRatingsRequestIsInvalidParamsAndChangesNothing) {
+        const auto engine = Analyser();
+        CountingAnalysisFactory factory{engine};
+        analyst.SetEngineFactory(factory.AsFactory());
+        Perform("e2e4");
+        const std::string before = AnalysisSnapshot();
+        const std::string fenBefore = StringMember(State(), "fen");
+
+        Json one = Json::object();
+        one["ratings"] = 1;
+        Json text = Json::object();
+        text["ratings"] = "true";
+        Json unknownNext = Json::object();
+        unknownNext["ratings"] = true;
+        unknownNext["ratingsOn"] = true;
+        for (const Json& analysis : {one, text, unknownNext}) {
+            Json request = Json::object();
+            request["analysis"] = analysis;
+            EXPECT_EQ(SetStateError(request), "invalid_params") << analysis.dump();
+            EXPECT_EQ(AnalysisSnapshot(), before) << analysis.dump();
+        }
+
+        // Combined with a fen or an opponent: refused whole, the fen is not loaded and the switch is not applied
+        Json combined = FenState(kMateInOneFen);
+        combined["analysis"] = RatingsRequest(true)["analysis"];
+        EXPECT_EQ(SetStateError(combined), "invalid_params");
+        Json withOpponent = OpponentRequest("black");
+        withOpponent["analysis"] = RatingsRequest(true)["analysis"];
+        EXPECT_EQ(SetStateError(withOpponent), "invalid_params");
+
+        EXPECT_EQ(AnalysisSnapshot(), before);
+        EXPECT_EQ(StringMember(State(), "fen"), fenBefore);
+        EXPECT_EQ(GetJsonBool(AnalysisOfState(), "ratingsOn"), false);
+        Frames();
+        EXPECT_EQ(factory.Calls(), 0);
+    }
+
+    TEST_F(ChessGameControlTest, TheStateVersionGrowsWithASwitchAndWithARatingThatArrives) {
+        const auto engine = Analyser(kPawnUp, Mv("e2e4"));
+        CountingAnalysisFactory factory{engine};
+        analyst.SetEngineFactory(factory.AsFactory());
+        Perform("e2e4");
+        const uint64_t before = control.GetStateVersion();
+
+        ASSERT_TRUE(control.SetState(RatingsRequest(true)).has_value());
+        const uint64_t switched = control.GetStateVersion();
+        EXPECT_GT(switched, before);
+        uint64_t last = switched;
+        ASSERT_TRUE(FrameUntil([&] {
+            EXPECT_GE(control.GetStateVersion(), last) << "never goes back";
+            last = control.GetStateVersion();
+            return AllRated(AnalysisMember("ratings"), 1);
+        }));
+        EXPECT_GT(control.GetStateVersion(), switched) << "the rating that arrives is a change a client can wait for";
+
+        const uint64_t rated = control.GetStateVersion();
+        Frames();
+        EXPECT_EQ(control.GetStateVersion(), rated) << "nothing left to rate, the version stays";
     }
 
 }  // namespace BECore::Chess::Tests

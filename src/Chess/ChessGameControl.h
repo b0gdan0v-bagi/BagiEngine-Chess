@@ -48,7 +48,7 @@ namespace BECore::Chess {
      * the starting set is a promoted pawn (it counts in the points and is not a missing pawn), a pawn that promoted into a piece that was missing shows as
      * a pawn gone, and a promoted piece that is taken later shows as a missing pawn.
      *
-     * analysis is {"evaluationOn", "hintRequested", "thinking", "evaluation", "hint", "lines", "error"} (the analysis of the position by the engine the person picked, never
+     * analysis is {"evaluationOn", "hintRequested", "thinking", "evaluation", "hint", "lines", "ratingsOn", "ratings", "error"} (the analysis of the position by the engine the person picked, never
      * handicapped, at the limits of the strongest level; PositionAnalyst): evaluationOn whether the evaluation is switched on (off at the start of every game), hintRequested
      * whether a hint was asked for the position now on the board (a hint belongs to its position: a move, a reset or a set_state drops the request), thinking whether a search runs.
      * evaluation is null while it is off or not yet computed for this position, else {"score": {"kind": "centipawns"|"mate", "value": int}, "text": "+0.35"|"#3", "depth": int}
@@ -60,6 +60,12 @@ namespace BECore::Chess {
      * unless the evaluation is on or a hint was asked for this position, and the answer for this very position has come; it goes with the hint (a move, a reset, a set_state, a
      * change of the engine pick) and nothing starts only to fill it. error is null or {"kind", "detail"} with the kinds of
      * opponent.error; it belongs to the position and the engine, and goes with the next move, the next pick of the engine or a new hint request.
+     * ratingsOn is whether the moves are being rated (off at the start of every game, it costs CPU; a reset keeps the switch). ratings has one entry per move of "moves", in the same
+     * order: null while the move is not rated, else {"brilliant": bool, "reason": "brilliant"|"not_best"|"forced"|"obvious"} (MoveRater, MoveRating.h). A move is brilliant when it is the
+     * best move of the own engine at depth 5 in the position it was played in (the engine's first line before the move) and it was a choice: "forced" is a position with one legal move,
+     * "obvious" one where the second line is 200 centipawns or more behind (a forced recapture, a mate in one); "not_best" is any other move. Rated in the background, the oldest move first, with
+     * an engine of its own that is always the own engine, whatever opponent.engine is, so the same game gets the same ratings twice; the ratings of earlier moves stay after a new move and go
+     * with a reset or a set_state of a fen. Independent of hintRequested and of the evaluation, and of the turn of the person.
      *
      * Actions: {"type": "move", "uci": "e2e4"}, every legal move once; none once the game is over. The list does not change with the opponent: the program's
      * side is listed and accepted like the other (a controller may play for it; a search that the move makes stale is dropped). Castling is the king's move
@@ -73,14 +79,14 @@ namespace BECore::Chess {
      * seats (the old shape); the seat objects "white" and "black" (members optional, nothing else allowed in them) then override one seat; plays says who plays and a missing
      * plays keeps the sides as they are. "both" starts a game of two programs, each with an engine object of its own; "plays": "white" while both play is a takeover (the person
      * has Black, White's program and its search stay), null ends it. Everything is checked before anything changes, so a refused call (invalid_params) changes nothing.
-     * The opponent is applied first, then the position. SetState also takes {"analysis": {"evaluation": bool, "hint": bool}} (a missing member means unchanged; {} changes
-     * nothing; "evaluation" switches the evaluation on or off, "hint": true asks for a hint for the position now on the board and "hint": false drops it); a wrong type or a member
-     * that is not one of the two is invalid_params. **analysis cannot be combined with fen or opponent in one call** (invalid_params: the hint belongs to the position after them,
-     * two calls say it plainly). A hint on a side that the program plays (so on either turn while two programs play) is not_your_turn, on a finished game game_over; nothing is changed then, the
-     * evaluation switch of the same call included. list_actions is not changed by any of it. A pick that finds no engine (only Stockfish can fail) is engine_unavailable (with the sentence of the
-     * engine's error) and is refused as a whole, whichever seat has no engine: the position is not replaced and the opponent is unchanged (sides, seats and a running search
-     * stay as they were), the error is in the state, so a client can ask again with "engine": "own". A pick that changes nothing (the same sides and seats, no error standing) does nothing: a running
-     * Stockfish is not restarted. With an error standing, the same "plays" asks for an engine again, and plays null clears it.
+     * The opponent is applied first, then the position. SetState also takes {"analysis": {"evaluation": bool, "hint": bool, "ratings": bool}} (a missing member means unchanged; {} changes
+     * nothing; "evaluation" switches the evaluation on or off, "hint": true asks for a hint for the position now on the board and "hint": false drops it, "ratings" switches the rating of
+     * the moves, also on a finished game); a wrong type or a member that is not one of the three is invalid_params. **analysis cannot be combined with fen or opponent in one call** (invalid_params:
+     * the hint belongs to the position after them, two calls say it plainly). A hint on a side that the program plays (so on either turn while two programs play) is not_your_turn, on a finished game
+     * game_over; nothing is changed then, the evaluation switch of the same call included. list_actions is not changed by any of it. A pick that finds no engine (only Stockfish can fail) is
+     * engine_unavailable (with the sentence of the engine's error) and is refused as a whole, whichever seat has no engine: the position is not replaced and the opponent is unchanged (sides, seats
+     * and a running search stay as they were), the error is in the state, so a client can ask again with "engine": "own". A pick that changes nothing (the same sides and seats, no error standing)
+     * does nothing: a running Stockfish is not restarted. With an error standing, the same "plays" asks for an engine again, and plays null clears it.
      *
      * The state version is the version of the game plus the revision of the opponent (a pick, an error that appears or goes) plus the revision of the analyst (a switch,
      * a hint asked or dropped, an answer that arrives, an error that appears or goes), so a push reports a change of the opponent and a hint that came as well; it never goes back.

@@ -6,6 +6,7 @@
 #include <Chess/Game/ChessGameModel.h>
 #include <Chess/Game/MoveGenerator.h>
 #include <Common/EngineEnvironment.h>
+#include <EASTL/algorithm.h>
 #include <chrono>
 
 /// PositionAnalyst with the real TaskManager and engines made in the test (TestEngines.h, no process), plus the OwnEngine for the mate in one and the default factory, and a
@@ -841,6 +842,135 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(analyst.GetHint(model)->move, Mv("a1a8"));
         EXPECT_EQ(analyst.GetHint(model)->score, (AnalysisScore{AnalysisScoreKind::Mate, 1}));
         analyst.Shutdown();
+    }
+
+    // ---- The ratings of the moves (the MoveRater the analyst owns) ----
+
+    namespace {
+
+        /// Every move of @p model is rated
+        bool AllRated(const PositionAnalyst& analyst, const ChessGameModel& model) {
+            const MoveRatings ratings = analyst.GetRatings(model);
+            return !ratings.empty() && eastl::all_of(ratings.begin(), ratings.end(), [](const std::optional<MoveRating>& rating) { return rating.has_value(); });
+        }
+
+    }  // namespace
+
+    TEST_F(PositionAnalystTest, TheRatingsAreOffByDefaultAndUpdateNeverAsksTheFactory) {
+        const auto engine = MakeEngine();
+        CountingAnalysisFactory factory{engine};
+        ChessGameModel model;
+        PositionAnalyst analyst;
+        analyst.SetEngineFactory(factory.AsFactory());
+
+        ASSERT_TRUE(Play(model, "e2e4"));
+        UpdateMany(analyst, model, OpponentEngine::Own);
+
+        EXPECT_FALSE(analyst.AreRatingsOn());
+        EXPECT_EQ(factory.Calls(), 0);
+        EXPECT_EQ(engine->Calls(), 0);
+        EXPECT_EQ(analyst.GetRevision(), 0u);
+        const MoveRatings ratings = analyst.GetRatings(model);
+        ASSERT_EQ(ratings.size(), 1u) << "one entry per move, not rated yet";
+        EXPECT_FALSE(ratings[0].has_value());
+        EXPECT_FALSE(analyst.GetRatingError().has_value());
+    }
+
+    TEST_F(PositionAnalystTest, TheRatingsAreMadeWithTheAnalystsFactoryAskedForTheOwnEngine) {
+        const auto engine = MakeEngine(kScore, Mv("e2e4"));  // line 1 is e2e4 for every request, the second line 25 centipawns lower
+        CountingAnalysisFactory factory{engine};
+        ChessGameModel model;
+        PositionAnalyst analyst;
+        analyst.SetEngineFactory(factory.AsFactory());
+        ASSERT_TRUE(Play(model, "e2e4"));
+        ASSERT_TRUE(Play(model, "e7e5"));
+
+        analyst.SetRatings(true);
+        EXPECT_TRUE(analyst.AreRatingsOn());
+        EXPECT_GT(analyst.GetRevision(), 0u) << "a switch is a change a display shows";
+        const uint64_t switched = analyst.GetRevision();
+        ASSERT_TRUE(UpdateUntil(analyst, model, OpponentEngine::Stockfish, [&] { return AllRated(analyst, model); })) << DescribeError(analyst.GetRatingError()).c_str();
+
+        const MoveRatings ratings = analyst.GetRatings(model);
+        ASSERT_EQ(ratings.size(), 2u);
+        EXPECT_EQ(ratings[0]->reason, MoveRatingReason::Brilliant) << "e2e4 is the scripted best move with a close second line";
+        EXPECT_EQ(ratings[1]->reason, MoveRatingReason::NotBest);
+        ASSERT_EQ(factory.Calls(), 1) << "one engine for the rater, the analysis is off";
+        EXPECT_EQ(factory.Engines()[0], "own") << "whatever the person picked, the ratings are the own engine's";
+        EXPECT_GT(analyst.GetRevision(), switched) << "a rating that arrives moves the revision";
+        EXPECT_FALSE(analyst.IsThinking()) << "IsThinking is the analyst's own";
+    }
+
+    TEST_F(PositionAnalystTest, TheRatingsSurviveANewMoveAndGoWithAnotherGame) {
+        const auto engine = MakeEngine(kScore, Mv("e2e4"));
+        CountingAnalysisFactory factory{engine};
+        ChessGameModel model;
+        PositionAnalyst analyst;
+        analyst.SetEngineFactory(factory.AsFactory());
+        analyst.SetRatings(true);
+        ASSERT_TRUE(Play(model, "e2e4"));
+        ASSERT_TRUE(UpdateUntil(analyst, model, OpponentEngine::Own, [&] { return AllRated(analyst, model); }));
+
+        ASSERT_TRUE(Play(model, "e7e5"));
+        const MoveRatings grown = analyst.GetRatings(model);
+        ASSERT_EQ(grown.size(), 2u);
+        EXPECT_TRUE(grown[0].has_value()) << "unlike a hint, a rating stays after the next move";
+        EXPECT_FALSE(grown[1].has_value());
+        ASSERT_TRUE(UpdateUntil(analyst, model, OpponentEngine::Own, [&] { return AllRated(analyst, model); }));
+
+        model.Reset();
+        analyst.Update(model, OpponentEngine::Own);
+        EXPECT_TRUE(analyst.GetRatings(model).empty());
+        EXPECT_TRUE(analyst.AreRatingsOn()) << "a reset keeps the switch";
+    }
+
+    TEST_F(PositionAnalystTest, ShutdownDropsTheRatingsAndSwitchesThemOff) {
+        const auto engine = MakeEngine(kScore, Mv("e2e4"));
+        CountingAnalysisFactory factory{engine};
+        ChessGameModel model;
+        PositionAnalyst analyst;
+        analyst.SetEngineFactory(factory.AsFactory());
+        analyst.SetRatings(true);
+        ASSERT_TRUE(Play(model, "e2e4"));
+        ASSERT_TRUE(UpdateUntil(analyst, model, OpponentEngine::Own, [&] { return AllRated(analyst, model); }));
+        const int calls = engine->Calls();
+
+        analyst.Shutdown();
+
+        EXPECT_FALSE(analyst.AreRatingsOn());
+        ASSERT_EQ(analyst.GetRatings(model).size(), 1u);
+        EXPECT_FALSE(analyst.GetRatings(model)[0].has_value());
+        ASSERT_TRUE(Play(model, "e7e5"));
+        UpdateMany(analyst, model, OpponentEngine::Own);
+        EXPECT_EQ(engine->Calls(), calls) << "nothing starts until a switch";
+    }
+
+    TEST_F(PositionAnalystTest, TheEvaluationAndTheHintAreTheSameWhileTheRatingsRun) {
+        const auto analysing = MakeEngine(kScore, Mv("e7e5"));  // the analyst's own engine, made first (Update runs the analysis before the rater)
+        const auto rating = MakeEngine({AnalysisScoreKind::Centipawns, 50}, Mv("d2d4"));
+        CountingAnalysisFactory factory{analysing, rating};
+        ChessGameModel model;
+        PositionAnalyst analyst;
+        analyst.SetEngineFactory(factory.AsFactory());
+        ASSERT_TRUE(Play(model, "e2e4"));
+        analyst.SetEvaluation(true);
+        ASSERT_TRUE(analyst.RequestHint(model).has_value());
+        analyst.SetRatings(true);
+
+        ASSERT_TRUE(UpdateUntil(analyst, model, OpponentEngine::Stockfish, [&] { return AllRated(analyst, model) && analyst.GetHint(model).has_value(); }))
+            << DescribeError(analyst.GetError()).c_str();
+
+        EXPECT_EQ(analyst.GetEvaluation(model)->move, Mv("e7e5"));
+        EXPECT_EQ(analyst.GetEvaluation(model)->score, kScore);
+        EXPECT_EQ(analyst.GetHint(model)->move, Mv("e7e5"));
+        ASSERT_EQ(analyst.GetLines(model).size(), 2u);
+        EXPECT_EQ(analyst.GetRatings(model)[0]->reason, MoveRatingReason::NotBest) << "the rater's engine thinks d2d4, not e2e4";
+        ASSERT_EQ(factory.Calls(), 2);
+        EXPECT_EQ(factory.Engines()[0], "stockfish");
+        EXPECT_EQ(factory.Engines()[1], "own");
+        EXPECT_FALSE(analyst.GetError().has_value());
+        EXPECT_EQ(analysing->LastRequest().moves.size(), 1u) << "the analysis is about the position now on the board";
+        EXPECT_EQ(rating->LastRequest().moves.size(), 0u) << "the rating is about the position before the move";
     }
 
 }  // namespace BECore::Chess::Tests

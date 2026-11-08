@@ -21,10 +21,10 @@ namespace BECore::Chess {
      * Owns the adapter of the external control API (ChessGameControl) next to the model it drives, and the seat of the computer opponent
      * (OpponentController). A game starts with nobody as the opponent: Start() loads the settings (where Stockfish is) and nothing else; the opponent
      * is made when a side is picked on GetOpponent(). The choice the opponent panel makes (OpponentChoice: a mode, the person's color, an engine and a level by id) is owned
-     * here too, over the same controller, and remembers the person's color while nobody plays. The analysis of the position (PositionAnalyst: the evaluation and the hint) is owned here as well,
-     * with the default factory over the settings the controller holds; it starts switched off and Start() puts it back to that. IGame has no per-frame hook, so ChessBoardComponent runs
-     * GetOpponent().Update() and GetAnalyst().Update() every frame. Stop() destroys the opponent and shuts the analyst down, which happens before the task system goes down
-     * (Application::Cleanup()): a search that nobody cancelled would hold the join of the pool.
+     * here too, over the same controller, and remembers the person's color while nobody plays. The analysis of the position (PositionAnalyst: the evaluation, the hint and, through its MoveRater, the
+     * ratings of the played moves) is owned here as well, with the default factory over the settings the controller holds; it starts switched off and Start() puts it back to that. IGame has no
+     * per-frame hook, so ChessBoardComponent runs GetOpponent().Update() and GetAnalyst().Update() every frame. Stop() destroys the opponent and shuts the analyst down, which happens before the task
+     * system goes down (Application::Cleanup()): a search that nobody cancelled would hold the join of the pool.
      */
     class ChessGame : public IGame {
         BE_CLASS(ChessGame)

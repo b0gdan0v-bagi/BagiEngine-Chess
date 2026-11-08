@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Chess/Engine/AnalysisEngineFactory.h>
+#include <Chess/Engine/MoveRater.h>
 #include <Chess/Engine/OpponentController.h>
 #include <Chess/Engine/OpponentEngines.h>
 #include <Chess/Engine/OpponentSettings.h>
@@ -72,6 +73,11 @@ namespace BECore::Chess {
      * arrives and an error that appears or goes, never with a search that starts or ends (IsThinking()), and never goes back; a display that publishes the analysis adds it to the version of
      * the model.
      *
+     * **The ratings of the moves.** The analyst also owns a MoveRater (MoveRater.h has the definition and the rules), so the owner of the model has one object to update and to shut down. SetRatings()
+     * switches it (off at the start, like the evaluation), Update() ends up in its Update(), Cancel() and Shutdown() forward, GetRatings() reads, and GetRevision() adds its revision. The rater
+     * has an engine of its own (the factory is asked for OpponentEngine::Own, whatever the person picked) and a history of its own, not the version rule: the ratings of earlier moves survive the next
+     * move, and go with a reset or a position set from outside. Its search never touches the analyst's, and IsThinking() stays the analyst's own.
+     *
      * Logging: with EngineOpponent, OpponentController and MoveRater, one of the classes of Engine/ that log (LOG_ERROR once per failed search, LOG_INFO for a dropped one).
      */
     class PositionAnalyst {
@@ -86,7 +92,8 @@ namespace BECore::Chess {
         PositionAnalyst(PositionAnalyst&&) = delete;
         PositionAnalyst& operator=(PositionAnalyst&&) = delete;
 
-        /// How an engine is made at the first search and after a change of the pick; an empty one puts the default back (MakeAnalysisEngine over empty settings). Read at the next search
+        /// How an engine is made at the first search and after a change of the pick; an empty one puts the default back (MakeAnalysisEngine over empty settings). Read at the next search.
+        /// The rater gets the same factory (and asks it for OpponentEngine::Own)
         void SetEngineFactory(AnalysisEngineFactory factory);
 
         /**
@@ -104,7 +111,7 @@ namespace BECore::Chess {
          * In this order: a finished search is taken (kept when it is still wanted: not cancelled, asked at this version and for this engine pick; else dropped); a running search that
          * is stale or no longer wanted is cancelled; a hint request, a result and an error that belong to an older version (or to another engine) are dropped; then, when the evaluation is
          * on or a hint was asked for this version, no answer is held, no search runs, no error stands and the game is not over, a search starts with the limits of the strongest level of
-         * @p picked. So an answer dropped as stale can be followed by a new search in the same call.
+         * @p picked. So an answer dropped as stale can be followed by a new search in the same call. Then the rater takes its step (MoveRater::Update(), which never waits either).
          */
         void Update(const ChessGameModel& model, OpponentEngine picked);
 
@@ -118,14 +125,32 @@ namespace BECore::Chess {
         /// Drops the hint request (the hint, the search stays when the evaluation wants it)
         void CancelHint();
 
-        /// Cancels the search in flight and drops the answer; the switches stay, so the next Update() asks again. Returns at once
+        /// Switches the rating of the moves on or off (MoveRater::SetOn()): off stops its search at the next Update(), the ratings stay
+        void SetRatings(bool on);
+
+        /// Cancels the search in flight (the rater's too) and drops the answer; the switches stay, so the next Update() asks again. Returns at once
         void Cancel();
 
-        /// Cancels, switches the evaluation off, drops the hint, the answer and the engine. Later Update()s start nothing until a switch or a request. Call it before TaskManager::Shutdown()
+        /// Cancels, switches the evaluation and the ratings off, drops the hint, the answer, the ratings and the engines. Later Update()s start nothing until a switch or a request. Call it before
+        /// TaskManager::Shutdown()
         void Shutdown();
 
         [[nodiscard]] bool IsEvaluationOn() const noexcept {
             return _evaluationOn;
+        }
+
+        [[nodiscard]] bool AreRatingsOn() const noexcept {
+            return _rater.IsOn();
+        }
+
+        /// The ratings of the moves of @p model, in the order of GetMoves(); an empty entry is a move that is not rated (yet). Never more entries than moves (MoveRater::GetRatings())
+        [[nodiscard]] MoveRatings GetRatings(const ChessGameModel& model) const {
+            return _rater.GetRatings(model);
+        }
+
+        /// Why the rating of a move failed, when it did (MoveRater::GetError()); kept apart from GetError(), which is the analysis's
+        [[nodiscard]] const std::optional<EngineError>& GetRatingError() const noexcept {
+            return _rater.GetError();
         }
 
         /// A hint was asked for the position of @p model (its version) and has not been dropped; it may not have come yet
@@ -154,7 +179,7 @@ namespace BECore::Chess {
 
         /// Grows with every change a display shows (see above); never goes back
         [[nodiscard]] uint64_t GetRevision() const noexcept {
-            return _revision;
+            return _revision + _rater.GetRevision();
         }
 
     private:
@@ -171,6 +196,9 @@ namespace BECore::Chess {
 
         /// Runs on the pool: asks the engine and leaves the answer in @p search. Takes its arguments by value, so the frame owns everything it uses
         static Task<void> RunSearch(eastl::shared_ptr<Search> search, SearchRequest request);
+
+        /// Update() without the rater: the analysis search of the evaluation and the hint
+        void UpdateSearch(const ChessGameModel& model, OpponentEngine picked);
 
         [[nodiscard]] bool IsWantedAt(uint64_t version) const noexcept;
         void TakeAnswer(const ChessGameModel& model, OpponentEngine picked);
@@ -201,6 +229,8 @@ namespace BECore::Chess {
         OpponentEngine _errorEngine = kDefaultOpponentEngine;
 
         uint64_t _revision = 0;
+
+        MoveRater _rater;  ///< the ratings of the moves, with its own engine and history; its revision is added in GetRevision()
     };
 
 }  // namespace BECore::Chess

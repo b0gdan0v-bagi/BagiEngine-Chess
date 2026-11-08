@@ -165,18 +165,19 @@ namespace BECore::Chess {
         struct AnalysisPick {
             std::optional<bool> evaluation;
             std::optional<bool> hint;
+            std::optional<bool> ratings;
         };
 
-        constexpr const char* kAnalysisUsage = "'analysis' has to be an object like {\"evaluation\": true, \"hint\": true} (both members are optional booleans)";
+        constexpr const char* kAnalysisUsage = "'analysis' has to be an object like {\"evaluation\": true, \"hint\": true, \"ratings\": true} (the members are optional booleans)";
 
-        /// Reads {"evaluation", "hint"}; nothing is changed
+        /// Reads {"evaluation", "hint", "ratings"}; nothing is changed
         std::expected<AnalysisPick, ControlError> ParseAnalysis(const Json& analysis) {
             if (!analysis.is_object()) {
                 return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, kAnalysisUsage));
             }
             AnalysisPick pick;
             for (const auto& [key, value] : analysis.items()) {
-                std::optional<bool>* target = key == "evaluation" ? &pick.evaluation : key == "hint" ? &pick.hint : nullptr;
+                std::optional<bool>* target = key == "evaluation" ? &pick.evaluation : key == "hint" ? &pick.hint : key == "ratings" ? &pick.ratings : nullptr;
                 if (!target || !value.is_boolean()) {
                     return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, kAnalysisUsage));
                 }
@@ -370,6 +371,21 @@ namespace BECore::Chess {
             lines.push_back(std::move(described));
         }
         analysis["lines"] = std::move(lines);
+
+        // One entry per move of "moves", in the same order: null while the move is not rated
+        analysis["ratingsOn"] = _analyst.AreRatingsOn();
+        Json ratings = Json::array();
+        for (const std::optional<MoveRating>& rating : _analyst.GetRatings(_model)) {
+            if (rating) {
+                Json described = Json::object();
+                described["brilliant"] = rating->IsBrilliant();
+                described["reason"] = MakeJsonString(MoveRatingReasonId(rating->reason));
+                ratings.push_back(std::move(described));
+            } else {
+                ratings.push_back(Json());
+            }
+        }
+        analysis["ratings"] = std::move(ratings);
         analysis["error"] = ErrorJson(_analyst.GetError());
         return analysis;
     }
@@ -427,9 +443,9 @@ namespace BECore::Chess {
         const Json* opponentMember = FindJsonMember(state, "opponent");
         const Json* analysisMember = FindJsonMember(state, "analysis");
         if (!fenMember && !opponentMember && !analysisMember) {
-            return std::unexpected(
-                MakeControlError(ControlErrors::kInvalidParams,
-                                 "'fen' (a FEN string), 'opponent' ({\"plays\", \"level\", \"engine\", \"white\", \"black\"}), both, or 'analysis' ({\"evaluation\", \"hint\"}) alone are needed"));
+            return std::unexpected(MakeControlError(
+                ControlErrors::kInvalidParams,
+                "'fen' (a FEN string), 'opponent' ({\"plays\", \"level\", \"engine\", \"white\", \"black\"}), both, or 'analysis' ({\"evaluation\", \"hint\", \"ratings\"}) alone are needed"));
         }
         if (analysisMember && (fenMember || opponentMember)) {
             return std::unexpected(MakeControlError(ControlErrors::kInvalidParams,
@@ -496,6 +512,9 @@ namespace BECore::Chess {
         _analyst.SetPicked(_opponent.GetEngine());  // the engine the analysis will use is the one picked now
         if (pick->evaluation) {
             _analyst.SetEvaluation(*pick->evaluation);
+        }
+        if (pick->ratings) {
+            _analyst.SetRatings(*pick->ratings);  // no refusal: a finished game's moves are rated like any
         }
         if (pick->hint) {
             if (*pick->hint) {
