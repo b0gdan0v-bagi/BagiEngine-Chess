@@ -18,7 +18,7 @@ src/Chess/
 ├── Engine/                   the computer opponent (src/Chess/Engine/CLAUDE.md)
 │   ├── ChessEngine.h, Analysis.*, SearchRequest.*     IChessEngine (FindMove, Analyse), the request and the analysis
 │   ├── UciProtocol.*, UciProcess.*, UciEngine.*       Stockfish over UCI in a child process (POSIX)
-│   ├── Evaluation.*, Search.*, OwnEngine.*            the engine of our own
+│   ├── Evaluation.*, Search.*, TranspositionTable.*, OwnEngine.*   the engine of our own
 │   ├── BlunderEngine.*, OpponentLevels.*, OpponentEngines.*, OpponentText.*, OpponentSettings.*   handicap, levels, engines, words, settings
 │   └── EngineOpponent.*, OpponentController.*, OpponentChoice.*   the opponent in a game, its seat, the person's choice
 └── Components/               scene glue: board, pieces, result, captured material (src/Chess/Components/CLAUDE.md)
