@@ -233,6 +233,28 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(HintRefusalFor(finished, PieceColor::White), HintRefusal::GameOver);
     }
 
+    TEST_F(PositionAnalystTest, TheHintRuleKnowsTwoPrograms) {
+        const ProgramSides nobody;
+        const ProgramSides both{true, true};
+
+        ChessGameModel model;  // White to move
+        EXPECT_EQ(HintRefusalFor(model, nobody), std::nullopt);
+        EXPECT_EQ(HintRefusalFor(model, both), HintRefusal::ProgramsTurn);
+        EXPECT_EQ(HintRefusalFor(model, ProgramSides::Of(PieceColor::Black)), std::nullopt);
+        EXPECT_EQ(HintRefusalFor(model, ProgramSides::Of(PieceColor::White)), HintRefusal::ProgramsTurn);
+
+        ASSERT_TRUE(Play(model, "e2e4"));  // Black to move
+        EXPECT_EQ(HintRefusalFor(model, nobody), std::nullopt);
+        EXPECT_EQ(HintRefusalFor(model, both), HintRefusal::ProgramsTurn) << "refused on either turn";
+        EXPECT_EQ(HintRefusalFor(model, ProgramSides::Of(PieceColor::White)), std::nullopt);
+        EXPECT_EQ(HintRefusalFor(model, ProgramSides::Of(PieceColor::Black)), HintRefusal::ProgramsTurn);
+
+        ChessGameModel finished;
+        finished.SetPosition(PositionFromFen(kMatedBlackFen));
+        EXPECT_EQ(HintRefusalFor(finished, both), HintRefusal::GameOver) << "the end is named before the turn";
+        EXPECT_EQ(HintRefusalFor(finished, nobody), HintRefusal::GameOver);
+    }
+
     TEST_F(PositionAnalystTest, AFailingEngineIsOneErrorForTheVersionNotATryPerFrame) {
         const auto engine = MakeEngine();
         engine->FailWith(EngineError{EngineErrorKind::ProcessDied, "the engine died"});

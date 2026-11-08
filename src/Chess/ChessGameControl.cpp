@@ -124,12 +124,14 @@ namespace BECore::Chess {
             return ids;
         }
 
-        /// The opponent as set_state asks for it, checked
+        /// The opponent as set_state asks for it, checked: the colors the program plays and the choice of each seat
         struct OpponentPick {
-            std::optional<PieceColor> plays;
-            size_t level = kDefaultOpponentLevel;
-            OpponentEngine engine = kDefaultOpponentEngine;
+            ProgramSides plays;
+            SeatChoice white;
+            SeatChoice black;
         };
+
+        constexpr eastl::string_view kBothId = "both";
 
         /// "stockfish, own" for a message
         eastl::string EngineIds() {
@@ -187,38 +189,77 @@ namespace BECore::Chess {
             return MakeControlError(ControlErrors::kInvalidParams, message);
         }
 
-        /// Reads {"plays", "level", "engine"}; a member that is missing keeps what @p current says. Nothing is changed: the pick is applied by the caller once everything is valid
+        /// Reads "level" and "engine" of @p object (the opponent, or one of its seat objects, named @p where in a message) into @p choice; a member that is missing keeps what it was
+        std::expected<void, ControlError> ReadChoice(const Json& object, eastl::string_view where, SeatChoice& choice) {
+            if (FindJsonMember(object, "level")) {
+                const auto id = GetJsonString(object, "level");
+                const std::optional<size_t> level = id ? FindOpponentLevel(eastl::string_view(id->data(), id->size())) : std::nullopt;
+                if (!level) {
+                    return std::unexpected(BadOpponent(Format("{} 'level' has to be the id of a level: {}", where, LevelIds())));
+                }
+                choice.level = *level;
+            }
+            if (FindJsonMember(object, "engine")) {
+                const auto id = GetJsonString(object, "engine");
+                const std::optional<OpponentEngine> engine = id ? FindOpponentEngine(eastl::string_view(id->data(), id->size())) : std::nullopt;
+                if (!engine) {
+                    return std::unexpected(BadOpponent(Format("{} 'engine' has to be the id of an engine: {}", where, EngineIds())));
+                }
+                choice.engine = *engine;
+            }
+            return {};
+        }
+
+        /// Reads the seat object {"engine", "level"} of one color into @p choice; nothing else is a member of it
+        std::expected<void, ControlError> ReadSeat(const Json& seat, eastl::string_view color, SeatChoice& choice) {
+            const eastl::string where = Format("opponent '{}'", color);
+            if (!seat.is_object()) {
+                return std::unexpected(BadOpponent(Format("{} has to be an object like {{\"engine\": \"own\", \"level\": \"easy\"}}", where)));
+            }
+            for (const auto& [key, value] : seat.items()) {
+                if (key != "engine" && key != "level") {
+                    return std::unexpected(BadOpponent(Format("{} has no member '{}': only 'engine' and 'level'", where, key)));
+                }
+            }
+            return ReadChoice(seat, eastl::string_view(where.data(), where.size()), choice);
+        }
+
+        /// Reads {"plays", "level", "engine", "white", "black"}; a member that is missing keeps what @p current says, per seat. "level" and "engine" are for both seats, then the seat objects
+        /// override one seat, then "plays" says who plays. Nothing is changed: the pick is applied by the caller once everything is valid
         std::expected<OpponentPick, ControlError> ParseOpponent(const Json& opponent, OpponentPick current) {
             if (!opponent.is_object()) {
                 return std::unexpected(BadOpponent("'opponent' has to be an object like {\"plays\": \"black\", \"level\": \"easy\"}"));
             }
+            for (SeatChoice* seat : {&current.white, &current.black}) {  // the old shape: one level and one engine for both seats
+                if (auto read = ReadChoice(opponent, "opponent", *seat); !read) {
+                    return std::unexpected(std::move(read.error()));
+                }
+            }
+            if (const Json* white = FindJsonMember(opponent, "white")) {
+                if (auto read = ReadSeat(*white, "white", current.white); !read) {
+                    return std::unexpected(std::move(read.error()));
+                }
+            }
+            if (const Json* black = FindJsonMember(opponent, "black")) {
+                if (auto read = ReadSeat(*black, "black", current.black); !read) {
+                    return std::unexpected(std::move(read.error()));
+                }
+            }
             if (const Json* plays = FindJsonMember(opponent, "plays")) {
                 if (plays->is_null()) {
-                    current.plays = std::nullopt;
+                    current.plays = ProgramSides{};
                 } else {
                     const auto side = GetJsonString(opponent, "plays");
-                    const std::optional<PieceColor> color = side ? ParseColor(eastl::string_view(side->data(), side->size())) : std::nullopt;
-                    if (!color) {
-                        return std::unexpected(BadOpponent("opponent 'plays' has to be \"white\", \"black\" or null (two people): the color the program plays"));
+                    const eastl::string_view id = side ? eastl::string_view(side->data(), side->size()) : eastl::string_view();
+                    const std::optional<PieceColor> color = side ? ParseColor(id) : std::nullopt;
+                    if (side && id == kBothId) {
+                        current.plays = ProgramSides{true, true};
+                    } else if (color) {
+                        current.plays = ProgramSides::Of(color);
+                    } else {
+                        return std::unexpected(BadOpponent("opponent 'plays' has to be \"white\", \"black\", \"both\" or null (two people): the colors the program plays"));
                     }
-                    current.plays = color;
                 }
-            }
-            if (FindJsonMember(opponent, "level")) {
-                const auto id = GetJsonString(opponent, "level");
-                const std::optional<size_t> level = id ? FindOpponentLevel(eastl::string_view(id->data(), id->size())) : std::nullopt;
-                if (!level) {
-                    return std::unexpected(BadOpponent(Format("opponent 'level' has to be the id of a level: {}", LevelIds())));
-                }
-                current.level = *level;
-            }
-            if (FindJsonMember(opponent, "engine")) {
-                const auto id = GetJsonString(opponent, "engine");
-                const std::optional<OpponentEngine> engine = id ? FindOpponentEngine(eastl::string_view(id->data(), id->size())) : std::nullopt;
-                if (!engine) {
-                    return std::unexpected(BadOpponent(Format("opponent 'engine' has to be the id of an engine: {}", EngineIds())));
-                }
-                current.engine = *engine;
             }
             return current;
         }
@@ -265,10 +306,25 @@ namespace BECore::Chess {
         const std::optional<PieceColor> plays = _opponent.GetPlays();
         const std::optional<EngineError>& error = _opponent.GetError();
 
+        Json seats = Json::object();
+        for (const PieceColor color : {PieceColor::White, PieceColor::Black}) {
+            const SeatChoice& choice = _opponent.GetSeatChoice(color);
+            Json seat = Json::object();
+            seat["engine"] = MakeJsonString(OpponentEngineId(choice.engine));
+            seat["level"] = MakeJsonString(GetOpponentLevels()[choice.level].id);
+            const eastl::string_view id = PieceColorId(color);
+            seats[std::string(id.data(), id.size())] = std::move(seat);
+        }
+
         Json opponent = Json::object();
-        opponent["plays"] = plays ? MakeJsonString(PieceColorId(*plays)) : Json();
+        if (_opponent.IsWatching()) {
+            opponent["plays"] = MakeJsonString(kBothId);
+        } else {
+            opponent["plays"] = plays ? MakeJsonString(PieceColorId(*plays)) : Json();
+        }
         opponent["level"] = MakeJsonString(GetOpponentLevels()[_opponent.GetLevel()].id);
         opponent["engine"] = MakeJsonString(OpponentEngineId(_opponent.GetEngine()));
+        opponent["seats"] = std::move(seats);
         opponent["thinking"] = _opponent.IsThinking();
         opponent["error"] = ErrorJson(error);
         return opponent;
@@ -382,7 +438,7 @@ namespace BECore::Chess {
         }
         std::optional<OpponentPick> pick;
         if (opponentMember) {
-            auto parsed = ParseOpponent(*opponentMember, OpponentPick{_opponent.GetPlays(), _opponent.GetLevel(), _opponent.GetEngine()});
+            auto parsed = ParseOpponent(*opponentMember, OpponentPick{_opponent.GetSides(), _opponent.GetSeatChoice(PieceColor::White), _opponent.GetSeatChoice(PieceColor::Black)});
             if (!parsed) {
                 return std::unexpected(std::move(parsed.error()));
             }
@@ -395,7 +451,7 @@ namespace BECore::Chess {
 
         // The opponent first: it is the one step that can fail later (no engine), and then the position stays as it is
         if (pick) {
-            const auto chosen = _opponent.Choose(pick->plays, pick->level, pick->engine);
+            const auto chosen = _opponent.ChooseSeats(pick->plays, pick->white, pick->black);
             if (!chosen) {
                 return std::unexpected(
                     MakeControlError(ChessControlErrors::kEngineUnavailable, Format("no engine for the opponent ({}): {}", ErrorKindName(chosen.error().kind), chosen.error().detail)));
@@ -415,11 +471,12 @@ namespace BECore::Chess {
             return std::unexpected(pick.error());
         }
         if (pick->hint.value_or(false)) {
-            if (const std::optional<HintRefusal> refusal = HintRefusalFor(_model, _opponent.GetPlays())) {
+            if (const std::optional<HintRefusal> refusal = HintRefusalFor(_model, _opponent.GetSides())) {
                 if (*refusal == HintRefusal::GameOver) {
                     return std::unexpected(MakeControlError(ChessControlErrors::kGameOver, Format("the game is over ({}): there is nothing to hint", StatusName(_model.GetStatus()))));
                 }
-                return std::unexpected(MakeControlError(ChessControlErrors::kNotYourTurn, "the program plays this side: a hint is for the person, ask on the person's turn"));
+                return std::unexpected(
+                    MakeControlError(ChessControlErrors::kNotYourTurn, "the program plays this side: a hint is for the person, ask on the person's turn (never in a game of two programs)"));
             }
         }
 

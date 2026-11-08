@@ -16,7 +16,7 @@ namespace BECore::Chess {
         /// set_state asked for a computer opponent and there is no engine to make it (no Stockfish found; the own engine cannot fail): the pick is refused as a whole, so the position and the opponent
         /// stay as they were and the error is in the state
         inline constexpr eastl::string_view kEngineUnavailable = "engine_unavailable";
-        /// set_state asked for a hint on a side that the program plays: a hint is for the person (HintRefusalFor). On a finished game the code is game_over
+        /// set_state asked for a hint on a side that the program plays (either side while two programs play): a hint is for the person (HintRefusalFor). On a finished game the code is game_over
         inline constexpr eastl::string_view kNotYourTurn = "not_your_turn";
     }  // namespace ChessControlErrors
 
@@ -30,10 +30,12 @@ namespace BECore::Chess {
      * "ongoing" ends the game. startFen is the position the game began from and moves the UCI moves played since, so the pair
      * rebuilds the game (and its repetitions).
      *
-     * opponent is {"plays", "level", "engine", "thinking", "error"}: plays is the color the PROGRAM plays ("white" or "black"; null for two people, the start of
-     * every game), level the id of the strength ("easy", "medium", "hard", "max"; the one that would be used, also while plays is null), engine the id of the
-     * program that plays ("stockfish", the start of every game, or "own", the engine of the game itself; also the one that would be used while plays is null;
-     * one never stands in for the other), thinking whether the program is searching for its move, error null or {"kind", "detail"} (kind in snake_case:
+     * opponent is {"plays", "level", "engine", "seats", "thinking", "error"}: plays is the color the PROGRAM plays ("white" or "black"; "both" while two programs play
+     * each other; null for two people, the start of every game), level the id of the strength ("easy", "medium", "hard", "max"; the one that would be used, also while
+     * plays is null), engine the id of the program that plays ("stockfish", the start of every game, or "own", the engine of the game itself; also the one that would be used
+     * while plays is null; one never stands in for the other); level and engine are those of the seat that plays when exactly one plays, else of White's seat. seats is
+     * {"white": {"engine", "level"}, "black": {"engine", "level"}}, always there: the choice of each color, also for a color that nobody plays. thinking is whether a program
+     * (either) is searching for its move, error null or {"kind", "detail"} (kind in snake_case:
      * "launch_failed", "timeout", "process_died", "protocol_error", "illegal_move", "no_move", "bad_request", "cancelled", "unsupported"; detail is the sentence
      * of the log). While an error stands the program does not play and waits for the version of the game to move (a reset, set_state, a move of someone else) or
      * for another pick. A pick of Stockfish succeeds whenever a Stockfish file is found (a launch that fails shows only at the first search, as error
@@ -61,15 +63,18 @@ namespace BECore::Chess {
      * invalid_params (not a UCI move). Reset takes no options and keeps the opponent.
      *
      * SetState takes {"fen": ".."} (any position that Position::FromFen() accepts, which may be a finished game), {"opponent": {"plays": .., "level": ..,
-     * "engine": ..}} (inside it a missing member means unchanged; plays is "white", "black" or null; level and engine an id, "stockfish" or "own" for the engine,
-     * exactly as written) or both; none of fen, opponent, analysis is invalid_params. Everything is checked before anything changes, so a refused call (invalid_params) changes nothing.
+     * "engine": .., "white": {"engine": .., "level": ..}, "black": {..}}} (inside it a missing member means unchanged, per seat; plays is "white", "black", "both" or null;
+     * level and engine an id, "stockfish" or "own" for the engine, exactly as written) or both; none of fen, opponent, analysis is invalid_params. level and engine set BOTH
+     * seats (the old shape); the seat objects "white" and "black" (members optional, nothing else allowed in them) then override one seat; plays says who plays and a missing
+     * plays keeps the sides as they are. "both" starts a game of two programs, each with an engine object of its own; "plays": "white" while both play is a takeover (the person
+     * has Black, White's program and its search stay), null ends it. Everything is checked before anything changes, so a refused call (invalid_params) changes nothing.
      * The opponent is applied first, then the position. SetState also takes {"analysis": {"evaluation": bool, "hint": bool}} (a missing member means unchanged; {} changes
      * nothing; "evaluation" switches the evaluation on or off, "hint": true asks for a hint for the position now on the board and "hint": false drops it); a wrong type or a member
      * that is not one of the two is invalid_params. **analysis cannot be combined with fen or opponent in one call** (invalid_params: the hint belongs to the position after them,
-     * two calls say it plainly). A hint on the side that the program plays is not_your_turn, on a finished game game_over; nothing is changed then, the evaluation switch of the same call
-     * included. list_actions is not changed by any of it. A pick that finds no engine (only Stockfish can fail) is engine_unavailable (with the sentence of the
-     * engine's error) and is refused as a whole: the position is not replaced and the opponent is unchanged (side, level, engine and a running search stay as they
-     * were), the error is in the state, so a client can ask again with "engine": "own". A pick that changes nothing (the same side, level and engine, no error standing) does nothing: a running
+     * two calls say it plainly). A hint on a side that the program plays (so on either turn while two programs play) is not_your_turn, on a finished game game_over; nothing is changed then, the
+     * evaluation switch of the same call included. list_actions is not changed by any of it. A pick that finds no engine (only Stockfish can fail) is engine_unavailable (with the sentence of the
+     * engine's error) and is refused as a whole, whichever seat has no engine: the position is not replaced and the opponent is unchanged (sides, seats and a running search
+     * stay as they were), the error is in the state, so a client can ask again with "engine": "own". A pick that changes nothing (the same sides and seats, no error standing) does nothing: a running
      * Stockfish is not restarted. With an error standing, the same "plays" asks for an engine again, and plays null clears it.
      *
      * The state version is the version of the game plus the revision of the opponent (a pick, an error that appears or goes) plus the revision of the analyst (a switch,
