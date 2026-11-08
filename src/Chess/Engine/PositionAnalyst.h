@@ -44,7 +44,8 @@ namespace BECore::Chess {
      * goes with the next version, with a change of the picked engine, or with a new RequestHint() (the retry).
      *
      * **The engine** is the one the person picked (Update() is given it), made lazily at the first search by the factory and made again after the pick changed; a change of the pick
-     * cancels the search, drops the result and the error and a new engine answers the next one. It is never the opponent's object: a UciEngine's FindMove() and Analyse() share a mutex, so the
+     * cancels the search, drops the result and the error and a new engine answers the next one (the drop is done by Update() and, at once, by SetPicked(), so the reads never show the old
+     * engine's answer once the caller has told the analyst of the pick). It is never the opponent's object: a UciEngine's FindMove() and Analyse() share a mutex, so the
      * analysis has a process of its own and the opponent's search never waits for it. The limits are those of the strongest level (LimitsOf(picked, GetOpponentLevels().back())), no handicap:
      * the owner's rule is that nothing is spoilt or replaced behind the person's back. Nothing falls back to the other engine.
      *
@@ -80,6 +81,15 @@ namespace BECore::Chess {
 
         /// How an engine is made at the first search and after a change of the pick; an empty one puts the default back (MakeAnalysisEngine over empty settings). Read at the next search
         void SetEngineFactory(AnalysisEngineFactory factory);
+
+        /**
+         * @brief Tells the analyst which engine the person has picked, at once. Update() does the same with its argument, so a caller that changes the pick between two frames and then reads
+         * (the control adapter: `set_state` of the engine, then `get_state`) calls this to have the reads right without waiting for the next Update().
+         *
+         * A pick that differs from the one the analyst knows cancels the search of the other engine, drops its engine object, its result and its error (the revision grows when
+         * something shown goes). The same pick does nothing.
+         */
+        void SetPicked(OpponentEngine picked);
 
         /**
          * @brief One step, for the main thread; it never waits for the engine.
@@ -161,6 +171,7 @@ namespace BECore::Chess {
         AnalysisEngineFactory _factory;  ///< empty: MakeAnalysisEngine over empty settings
         eastl::shared_ptr<IChessEngine> _engine;
         OpponentEngine _engineKind = kDefaultOpponentEngine;  ///< what _engine was made for; meaningless while it is null
+        OpponentEngine _picked = kDefaultOpponentEngine;      ///< the pick the analyst knows (SetPicked, Update)
 
         bool _evaluationOn = false;
         std::optional<uint64_t> _hintVersion;  ///< the version of the model a hint was asked at

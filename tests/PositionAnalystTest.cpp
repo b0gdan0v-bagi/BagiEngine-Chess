@@ -334,6 +334,52 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(own->Calls(), 1);
     }
 
+    TEST_F(PositionAnalystTest, SetPickedDropsTheOldEnginesResultErrorAndSearchAtOnce) {
+        const auto stockfish = MakeEngine({AnalysisScoreKind::Centipawns, 10});
+        const auto own = MakeEngine({AnalysisScoreKind::Centipawns, 20});
+        CountingAnalysisFactory factory{stockfish, own};
+        ChessGameModel model;
+        PositionAnalyst analyst;
+        analyst.SetEngineFactory(factory.AsFactory());
+        analyst.SetEvaluation(true);
+        ASSERT_TRUE(UpdateUntil(analyst, model, OpponentEngine::Stockfish, [&] { return analyst.GetEvaluation(model).has_value(); }));
+
+        // The caller that changes the pick between two frames tells the analyst, and the reads are right with no Update() in between
+        const uint64_t revision = analyst.GetRevision();
+        analyst.SetPicked(OpponentEngine::Own);
+        EXPECT_FALSE(analyst.GetEvaluation(model).has_value());
+        EXPECT_GT(analyst.GetRevision(), revision) << "what was shown went";
+        analyst.SetPicked(OpponentEngine::Own);
+        EXPECT_EQ(analyst.GetRevision(), revision + 1) << "the same pick again does nothing";
+
+        ASSERT_TRUE(UpdateUntil(analyst, model, OpponentEngine::Own, [&] { return analyst.GetEvaluation(model).has_value(); }));
+        EXPECT_EQ(analyst.GetEvaluation(model)->score.value, 20);
+        ASSERT_EQ(factory.Calls(), 2);
+        EXPECT_EQ(factory.Engines()[1], "own");
+    }
+
+    TEST_F(PositionAnalystTest, SetPickedCancelsTheSearchOfTheOtherEngineAndDropsItsError) {
+        const auto stockfish = MakeEngine({AnalysisScoreKind::Centipawns, 10});
+        stockfish->Gate(true);
+        const auto own = MakeEngine({AnalysisScoreKind::Centipawns, 20});
+        own->FailWith(EngineError{EngineErrorKind::Timeout, "slow"});
+        CountingAnalysisFactory factory{stockfish, own};
+        ChessGameModel model;
+        PositionAnalyst analyst;
+        analyst.SetEngineFactory(factory.AsFactory());
+        analyst.SetEvaluation(true);
+        ASSERT_TRUE(UpdateUntil(analyst, model, OpponentEngine::Stockfish, [&] { return stockfish->Calls() == 1; }));
+        ASSERT_TRUE(analyst.IsThinking());
+
+        analyst.SetPicked(OpponentEngine::Own);
+        EXPECT_FALSE(analyst.IsThinking()) << "the search of the other engine is cancelled at once";
+        ASSERT_TRUE(WaitUntil([&] { return stockfish->WasCancelled(); }));
+
+        ASSERT_TRUE(UpdateUntil(analyst, model, OpponentEngine::Own, [&] { return analyst.GetError().has_value(); }));
+        analyst.SetPicked(OpponentEngine::Stockfish);
+        EXPECT_FALSE(analyst.GetError().has_value()) << "the error of the engine that is no longer picked goes at once";
+    }
+
     TEST_F(PositionAnalystTest, AnAnswerOfTheOldEngineIsDroppedWhenThePickChangesWhileItThinks) {
         const auto stockfish = MakeEngine({AnalysisScoreKind::Centipawns, 10});
         stockfish->Gate(false);

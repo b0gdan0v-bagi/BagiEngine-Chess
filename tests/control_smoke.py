@@ -7,7 +7,8 @@ ctest runs it as BagiChessControlSmoke (be_add_game_control_tests). It builds on
 which it finds through the environment variable BAGI_ENGINE_DIR (set by ctest), or in the submodule engine/. The game is played on the real clock, with
 --manual-clock, and with moves before its first frame. The computer opponent is played on both clocks in two ways. The engine of our own ("own
 engine" scenarios, base ones) needs nothing from the environment: it runs inside the game, with no process, so it also runs where the next kind is left out;
-it answers the same move to the same position (a fixed depth), which the scenario checks after a reset. The opponent panel ("opponent panel" scenarios, base
+it answers the same move to the same position (a fixed depth), which the scenario checks after a reset. The analysis ("analysis" scenarios, base ones too) switches the evaluation of the own engine on, reads it from White's view on a mate in one, asks for a hint and reads it, and
+leaves the game with the analyst running. The opponent panel ("opponent panel" scenarios, base
 ones too) is driven only by `ui_click` on the buttons and segments found by name, as a person would: open it with the Menu button, pick the own engine,
 Computer, a level and a color, read the pick back from `get_state` and from `ui_tree`, play, close it with OK. The captured material ("captured material"
 scenarios, base ones too, no engine) reads `get_state.material` after a capture, after a position set from outside and after a reset, and, on the headless
@@ -341,6 +342,87 @@ def run_own_engine_scenario(client: BagiControlClient, headless: bool) -> None:
         check_the_board_turns_with_the_program(client)
 
 
+def get_analysis(client: BagiControlClient) -> dict:
+    return client.call("get_state")["state"]["analysis"]
+
+
+def wait_for_the_analysis(client: BagiControlClient, accept, what: str) -> dict:
+    """Until accept(analysis) holds; gives that analysis. Real clock: poll; manual clock: step a frame per poll. Limited by time, never a fixed sleep."""
+    deadline = time.monotonic() + OPPONENT_WAIT_SECONDS
+    manual = client.call("status")["manualClock"]
+    while True:
+        analysis = get_analysis(client)
+        check(analysis["error"] is None, f"the analysis failed: {analysis['error']}")
+        if accept(analysis):
+            return analysis
+        check(time.monotonic() < deadline, f"the analysis did not come ({what}) in {OPPONENT_WAIT_SECONDS} s: {analysis}")
+        if manual:
+            client.call("step")
+        time.sleep(POLL_SECONDS)
+
+
+def run_analysis_scenario(client: BagiControlClient, headless: bool) -> None:
+    """The engine of our own analyses: the evaluation is switched on and read from White's view, a hint is asked for and bound to its position, and a hint on the program's turn is refused."""
+    if client.call("status")["manualClock"]:
+        client.call("step")
+    client.call("reset")
+
+    analysis = get_analysis(client)
+    check(analysis["evaluationOn"] is False and analysis["hintRequested"] is False and analysis["thinking"] is False, f"unexpected default analysis {analysis}")
+    check(analysis["evaluation"] is None and analysis["hint"] is None and analysis["error"] is None, f"the default analysis is not empty {analysis}")
+
+    # A hint is for the person: on the turn of the side the program plays it is refused, and nothing changes (no frame between the move and the request: the reply takes at least one)
+    client.call("set_state", {"opponent": {"engine": "own", "plays": "black", "level": "max"}})
+    client.call("perform_action", move("e2e4"))
+    version = client.call("get_state")["version"]
+    expect_error("not_your_turn", lambda: client.call("set_state", {"analysis": {"evaluation": True, "hint": True}}), "a hint on the program's turn")
+    check(get_analysis(client)["evaluationOn"] is False and client.call("get_state")["version"] == version, "a refused hint changed something")
+    wait_until_the_program_played(client, lambda moves: len(moves) == 2, "two moves")
+    client.call("set_state", {"opponent": {"plays": None}})
+
+    # Neither the position nor the opponent travels with the analysis, and a wrong member is refused whole
+    expect_error("invalid_params", lambda: client.call("set_state", {"fen": MATE_IN_ONE_FEN, "analysis": {"hint": True}}), "analysis with a fen")
+    expect_error("invalid_params", lambda: client.call("set_state", {"opponent": {"plays": None}, "analysis": {"hint": True}}), "analysis with an opponent")
+    expect_error("invalid_params", lambda: client.call("set_state", {"analysis": {"evaluation": True, "hint": "yes"}}), "a hint that is not a boolean")
+    expect_error("invalid_params", lambda: client.call("set_state", {"analysis": {"evaluation": True, "hnt": True}}), "a member that is not one of the two")
+    check(get_analysis(client)["evaluationOn"] is False, "a refused call switched the evaluation on")
+
+    # The own engine analyses; the evaluation is switched on and read back
+    client.call("reset")
+    version = client.call("get_state")["version"]
+    client.call("set_state", {"opponent": {"engine": "own", "plays": None}})
+    switched = client.call("set_state", {"analysis": {"evaluation": True}})
+    check(switched["version"] > version, "switching the evaluation on did not move the state version")
+    check(get_analysis(client)["evaluationOn"] is True, f"the evaluation is not on: {get_analysis(client)}")
+
+    # A mate in one, loaded in a call of its own: the evaluation is White's mate in 1, and no hint was asked for
+    client.call("set_state", {"fen": MATE_IN_ONE_FEN})
+    analysis = wait_for_the_analysis(client, lambda a: a["evaluation"] is not None, "the evaluation of the mate in one")
+    check(analysis["evaluation"]["score"] == {"kind": "mate", "value": 1}, f"the evaluation of a mate in one is not mate 1: {analysis['evaluation']}")
+    check(analysis["evaluation"]["text"] == "#1", f"unexpected text {analysis['evaluation']}")
+    check(analysis["hint"] is None and analysis["hintRequested"] is False, f"a hint is there that nobody asked for: {analysis}")
+
+    before = client.call("get_state")["version"]
+    client.call("set_state", {"analysis": {"hint": True}})
+    check(client.call("get_state")["version"] > before and get_analysis(client)["hintRequested"] is True, "asking for a hint did not show")
+    analysis = wait_for_the_analysis(client, lambda a: a["hint"] is not None, "the hint")
+    check(analysis["hint"]["move"] == "a1a8", f"the hint for the mate in one is {analysis['hint']}")
+    check({"type": "move", "uci": "a1a8"} in client.call("list_actions")["actions"], "the hinted move is not one of the listed actions")
+
+    # A move drops the hint at once and the evaluation follows the new position later (it is Black's turn now: still White's view)
+    client.call("perform_action", move("g1h1"))
+    analysis = get_analysis(client)
+    check(analysis["hint"] is None and analysis["hintRequested"] is False, f"the hint outlived the move: {analysis}")
+    check(analysis["evaluation"] is None, f"the evaluation of the old position outlived the move: {analysis}")
+    wait_for_the_analysis(client, lambda a: a["evaluation"] is not None, "the evaluation of the next position")
+
+    # A hint can be taken back; the game then ends with the analyst running (after quit the game must exit by itself, with no search holding it)
+    client.call("set_state", {"analysis": {"hint": True}})
+    client.call("set_state", {"analysis": {"hint": False}})
+    check(get_analysis(client)["hintRequested"] is False, "a hint taken back is still asked for")
+    client.call("perform_action", move("g8h8"))
+
+
 # The scene is 840 x 800 units, the board 640 x 640 at y 80..720; the window fits the scene by the smaller scale and centers it
 VIEW_WIDTH, VIEW_HEIGHT = 840, 800
 BOARD_TOP, BOARD_BOTTOM = 80, 720
@@ -638,6 +720,8 @@ BASE_SCENARIOS = [
     ("moves before the first frame", ["--manual-clock"], run_moves_before_the_first_frame),
     ("own engine, real clock", [], run_own_engine_scenario),
     ("own engine, manual clock", ["--manual-clock"], run_own_engine_scenario),
+    ("analysis, real clock", [], run_analysis_scenario),
+    ("analysis, manual clock", ["--manual-clock"], run_analysis_scenario),
     ("opponent panel, real clock", [], run_opponent_panel_scenario),
     ("opponent panel, manual clock", ["--manual-clock"], run_opponent_panel_scenario),
     ("captured material, real clock", [], run_material_scenario),

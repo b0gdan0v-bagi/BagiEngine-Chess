@@ -80,6 +80,7 @@ namespace BECore::Chess {
         }
         // The opponent plays here, on the main thread, and not in OnDraw(): it changes the model
         game->GetOpponent().Update();
+        game->GetAnalyst().Update(game->GetModel(), game->GetOpponent().GetEngine());  // the engine search for the evaluation and the hint, on the pool; never waits
         static_cast<void>(game->GetChoice().Color());  // reading it remembers the person's color of a side set from outside (the control API) before that side is cleared
         LogResultOnce(game->GetModel());
         // A reset, a set_state, a move of the program or of the control API drops a pending promotion without a click on the board

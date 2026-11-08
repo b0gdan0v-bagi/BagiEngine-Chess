@@ -44,7 +44,26 @@ namespace BECore::Chess {
         _factory = std::move(factory);
     }
 
+    void PositionAnalyst::SetPicked(OpponentEngine picked) {
+        _picked = picked;
+        if (_search && _searchEngine != picked && !_search->token.IsCancelled()) {
+            LOG_INFO("Position analyst ({}): the engine pick changed while the engine was analysing, the search is cancelled"_format(OpponentEngineId(_searchEngine)));
+            _search->token.Cancel();
+        }
+        if (_engine && _engineKind != picked) {
+            _engine.reset();  // a running search keeps its own reference to the old one
+        }
+        if (_result && _resultEngine != picked) {
+            _result.reset();
+            ++_revision;
+        }
+        if (_error && _errorEngine != picked) {
+            ClearError();
+        }
+    }
+
     void PositionAnalyst::Update(const ChessGameModel& model, OpponentEngine picked) {
+        SetPicked(picked);
         if (_search && _search->done.load(std::memory_order_acquire)) {
             TakeAnswer(model, picked);
         }
@@ -181,16 +200,8 @@ namespace BECore::Chess {
 
     void PositionAnalyst::DropWhatIsOld(const ChessGameModel& model, OpponentEngine picked) {
         const uint64_t version = model.GetVersion();
-        if (_engine && _engineKind != picked) {
-            _engine.reset();  // a running search keeps its own reference to the old one
-        }
-        if (_result) {
-            if (_resultEngine != picked && _resultVersion == version) {
-                ++_revision;  // the answer on display belonged to the other engine
-            }
-            if (_resultVersion != version || _resultEngine != picked) {
-                _result.reset();
-            }
+        if (_result && _resultVersion != version) {
+            _result.reset();
         }
         if (_hintVersion && *_hintVersion != version) {
             _hintVersion.reset();

@@ -140,6 +140,49 @@ namespace BECore::Chess {
             return ids;
         }
 
+        /// {"kind", "detail"} of an engine error, or null
+        Json ErrorJson(const std::optional<EngineError>& error) {
+            if (!error) {
+                return Json();
+            }
+            Json described = Json::object();
+            described["kind"] = MakeJsonString(ErrorKindName(error->kind));
+            described["detail"] = TextJson(error->detail);
+            return described;
+        }
+
+        /// {"kind", "value"} of a score
+        Json ScoreJson(const AnalysisScore& score) {
+            Json json = Json::object();
+            json["kind"] = score.kind == AnalysisScoreKind::Mate ? "mate" : "centipawns";
+            json["value"] = score.value;
+            return json;
+        }
+
+        /// What set_state asks of the analyst, checked; a member that is missing is nothing
+        struct AnalysisPick {
+            std::optional<bool> evaluation;
+            std::optional<bool> hint;
+        };
+
+        constexpr const char* kAnalysisUsage = "'analysis' has to be an object like {\"evaluation\": true, \"hint\": true} (both members are optional booleans)";
+
+        /// Reads {"evaluation", "hint"}; nothing is changed
+        std::expected<AnalysisPick, ControlError> ParseAnalysis(const Json& analysis) {
+            if (!analysis.is_object()) {
+                return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, kAnalysisUsage));
+            }
+            AnalysisPick pick;
+            for (const auto& [key, value] : analysis.items()) {
+                std::optional<bool>* target = key == "evaluation" ? &pick.evaluation : key == "hint" ? &pick.hint : nullptr;
+                if (!target || !value.is_boolean()) {
+                    return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, kAnalysisUsage));
+                }
+                *target = value.get<bool>();
+            }
+            return pick;
+        }
+
         ControlError BadOpponent(eastl::string message) {
             return MakeControlError(ControlErrors::kInvalidParams, message);
         }
@@ -182,7 +225,7 @@ namespace BECore::Chess {
 
     }  // namespace
 
-    ChessGameControl::ChessGameControl(ChessGameModel& model, OpponentController& opponent) : _model(model), _opponent(opponent) {}
+    ChessGameControl::ChessGameControl(ChessGameModel& model, OpponentController& opponent, PositionAnalyst& analyst) : _model(model), _opponent(opponent), _analyst(analyst) {}
 
     MoveList ChessGameControl::LegalMoves() const {
         return _model.IsGameOver() ? MoveList() : MoveGenerator::GenerateLegal(_model.GetPosition());
@@ -214,6 +257,7 @@ namespace BECore::Chess {
         state["moves"] = std::move(moves);
         state["opponent"] = OpponentJson();
         state["material"] = MaterialJson(_model.GetPosition());
+        state["analysis"] = AnalysisJson();
         return state;
     }
 
@@ -226,15 +270,40 @@ namespace BECore::Chess {
         opponent["level"] = MakeJsonString(GetOpponentLevels()[_opponent.GetLevel()].id);
         opponent["engine"] = MakeJsonString(OpponentEngineId(_opponent.GetEngine()));
         opponent["thinking"] = _opponent.IsThinking();
-        if (error) {
-            Json described = Json::object();
-            described["kind"] = MakeJsonString(ErrorKindName(error->kind));
-            described["detail"] = TextJson(error->detail);
-            opponent["error"] = std::move(described);
-        } else {
-            opponent["error"] = Json();
-        }
+        opponent["error"] = ErrorJson(error);
         return opponent;
+    }
+
+    Json ChessGameControl::AnalysisJson() const {
+        Json analysis = Json::object();
+        analysis["evaluationOn"] = _analyst.IsEvaluationOn();
+        analysis["hintRequested"] = _analyst.IsHintRequested(_model);
+        analysis["thinking"] = _analyst.IsThinking();
+
+        const std::optional<AnalysisLine> evaluation = _analyst.GetEvaluation(_model);
+        if (evaluation) {
+            const AnalysisScore white = ScoreForWhite(evaluation->score, _model.GetTurn());  // a bar needs one fixed side
+            Json line = Json::object();
+            line["score"] = ScoreJson(white);
+            line["text"] = TextJson(ScoreText(white));
+            line["depth"] = evaluation->depth;
+            analysis["evaluation"] = std::move(line);
+        } else {
+            analysis["evaluation"] = Json();
+        }
+
+        const std::optional<AnalysisLine> hint = _analyst.GetHint(_model);
+        if (hint) {
+            Json line = Json::object();
+            line["move"] = TextJson(hint->move.ToUci());
+            line["text"] = TextJson(ScoreText(hint->score));  // as the engine gave it: the side to move's view
+            line["depth"] = hint->depth;
+            analysis["hint"] = std::move(line);
+        } else {
+            analysis["hint"] = Json();
+        }
+        analysis["error"] = ErrorJson(_analyst.GetError());
+        return analysis;
     }
 
     std::expected<Json, ControlError> ChessGameControl::GetActions() const {
@@ -288,8 +357,14 @@ namespace BECore::Chess {
     std::expected<void, ControlError> ChessGameControl::SetState(const Json& state) {
         const Json* fenMember = FindJsonMember(state, "fen");
         const Json* opponentMember = FindJsonMember(state, "opponent");
-        if (!fenMember && !opponentMember) {
-            return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, "'fen' (a FEN string), 'opponent' ({\"plays\", \"level\", \"engine\"}) or both are needed"));
+        const Json* analysisMember = FindJsonMember(state, "analysis");
+        if (!fenMember && !opponentMember && !analysisMember) {
+            return std::unexpected(MakeControlError(ControlErrors::kInvalidParams,
+                                                    "'fen' (a FEN string), 'opponent' ({\"plays\", \"level\", \"engine\"}), both, or 'analysis' ({\"evaluation\", \"hint\"}) alone are needed"));
+        }
+        if (analysisMember && (fenMember || opponentMember)) {
+            return std::unexpected(MakeControlError(ControlErrors::kInvalidParams,
+                                                    "'analysis' cannot be combined with 'fen' or 'opponent': a hint belongs to the position after them, so set them in one call and ask in the next"));
         }
 
         // Check everything first: a refused call changes nothing
@@ -314,6 +389,10 @@ namespace BECore::Chess {
             pick = *parsed;
         }
 
+        if (analysisMember) {
+            return SetAnalysis(*analysisMember);
+        }
+
         // The opponent first: it is the one step that can fail later (no engine), and then the position stays as it is
         if (pick) {
             const auto chosen = _opponent.Choose(pick->plays, pick->level, pick->engine);
@@ -321,6 +400,7 @@ namespace BECore::Chess {
                 return std::unexpected(
                     MakeControlError(ChessControlErrors::kEngineUnavailable, Format("no engine for the opponent ({}): {}", ErrorKindName(chosen.error().kind), chosen.error().detail)));
             }
+            _analyst.SetPicked(_opponent.GetEngine());  // at once, so a get_state before the next frame does not show the old engine's answer
         }
         if (position) {
             _model.SetPosition(*position);
@@ -328,8 +408,38 @@ namespace BECore::Chess {
         return {};
     }
 
+    std::expected<void, ControlError> ChessGameControl::SetAnalysis(const Json& analysis) {
+        // Check everything first: a refused call changes nothing, the switch of the evaluation included
+        const auto pick = ParseAnalysis(analysis);
+        if (!pick) {
+            return std::unexpected(pick.error());
+        }
+        if (pick->hint.value_or(false)) {
+            if (const std::optional<HintRefusal> refusal = HintRefusalFor(_model, _opponent.GetPlays())) {
+                if (*refusal == HintRefusal::GameOver) {
+                    return std::unexpected(MakeControlError(ChessControlErrors::kGameOver, Format("the game is over ({}): there is nothing to hint", StatusName(_model.GetStatus()))));
+                }
+                return std::unexpected(MakeControlError(ChessControlErrors::kNotYourTurn, "the program plays this side: a hint is for the person, ask on the person's turn"));
+            }
+        }
+
+        _analyst.SetPicked(_opponent.GetEngine());  // the engine the analysis will use is the one picked now
+        if (pick->evaluation) {
+            _analyst.SetEvaluation(*pick->evaluation);
+        }
+        if (pick->hint) {
+            if (*pick->hint) {
+                const auto asked = _analyst.RequestHint(_model);
+                EXPECT(asked.has_value(), "ChessGameControl: HintRefusalFor and RequestHint disagree");
+            } else {
+                _analyst.CancelHint();
+            }
+        }
+        return {};
+    }
+
     uint64_t ChessGameControl::GetStateVersion() const {
-        return _model.GetVersion() + _opponent.GetRevision();
+        return _model.GetVersion() + _opponent.GetRevision() + _analyst.GetRevision();
     }
 
 }  // namespace BECore::Chess

@@ -25,7 +25,15 @@ namespace BECore::Chess {
         return chess ? &chess->GetChoice() : nullptr;
     }
 
-    ChessGame::ChessGame() : _opponent(_model), _choice(_opponent), _control(_model, _opponent) {}
+    PositionAnalyst* ChessGame::GetActiveAnalyst() {
+        ChessGame* chess = GetActive();
+        return chess ? &chess->GetAnalyst() : nullptr;
+    }
+
+    ChessGame::ChessGame() : _opponent(_model), _choice(_opponent), _control(_model, _opponent, _analyst) {
+        // The settings are read at the time of the search, so the ones Start() loads are the ones used
+        _analyst.SetEngineFactory([this](OpponentEngine engine) { return MakeAnalysisEngine(engine, _opponent.GetSettings()); });
+    }
 
     IControllableGame* ChessGame::AsControllable() {
         return &_control;
@@ -46,13 +54,15 @@ namespace BECore::Chess {
         _opponent.SetSide(std::nullopt);
         _opponent.SetLevel(kDefaultOpponentLevel);
         _opponent.SetEngine(kDefaultOpponentEngine);
-        _choice.Reset();  // a new game starts with White remembered as the person's color
+        _choice.Reset();      // a new game starts with White remembered as the person's color
+        _analyst.Shutdown();  // nothing is analysed until the evaluation is switched on or a hint is asked for
     }
 
     void ChessGame::Stop() {
         // Components own their own subscriptions. The choice holds nothing but a reference to the controller and a color. The opponent goes now, before TaskManager::Shutdown(): a search nobody
         // cancelled would hold the join of the pool
         _opponent.Shutdown();
+        _analyst.Shutdown();
     }
 
     void ChessGame::Reset() {

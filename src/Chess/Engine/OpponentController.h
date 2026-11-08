@@ -65,6 +65,11 @@ namespace BECore::Chess {
         /// Where the default factory looks for Stockfish; read at the next pick, an opponent that already plays keeps its engine
         void SetSettings(OpponentSettings settings);
 
+        /// The settings the controller holds (SetSettings); the analysis reads them at the time of its search, so the ones `ChessGame::Start()` loads are seen
+        [[nodiscard]] const OpponentSettings& GetSettings() const noexcept {
+            return _settings;
+        }
+
         /// The factory that makes the engine at a pick, asked for (engine, level); an empty one puts the default back (the Stockfish of the settings, the OwnEngine, each under the handicap of the
         /// level: WithHandicap; a factory given here is never wrapped)
         void SetEngineFactory(EngineFactory factory);
