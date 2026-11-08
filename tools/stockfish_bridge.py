@@ -72,18 +72,21 @@ def find_stockfish(explicit: str | None) -> str | None:
 class UciEngine:
     """A UCI engine in a subprocess. Lines are read by a thread, so that every wait has a timeout."""
 
-    def __init__(self, path: str, options: dict[str, str] | None = None, trace: TextIO | None = None):
+    def __init__(self, path: str | list[str], options: dict[str, str] | None = None, trace: TextIO | None = None):
+        """`path` is the executable, or the whole command as a list (a script run by an interpreter). `uci_lines` keeps the reply to `uci`."""
         self._trace = trace
         self._lines: queue.Queue[str | None] = queue.Queue()
+        self.uci_lines: list[str] = []
+        command = [path] if isinstance(path, str) else list(path)
         try:
-            self._process = subprocess.Popen([path], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, bufsize=1)
+            self._process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, bufsize=1)
         except OSError as error:
-            raise UciError(f"cannot start {path}: {error}") from error
+            raise UciError(f"cannot start {command[0]}: {error}") from error
         threading.Thread(target=self._read_lines, daemon=True).start()
 
         try:
             self._send("uci")
-            self._wait_for(lambda line: line == "uciok", UCI_STARTUP_SECONDS, "uciok")
+            self._wait_for(self._collect_uci_reply, UCI_STARTUP_SECONDS, "uciok")
             for name, value in (options or {}).items():
                 self._send(f"setoption name {name} value {value}")
             self._ready()
@@ -103,12 +106,29 @@ class UciEngine:
 
     def best_move(self, position: str, movetime_ms: int) -> str | None:
         """The UCI move Stockfish picks for `position` (a `position ...` command), or None when it has none (mate, stalemate)."""
+        return self.search(position, f"movetime {movetime_ms}", movetime_ms / 1000 + UCI_ANSWER_SLACK_SECONDS)
+
+    def search(self, position: str, go_arguments: str, timeout_seconds: float) -> str | None:
+        """Sends `position` and `go <go_arguments>`; the UCI move of the `bestmove` line, or None for `(none)` / `0000`."""
         self._send(position)
-        self._send(f"go movetime {movetime_ms}")
-        line = self._wait_for(lambda text: text.startswith("bestmove"), movetime_ms / 1000 + UCI_ANSWER_SLACK_SECONDS, "bestmove")
+        self._send(f"go {go_arguments}".strip())
+        line = self._wait_for(lambda text: text.startswith("bestmove"), timeout_seconds, "bestmove")
         fields = line.split()
         move = fields[1] if len(fields) > 1 else "(none)"
         return None if move in ("(none)", "0000") else move
+
+    def set_option(self, name: str, value: str) -> list[str]:
+        """Sends one `setoption` and waits for the engine to be ready; gives the lines it said on the way (`info string` refusals)."""
+        self._send(f"setoption name {name} value {value}")
+        self._send("isready")
+        said: list[str] = []
+
+        def collect(line: str) -> bool:
+            said.append(line)
+            return line == "readyok"
+
+        self._wait_for(collect, UCI_STARTUP_SECONDS, "readyok")
+        return said[:-1]
 
     def legal_moves(self, position: str) -> set[str]:
         """The legal moves of `position` as Stockfish counts them (`go perft 1`)."""
@@ -156,6 +176,10 @@ class UciEngine:
             self._process.stdin.flush()
         except (OSError, ValueError) as error:  # the engine died (broken pipe) or was closed
             raise UciError(f"the engine does not take '{command}': {error}") from error
+
+    def _collect_uci_reply(self, line: str) -> bool:
+        self.uci_lines.append(line)
+        return line == "uciok"
 
     def _ready(self) -> None:
         self._send("isready")
