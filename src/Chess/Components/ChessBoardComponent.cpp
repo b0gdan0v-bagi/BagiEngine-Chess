@@ -7,6 +7,7 @@
 #include <BECore/UI/UICanvasComponent.h>
 #include <Chess/ChessGame.h>
 #include <Chess/Engine/OpponentText.h>
+#include <Chess/Engine/PositionAnalyst.h>
 #include <Chess/Game/BoardCoordinates.h>
 #include <Chess/Game/BoardOrientation.h>
 #include <Chess/Game/PromotionChoices.h>
@@ -27,6 +28,10 @@ namespace BECore::Chess {
         constexpr Color kLegalCaptureSquare{220, 90, 90, 160};
         constexpr Color kCheckSquare{230, 60, 60, 210};
         constexpr Color kMateSquare{150, 20, 20, 240};
+        // The hint (the best move the engine found): the square the piece leaves in a lighter blue, the square it goes to in a stronger one. A first guess nobody has seen on screen: neither the
+        // red of check nor the green of the selection, drawn under the selection so that one stays readable on top of it
+        constexpr Color kHintFromSquare{60, 130, 230, 110};
+        constexpr Color kHintToSquare{60, 130, 230, 200};
 
         // One line in the log when a game ends; the board has no text to show it in.
         void LogResult(const ChessGameModel& model) {
@@ -273,6 +278,19 @@ namespace BECore::Chess {
             float ky = 0.0f;
             SquareToPixel(king.file, king.rank, bottom, kx, ky);
             renderer.DrawFilledRect(kx, ky, _squareSize, _squareSize, model->IsGameOver() ? kMateSquare : kCheckSquare);
+        }
+
+        // The hint, once the engine has answered for this very position: the two squares of the move, under the selection. It is never played, and the analyst gives nothing for another
+        // version, so any change of the position takes it off at the next frame
+        if (const PositionAnalyst* analyst = ChessGame::GetActiveAnalyst(); analyst && !model->IsGameOver()) {
+            if (const std::optional<AnalysisLine> hint = analyst->GetHint(*model)) {
+                float hx = 0.0f;
+                float hy = 0.0f;
+                SquareToPixel(hint->move.From().file, hint->move.From().rank, bottom, hx, hy);
+                renderer.DrawFilledRect(hx, hy, _squareSize, _squareSize, kHintFromSquare);
+                SquareToPixel(hint->move.To().file, hint->move.To().rank, bottom, hx, hy);
+                renderer.DrawFilledRect(hx, hy, _squareSize, _squareSize, kHintToSquare);
+            }
         }
 
         if (model->HasSelection()) {

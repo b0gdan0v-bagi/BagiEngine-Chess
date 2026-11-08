@@ -22,7 +22,7 @@ src/Chess/
 │   ├── BlunderEngine.*, OpponentLevels.*, OpponentEngines.*, OpponentText.*, OpponentSettings.*   handicap, levels, engines, words, settings
 │   ├── EngineOpponent.*, OpponentController.*, OpponentChoice.*   the opponent in a game, its seat, the person's choice
 │   └── PositionAnalyst.*     the analysis of the position in the background: the evaluation and the hint (one `Analyse` per version), the hint rule `HintRefusalFor`, `MakeAnalysisEngine`
-└── Components/               scene glue: board, pieces, result, captured material (src/Chess/Components/CLAUDE.md)
+└── Components/               scene glue: board, hint, pieces, result, captured material (src/Chess/Components/CLAUDE.md)
 ```
 
 - State lives in `ChessGameModel`. Components never keep game state: they reach the model through `ChessGame::GetActiveModel()` (null when Chess is not the active game, and then they do nothing).
@@ -33,7 +33,7 @@ src/Chess/
 |------|-------|
 | `src/Chess/Game/CLAUDE.md` | every file of the rules and what it guarantees |
 | `src/Chess/Engine/CLAUDE.md` | the opponent: the engine interface, UCI and Stockfish, the own engine, the levels and the handicap, the settings file, the controller and the choice, the opponent in the running game |
-| `src/Chess/Components/CLAUDE.md` | the scene and the UI: the pieces, the board geometry and orientation, the coordinates, the captured material, the HUD, the opponent panel, the promotion picker, the words of the HUD, the draw order; **read it before changing `config/SceneConfig.xml`** |
+| `src/Chess/Components/CLAUDE.md` | the scene and the UI: the pieces, the board geometry and orientation, the hint on the board, the coordinates, the captured material, the HUD, the opponent panel, the promotion picker, the words of the HUD, the draw order; **read it before changing `config/SceneConfig.xml`** |
 | `tests/CLAUDE.md` | every test file and what it covers, the control smoke, the fake UCI engine, the test helpers |
 
 ## Control API

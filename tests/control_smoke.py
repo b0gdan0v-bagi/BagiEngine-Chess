@@ -362,8 +362,12 @@ def wait_for_the_analysis(client: BagiControlClient, accept, what: str) -> dict:
 
 
 def run_analysis_scenario(client: BagiControlClient, headless: bool) -> None:
-    """The engine of our own analyses: the evaluation is switched on and read from White's view, a hint is asked for and bound to its position, and a hint on the program's turn is refused."""
-    if client.call("status")["manualClock"]:
+    """The engine of our own analyses: the evaluation is switched on and read from White's view, a hint is asked for and bound to its position, and a hint on the program's turn is refused.
+
+    Headless, the hint is also seen on the board: the board band of a screenshot with the hint differs from the one without it, and is the same again once it is taken back or a
+    reset has put the opening back. The pictures are compared, not read: how the hint looks is not checked."""
+    manual = client.call("status")["manualClock"]
+    if manual:
         client.call("step")
     client.call("reset")
 
@@ -373,7 +377,6 @@ def run_analysis_scenario(client: BagiControlClient, headless: bool) -> None:
 
     # A hint is for the person: on the turn of the side the program plays it is refused, and nothing changes. Only the manual clock has no frame between the move and the
     # request, so the program is surely still to answer; on the real clock the own engine may answer first (ChessGameControlTest checks this deterministically)
-    manual = client.call("status")["manualClock"]
     client.call("set_state", {"opponent": {"engine": "own", "plays": "black", "level": "max"}})
     client.call("perform_action", move("e2e4"))
     if manual:
@@ -394,6 +397,10 @@ def run_analysis_scenario(client: BagiControlClient, headless: bool) -> None:
     client.call("reset")
     version = client.call("get_state")["version"]
     client.call("set_state", {"opponent": {"engine": "own", "plays": None}})
+    opening_band = None
+    if headless:
+        let_frames_pass(client, 2)
+        opening_band = board_band(take_screenshot(client))  # the opening with no hint, to compare with after the hint has come and gone
     switched = client.call("set_state", {"analysis": {"evaluation": True}})
     check(switched["version"] > version, "switching the evaluation on did not move the state version")
     check(get_analysis(client)["evaluationOn"] is True, f"the evaluation is not on: {get_analysis(client)}")
@@ -405,12 +412,29 @@ def run_analysis_scenario(client: BagiControlClient, headless: bool) -> None:
     check(analysis["evaluation"]["text"] == "#1", f"unexpected text {analysis['evaluation']}")
     check(analysis["hint"] is None and analysis["hintRequested"] is False, f"a hint is there that nobody asked for: {analysis}")
 
+    plain_band = None
+    if headless:
+        let_frames_pass(client, 2)
+        plain_band = board_band(take_screenshot(client))  # the mate in one with the evaluation but no hint
+
     before = client.call("get_state")["version"]
     client.call("set_state", {"analysis": {"hint": True}})
     check(client.call("get_state")["version"] > before and get_analysis(client)["hintRequested"] is True, "asking for a hint did not show")
     analysis = wait_for_the_analysis(client, lambda a: a["hint"] is not None, "the hint")
     check(analysis["hint"]["move"] == "a1a8", f"the hint for the mate in one is {analysis['hint']}")
     check({"type": "move", "uci": "a1a8"} in client.call("list_actions")["actions"], "the hinted move is not one of the listed actions")
+    if headless:
+        let_frames_pass(client, 2)
+        hinted_band = board_band(take_screenshot(client))
+        check(hinted_band != plain_band, "the board looks the same with the hint on it: the two squares of a1a8 are not filled")
+        # Taking it back is the position without a hint again; asked for once more it is the same picture as the first time (the answer is deterministic)
+        client.call("set_state", {"analysis": {"hint": False}})
+        let_frames_pass(client, 2)
+        check(board_band(take_screenshot(client)) == plain_band, "the board still shows the hint after it was taken back")
+        client.call("set_state", {"analysis": {"hint": True}})
+        wait_for_the_analysis(client, lambda a: a["hint"] is not None, "the hint again")
+        let_frames_pass(client, 2)
+        check(board_band(take_screenshot(client)) == hinted_band, "the hint is not drawn the same way twice")
 
     # A move drops the hint at once and the evaluation follows the new position later (it is Black's turn now: still White's view)
     client.call("perform_action", move("g1h1"))
@@ -424,7 +448,19 @@ def run_analysis_scenario(client: BagiControlClient, headless: bool) -> None:
     client.call("set_state", {"analysis": {"hint": True}})
     client.call("set_state", {"analysis": {"hint": False}})
     check(get_analysis(client)["hintRequested"] is False, "a hint taken back is still asked for")
-    client.call("perform_action", move("g8h8"))
+
+    # A hint asked for in the mate in one is gone after a move and a reset: the opening is drawn as it was before any hint
+    if headless:
+        client.call("set_state", {"analysis": {"hint": True}})
+        wait_for_the_analysis(client, lambda a: a["hint"] is not None, "the hint before the reset")
+        client.call("reset")
+        check(get_analysis(client)["hint"] is None, "the hint outlived a reset")
+        let_frames_pass(client, 2)
+        check(board_band(take_screenshot(client)) == opening_band, "the opening after a reset is not drawn as it was before the hint")
+        last_move = "e2e4"  # the opening is back
+    else:
+        last_move = "g8h8"  # Black is to move in the mate in one after g1h1
+    client.call("perform_action", move(last_move))  # a move for the evaluation to follow, so the game quits with a search under way
 
 
 # The scene is 840 x 800 units, the board 640 x 640 at y 80..720; the window fits the scene by the smaller scale and centers it
