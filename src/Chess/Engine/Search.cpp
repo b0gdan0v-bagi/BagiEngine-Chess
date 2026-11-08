@@ -1,5 +1,6 @@
 #include "Search.h"
 
+#include <Chess/Engine/TranspositionTable.h>
 #include <Chess/Game/GameStatus.h>
 #include <Chess/Game/MoveGenerator.h>
 
@@ -16,7 +17,7 @@ namespace BECore::Chess {
         /// kMaxSearchDepth plus the extensions, and what is left at that ply is judged by the static score. The move lists of a node
         /// live on the stack: a Negamax or Quiescence frame takes about 3 KB in a Debug build (measured, macOS), so 96 plies are
         /// about 300 KB, which fits the 512 KB that a std::thread of the Background pool gets on macOS (Linux gives 8 MB, Windows 1 MB).
-        /// The killers and the history of Search() (QuietMoves, about 33 KB) are on that stack too; the second static_assert below counts them
+        /// The killers and the history of Search() (QuietMoves, about 33 KB) are on that stack too; the static_assert after QuietMoves counts them
         constexpr int kMaxPly = kMaxSearchDepth + kMaxExtensionPly;
         /// The size of a Negamax or Quiescence frame in a Debug build (measured on macOS) and the stack of a Background pool thread there (a std::thread with the default
         /// 512 KB); the assert keeps the comment above honest if kMaxSearchDepth or the extension grows
@@ -43,6 +44,8 @@ namespace BECore::Chess {
         static_assert(kHistoryMax < kSecondKillerScore && kSecondKillerScore < kFirstKillerScore && kFirstKillerScore < kPromotionScore);
         /// Order() is given this ply by the nodes that do not use killers and history
         constexpr int kNoKillerPly = -1;
+        /// The table is built only for a search of at least this depth: the levels with fewer plies pay no allocation
+        constexpr int kMinTableDepth = 3;
         constexpr int kKillersPerPly = 2;
         /// The history is kept per color of the mover
         constexpr size_t kColorCount = 2;
@@ -153,6 +156,9 @@ namespace BECore::Chess {
             /// Counts a node and looks at the limits: the node limit in every node, the clock and the token every kSearchPollInterval
             void CountNode() noexcept;
             [[nodiscard]] bool LimitsReached() const;
+            /// Whether no 50-move draw can fall inside the subtree of a node with @p depth plies left (extensions included), so that a
+            /// result of the table does not depend on the clock. A capture or a pawn move resets the clock, so quiescence cannot reach it
+            [[nodiscard]] bool ClockAllowsTable(int depth) const noexcept;
             /// @p ply is where the killers are looked up; kNoKillerPly orders the quiet moves as the generator gave them
             [[nodiscard]] ScoredMoves Order(const MoveList& moves, Move preferred, int ply = kNoKillerPly) const;
 
@@ -168,6 +174,11 @@ namespace BECore::Chess {
             /// Off during the first iteration, which must finish
             bool _stopEnabled = false;
             QuietMoves _quiet;
+            /// Built in Run() for a search deep enough; empty means no table
+            std::optional<TranspositionTable> _table;
+            /// How many times Negamax returned a draw that depends on the history (a repeated position, the 50-move clock). A node
+            /// whose subtree moved it stores nothing
+            uint64_t _historyDraws = 0;
         };
 
         void Searcher::CountNode() noexcept {
@@ -192,6 +203,10 @@ namespace BECore::Chess {
             return _control.nodeLimit != 0 && _nodes >= _control.nodeLimit;
         }
 
+        bool Searcher::ClockAllowsTable(int depth) const noexcept {
+            return _position.HalfmoveClock() + depth + kMaxExtensionPly < kFiftyMovePlies;
+        }
+
         ScoredMoves Searcher::Order(const MoveList& moves, Move preferred, int ply) const {
             const bool useQuiet = _settings.quietOrdering && ply != kNoKillerPly;
             const PieceColor color = _position.SideToMove();
@@ -214,7 +229,11 @@ namespace BECore::Chess {
             if (ply >= kMaxPly) {
                 return Evaluate(_position);
             }
-            if (_position.RepetitionCount() >= kRepetitionDrawCount || _position.IsInsufficientMaterial()) {
+            if (_position.RepetitionCount() >= kRepetitionDrawCount) {
+                ++_historyDraws;
+                return kDrawScore;
+            }
+            if (_position.IsInsufficientMaterial()) {
                 return kDrawScore;
             }
 
@@ -226,17 +245,50 @@ namespace BECore::Chess {
                 return _settings.quiescence ? Quiescence(alpha, beta, ply) : Evaluate(_position);
             }
 
+            // The table: an entry at least as deep gives its score (or a bound that narrows the window) where the clock allows,
+            // any entry gives its move for the ordering
+            const bool tableUsable = _table && ClockAllowsTable(depth);
+            Move tableMove;
+            if (_table) {
+                if (const TableEntry* entry = _table->Probe(_position.Key())) {
+                    tableMove = entry->move;
+                    if (tableUsable && entry->depth >= depth) {
+                        const int stored = ScoreFromTable(entry->score, ply);
+                        switch (entry->bound) {
+                            case TableBound::Exact:
+                                return stored;
+                            case TableBound::Lower:
+                                if (stored >= beta) {
+                                    return stored;
+                                }
+                                alpha = eastl::max(alpha, stored);
+                                break;
+                            case TableBound::Upper:
+                                if (stored <= alpha) {
+                                    return stored;
+                                }
+                                beta = eastl::min(beta, stored);
+                                break;
+                        }
+                    }
+                }
+            }
+
             const MoveList moves = MoveGenerator::GenerateLegal(_position);
             if (moves.empty()) {
                 return inCheck ? -MateIn(ply) : kDrawScore;
             }
             if (_position.HalfmoveClock() >= kFiftyMovePlies) {
+                ++_historyDraws;
                 return kDrawScore;
             }
 
-            ScoredMoves scored = Order(moves, Move{}, ply);
+            const uint64_t historyDrawsBefore = _historyDraws;
+            const int windowAlpha = alpha;
+            ScoredMoves scored = Order(moves, tableMove, ply);
             const PieceColor mover = _position.SideToMove();
             int best = -kInfinity;
+            Move bestMove;
             for (size_t i = 0; i < scored.size(); ++i) {
                 PickBest(scored, i);
                 const Move move = scored[i].move;
@@ -249,6 +301,7 @@ namespace BECore::Chess {
                 }
                 if (score > best) {
                     best = score;
+                    bestMove = move;
                     if (score > alpha) {
                         alpha = score;
                         if (alpha >= beta) {
@@ -259,6 +312,14 @@ namespace BECore::Chess {
                         }
                     }
                 }
+            }
+
+            // A subtree that returned a draw because of the history is not stored: the same position reached by another path
+            // may not have that draw
+            if (tableUsable && _historyDraws == historyDrawsBefore) {
+                const TableBound bound = best >= beta ? TableBound::Lower : (best <= windowAlpha ? TableBound::Upper : TableBound::Exact);
+                // Nothing reached alpha, so no move of a fail-low node is known to be best
+                _table->Store(_position.Key(), bound == TableBound::Upper ? Move{} : bestMove, ScoreToTable(best, ply), depth, bound);
             }
             return best;
         }
@@ -352,6 +413,9 @@ namespace BECore::Chess {
             }
 
             const int maxDepth = eastl::clamp(_settings.maxDepth, 1, kMaxSearchDepth);
+            if (_settings.tableEntries != 0 && maxDepth >= kMinTableDepth) {
+                _table.emplace(_settings.tableEntries);
+            }
             Move best;
             for (int depth = 1; depth <= maxDepth; ++depth) {
                 // The first iteration is never stopped: it is what makes the answer exist
