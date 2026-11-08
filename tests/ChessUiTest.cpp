@@ -66,6 +66,8 @@ namespace BECore::Chess::Tests {
         const Color kSelectedColor{120, 200, 120, 200};
         const Color kLegalMoveColor{120, 200, 120, 120};
         const Color kCheckColor{230, 60, 60, 210};
+        const Color kHintFromColor{60, 130, 230, 110};  // the two squares of the hint: the one the piece leaves and the one it goes to
+        const Color kHintToColor{60, 130, 230, 200};
 
         // The tall cell of a pawn in the piece atlas (TextureLibrary.xml, assets/chess_test.png is 700 x 381).
         // The library is empty in the test environment, so the test gives a sprite its cell.
@@ -915,6 +917,26 @@ namespace BECore::Chess::Tests {
                 _manager->UpdateAll();
                 return done();
             });
+        }
+
+        /// The analyst of the game that is running
+        PositionAnalyst& Analyst() const {
+            PositionAnalyst* analyst = ChessGame::GetActiveAnalyst();
+            EXPECT_NE(analyst, nullptr);
+            return *analyst;
+        }
+
+        /// Asks for the hint of the position on the board and runs frames until the engine has answered for it
+        bool ShowTheHint() {
+            if (!Analyst().RequestHint(Model())) {
+                return false;
+            }
+            return FramesUntil([&] { return Analyst().GetHint(Model()).has_value(); });
+        }
+
+        /// The recorded fills of the hint in the last frame: the squares it leaves and goes to, in drawing order
+        [[nodiscard]] std::pair<eastl::vector<const DrawCall*>, eastl::vector<const DrawCall*>> HintFills() const {
+            return {RectCalls(kHintFromColor), RectCalls(kHintToColor)};
         }
 
         /// Frames in which nothing is meant to happen
@@ -5439,6 +5461,239 @@ namespace BECore::Chess::Tests {
         fine.layout.Update(ContextOf(*plain));
         EXPECT_EQ(MaterialClearance(fine.layout, hud->GetLayout(), kMinGap), "");
         hud->GetLayout().Invalidate();
+    }
+
+    // ---- the hint on the board ----------------------------------------------------------------------------------------------------
+    // The analyst holds the hint for one version of the position; the board fills its two squares (under the selection and the pieces) while it does. An engine double answers the
+    // scripted move e2e4 through the analyst's factory, and the frames are real ones
+
+    TEST_F(ChessUiTest, WithNoHintAskedForNoExtraSquareIsFilled) {
+        CountingAnalysisFactory factory({eastl::make_shared<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"))});
+        Analyst().SetEngineFactory(factory.AsFactory());
+        Settle();
+        EXPECT_TRUE(HintFills().first.empty());
+        EXPECT_TRUE(HintFills().second.empty());
+        Analyst().SetEvaluation(true);  // an evaluation alone is no hint
+        ASSERT_TRUE(FramesUntil([&] { return Analyst().GetEvaluation(Model()).has_value(); }));
+        Draw();
+        EXPECT_TRUE(HintFills().first.empty());
+        EXPECT_TRUE(HintFills().second.empty());
+        EXPECT_EQ(RectCalls(kLightSquareColor).size() + RectCalls(kDarkSquareColor).size(), 64u);
+    }
+
+    TEST_F(ChessUiTest, AReadyHintFillsTheTwoSquaresOfItsMoveInTheirOwnColorsWithWhiteAtTheBottom) {
+        CountingAnalysisFactory factory({eastl::make_shared<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"))});
+        Analyst().SetEngineFactory(factory.AsFactory());
+        ASSERT_TRUE(ShowTheHint());
+        ASSERT_FALSE(BlackIsAtTheBottom());
+
+        for (const auto& size : {std::pair{1280.0f, 720.0f}, std::pair{720.0f, 1280.0f}}) {
+            SCOPED_TRACE(Format("output {}x{}", size.first, size.second).c_str());
+            DrawAt(size.first, size.second);
+            const auto [from, to] = HintFills();
+            ASSERT_EQ(from.size(), 1u);
+            ASSERT_EQ(to.size(), 1u);
+            EXPECT_TRUE(SameRect(from[0]->rect, SquareRect("e2"))) << "the square the piece leaves";
+            EXPECT_TRUE(SameRect(to[0]->rect, SquareRect("e4"))) << "the square it goes to";
+        }
+    }
+
+    TEST_F(ChessUiTest, AReadyHintFillsTheTurnedCellsWhenTheProgramPlaysWhite) {
+        CountingFactory opponentFactory({eastl::make_shared<GatedEngine>(true)});  // the program opens and holds its answer: the board stays as it is
+        Opponent().SetEngineFactory(opponentFactory.AsFactory());
+        CountingAnalysisFactory factory({eastl::make_shared<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"))});
+        Analyst().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        ControlPlays("white");
+        _manager->UpdateAll();
+        ASSERT_TRUE(BlackIsAtTheBottom());
+        ASSERT_TRUE(ShowTheHint());
+
+        Draw();
+        const auto [from, to] = HintFills();
+        ASSERT_EQ(from.size(), 1u);
+        ASSERT_EQ(to.size(), 1u);
+        EXPECT_TRUE(SameRect(from[0]->rect, SquareRect("e2")));
+        EXPECT_TRUE(SameRect(to[0]->rect, SquareRect("e4")));
+        // written out: e2 is the cell column 3, row 1 of the turned grid, e4 column 3, row 3
+        EXPECT_TRUE(SameRect(from[0]->rect, CellRect(3, 1)));
+        EXPECT_TRUE(SameRect(to[0]->rect, CellRect(3, 3)));
+    }
+
+    TEST_F(ChessUiTest, TheHintIsDrawnOverTheSquaresAndUnderThePiecesAndASelectionStaysOnTopOfIt) {
+        const auto pawn = GiveAtlasCell("WhitePawn_e2");
+        CountingAnalysisFactory factory({eastl::make_shared<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"))});
+        Analyst().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        ASSERT_TRUE(ShowTheHint());
+        Model().OnSquareClicked(Sq("e2"));  // a selection is not a change of the position: the hint stays
+        ASSERT_TRUE(Model().HasSelection());
+        Draw();
+
+        long lastSquare = -1;
+        long hintFrom = -1;
+        long hintTo = -1;
+        long selection = -1;
+        long legal = -1;
+        long piece = -1;
+        const auto& calls = _renderer->calls;
+        for (size_t i = 0; i < calls.size(); ++i) {
+            const DrawCall& call = calls[i];
+            const long at = static_cast<long>(i);
+            if (call.kind == DrawKind::Rect && (SameColor(call.color, kLightSquareColor) || SameColor(call.color, kDarkSquareColor))) {
+                lastSquare = at;
+            } else if (call.kind == DrawKind::Rect && SameColor(call.color, kHintFromColor)) {
+                hintFrom = at;
+            } else if (call.kind == DrawKind::Rect && SameColor(call.color, kHintToColor)) {
+                hintTo = at;
+            } else if (call.kind == DrawKind::Rect && SameColor(call.color, kSelectedColor)) {
+                selection = at;
+            } else if (call.kind == DrawKind::Rect && SameColor(call.color, kLegalMoveColor)) {
+                legal = at;
+            } else if (call.kind == DrawKind::Texture && call.texture == pawn.Get()) {
+                piece = at;
+            }
+        }
+        ASSERT_GE(hintFrom, 0);
+        ASSERT_GE(hintTo, 0);
+        ASSERT_GE(selection, 0);
+        ASSERT_GE(legal, 0);
+        ASSERT_GE(piece, 0);
+        EXPECT_LT(lastSquare, hintFrom) << "over the squares";
+        EXPECT_LT(hintFrom, hintTo);
+        EXPECT_LT(hintTo, selection) << "under the selection";
+        EXPECT_LT(hintTo, legal) << "and under the legal moves";
+        EXPECT_LT(hintTo, piece) << "and under the pieces";
+        EXPECT_LT(selection, piece);
+    }
+
+    TEST_F(ChessUiTest, AMoveByClicksAResetASetPositionAndTheControlApiTakeTheHintOffAtTheNextFrame) {
+        CountingAnalysisFactory factory({eastl::make_shared<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"))});
+        Analyst().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        const auto expectHint = [&](bool shown) {
+            Draw();
+            EXPECT_EQ(HintFills().first.size(), shown ? 1u : 0u);
+            EXPECT_EQ(HintFills().second.size(), shown ? 1u : 0u);
+        };
+
+        ASSERT_TRUE(ShowTheHint());
+        expectHint(true);
+        ClickMove("e2", "e3");  // a person's move
+        ASSERT_EQ(Model().GetMoves().size(), 1u);
+        expectHint(false);
+
+        ASSERT_TRUE(ShowTheHint());
+        expectHint(true);
+        Click("a7");  // the first click of a move only selects: the hint stays
+        expectHint(true);
+        Model().Reset();
+        expectHint(false);
+
+        ASSERT_TRUE(ShowTheHint());
+        expectHint(true);
+        Model().SetPosition(PositionFromFen(kBlackToMoveAfterE4));
+        expectHint(false);
+
+        ASSERT_TRUE(ShowTheHint());
+        expectHint(true);
+        Json request = Json::object();  // set_state and reset of the control API go through the same version
+        request["fen"] = "k7/8/8/8/8/8/4K3/7R w - - 0 1";
+        ASSERT_TRUE(ChessGame::GetActive()->AsControllable()->SetState(request).has_value());
+        expectHint(false);
+
+        ASSERT_TRUE(ShowTheHint());
+        expectHint(true);
+        ASSERT_TRUE(ChessGame::GetActive()->AsControllable()->Reset(Json::object()).has_value());
+        expectHint(false);
+    }
+
+    TEST_F(ChessUiTest, AFinishedGameShowsNoHint) {
+        CountingAnalysisFactory factory({eastl::make_shared<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Mate, 1}, Mv("a8a1"))});
+        Analyst().SetEngineFactory(factory.AsFactory());
+        StartFrom(kBlackMatesOnA1);
+        ASSERT_TRUE(ShowTheHint());
+        Draw();
+        ASSERT_EQ(HintFills().first.size(), 1u) << "a8";
+        EXPECT_TRUE(SameRect(HintFills().first[0]->rect, SquareRect("a8")));
+        EXPECT_TRUE(SameRect(HintFills().second[0]->rect, SquareRect("a1")));
+
+        ASSERT_TRUE(Play(Model(), "a8a1"));
+        ASSERT_TRUE(Model().IsGameOver());
+        _manager->UpdateAll();
+        Draw();
+        EXPECT_TRUE(HintFills().first.empty());
+        EXPECT_TRUE(HintFills().second.empty());
+        const auto refused = Analyst().RequestHint(Model());
+        ASSERT_FALSE(refused.has_value());
+        EXPECT_EQ(refused.error(), HintRefusal::GameOver);
+        IdleFrames(10);
+        Draw();
+        EXPECT_TRUE(HintFills().first.empty());
+        EXPECT_TRUE(HintFills().second.empty());
+    }
+
+    TEST_F(ChessUiTest, WhileTheEngineStillThinksNothingIsDrawnAndTheAnswerBringsTheHint) {
+        const auto engine = eastl::make_shared<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"));
+        engine->Gate(true);
+        CountingAnalysisFactory factory({engine});
+        Analyst().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        ASSERT_TRUE(Analyst().RequestHint(Model()).has_value());
+        ASSERT_TRUE(FramesUntil([&] { return engine->Calls() > 0; })) << "the engine is asked and holds its answer";
+        IdleFrames(20);
+        Draw();
+        EXPECT_TRUE(Analyst().IsHintRequested(Model()));
+        EXPECT_TRUE(Analyst().IsThinking());
+        EXPECT_TRUE(HintFills().first.empty());
+        EXPECT_TRUE(HintFills().second.empty());
+
+        engine->Open();
+        ASSERT_TRUE(FramesUntil([&] { return Analyst().GetHint(Model()).has_value(); }));
+        Draw();
+        EXPECT_EQ(HintFills().first.size(), 1u);
+        EXPECT_EQ(HintFills().second.size(), 1u);
+    }
+
+    TEST_F(ChessUiTest, TheHintPlaysNothingAndLeavesThePiecesAndTheStateOfTheGameAsTheyAre) {
+        CountingAnalysisFactory factory({eastl::make_shared<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"))});
+        Analyst().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        const auto boardOf = [&] {
+            const auto state = ChessGame::GetActive()->AsControllable()->GetState();
+            EXPECT_TRUE(state.has_value());
+            const Json* board = state ? FindJsonMember(*state, "board") : nullptr;
+            const Json* fen = state ? FindJsonMember(*state, "fen") : nullptr;
+            const Json* moves = state ? FindJsonMember(*state, "moves") : nullptr;
+            EXPECT_TRUE(board && fen && moves);
+            return board && fen && moves ? DumpJson(*board) + DumpJson(*fen) + DumpJson(*moves) : eastl::string();
+        };
+        const eastl::string before = boardOf();
+        const uint64_t modelVersion = Model().GetVersion();
+        ASSERT_TRUE(ShowTheHint());
+        IdleFrames(20);
+        Draw();
+        ASSERT_EQ(HintFills().first.size(), 1u);
+        EXPECT_EQ(boardOf(), before);
+        EXPECT_EQ(Model().GetVersion(), modelVersion) << "the model is not touched";
+        EXPECT_TRUE(Model().GetMoves().empty());
+        ExpectPiecesAtTheCellsOf(false);
+        EXPECT_EQ(PieceOrigin("WhitePawn_e2"), (std::pair<float, float>{420.0f, 560.0f}));
+    }
+
+    TEST_F(ChessUiTest, WithNoGameActiveTheBoardDrawsNoHint) {
+        CountingAnalysisFactory factory({eastl::make_shared<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"))});
+        Analyst().SetEngineFactory(factory.AsFactory());
+        ASSERT_TRUE(ShowTheHint());
+        Draw();
+        ASSERT_EQ(HintFills().first.size(), 1u);
+
+        GameManager::GetInstance().Shutdown();
+        ASSERT_EQ(ChessGame::GetActive(), nullptr);
+        Draw();
+        EXPECT_TRUE(HintFills().first.empty());
+        EXPECT_TRUE(HintFills().second.empty());
+        EXPECT_EQ(RectCalls(kLightSquareColor).size() + RectCalls(kDarkSquareColor).size(), 64u) << "the squares are still drawn";
     }
 
 }  // namespace BECore::Chess::Tests

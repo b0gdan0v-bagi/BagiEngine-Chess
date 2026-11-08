@@ -29,7 +29,7 @@ namespace BECore::Chess {
      * serves one model: the version means nothing across two.
      *
      * A search that fails, or an answer the model refuses, is logged once and kept in GetLastError(). No new search starts until ClearError(), so a
-     * missing engine is one error and not a try per frame. This is the one class of Engine/ that logs.
+     * missing engine is one error and not a try per frame. It logs, with OpponentController and PositionAnalyst (the only classes of Engine/ that do).
      */
     class EngineOpponent {
     public:

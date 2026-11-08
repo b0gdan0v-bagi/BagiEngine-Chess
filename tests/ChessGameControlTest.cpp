@@ -72,7 +72,7 @@ namespace BECore::Chess::Tests {
                 ::BECore::Tests::EngineEnvironment::EnsureCoreServices();  // TaskManager: a search of the opponent runs on its pool
             }
 
-            ChessGameControlTest() : opponent(model), control(model, opponent) {}
+            ChessGameControlTest() : opponent(model), control(model, opponent, analyst) {}
 
             /// The state as the JSON object that GetState() returned; fails the test when it is an error
             Json State() {
@@ -152,8 +152,67 @@ namespace BECore::Chess::Tests {
                 return result ? std::string("<accepted>") : ErrorCodeOf(result.error());
             }
 
+            /// What a game loop does with the analysis too: the frame of ChessBoardComponent, until @p done
+            template <typename Condition>
+            bool FrameUntil(Condition done) {
+                return WaitUntil([&] {
+                    opponent.Update();
+                    analyst.Update(model, opponent.GetEngine());
+                    return done();
+                });
+            }
+
+            /// A few frames, no waiting for anything
+            void Frames(int count = 100) {
+                for (int frame = 0; frame < count; ++frame) {
+                    opponent.Update();
+                    analyst.Update(model, opponent.GetEngine());
+                }
+            }
+
+            /// The "analysis" object of the state
+            Json AnalysisOfState() {
+                const Json state = State();
+                const Json* found = FindJsonMember(state, "analysis");
+                EXPECT_NE(found, nullptr);
+                return found ? *found : Json();
+            }
+
+            /// A member of the "analysis" object, copied (null when it is not there)
+            Json AnalysisMember(const char* key) {
+                const Json analysis = AnalysisOfState();
+                const Json* found = FindJsonMember(analysis, key);
+                return found ? *found : Json();
+            }
+
+            /// {"analysis": {..}}; an empty @p evaluation or @p hint leaves the member out
+            static Json AnalysisRequest(std::optional<bool> evaluation, std::optional<bool> hint) {
+                Json analysis = Json::object();
+                if (evaluation) {
+                    analysis["evaluation"] = *evaluation;
+                }
+                if (hint) {
+                    analysis["hint"] = *hint;
+                }
+                Json request = Json::object();
+                request["analysis"] = std::move(analysis);
+                return request;
+            }
+
+            /// set_state with the analysis; the test fails when it is refused
+            void AnalyseWith(std::optional<bool> evaluation, std::optional<bool> hint = std::nullopt) {
+                const auto result = control.SetState(AnalysisRequest(evaluation, hint));
+                ASSERT_TRUE(result.has_value()) << result.error().message.c_str();
+            }
+
+            /// The state of the analysis as one string, to see that a refused call changed nothing
+            std::string AnalysisSnapshot() {
+                return AnalysisOfState().dump() + " v" + std::to_string(control.GetStateVersion());
+            }
+
             ChessGameModel model;
             OpponentController opponent;
+            PositionAnalyst analyst;
             ChessGameControl control;
         };
 
@@ -1187,6 +1246,438 @@ namespace BECore::Chess::Tests {
             opponent.Update();
         }
         EXPECT_EQ(MoveCount(), 0u) << "the answer belongs to the game that was replaced";
+    }
+
+    // ---- The analysis ----
+
+    namespace {
+
+        constexpr AnalysisScore kPawnUp{AnalysisScoreKind::Centipawns, 35};
+
+        eastl::shared_ptr<AnalysingEngine> Analyser(AnalysisScore score = kPawnUp, std::optional<Move> move = std::nullopt) {
+            return eastl::make_shared<AnalysingEngine>(score, move);
+        }
+
+    }  // namespace
+
+    TEST_F(ChessGameControlTest, TheAnalysisOfANewGameIsOffAndEmpty) {
+        const Json analysis = AnalysisOfState();
+
+        ASSERT_TRUE(analysis.is_object());
+        EXPECT_EQ(analysis.size(), 6u) << "evaluationOn, hintRequested, thinking, evaluation, hint, error";
+        EXPECT_EQ(GetJsonBool(analysis, "evaluationOn"), false) << "the evaluation costs a process and CPU: it is off until asked for";
+        EXPECT_EQ(GetJsonBool(analysis, "hintRequested"), false);
+        EXPECT_EQ(GetJsonBool(analysis, "thinking"), false);
+        for (const char* key : {"evaluation", "hint", "error"}) {
+            const Json* member = FindJsonMember(analysis, key);
+            ASSERT_NE(member, nullptr) << key;
+            EXPECT_TRUE(member->is_null()) << key;
+        }
+    }
+
+    TEST_F(ChessGameControlTest, NothingIsAnalysedUntilAskedFor) {
+        const auto engine = Analyser();
+        CountingAnalysisFactory factory{engine};
+        analyst.SetEngineFactory(factory.AsFactory());
+
+        Perform("e2e4");
+        Frames();
+        EXPECT_EQ(factory.Calls(), 0);
+        EXPECT_EQ(engine->Calls(), 0);
+    }
+
+    TEST_F(ChessGameControlTest, TheEvaluationIsSwitchedOnAndReadFromWhitesView) {
+        const auto engine = Analyser(kPawnUp);
+        CountingAnalysisFactory factory{engine};
+        analyst.SetEngineFactory(factory.AsFactory());
+
+        const uint64_t before = control.GetStateVersion();
+        AnalyseWith(true);
+        EXPECT_GT(control.GetStateVersion(), before) << "a switch moves the version";
+        EXPECT_EQ(GetJsonBool(AnalysisOfState(), "evaluationOn"), true);
+        EXPECT_TRUE(AnalysisMember("evaluation").is_null()) << "not computed yet";
+
+        const uint64_t switched = control.GetStateVersion();
+        ASSERT_TRUE(FrameUntil([&] { return !AnalysisMember("evaluation").is_null(); }));
+        EXPECT_GT(control.GetStateVersion(), switched) << "a result that arrives moves the version";
+
+        const Json evaluation = AnalysisMember("evaluation");
+        EXPECT_EQ(StringMember(evaluation, "text"), "+0.35");
+        EXPECT_EQ(GetJsonInt(evaluation, "depth"), 7);
+        const Json* score = FindJsonMember(evaluation, "score");
+        ASSERT_NE(score, nullptr);
+        EXPECT_EQ(StringMember(*score, "kind"), "centipawns");
+        EXPECT_EQ(GetJsonInt(*score, "value"), 35);
+        EXPECT_TRUE(AnalysisMember("hint").is_null()) << "no hint was asked for";
+        EXPECT_EQ(GetJsonBool(AnalysisOfState(), "thinking"), false);
+
+        // The engine says +35 for the side to move; with Black to move that is 35 for Black, so -35 for White
+        Perform("e2e4");
+        EXPECT_TRUE(AnalysisMember("evaluation").is_null()) << "the answer belonged to the other position";
+        ASSERT_TRUE(FrameUntil([&] { return !AnalysisMember("evaluation").is_null(); }));
+        const Json black = AnalysisMember("evaluation");
+        EXPECT_EQ(StringMember(black, "text"), "-0.35");
+        EXPECT_EQ(GetJsonInt(*FindJsonMember(black, "score"), "value"), -35);
+
+        AnalyseWith(false);
+        EXPECT_EQ(GetJsonBool(AnalysisOfState(), "evaluationOn"), false);
+        EXPECT_TRUE(AnalysisMember("evaluation").is_null()) << "off shows nothing";
+    }
+
+    TEST_F(ChessGameControlTest, AMateIsReadFromWhitesViewToo) {
+        const auto engine = Analyser({AnalysisScoreKind::Mate, 2});
+        CountingAnalysisFactory factory{engine};
+        analyst.SetEngineFactory(factory.AsFactory());
+
+        Perform("e2e4");  // Black to move, and the engine says Black mates in 2
+        AnalyseWith(true);
+        ASSERT_TRUE(FrameUntil([&] { return !AnalysisMember("evaluation").is_null(); }));
+
+        const Json evaluation = AnalysisMember("evaluation");
+        EXPECT_EQ(StringMember(evaluation, "text"), "#-2");
+        const Json* score = FindJsonMember(evaluation, "score");
+        ASSERT_NE(score, nullptr);
+        EXPECT_EQ(StringMember(*score, "kind"), "mate");
+        EXPECT_EQ(GetJsonInt(*score, "value"), -2) << "White is mated in 2";
+    }
+
+    TEST_F(ChessGameControlTest, AHintIsAskedForAndReadBack) {
+        const auto engine = Analyser(kPawnUp, Mv("d2d4"));
+        CountingAnalysisFactory factory{engine};
+        analyst.SetEngineFactory(factory.AsFactory());
+
+        const uint64_t before = control.GetStateVersion();
+        AnalyseWith(std::nullopt, true);
+        EXPECT_GT(control.GetStateVersion(), before) << "a hint asked moves the version";
+        EXPECT_EQ(GetJsonBool(AnalysisOfState(), "hintRequested"), true);
+        EXPECT_TRUE(AnalysisMember("hint").is_null()) << "null until the answer for this very position has come";
+
+        const uint64_t asked = control.GetStateVersion();
+        ASSERT_TRUE(FrameUntil([&] { return !AnalysisMember("hint").is_null(); }));
+        EXPECT_GT(control.GetStateVersion(), asked) << "a hint that arrives moves the version";
+
+        const Json hint = AnalysisMember("hint");
+        EXPECT_EQ(StringMember(hint, "move"), "d2d4");
+        EXPECT_EQ(StringMember(hint, "text"), "+0.35");
+        EXPECT_EQ(GetJsonInt(hint, "depth"), 7);
+        EXPECT_TRUE(AnalysisMember("evaluation").is_null()) << "the evaluation is off: the search had a score, but it is not shown";
+        EXPECT_EQ(GetJsonBool(AnalysisOfState(), "evaluationOn"), false);
+
+        const eastl::vector<eastl::string> moves = ActionMoves();
+        EXPECT_NE(eastl::find(moves.begin(), moves.end(), "d2d4"), moves.end()) << "the hint is one of the listed actions";
+    }
+
+    TEST_F(ChessGameControlTest, AHintAndTheEvaluationAreOneSearch) {
+        const auto engine = Analyser(kPawnUp, Mv("d2d4"));
+        CountingAnalysisFactory factory{engine};
+        analyst.SetEngineFactory(factory.AsFactory());
+
+        AnalyseWith(true, true);
+        ASSERT_TRUE(FrameUntil([&] { return !AnalysisMember("hint").is_null() && !AnalysisMember("evaluation").is_null(); }));
+        Frames();
+        EXPECT_EQ(engine->Calls(), 1);
+    }
+
+    TEST_F(ChessGameControlTest, AMoveDropsTheHintAndTheVersionMovesWithIt) {
+        const auto engine = Analyser(kPawnUp, Mv("d2d4"));
+        CountingAnalysisFactory factory{engine};
+        analyst.SetEngineFactory(factory.AsFactory());
+        AnalyseWith(std::nullopt, true);
+        ASSERT_TRUE(FrameUntil([&] { return !AnalysisMember("hint").is_null(); }));
+
+        const uint64_t before = control.GetStateVersion();
+        Perform("e2e4");
+
+        EXPECT_GT(control.GetStateVersion(), before);
+        EXPECT_TRUE(AnalysisMember("hint").is_null()) << "at once, with no frame between";
+        EXPECT_EQ(GetJsonBool(AnalysisOfState(), "hintRequested"), false);
+        const int calls = engine->Calls();
+        Frames();
+        EXPECT_EQ(engine->Calls(), calls) << "the hint is not asked for again by itself";
+        EXPECT_TRUE(AnalysisMember("hint").is_null());
+    }
+
+    TEST_F(ChessGameControlTest, ResetAndSetPositionDropTheHint) {
+        const auto engine = Analyser(kPawnUp, Mv("d2d4"));
+        CountingAnalysisFactory factory{engine};
+        analyst.SetEngineFactory(factory.AsFactory());
+
+        AnalyseWith(std::nullopt, true);
+        ASSERT_TRUE(FrameUntil([&] { return !AnalysisMember("hint").is_null(); }));
+        ASSERT_TRUE(control.Reset(Json::object()).has_value());
+        EXPECT_TRUE(AnalysisMember("hint").is_null());
+        EXPECT_EQ(GetJsonBool(AnalysisOfState(), "hintRequested"), false);
+
+        AnalyseWith(std::nullopt, true);
+        ASSERT_TRUE(FrameUntil([&] { return !AnalysisMember("hint").is_null(); }));
+        SetFen(kMateInOneFen);
+        EXPECT_TRUE(AnalysisMember("hint").is_null());
+        EXPECT_EQ(GetJsonBool(AnalysisOfState(), "hintRequested"), false);
+    }
+
+    TEST_F(ChessGameControlTest, HintFalseDropsTheHint) {
+        const auto engine = Analyser(kPawnUp, Mv("d2d4"));
+        CountingAnalysisFactory factory{engine};
+        analyst.SetEngineFactory(factory.AsFactory());
+        AnalyseWith(std::nullopt, true);
+        ASSERT_TRUE(FrameUntil([&] { return !AnalysisMember("hint").is_null(); }));
+
+        const uint64_t before = control.GetStateVersion();
+        AnalyseWith(std::nullopt, false);
+
+        EXPECT_TRUE(AnalysisMember("hint").is_null());
+        EXPECT_EQ(GetJsonBool(AnalysisOfState(), "hintRequested"), false);
+        EXPECT_GT(control.GetStateVersion(), before);
+    }
+
+    TEST_F(ChessGameControlTest, AHintOnTheProgramsTurnIsNotYourTurnAndChangesNothing) {
+        CountingFactory opponents({eastl::make_shared<InstantEngine>()});
+        opponent.SetEngineFactory(opponents.AsFactory());
+        const auto engine = Analyser();
+        CountingAnalysisFactory factory{engine};
+        analyst.SetEngineFactory(factory.AsFactory());
+
+        SetOpponent(OpponentRequest("black"));  // the person has White
+        const std::string before = AnalysisSnapshot();
+        Perform("e2e4");  // Black, the program's, is to move
+        const std::string moved = AnalysisSnapshot();
+
+        // evaluation: true next to the refused hint is not applied either
+        EXPECT_EQ(SetStateError(AnalysisRequest(true, true)), "not_your_turn");
+        EXPECT_EQ(AnalysisSnapshot(), moved);
+        EXPECT_EQ(GetJsonBool(AnalysisOfState(), "evaluationOn"), false);
+        EXPECT_EQ(GetJsonBool(AnalysisOfState(), "hintRequested"), false);
+        Frames();
+        EXPECT_EQ(factory.Calls(), 0) << "the engine is never asked";
+        EXPECT_EQ(engine->Calls(), 0);
+        EXPECT_NE(before, moved);
+    }
+
+    TEST_F(ChessGameControlTest, EitherSideMayAskForAHintInAGameOfTwoPeople) {
+        const auto engine = Analyser(kPawnUp, Mv("e7e5"));
+        CountingAnalysisFactory factory{engine};
+        analyst.SetEngineFactory(factory.AsFactory());
+
+        Perform("e2e4");  // Black to move
+        AnalyseWith(std::nullopt, true);
+        ASSERT_TRUE(FrameUntil([&] { return !AnalysisMember("hint").is_null(); }));
+        EXPECT_EQ(StringMember(AnalysisMember("hint"), "move"), "e7e5");
+    }
+
+    TEST_F(ChessGameControlTest, AHintForThePersonsTurnIsAnsweredWhileTheProgramPlaysTheOtherSide) {
+        CountingFactory opponents({eastl::make_shared<InstantEngine>()});
+        opponent.SetEngineFactory(opponents.AsFactory());
+        const auto engine = Analyser(kPawnUp, Mv("d2d4"));
+        CountingAnalysisFactory factory{engine};
+        analyst.SetEngineFactory(factory.AsFactory());
+
+        SetOpponent(OpponentRequest("black"));
+        AnalyseWith(std::nullopt, true);  // White, the person's, is to move
+        ASSERT_TRUE(FrameUntil([&] { return !AnalysisMember("hint").is_null(); }));
+        EXPECT_EQ(StringMember(AnalysisMember("hint"), "move"), "d2d4");
+    }
+
+    TEST_F(ChessGameControlTest, AHintOnAFinishedGameIsGameOver) {
+        const auto engine = Analyser();
+        CountingAnalysisFactory factory{engine};
+        analyst.SetEngineFactory(factory.AsFactory());
+        SetFen(kMateInOneFen);
+        Perform("a1a8");
+        ASSERT_TRUE(model.IsGameOver());
+
+        const std::string before = AnalysisSnapshot();
+        EXPECT_EQ(SetStateError(AnalysisRequest(true, true)), "game_over");
+        EXPECT_EQ(AnalysisSnapshot(), before) << "nothing changed, the evaluation switch of the same call included";
+        Frames();
+        EXPECT_EQ(factory.Calls(), 0);
+
+        // The evaluation alone may be switched on for a finished game; it analyses nothing
+        AnalyseWith(true);
+        Frames();
+        EXPECT_EQ(factory.Calls(), 0);
+        EXPECT_TRUE(AnalysisMember("evaluation").is_null());
+    }
+
+    TEST_F(ChessGameControlTest, AnalysisCannotBeCombinedWithAFenOrAnOpponent) {
+        const auto engine = Analyser();
+        CountingAnalysisFactory factory{engine};
+        analyst.SetEngineFactory(factory.AsFactory());
+        const std::string before = AnalysisSnapshot();
+        const std::string fenBefore = StringMember(State(), "fen");
+
+        Json withFen = AnalysisRequest(true, true);
+        withFen["fen"] = MakeJsonString(kMateInOneFen);
+        EXPECT_EQ(SetStateError(withFen), "invalid_params");
+
+        Json withOpponent = AnalysisRequest(true, std::nullopt);
+        withOpponent["opponent"] = Json::object();
+        EXPECT_EQ(SetStateError(withOpponent), "invalid_params");
+
+        EXPECT_EQ(AnalysisSnapshot(), before);
+        EXPECT_EQ(StringMember(State(), "fen"), fenBefore) << "the position is not replaced";
+    }
+
+    TEST_F(ChessGameControlTest, BadAnalysisRequestsAreInvalidParamsAndChangeNothing) {
+        const auto engine = Analyser();
+        CountingAnalysisFactory factory{engine};
+        analyst.SetEngineFactory(factory.AsFactory());
+        const std::string before = AnalysisSnapshot();
+
+        const auto request = [](const Json& analysis) {
+            Json state = Json::object();
+            state["analysis"] = analysis;
+            return state;
+        };
+        Json wrongHint = Json::object();
+        wrongHint["evaluation"] = true;
+        wrongHint["hint"] = "yes";
+        Json wrongEvaluation = Json::object();
+        wrongEvaluation["evaluation"] = 1;
+        Json nullEvaluation = Json::object();
+        nullEvaluation["evaluation"] = Json();
+        Json unknown = Json::object();
+        unknown["evaluation"] = true;
+        unknown["hnt"] = true;
+
+        for (const Json& analysis : {wrongHint, wrongEvaluation, nullEvaluation, unknown, Json(5), Json("on"), Json(), Json::array(), Json(true)}) {
+            EXPECT_EQ(SetStateError(request(analysis)), "invalid_params") << analysis.dump();
+            EXPECT_EQ(AnalysisSnapshot(), before) << analysis.dump();
+        }
+        EXPECT_EQ(GetJsonBool(AnalysisOfState(), "evaluationOn"), false) << "the valid half of a refused call is not applied";
+        Frames();
+        EXPECT_EQ(factory.Calls(), 0);
+    }
+
+    TEST_F(ChessGameControlTest, AnEmptyAnalysisObjectChangesNothing) {
+        const std::string before = AnalysisSnapshot();
+        const auto result = control.SetState(AnalysisRequest(std::nullopt, std::nullopt));
+        EXPECT_TRUE(result.has_value());
+        EXPECT_EQ(AnalysisSnapshot(), before);
+    }
+
+    TEST_F(ChessGameControlTest, TheAnalysisIsThinkingWhileItsEngineSearches) {
+        const auto engine = eastl::make_shared<AnalysingEngine>(kPawnUp, std::nullopt, 7);
+        engine->Gate(true);
+        CountingAnalysisFactory factory{engine};
+        analyst.SetEngineFactory(factory.AsFactory());
+
+        AnalyseWith(true);
+        ASSERT_TRUE(FrameUntil([&] { return engine->Calls() == 1; }));
+        EXPECT_EQ(GetJsonBool(AnalysisOfState(), "thinking"), true);
+        EXPECT_TRUE(AnalysisMember("evaluation").is_null());
+
+        engine->Open();
+        ASSERT_TRUE(FrameUntil([&] { return !AnalysisMember("evaluation").is_null(); }));
+        EXPECT_EQ(GetJsonBool(AnalysisOfState(), "thinking"), false);
+    }
+
+    TEST_F(ChessGameControlTest, AFailingEngineShowsAsAnErrorWithItsKind) {
+        const auto engine = Analyser();
+        engine->FailWith(EngineError{EngineErrorKind::ProcessDied, "the engine died"});
+        CountingAnalysisFactory factory{engine};
+        analyst.SetEngineFactory(factory.AsFactory());
+
+        AnalyseWith(true);
+        ASSERT_TRUE(FrameUntil([&] { return !AnalysisMember("error").is_null(); }));
+        const Json error = AnalysisMember("error");
+        EXPECT_EQ(StringMember(error, "kind"), "process_died");
+        EXPECT_EQ(StringMember(error, "detail"), "the engine died");
+        EXPECT_TRUE(AnalysisMember("evaluation").is_null());
+        EXPECT_TRUE(OpponentMember("error").is_null()) << "the error of the analysis is not the opponent's";
+        Frames();
+        EXPECT_EQ(engine->Calls(), 1) << "one error, not a try per frame";
+
+        AnalyseWith(false);  // else the engine is asked about the next position and fails again, which is the right thing
+        Perform("e2e4");
+        Frames(1);
+        EXPECT_TRUE(AnalysisMember("error").is_null()) << "an error goes with the next position";
+    }
+
+    TEST_F(ChessGameControlTest, AFactoryThatCannotMakeTheEngineIsAnError) {
+        CountingAnalysisFactory factory(EngineError{EngineErrorKind::LaunchFailed, "no Stockfish"});
+        analyst.SetEngineFactory(factory.AsFactory());
+
+        AnalyseWith(std::nullopt, true);
+        ASSERT_TRUE(FrameUntil([&] { return !AnalysisMember("error").is_null(); }));
+        EXPECT_EQ(StringMember(AnalysisMember("error"), "kind"), "launch_failed");
+        EXPECT_TRUE(AnalysisMember("hint").is_null());
+        EXPECT_EQ(factory.Calls(), 1);
+    }
+
+    TEST_F(ChessGameControlTest, ChangingTheEngineDropsTheOldEnginesAnswerAtOnce) {
+        const auto stockfish = Analyser({AnalysisScoreKind::Centipawns, 35});
+        const auto own = Analyser({AnalysisScoreKind::Centipawns, 80});
+        CountingAnalysisFactory factory{stockfish, own};
+        analyst.SetEngineFactory(factory.AsFactory());
+        AnalyseWith(true);
+        ASSERT_TRUE(FrameUntil([&] { return !AnalysisMember("evaluation").is_null(); }));
+        ASSERT_EQ(StringMember(AnalysisMember("evaluation"), "text"), "+0.35");
+
+        // Nobody plays, so the pick needs no engine for the opponent; no frame runs between the pick and the read
+        SetOpponent(EngineRequest("own"));
+
+        EXPECT_TRUE(AnalysisMember("evaluation").is_null()) << "the answer of the other engine is not shown for the same position";
+        ASSERT_TRUE(FrameUntil([&] { return !AnalysisMember("evaluation").is_null(); }));
+        EXPECT_EQ(StringMember(AnalysisMember("evaluation"), "text"), "+0.80");
+        ASSERT_EQ(factory.Calls(), 2);
+        EXPECT_EQ(factory.Engines()[1], "own");
+    }
+
+    TEST_F(ChessGameControlTest, AnErrorOfTheOldEngineGoesWithThePick) {
+        const auto stockfish = Analyser();
+        stockfish->FailWith(EngineError{EngineErrorKind::Timeout, "slow"});
+        CountingAnalysisFactory factory{stockfish, Analyser({AnalysisScoreKind::Centipawns, 80})};
+        analyst.SetEngineFactory(factory.AsFactory());
+        AnalyseWith(true);
+        ASSERT_TRUE(FrameUntil([&] { return !AnalysisMember("error").is_null(); }));
+
+        SetOpponent(EngineRequest("own"));
+        EXPECT_TRUE(AnalysisMember("error").is_null());
+        ASSERT_TRUE(FrameUntil([&] { return !AnalysisMember("evaluation").is_null(); }));
+    }
+
+    TEST_F(ChessGameControlTest, TheAnalysisDoesNotChangeTheListOfActions) {
+        const auto engine = Analyser(kPawnUp, Mv("d2d4"));
+        CountingAnalysisFactory factory{engine};
+        analyst.SetEngineFactory(factory.AsFactory());
+        const eastl::vector<eastl::string> before = ActionMoves();
+
+        AnalyseWith(true, true);
+        ASSERT_TRUE(FrameUntil([&] { return !AnalysisMember("hint").is_null(); }));
+        EXPECT_EQ(ActionMoves(), before);
+        EXPECT_EQ(Actions().size(), 20u);
+    }
+
+    TEST_F(ChessGameControlTest, TheVersionNeverGoesBackWhileTheAnalysisRuns) {
+        const auto engine = Analyser(kPawnUp, Mv("d2d4"));
+        CountingAnalysisFactory factory{engine};
+        analyst.SetEngineFactory(factory.AsFactory());
+
+        uint64_t last = control.GetStateVersion();
+        const auto expectNoDrop = [&] {
+            const uint64_t now = control.GetStateVersion();
+            EXPECT_GE(now, last);
+            last = now;
+        };
+        AnalyseWith(true, true);
+        expectNoDrop();
+        ASSERT_TRUE(FrameUntil([&] {
+            expectNoDrop();
+            return !AnalysisMember("hint").is_null();
+        }));
+        Perform("e2e4");
+        expectNoDrop();
+        AnalyseWith(false, false);
+        expectNoDrop();
+        ASSERT_TRUE(control.Reset(Json::object()).has_value());
+        expectNoDrop();
+    }
+
+    TEST_F(ChessGameControlTest, SetStateNamesAnalysisAmongTheNeededMembers) {
+        const auto result = control.SetState(Json::object());
+        ASSERT_FALSE(result.has_value());
+        EXPECT_EQ(ErrorCodeOf(result.error()), "invalid_params");
+        EXPECT_NE(std::string(result.error().message.c_str()).find("analysis"), std::string::npos);
     }
 
 }  // namespace BECore::Chess::Tests

@@ -10,6 +10,9 @@ namespace BECore::Chess {
     /// for Own (which cannot fail); a test gives a double
     using EngineFactory = eastl::function<std::expected<eastl::shared_ptr<IChessEngine>, EngineError>(OpponentEngine, const OpponentLevel&)>;
 
+    /// Why no Stockfish was found: names the path that was tried when @p path is not empty, else the three places that are looked at. Shared with the analysis (PositionAnalyst)
+    [[nodiscard]] eastl::string NoStockfishDetail(const eastl::string& path);
+
     /**
      * @brief The seat of the computer opponent: which side the program plays (or none), which engine, at which strength, and the EngineOpponent behind that choice.
      *
@@ -41,7 +44,7 @@ namespace BECore::Chess {
      * whose engine ignores its CancellationToken keeps that engine alive on the pool until it returns. Call Shutdown() (or destroy the controller) before
      * TaskManager::Shutdown().
      *
-     * This class and EngineOpponent are the only ones of Engine/ that log.
+     * This class, EngineOpponent and PositionAnalyst are the only ones of Engine/ that log.
      */
     class OpponentController {
     public:
@@ -61,6 +64,11 @@ namespace BECore::Chess {
 
         /// Where the default factory looks for Stockfish; read at the next pick, an opponent that already plays keeps its engine
         void SetSettings(OpponentSettings settings);
+
+        /// The settings the controller holds (SetSettings); the analysis reads them at the time of its search, so the ones `ChessGame::Start()` loads are seen
+        [[nodiscard]] const OpponentSettings& GetSettings() const noexcept {
+            return _settings;
+        }
 
         /// The factory that makes the engine at a pick, asked for (engine, level); an empty one puts the default back (the Stockfish of the settings, the OwnEngine, each under the handicap of the
         /// level: WithHandicap; a factory given here is never wrapped)

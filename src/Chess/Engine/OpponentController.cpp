@@ -5,19 +5,19 @@
 
 namespace BECore::Chess {
 
-    namespace {
-
-        /// Why no Stockfish was found; names the path that was tried when the settings gave one, else the three places that are looked at
-        eastl::string NoStockfishDetail(const eastl::string& path) {
-            if (!path.empty()) {
-                return Format(
-                    "no Stockfish file at '{}' (stockfishPath in config/ChessSettings.local.xml or ChessSettings.xml): the path is used as written, '~' and environment variables are not expanded, "
-                    "a relative path is taken from the working directory",
-                    path);
-            }
-            return "no Stockfish found: put its path in stockfishPath of config/ChessSettings.local.xml, or set the environment variable STOCKFISH to it (when it is set it must name a file, "
-                   "there is no fallback), or put stockfish on PATH. The game does not ship Stockfish; install it yourself";
+    /// Why no Stockfish was found; names the path that was tried when the settings gave one, else the three places that are looked at
+    eastl::string NoStockfishDetail(const eastl::string& path) {
+        if (!path.empty()) {
+            return Format(
+                "no Stockfish file at '{}' (stockfishPath in config/ChessSettings.local.xml or ChessSettings.xml): the path is used as written, '~' and environment variables are not expanded, "
+                "a relative path is taken from the working directory",
+                path);
         }
+        return "no Stockfish found: put its path in stockfishPath of config/ChessSettings.local.xml, or set the environment variable STOCKFISH to it (when it is set it must name a file, "
+               "there is no fallback), or put stockfish on PATH. The game does not ship Stockfish; install it yourself";
+    }
+
+    namespace {
 
         /// The default factory: a UciEngine over the Stockfish that FindStockfish() finds for the settings, with the Skill Level of the level, under the handicap of the level (WithHandicap)
         std::expected<eastl::shared_ptr<IChessEngine>, EngineError> MakeStockfishEngine(const OpponentSettings& settings, const OpponentLevel& level) {

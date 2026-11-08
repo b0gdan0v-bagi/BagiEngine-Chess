@@ -20,6 +20,10 @@ namespace BECore::Chess {
         return {AnalysisScoreKind::Mate, searchScore < 0 ? -moves : moves};
     }
 
+    AnalysisScore ScoreForWhite(const AnalysisScore& score, PieceColor sideToMove) noexcept {
+        return {score.kind, sideToMove == PieceColor::White ? score.value : -score.value};
+    }
+
     eastl::string ScoreText(const AnalysisScore& score) {
         switch (score.kind) {
             case AnalysisScoreKind::Mate:

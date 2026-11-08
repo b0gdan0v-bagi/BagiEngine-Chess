@@ -55,6 +55,14 @@ namespace BECore::Chess {
     [[nodiscard]] AnalysisScore ScoreFromSearch(int searchScore) noexcept;
 
     /**
+     * @brief @p score (from the side to move's view) as White sees it: unchanged when White is to move, the sign of `value` flipped when Black is.
+     *
+     * The kind is kept (a mate stays a mate, in the same number of moves). It is the score a display with one fixed side wants (an evaluation bar), where
+     * the analysis itself speaks from the side to move. Applying it twice for the same side is the identity.
+     */
+    [[nodiscard]] AnalysisScore ScoreForWhite(const AnalysisScore& score, PieceColor sideToMove) noexcept;
+
+    /**
      * @brief A stable text of @p score for the log and the control API: "+0.35", "-1.20", "0.00", "#3", "#-2".
      *
      * Centipawns are shown as pawns with two decimals and a sign (none for zero); a centipawn is already a hundredth, so nothing is rounded.

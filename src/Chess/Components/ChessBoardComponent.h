@@ -46,10 +46,14 @@ namespace BECore::Chess {
      * program or of the control API closes it too). The actions are `ChessPromote` (`value` is an id of PromotionChoices: "queen", "rook", "bishop", "knight"; an id in no table is ignored with one
      * warning) and `ChessCancelPromotion` (drops the choice, the pawn stays selected).
      *
-     * It is also the frame of the computer opponent: IGame has no per-frame hook, so on every SceneUpdateEvent it runs
-     * ChessGame::GetOpponent().Update() (the one place that does; it changes the model, so it cannot be done in OnDraw()). While the program plays the side to move,
-     * a click on the board does nothing: a half-made move of the person would only cancel the program's own search. After the game has ended a click still starts
-     * the next one. The result of a game is logged once, whoever ended it.
+     * It is also the frame of the computer opponent and of the analysis: IGame has no per-frame hook, so on every SceneUpdateEvent it runs
+     * ChessGame::GetOpponent().Update() and ChessGame::GetAnalyst().Update() (the one place that does either; the first changes the model, so neither can be done in OnDraw()). While the program plays
+     * the side to move, a click on the board does nothing: a half-made move of the person would only cancel the program's own search. After the game has ended a click still starts the next one. The
+     * result of a game is logged once, whoever ended it.
+     *
+     * The hint (PositionAnalyst::GetHint()) is drawn here too: when the analyst holds a hint for the position on the board, the two squares of its move are filled, after the check and before the
+     * selection (so a selection and its legal moves stay readable on top), through the same SquareToPixel(). Nothing is played; the hint is bound to the version of the model, so a move, a reset
+     * or a position set from outside takes it away at the next frame, and a finished game shows none.
      *
      * The board is drawn from White's side, and from Black's side (turned by 180 degrees) while the program plays White, so the person who plays Black sees their own pieces at the bottom.
      * The pieces, the highlights and the clicks all go through SquareToPixel() / OnMouseDown() and BoardOrientation.h; only the geometry turns, the model and the control API do not.

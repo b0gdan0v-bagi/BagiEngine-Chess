@@ -111,6 +111,41 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(ScoreText(ScoreFromSearch(-MateIn(2))), "#-1");
     }
 
+    TEST(AnalysisTest, WhiteToMoveKeepsTheScoreAsItIs) {
+        EXPECT_EQ(ScoreForWhite(Cp(35), PieceColor::White), Cp(35));
+        EXPECT_EQ(ScoreForWhite(Cp(-120), PieceColor::White), Cp(-120));
+        EXPECT_EQ(ScoreForWhite(Mate(3), PieceColor::White), Mate(3));
+        EXPECT_EQ(ScoreForWhite(Mate(-2), PieceColor::White), Mate(-2));
+    }
+
+    TEST(AnalysisTest, BlackToMoveFlipsTheSignAndKeepsTheKind) {
+        EXPECT_EQ(ScoreForWhite(Cp(35), PieceColor::Black), Cp(-35));
+        EXPECT_EQ(ScoreForWhite(Cp(-120), PieceColor::Black), Cp(120));
+        EXPECT_EQ(ScoreForWhite(Mate(3), PieceColor::Black), Mate(-3)) << "Black mates in 3: bad for White";
+        EXPECT_EQ(ScoreForWhite(Mate(-2), PieceColor::Black), Mate(2)) << "Black is mated in 2: good for White";
+        EXPECT_EQ(ScoreForWhite(Mate(1), PieceColor::Black).kind, AnalysisScoreKind::Mate);
+        EXPECT_EQ(ScoreForWhite(Cp(1), PieceColor::Black).kind, AnalysisScoreKind::Centipawns);
+    }
+
+    TEST(AnalysisTest, ZeroStaysZeroForBothColors) {
+        EXPECT_EQ(ScoreForWhite(Cp(0), PieceColor::White), Cp(0));
+        EXPECT_EQ(ScoreForWhite(Cp(0), PieceColor::Black), Cp(0));
+        EXPECT_EQ(ScoreText(ScoreForWhite(Cp(0), PieceColor::Black)), "0.00") << "no negative zero";
+    }
+
+    TEST(AnalysisTest, TurningTheScoreTwiceForTheSameColorIsTheIdentity) {
+        for (const PieceColor color : {PieceColor::White, PieceColor::Black}) {
+            for (const AnalysisScore score : {Cp(0), Cp(35), Cp(-120), Mate(1), Mate(-4)}) {
+                EXPECT_EQ(ScoreForWhite(ScoreForWhite(score, color), color), score);
+            }
+        }
+    }
+
+    TEST(AnalysisTest, TheTextOfAScoreForWhiteFollowsTheSign) {
+        EXPECT_EQ(ScoreText(ScoreForWhite(Cp(35), PieceColor::Black)), "-0.35");
+        EXPECT_EQ(ScoreText(ScoreForWhite(Mate(2), PieceColor::Black)), "#-2");
+    }
+
     TEST(AnalysisTest, TheBestLineIsTheFirstOne) {
         Analysis analysis;
         analysis.lines.push_back(AnalysisLine{Mv("e2e4"), Cp(30), 12});
