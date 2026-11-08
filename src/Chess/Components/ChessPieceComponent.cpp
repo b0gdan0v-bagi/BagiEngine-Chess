@@ -59,7 +59,7 @@ namespace BECore::Chess {
         Observe(*model, cur, event.deltaTime);
 
         // The square drawn: the one the slide leaves while a slide runs (a captured piece waits there), else where the model has the piece.
-        const Square shown = _sliding ? _slideFrom : cur;
+        const Square shown = IsSliding() ? _slideFrom : cur;
         if (!shown.IsInside()) {
             transform->_x = kHiddenX;
             transform->_y = kHiddenY;
@@ -69,7 +69,7 @@ namespace BECore::Chess {
         float px = 0.0f;
         float py = 0.0f;
         board->SquareToPixel(shown.file, shown.rank, px, py);
-        if (_sliding && _slideTo.IsInside()) {
+        if (IsSliding() && _slideTo.IsInside()) {
             // The pixels of both squares are taken now, so a turn of the board during the slide cannot leave the piece in a wrong place.
             float toX = 0.0f;
             float toY = 0.0f;
@@ -84,7 +84,7 @@ namespace BECore::Chess {
         transform->_height = size;
 
         // A promotion shows when the slide ends, not while the pawn is still on its way.
-        if (!_sliding && cur.IsInside()) {
+        if (!IsSliding() && cur.IsInside()) {
             ShowPieceType(model->GetPieceOf(this));
         }
     }
@@ -93,12 +93,12 @@ namespace BECore::Chess {
         const size_t moves = model.GetMoves().size();
         const bool sameGame = _seen && model.GetStartFen() == _seenStartFen;
         const bool unchanged = sameGame && moves == _seenMoves && current == _lastSquare;
-        const bool played = sameGame && moves == _seenMoves + 1;
+        // One move is one more of both numbers: a reset adds a version too, so a reset and moves between two frames are not taken for one move.
+        const bool played = sameGame && moves == _seenMoves + 1 && model.GetVersion() == _seenVersion + 1;
 
-        if (!unchanged) {
-            if (played && current == _lastSquare) {
-                // A move of another piece: a slide of this one under way goes on.
-            } else if (played && deltaTime > 0.0f && _slideDuration > 0.0f && _lastSquare.IsInside()) {
+        // A move of another piece (played, this piece on its square) leaves a slide of this one under way alone.
+        if (!unchanged && !(played && current == _lastSquare)) {
+            if (played && deltaTime > 0.0f && _slideDuration > 0.0f && _lastSquare.IsInside()) {
                 StartSlide(_lastSquare, current);
             } else {
                 // The first sighting, a reset, a new position, a frame with no time, a count that fell: at once.
@@ -109,6 +109,7 @@ namespace BECore::Chess {
         _seen = true;
         _lastSquare = current;
         _seenMoves = moves;
+        _seenVersion = model.GetVersion();
         if (!sameGame) {
             _seenStartFen = model.GetStartFen();
         }
@@ -118,15 +119,16 @@ namespace BECore::Chess {
         _slideFrom = from;
         _slideTo = to;
         _slideProgress = 0.0f;
-        _sliding = true;
         // The tween first moves in the next frame (stage 2b), so this frame still draws the old square. A new slide replaces the one under way.
-        _slide.Reset(CoreManager::GetTweens().Start<float>(
-            0.0f, 1.0f, {.duration = _slideDuration, .ease = EaseType::QuadOut}, [this](const float& progress) { _slideProgress = progress; }, [this]() { _sliding = false; }));
+        _slide.Reset(CoreManager::GetTweens().Start<float>(0.0f, 1.0f, {.duration = _slideDuration, .ease = EaseType::QuadOut}, [this](const float& progress) { _slideProgress = progress; }));
     }
 
     void ChessPieceComponent::EndSlide() {
         _slide.Reset();
-        _sliding = false;
+    }
+
+    bool ChessPieceComponent::IsSliding() const {
+        return _slide.Get() && !_slide.Get()->IsFinished();
     }
 
     void ChessPieceComponent::ForgetSeen() {

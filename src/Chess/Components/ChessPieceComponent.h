@@ -50,6 +50,8 @@ namespace BECore::Chess {
     public:
         /// The slide time of a piece in seconds when the scene does not say.
         static constexpr float kDefaultSlideDuration = 0.15f;
+        /// The square of a piece that is not on the board (as the model reports a captured piece).
+        static constexpr Square kOffBoard{-1, -1};
 
         ChessPieceComponent() = default;
         ~ChessPieceComponent() override;
@@ -73,19 +75,22 @@ namespace BECore::Chess {
         /// Forgets what was seen, so the next sighting places the piece at once.
         void ForgetSeen();
 
+        /// True from the move that started the slide until the tween ends (completes, is replaced or cleared): read from the handle, so a TweenManager::Clear() cannot leave it set.
+        [[nodiscard]] bool IsSliding() const;
+
         bool _registered = false;
         PieceType _shownType = PieceType::None;  ///< Type of the piece the sprite shows now.
 
-        ScopedTween _slide;           ///< The running slide; the destructor cancels it (its setter points at this).
-        bool _sliding = false;        ///< True from the move that started the slide until the tween completes.
-        float _slideProgress = 0.0f;  ///< 0..1, written by the tween.
-        Square _slideFrom{-1, -1};    ///< The square the slide leaves (a captured piece stays here).
-        Square _slideTo{-1, -1};      ///< The square the slide goes to; outside the board for a captured piece.
+        ScopedTween _slide;             ///< The running slide; the destructor cancels it (its setter points at this).
+        float _slideProgress = 0.0f;    ///< 0..1, written by the tween.
+        Square _slideFrom = kOffBoard;  ///< The square the slide leaves (a captured piece stays here).
+        Square _slideTo = kOffBoard;    ///< The square the slide goes to; outside the board for a captured piece.
 
-        bool _seen = false;           ///< True once an update saw the model and the board.
-        Square _lastSquare{-1, -1};   ///< The square the model gave last update (outside the board when captured).
-        size_t _seenMoves = 0;        ///< Number of moves played when seen last.
-        eastl::string _seenStartFen;  ///< Start position of the game when seen last.
+        bool _seen = false;              ///< True once an update saw the model and the board.
+        Square _lastSquare = kOffBoard;  ///< The square the model gave last update (outside the board when captured).
+        size_t _seenMoves = 0;           ///< Number of moves played when seen last.
+        uint64_t _seenVersion = 0;       ///< Version of the model when seen last: a played move is exactly one more.
+        eastl::string _seenStartFen;     ///< Start position of the game when seen last.
     };
 
 }  // namespace BECore::Chess
