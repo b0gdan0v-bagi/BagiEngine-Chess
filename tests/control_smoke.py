@@ -62,6 +62,9 @@ LOCAL_SETTINGS = REPO_ROOT / "config" / "ChessSettings.local.xml"
 FAKE_ENGINE_MOVES = "e7e5,b8c6,g8f6"  # what the fake answers to its 1st, 2nd and 3rd search
 OPPONENT_WAIT_SECONDS = 30.0  # a stall of the machine is not a failure; a program that never answers is
 POLL_SECONDS = 0.01
+SETTLE_FRAMES = 4  # frames of the manual clock after a played move until its slide (0.15 s) is over
+SETTLE_FRAME_SECONDS = 0.1
+SETTLE_SECONDS = 0.5  # game time on the real clock, three times the slide
 FRAMES_WITHOUT_AN_ANSWER = 10
 
 
@@ -230,6 +233,20 @@ def let_frames_pass(client: BagiControlClient, frames: int) -> None:
     deadline = time.monotonic() + OPPONENT_WAIT_SECONDS
     while client.call("status")["frame"] < target:
         check(time.monotonic() < deadline, f"the game did not run {frames} frames in {OPPONENT_WAIT_SECONDS} s")
+        time.sleep(POLL_SECONDS)
+
+
+def let_the_pieces_settle(client: BagiControlClient) -> None:
+    """The pieces of a move that was just played have finished sliding to their squares (ChessPieceComponent, 0.15 s).
+
+    Manual clock: four frames of 0.1 s (the first sees the move, the next ones move the tween). Real clock: until the game time has grown by 0.5 s."""
+    if client.call("status")["manualClock"]:
+        client.call("step", {"frames": SETTLE_FRAMES, "dt": SETTLE_FRAME_SECONDS})
+        return
+    target = client.call("status")["totalTime"] + SETTLE_SECONDS
+    deadline = time.monotonic() + OPPONENT_WAIT_SECONDS
+    while client.call("status")["totalTime"] < target:
+        check(time.monotonic() < deadline, f"the game did not run {SETTLE_SECONDS} s in {OPPONENT_WAIT_SECONDS} s")
         time.sleep(POLL_SECONDS)
 
 
@@ -504,7 +521,7 @@ def check_the_board_turns_with_the_program(client: BagiControlClient) -> None:
     wait_until_the_program_played(client, lambda moves: len(moves) == 1, "the opening move of White")
     fen = client.call("get_state")["state"]["fen"]  # Black to move: the program, as White, does not search again
     check(fen.split()[1] == "b", f"Black is not to move after the opening move of White: {fen}")
-    let_frames_pass(client, 2)
+    let_the_pieces_settle(client)  # the program's own move slides for 0.15 s; the later pictures follow a set_state, which snaps
     rotated = take_screenshot(client)
 
     client.call("set_state", {"opponent": {"plays": None}})
