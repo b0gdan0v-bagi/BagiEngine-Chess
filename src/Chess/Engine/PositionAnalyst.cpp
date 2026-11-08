@@ -58,6 +58,7 @@ namespace BECore::Chess {
         }
         if (_result && _resultEngine != picked) {
             _result.reset();
+            _second.reset();
             ++_revision;
         }
         if (_error && _errorEngine != picked) {
@@ -116,6 +117,7 @@ namespace BECore::Chess {
         }
         if (_result) {
             _result.reset();
+            _second.reset();
             ++_revision;
         }
     }
@@ -144,6 +146,18 @@ namespace BECore::Chess {
             return std::nullopt;
         }
         return _result;
+    }
+
+    eastl::vector<AnalysisLine> PositionAnalyst::GetLines(const ChessGameModel& model) const {
+        eastl::vector<AnalysisLine> lines;
+        if ((!_evaluationOn && !IsHintRequested(model)) || !_result || _resultVersion != model.GetVersion()) {
+            return lines;
+        }
+        lines.push_back(*_result);
+        if (_second) {
+            lines.push_back(*_second);
+        }
+        return lines;
     }
 
     Task<void> PositionAnalyst::RunSearch(eastl::shared_ptr<Search> search, SearchRequest request) {
@@ -184,6 +198,7 @@ namespace BECore::Chess {
             return;
         }
         _result = answer->Best();
+        _second = answer->Second() ? std::optional<AnalysisLine>(*answer->Second()) : std::nullopt;
         _resultVersion = version;
         _resultEngine = engine;
         ++_revision;
@@ -205,6 +220,7 @@ namespace BECore::Chess {
         const uint64_t version = model.GetVersion();
         if (_result && _resultVersion != version) {
             _result.reset();
+            _second.reset();
         }
         if (_hintVersion && *_hintVersion != version) {
             _hintVersion.reset();
@@ -230,7 +246,9 @@ namespace BECore::Chess {
         _searchEngine = picked;
         const SearchLimits limits = LimitsOf(picked, GetOpponentLevels().back());
         // Fire and forget: the task keeps itself alive until it ends, and the answer comes through _search, not through the handle
-        TaskManager::GetInstance().Run(RunSearch(_search, SearchRequest::FromModel(model, limits)));
+        SearchRequest request = SearchRequest::FromModel(model, limits);
+        request.lines = kAnalysisLines;
+        TaskManager::GetInstance().Run(RunSearch(_search, std::move(request)));
     }
 
     void PositionAnalyst::Fail(uint64_t version, OpponentEngine engine, EngineError error) {

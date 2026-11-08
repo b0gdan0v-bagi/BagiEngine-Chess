@@ -526,6 +526,7 @@ def run_analysis_scenario(client: BagiControlClient, headless: bool) -> None:
     analysis = get_analysis(client)
     check(analysis["evaluationOn"] is False and analysis["hintRequested"] is False and analysis["thinking"] is False, f"unexpected default analysis {analysis}")
     check(analysis["evaluation"] is None and analysis["hint"] is None and analysis["error"] is None, f"the default analysis is not empty {analysis}")
+    check(analysis["lines"] == [], f"the default analysis has lines {analysis}")
 
     # A hint is for the person: on the turn of the side the program plays it is refused, and nothing changes. Only the manual clock has no frame between the move and the
     # request, so the program is surely still to answer; on the real clock the own engine may answer first (ChessGameControlTest checks this deterministically)
@@ -563,6 +564,13 @@ def run_analysis_scenario(client: BagiControlClient, headless: bool) -> None:
     check(analysis["evaluation"]["score"] == {"kind": "mate", "value": 1}, f"the evaluation of a mate in one is not mate 1: {analysis['evaluation']}")
     check(analysis["evaluation"]["text"] == "#1", f"unexpected text {analysis['evaluation']}")
     check(analysis["hint"] is None and analysis["hintRequested"] is False, f"a hint is there that nobody asked for: {analysis}")
+    # The two lines come with the evaluation, White's view, best first: the mating move, then another legal move that does not mate in one
+    lines = analysis["lines"]
+    check(len(lines) == 2, f"the evaluation of the mate in one does not come with two lines: {lines}")
+    check(lines[0]["move"] == "a1a8" and lines[0]["score"] == {"kind": "mate", "value": 1} and lines[0]["text"] == "#1", f"unexpected first line {lines[0]}")
+    check(lines[1]["move"] != "a1a8" and lines[1]["score"] != {"kind": "mate", "value": 1} and isinstance(lines[1]["depth"], int), f"unexpected second line {lines[1]}")
+    listed = [action["uci"] for action in client.call("list_actions")["actions"]]
+    check(lines[1]["move"] in listed, f"the second line {lines[1]['move']} is not a listed action")
 
     plain_band = None
     if headless:
@@ -574,6 +582,7 @@ def run_analysis_scenario(client: BagiControlClient, headless: bool) -> None:
     check(client.call("get_state")["version"] > before and get_analysis(client)["hintRequested"] is True, "asking for a hint did not show")
     analysis = wait_for_the_analysis(client, lambda a: a["hint"] is not None, "the hint")
     check(analysis["hint"]["move"] == "a1a8", f"the hint for the mate in one is {analysis['hint']}")
+    check(analysis["lines"][0]["move"] == "a1a8", f"the first line is not the hint: {analysis['lines']}")
     check({"type": "move", "uci": "a1a8"} in client.call("list_actions")["actions"], "the hinted move is not one of the listed actions")
     if headless:
         let_frames_pass(client, 2)

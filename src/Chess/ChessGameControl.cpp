@@ -358,6 +358,18 @@ namespace BECore::Chess {
         } else {
             analysis["hint"] = Json();
         }
+
+        Json lines = Json::array();
+        for (const AnalysisLine& line : _analyst.GetLines(_model)) {
+            const AnalysisScore white = ScoreForWhite(line.score, _model.GetTurn());
+            Json described = Json::object();
+            described["move"] = TextJson(line.move.ToUci());
+            described["score"] = ScoreJson(white);
+            described["text"] = TextJson(ScoreText(white));
+            described["depth"] = line.depth;
+            lines.push_back(std::move(described));
+        }
+        analysis["lines"] = std::move(lines);
         analysis["error"] = ErrorJson(_analyst.GetError());
         return analysis;
     }

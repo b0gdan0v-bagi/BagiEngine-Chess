@@ -1264,7 +1264,7 @@ namespace BECore::Chess::Tests {
         const Json analysis = AnalysisOfState();
 
         ASSERT_TRUE(analysis.is_object());
-        EXPECT_EQ(analysis.size(), 6u) << "evaluationOn, hintRequested, thinking, evaluation, hint, error";
+        EXPECT_EQ(analysis.size(), 7u) << "evaluationOn, hintRequested, thinking, evaluation, hint, lines, error";
         EXPECT_EQ(GetJsonBool(analysis, "evaluationOn"), false) << "the evaluation costs a process and CPU: it is off until asked for";
         EXPECT_EQ(GetJsonBool(analysis, "hintRequested"), false);
         EXPECT_EQ(GetJsonBool(analysis, "thinking"), false);
@@ -1273,6 +1273,95 @@ namespace BECore::Chess::Tests {
             ASSERT_NE(member, nullptr) << key;
             EXPECT_TRUE(member->is_null()) << key;
         }
+    }
+
+    TEST_F(ChessGameControlTest, TheLinesAreEmptyWhileOffAndNothingIsSearchedForThem) {
+        const auto engine = Analyser();
+        CountingAnalysisFactory factory{engine};
+        analyst.SetEngineFactory(factory.AsFactory());
+
+        const Json lines = AnalysisMember("lines");
+        ASSERT_TRUE(lines.is_array());
+        EXPECT_TRUE(lines.empty());
+        Perform("e2e4");
+        Frames();
+        EXPECT_TRUE(AnalysisMember("lines").empty()) << "asking for nothing publishes nothing";
+        EXPECT_EQ(engine->Calls(), 0);
+    }
+
+    TEST_F(ChessGameControlTest, TheLinesAreBestFirstAndFromWhitesView) {
+        const auto engine = Analyser(kPawnUp, Mv("e7e5"));
+        engine->SetSecondLine({AnalysisScoreKind::Mate, 3}, 5);
+        CountingAnalysisFactory factory{engine};
+        analyst.SetEngineFactory(factory.AsFactory());
+
+        AnalyseWith(true);
+        EXPECT_TRUE(AnalysisMember("lines").empty()) << "not computed yet";
+        Perform("e2e4");  // Black to move: both scores are the side to move's, so White sees them turned
+        ASSERT_TRUE(FrameUntil([&] { return !AnalysisMember("lines").empty(); }));
+
+        const Json lines = AnalysisMember("lines");
+        ASSERT_EQ(lines.size(), 2u);
+        EXPECT_EQ(engine->LastRequest().lines, 2) << "the engine is asked for two lines";
+        EXPECT_EQ(StringMember(lines[0], "move"), "e7e5");
+        EXPECT_EQ(StringMember(lines[0], "text"), "-0.35");
+        EXPECT_EQ(GetJsonInt(*FindJsonMember(lines[0], "score"), "value"), -35);
+        EXPECT_EQ(StringMember(*FindJsonMember(lines[0], "score"), "kind"), "centipawns");
+        EXPECT_EQ(GetJsonInt(lines[0], "depth"), 7);
+        EXPECT_NE(StringMember(lines[1], "move"), "e7e5") << "a different move";
+        EXPECT_EQ(StringMember(lines[1], "text"), "#-3");
+        EXPECT_EQ(StringMember(*FindJsonMember(lines[1], "score"), "kind"), "mate");
+        EXPECT_EQ(GetJsonInt(*FindJsonMember(lines[1], "score"), "value"), -3);
+        EXPECT_EQ(GetJsonInt(lines[1], "depth"), 5);
+
+        // the first line is what the evaluation and the hint say (the hint's text stays the side to move's)
+        EXPECT_EQ(StringMember(AnalysisMember("evaluation"), "text"), "-0.35");
+        EXPECT_TRUE(AnalysisMember("hint").is_null()) << "no hint was asked for";
+    }
+
+    TEST_F(ChessGameControlTest, ALineAfterAHintAloneIsPublishedAndItsFirstIsTheHint) {
+        const auto engine = Analyser(kPawnUp, Mv("d2d4"));
+        CountingAnalysisFactory factory{engine};
+        analyst.SetEngineFactory(factory.AsFactory());
+
+        AnalyseWith(std::nullopt, true);
+        ASSERT_TRUE(FrameUntil([&] { return !AnalysisMember("hint").is_null(); }));
+
+        const Json lines = AnalysisMember("lines");
+        ASSERT_EQ(lines.size(), 2u);
+        EXPECT_EQ(StringMember(lines[0], "move"), StringMember(AnalysisMember("hint"), "move"));
+        EXPECT_TRUE(AnalysisMember("evaluation").is_null());
+
+        AnalyseWith(std::nullopt, false);
+        EXPECT_TRUE(AnalysisMember("lines").empty()) << "dropped with the hint, though the answer is still held";
+    }
+
+    TEST_F(ChessGameControlTest, ThePositionWithOneLegalMoveHasOneLine) {
+        const auto engine = Analyser();
+        CountingAnalysisFactory factory{engine};
+        analyst.SetEngineFactory(factory.AsFactory());
+
+        SetFen("7k/8/8/8/8/8/r7/7K w - - 0 1");  // the rook covers g2 and h2: Kg1 is the only legal move
+        ASSERT_EQ(ActionMoves().size(), 1u);
+        AnalyseWith(true);
+        ASSERT_TRUE(FrameUntil([&] { return !AnalysisMember("lines").empty(); }));
+        EXPECT_EQ(AnalysisMember("lines").size(), 1u) << "the engine is asked for two, a second legal move does not exist";
+        EXPECT_EQ(engine->LastRequest().lines, 2);
+    }
+
+    TEST_F(ChessGameControlTest, TheLinesGoWithAMoveAndWithAChangeOfTheEngine) {
+        const auto engine = Analyser();
+        CountingAnalysisFactory factory{engine};
+        analyst.SetEngineFactory(factory.AsFactory());
+        AnalyseWith(true);
+        ASSERT_TRUE(FrameUntil([&] { return !AnalysisMember("lines").empty(); }));
+
+        Perform("e2e4");
+        EXPECT_TRUE(AnalysisMember("lines").empty()) << "at once, with no frame between";
+        ASSERT_TRUE(FrameUntil([&] { return !AnalysisMember("lines").empty(); }));
+
+        SetOpponent(EngineRequest("own"));
+        EXPECT_TRUE(AnalysisMember("lines").empty()) << "the old engine's answer goes at once";
     }
 
     TEST_F(ChessGameControlTest, NothingIsAnalysedUntilAskedFor) {

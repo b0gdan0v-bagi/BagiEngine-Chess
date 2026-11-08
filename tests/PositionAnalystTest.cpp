@@ -621,6 +621,176 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(GetOpponentLevels().back().id, "max");
     }
 
+    TEST_F(PositionAnalystTest, TheSearchAsksForTwoLinesAndKeepsTheSecondNextToTheBestOne) {
+        const auto engine = MakeEngine(kScore, Mv("e2e4"));
+        constexpr AnalysisScore kSecondScore{AnalysisScoreKind::Centipawns, -20};
+        engine->SetSecondLine(kSecondScore, 5);
+        CountingAnalysisFactory factory{engine};
+        ChessGameModel model;
+        PositionAnalyst analyst;
+        analyst.SetEngineFactory(factory.AsFactory());
+        analyst.SetEvaluation(true);
+
+        EXPECT_TRUE(analyst.GetLines(model).empty());
+        ASSERT_TRUE(UpdateUntil(analyst, model, OpponentEngine::Stockfish, [&] { return !analyst.GetLines(model).empty(); })) << DescribeError(analyst.GetError()).c_str();
+
+        EXPECT_EQ(engine->LastRequest().lines, kAnalysisLines);
+        EXPECT_EQ(kAnalysisLines, 2);
+        const eastl::vector<AnalysisLine> lines = analyst.GetLines(model);
+        ASSERT_EQ(lines.size(), 2u);
+        EXPECT_EQ(lines[0].move, Mv("e2e4"));
+        EXPECT_EQ(lines[0].score, kScore);
+        EXPECT_EQ(lines[0].depth, 7);
+        EXPECT_NE(lines[1].move, Mv("e2e4"));
+        EXPECT_TRUE(MoveGenerator::ParseUci(model.GetPosition(), lines[1].move.ToUci()).has_value()) << "a legal move";
+        EXPECT_EQ(lines[1].score, kSecondScore);
+        EXPECT_EQ(lines[1].depth, 5);
+        EXPECT_EQ(analyst.GetEvaluation(model)->move, lines[0].move) << "the evaluation is the best line, as before";
+        EXPECT_EQ(analyst.GetEvaluation(model)->score, kScore);
+    }
+
+    TEST_F(PositionAnalystTest, TheHintIsTheBestLineAndTheLinesNeedTheEvaluationOrAHint) {
+        const auto engine = MakeEngine(kScore, Mv("d2d4"));
+        CountingAnalysisFactory factory{engine};
+        ChessGameModel model;
+        PositionAnalyst analyst;
+        analyst.SetEngineFactory(factory.AsFactory());
+        analyst.SetEvaluation(true);
+        ASSERT_TRUE(analyst.RequestHint(model).has_value());
+        ASSERT_TRUE(UpdateUntil(analyst, model, OpponentEngine::Stockfish, [&] { return analyst.GetHint(model).has_value(); }));
+
+        ASSERT_EQ(analyst.GetLines(model).size(), 2u);
+        EXPECT_EQ(analyst.GetLines(model)[0].move, analyst.GetHint(model)->move);
+
+        analyst.SetEvaluation(false);
+        EXPECT_EQ(analyst.GetLines(model).size(), 2u) << "the hint is still asked for";
+        analyst.CancelHint();
+        EXPECT_TRUE(analyst.GetLines(model).empty()) << "neither the evaluation nor a hint: nothing is published, though the answer is held";
+        analyst.SetEvaluation(true);
+        EXPECT_EQ(analyst.GetLines(model).size(), 2u) << "switching on again is at once";
+        UpdateMany(analyst, model, OpponentEngine::Stockfish);
+        EXPECT_EQ(engine->Calls(), 1) << "no search was made for the second line";
+    }
+
+    TEST_F(PositionAnalystTest, AHintAloneAsksForTwoLinesToo) {
+        const auto engine = MakeEngine(kScore, Mv("d2d4"));
+        CountingAnalysisFactory factory{engine};
+        ChessGameModel model;
+        PositionAnalyst analyst;
+        analyst.SetEngineFactory(factory.AsFactory());
+
+        ASSERT_TRUE(analyst.RequestHint(model).has_value());
+        EXPECT_TRUE(analyst.GetLines(model).empty());
+        ASSERT_TRUE(UpdateUntil(analyst, model, OpponentEngine::Stockfish, [&] { return !analyst.GetLines(model).empty(); }));
+        EXPECT_EQ(analyst.GetLines(model).size(), 2u);
+        EXPECT_FALSE(analyst.GetEvaluation(model).has_value());
+    }
+
+    TEST_F(PositionAnalystTest, AMoveASwitchedEngineAndCancelDropTheLines) {
+        const auto engine = MakeEngine();
+        CountingAnalysisFactory factory{engine};
+        ChessGameModel model;
+        PositionAnalyst analyst;
+        analyst.SetEngineFactory(factory.AsFactory());
+        analyst.SetEvaluation(true);
+        ASSERT_TRUE(UpdateUntil(analyst, model, OpponentEngine::Stockfish, [&] { return !analyst.GetLines(model).empty(); }));
+
+        analyst.SetPicked(OpponentEngine::Own);
+        EXPECT_TRUE(analyst.GetLines(model).empty()) << "another engine: at once";
+        ASSERT_TRUE(UpdateUntil(analyst, model, OpponentEngine::Own, [&] { return !analyst.GetLines(model).empty(); }));
+
+        ASSERT_TRUE(Play(model, "e2e4"));
+        EXPECT_TRUE(analyst.GetLines(model).empty()) << "another position: at once";
+        ASSERT_TRUE(UpdateUntil(analyst, model, OpponentEngine::Own, [&] { return !analyst.GetLines(model).empty(); }));
+
+        analyst.Cancel();
+        EXPECT_TRUE(analyst.GetLines(model).empty());
+    }
+
+    TEST_F(PositionAnalystTest, AStaleAnswerWithTwoLinesIsDropped) {
+        const auto engine = MakeEngine();
+        engine->Gate(false);
+        CountingAnalysisFactory factory{engine};
+        ChessGameModel model;
+        PositionAnalyst analyst;
+        analyst.SetEngineFactory(factory.AsFactory());
+        analyst.SetEvaluation(true);
+        analyst.Update(model, OpponentEngine::Stockfish);
+        ASSERT_TRUE(WaitUntil([&] { return engine->Calls() == 1; }));
+
+        ASSERT_TRUE(Play(model, "e2e4"));
+        analyst.Update(model, OpponentEngine::Stockfish);
+        engine->Open();  // the old worker answers with two lines for the position before the move
+        ASSERT_TRUE(UpdateUntil(analyst, model, OpponentEngine::Stockfish, [&] { return !analyst.GetLines(model).empty(); }));
+
+        const eastl::vector<AnalysisLine> lines = analyst.GetLines(model);
+        ASSERT_EQ(lines.size(), 2u);
+        for (const AnalysisLine& line : lines) {
+            EXPECT_TRUE(MoveGenerator::ParseUci(model.GetPosition(), line.move.ToUci()).has_value()) << "moves of Black, from the new search: " << line.move.ToUci().c_str();
+        }
+        EXPECT_EQ(engine->Calls(), 2);
+    }
+
+    TEST_F(PositionAnalystTest, APositionWithOneLegalMoveHasOneLine) {
+        const auto engine = MakeEngine();
+        CountingAnalysisFactory factory{engine};
+        ChessGameModel model;
+        model.SetPosition(PositionFromFen("7k/8/8/8/8/8/r7/7K w - - 0 1"));  // the rook covers g2 and h2: Kg1 is the only move
+        PositionAnalyst analyst;
+        analyst.SetEngineFactory(factory.AsFactory());
+        analyst.SetEvaluation(true);
+
+        ASSERT_TRUE(UpdateUntil(analyst, model, OpponentEngine::Stockfish, [&] { return !analyst.GetLines(model).empty(); }));
+        ASSERT_EQ(analyst.GetLines(model).size(), 1u);
+        EXPECT_EQ(analyst.GetLines(model)[0].move, Mv("h1g1"));
+        EXPECT_TRUE(analyst.GetEvaluation(model).has_value());
+    }
+
+    TEST_F(PositionAnalystTest, AFailingSearchGivesNoLinesAndOneError) {
+        const auto engine = MakeEngine();
+        engine->FailWith(EngineError{EngineErrorKind::ProcessDied, "gone"});
+        CountingAnalysisFactory factory{engine};
+        ChessGameModel model;
+        PositionAnalyst analyst;
+        analyst.SetEngineFactory(factory.AsFactory());
+        analyst.SetEvaluation(true);
+
+        ASSERT_TRUE(UpdateUntil(analyst, model, OpponentEngine::Stockfish, [&] { return analyst.GetError().has_value(); }));
+        UpdateMany(analyst, model, OpponentEngine::Stockfish);
+        EXPECT_TRUE(analyst.GetLines(model).empty());
+        EXPECT_EQ(engine->Calls(), 1);
+    }
+
+    TEST_F(PositionAnalystTest, TheOwnEngineGivesTwoLinesWithTheMateFirst) {
+        ChessGameModel model;
+        model.SetPosition(PositionFromFen(kMateInOneFen));
+        PositionAnalyst analyst;  // the default factory
+        analyst.SetEvaluation(true);
+
+        ASSERT_TRUE(UpdateUntil(analyst, model, OpponentEngine::Own, [&] { return !analyst.GetLines(model).empty(); })) << DescribeError(analyst.GetError()).c_str();
+
+        const eastl::vector<AnalysisLine> lines = analyst.GetLines(model);
+        ASSERT_EQ(lines.size(), 2u);
+        EXPECT_EQ(lines[0].move, Mv("a1a8"));
+        EXPECT_EQ(lines[0].score, (AnalysisScore{AnalysisScoreKind::Mate, 1}));
+        EXPECT_NE(lines[1].move, lines[0].move);
+        analyst.Shutdown();
+    }
+
+    TEST_F(PositionAnalystTest, ARealStockfishGivesTwoLines) {
+        SKIP_WITHOUT_STOCKFISH(path);
+        ChessGameModel model;
+        PositionAnalyst analyst;  // the default factory: the Stockfish that FindStockfish finds
+        analyst.SetEvaluation(true);
+
+        ASSERT_TRUE(UpdateUntil(analyst, model, OpponentEngine::Stockfish, [&] { return !analyst.GetLines(model).empty() || analyst.GetError().has_value(); }));
+
+        const eastl::vector<AnalysisLine> lines = analyst.GetLines(model);
+        ASSERT_EQ(lines.size(), 2u) << DescribeError(analyst.GetError()).c_str();
+        EXPECT_NE(lines[0].move, lines[1].move);
+        analyst.Shutdown();
+    }
+
     TEST_F(PositionAnalystTest, TheDefaultFactoryMakesTheOwnEngineWithoutAPath) {
         const std::expected<eastl::shared_ptr<IChessEngine>, EngineError> engine = MakeAnalysisEngine(OpponentEngine::Own, OpponentSettings{});
 

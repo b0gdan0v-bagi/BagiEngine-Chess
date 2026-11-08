@@ -48,12 +48,17 @@ namespace BECore::Chess {
      * the starting set is a promoted pawn (it counts in the points and is not a missing pawn), a pawn that promoted into a piece that was missing shows as
      * a pawn gone, and a promoted piece that is taken later shows as a missing pawn.
      *
-     * analysis is {"evaluationOn", "hintRequested", "thinking", "evaluation", "hint", "error"} (the analysis of the position by the engine the person picked, never
+     * analysis is {"evaluationOn", "hintRequested", "thinking", "evaluation", "hint", "lines", "error"} (the analysis of the position by the engine the person picked, never
      * handicapped, at the limits of the strongest level; PositionAnalyst): evaluationOn whether the evaluation is switched on (off at the start of every game), hintRequested
      * whether a hint was asked for the position now on the board (a hint belongs to its position: a move, a reset or a set_state drops the request), thinking whether a search runs.
      * evaluation is null while it is off or not yet computed for this position, else {"score": {"kind": "centipawns"|"mate", "value": int}, "text": "+0.35"|"#3", "depth": int}
      * **from White's view** (value positive: White is better, or White mates; the text is of the same score). hint is null until the answer for this very position has come, else
-     * {"move": "e2e4", "text": .., "depth": ..}: the move, and the score in the view of the side to move (as the engine gave it). error is null or {"kind", "detail"} with the kinds of
+     * {"move": "e2e4", "text": .., "depth": ..}: the move, and the score in the view of the side to move (as the engine gave it). lines is an array, best first, of
+     * {"move": "e2e4", "score": {"kind", "value"}, "text", "depth"} (the engine is asked for two lines): the first is the line of the evaluation and of the hint, the second the next best
+     * move and how the position stands if it is played; a position with one legal move has one line. **The scores are from White's view, as for evaluation** (not the side to move's
+     * as in hint.text), so a consumer that compares the two lines (the margin between the best and the second move) subtracts them and flips the sign for Black. The array is empty
+     * unless the evaluation is on or a hint was asked for this position, and the answer for this very position has come; it goes with the hint (a move, a reset, a set_state, a
+     * change of the engine pick) and nothing starts only to fill it. error is null or {"kind", "detail"} with the kinds of
      * opponent.error; it belongs to the position and the engine, and goes with the next move, the next pick of the engine or a new hint request.
      *
      * Actions: {"type": "move", "uci": "e2e4"}, every legal move once; none once the game is over. The list does not change with the opponent: the program's
