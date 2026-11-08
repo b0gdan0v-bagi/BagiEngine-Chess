@@ -199,6 +199,23 @@ def run_chess_scenario(client: BagiControlClient, headless: bool) -> None:
         check_screenshots(client)
 
 
+def without_squares(image, squares: list, turned: bool = False) -> list:
+    """The rows of a screenshot with the cells of the given squares (White at the bottom, or Black with `turned`) blanked: the board marks the last move on them, which a position set from a FEN does not have."""
+    scale, left, top = view_in_picture(image)
+    rows = [bytearray(row) for row in image.rows]
+    for square in squares:
+        column, rank = ord(square[0]) - ord("a"), int(square[1]) - 1
+        if turned:
+            column, rank = 7 - column, 7 - rank
+        first_x, last_x = int(left + (BOARD_LEFT + column * SQUARE_SIZE) * scale), int(left + (BOARD_LEFT + (column + 1) * SQUARE_SIZE) * scale) + 1
+        first_y, last_y = int(top + (BOARD_TOP + (7 - rank) * SQUARE_SIZE) * scale), int(top + (BOARD_TOP + (8 - rank) * SQUARE_SIZE) * scale) + 1
+        for y in range(max(first_y, 0), min(last_y, image.height)):
+            rows[y][max(first_x, 0) * image.channels : min(last_x, image.width) * image.channels] = bytes(
+                (min(last_x, image.width) - max(first_x, 0)) * image.channels
+            )
+    return rows
+
+
 def run_moves_before_the_first_frame(client: BagiControlClient, headless: bool) -> None:
     """A client that acts at once: the scene registers its pieces in the first frame, after these moves, and has to show them."""
     if not headless:
@@ -208,11 +225,16 @@ def run_moves_before_the_first_frame(client: BagiControlClient, headless: bool) 
     client.call("step", {"frames": 2})
     by_moves = take_screenshot(client)
 
-    # The same position set from outside is drawn the same way, and it is not the opening
+    # The same position set from outside is drawn the same way, and it is not the opening. The board marks the two squares of the last move and a position set from a FEN
+    # has no move, so those two squares are left out of the comparison (the pieces on them are still compared by the neighbours and by the other squares)
     client.call("set_state", {"fen": client.call("get_state")["state"]["fen"]})
     client.call("step", {"frames": 2})
     by_fen = take_screenshot(client)
-    check(by_moves.rows == by_fen.rows, "the scene after moves played before the first frame is not the scene of the same position")
+    marked = [OPENING[-1][:2], OPENING[-1][2:4]]
+    check(
+        without_squares(by_moves, marked) == without_squares(by_fen, marked),
+        "the scene after moves played before the first frame is not the scene of the same position",
+    )
     client.call("reset")
     client.call("step", {"frames": 2})
     check(by_moves.rows != take_screenshot(client).rows, "the scene still shows the opening after four moves")
@@ -627,6 +649,7 @@ def run_analysis_scenario(client: BagiControlClient, headless: bool) -> None:
 # The scene is 840 x 800 units, the board 640 x 640 at y 80..720; the window fits the scene by the smaller scale and centers it
 VIEW_WIDTH, VIEW_HEIGHT = 840, 800
 BOARD_TOP, BOARD_BOTTOM = 80, 720
+BOARD_LEFT, SQUARE_SIZE = 100, 80  # the left edge of the board and the side of a square, in view units
 BOARD_BAND_INSET = 2  # rows kept away from the edge of the board, against rounding
 
 
@@ -667,6 +690,8 @@ def check_the_board_turns_with_the_program(client: BagiControlClient) -> None:
     check(fen.split()[1] == "b", f"Black is not to move after the opening move of White: {fen}")
     let_the_pieces_settle(client)  # the program's own move slides for 0.15 s; the later pictures follow a set_state, which snaps
     rotated = take_screenshot(client)
+    opening = get_moves(client)[0]  # the board marks its two squares, which a position set from a FEN does not have: they are left out of the last comparison
+    marked = [opening[:2], opening[2:4]]
 
     client.call("set_state", {"opponent": {"plays": None}})
     client.call("set_state", {"fen": fen})
@@ -689,7 +714,12 @@ def check_the_board_turns_with_the_program(client: BagiControlClient) -> None:
     client.call("set_state", {"fen": fen})
     client.call("set_state", {"opponent": {"plays": "white"}})
     let_frames_pass(client, 2)
-    check(board_band(take_screenshot(client)) == board_band(rotated), "the board turned again is not the picture it was the first time")
+    turned_again = take_screenshot(client)
+    first, last = board_rows(turned_again)
+    check(
+        without_squares(turned_again, marked, turned=True)[first:last] == without_squares(rotated, marked, turned=True)[first:last],
+        "the board turned again is not the picture it was the first time",
+    )
     client.call("set_state", {"opponent": {"plays": None}})
 
 
