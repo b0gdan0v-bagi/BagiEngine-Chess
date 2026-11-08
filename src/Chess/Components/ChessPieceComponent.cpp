@@ -1,5 +1,8 @@
 #include "ChessPieceComponent.h"
 
+#include <BECore/Animation/Easing.h>
+#include <BECore/Animation/Lerp.h>
+#include <BECore/GameManager/CoreManager.h>
 #include <BECore/Scene/Components/SpriteRendererComponent.h>
 #include <BECore/Scene/Components/TransformComponent.h>
 #include <BECore/Scene/SceneNode.h>
@@ -32,7 +35,7 @@ namespace BECore::Chess {
         SubscribeInScene<SceneEvents::SceneUpdateEvent, &ChessPieceComponent::OnUpdate>(this);
     }
 
-    void ChessPieceComponent::OnUpdate(const SceneEvents::SceneUpdateEvent&) {
+    void ChessPieceComponent::OnUpdate(const SceneEvents::SceneUpdateEvent& event) {
         // Late-register if the model wasn't ready at OnAttached time.
         if (!_registered) {
             RegisterWithModel();
@@ -46,13 +49,18 @@ namespace BECore::Chess {
         }
 
         if (!model || !board) {
+            ForgetSeen();
             transform->_x = kHiddenX;
             transform->_y = kHiddenY;
             return;
         }
 
         const Square cur = model->GetSquareOf(this);
-        if (!cur.IsInside()) {
+        Observe(*model, cur, event.deltaTime);
+
+        // The square drawn: the one the slide leaves while a slide runs (a captured piece waits there), else where the model has the piece.
+        const Square shown = _sliding ? _slideFrom : cur;
+        if (!shown.IsInside()) {
             transform->_x = kHiddenX;
             transform->_y = kHiddenY;
             return;
@@ -60,14 +68,70 @@ namespace BECore::Chess {
 
         float px = 0.0f;
         float py = 0.0f;
-        board->SquareToPixel(cur.file, cur.rank, px, py);
+        board->SquareToPixel(shown.file, shown.rank, px, py);
+        if (_sliding && _slideTo.IsInside()) {
+            // The pixels of both squares are taken now, so a turn of the board during the slide cannot leave the piece in a wrong place.
+            float toX = 0.0f;
+            float toY = 0.0f;
+            board->SquareToPixel(_slideTo.file, _slideTo.rank, toX, toY);
+            px = Lerp(px, toX, _slideProgress);
+            py = Lerp(py, toY, _slideProgress);
+        }
         transform->_x = px;
         transform->_y = py;
         const float size = board->GetSquareSize();
         transform->_width = size;
         transform->_height = size;
 
-        ShowPieceType(model->GetPieceOf(this));
+        // A promotion shows when the slide ends, not while the pawn is still on its way.
+        if (!_sliding && cur.IsInside()) {
+            ShowPieceType(model->GetPieceOf(this));
+        }
+    }
+
+    void ChessPieceComponent::Observe(const ChessGameModel& model, Square current, float deltaTime) {
+        const size_t moves = model.GetMoves().size();
+        const bool sameGame = _seen && model.GetStartFen() == _seenStartFen;
+        const bool unchanged = sameGame && moves == _seenMoves && current == _lastSquare;
+        const bool played = sameGame && moves == _seenMoves + 1;
+
+        if (!unchanged) {
+            if (played && current == _lastSquare) {
+                // A move of another piece: a slide of this one under way goes on.
+            } else if (played && deltaTime > 0.0f && _slideDuration > 0.0f && _lastSquare.IsInside()) {
+                StartSlide(_lastSquare, current);
+            } else {
+                // The first sighting, a reset, a new position, a frame with no time, a count that fell: at once.
+                EndSlide();
+            }
+        }
+
+        _seen = true;
+        _lastSquare = current;
+        _seenMoves = moves;
+        if (!sameGame) {
+            _seenStartFen = model.GetStartFen();
+        }
+    }
+
+    void ChessPieceComponent::StartSlide(Square from, Square to) {
+        _slideFrom = from;
+        _slideTo = to;
+        _slideProgress = 0.0f;
+        _sliding = true;
+        // The tween first moves in the next frame (stage 2b), so this frame still draws the old square. A new slide replaces the one under way.
+        _slide.Reset(CoreManager::GetTweens().Start<float>(
+            0.0f, 1.0f, {.duration = _slideDuration, .ease = EaseType::QuadOut}, [this](const float& progress) { _slideProgress = progress; }, [this]() { _sliding = false; }));
+    }
+
+    void ChessPieceComponent::EndSlide() {
+        _slide.Reset();
+        _sliding = false;
+    }
+
+    void ChessPieceComponent::ForgetSeen() {
+        EndSlide();
+        _seen = false;
     }
 
     void ChessPieceComponent::ShowPieceType(Piece piece) {
