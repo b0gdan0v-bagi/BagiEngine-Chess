@@ -332,7 +332,8 @@ namespace BECore::Chess {
             return;
         }
 
-        // The program's turn: the person has nothing to move, and a selection would only fight the search that is under way
+        // The program's turn: the person has nothing to move, and a selection would only fight the search that is under way. PlaysFor is true for either seat, so while two
+        // programs play (a watch) the board takes no click on either turn
         const OpponentController* opponent = ChessGame::GetActiveOpponent();
         if (opponent && opponent->PlaysFor(model->GetTurn())) {
             return;
