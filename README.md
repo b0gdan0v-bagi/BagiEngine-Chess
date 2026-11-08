@@ -52,7 +52,7 @@ Beyond that, SDL, SDL_image, the Vulkan headers and the Vulkan loader library ar
 
    Run this again after adding or deleting a source file (the sources are globbed), after changing a class that uses `BE_CLASS`, `BE_EVENT` or `BE_REFLECT_FIELD` (the reflection code is generated at configure time), after a change to `CMakePresets.json`, `CMakeUserPresets.json` or a `*.cmake` file, and after the `engine/` pointer moves.
 
-5. Build everything (`BagiChess` and `ChessTests`; the first build also compiles the engine and its libraries and takes a while):
+5. Build everything (`BagiChess`, `BagiChessUci` and `ChessTests`; the first build also compiles the engine and its libraries and takes a while):
 
    ```bash
    cmake --build --preset macos-debug
@@ -72,7 +72,7 @@ Beyond that, SDL, SDL_image, the Vulkan headers and the Vulkan loader library ar
    ctest --preset macos-debug
    ```
 
-   That is `ChessTests` (the gtest cases, each in its own process) and `BagiChessControlSmoke`, a Python script that starts `BagiChess --control --headless` and plays it over the control API. The smoke test needs the built `BagiChess` and is **skipped** (exit code 77) when the executable is missing, so build the default target as in step 5, or add `BagiChess` to a narrower `--target ChessTests BagiChess`. Stockfish is not needed: the tests that use a real one skip themselves. To run them against yours:
+   That is `ChessTests` (the gtest cases, each in its own process) `BagiChessControlSmoke`, a Python script that starts `BagiChess --control --headless` and plays it over the control API, and `BagiChessUciSmoke`, which starts `BagiChessUci` and talks UCI to it over pipes. A smoke test needs its built executable and is **skipped** (exit code 77) when it is missing, so build the default target as in step 5, or add `BagiChess` and `BagiChessUci` to a narrower `--target ChessTests BagiChess BagiChessUci`. Stockfish is not needed: the tests that use a real one skip themselves. To run them against yours:
 
    ```bash
    build/ClangmacOS/ChessTests --gtest_filter='Stockfish*:UciEngineStockfishTest*'   # STOCKFISH or PATH
@@ -125,13 +125,24 @@ A value that is set but names no file is not skipped: a wrong `stockfishPath` do
 
 With none of the three the game still runs as two people, and picking Computer with "Stockfish" says "Engine not found" and changes nothing else (the panel stays on Two players). The way out is the **Engine** row of the panel: pick "Own engine" (that clears the message), then Computer again. The game starts Stockfish as a child process, which is only written for macOS and Linux so far (macOS is what it is tested on); on Windows Stockfish cannot play yet (the status line says "Engine not supported here"), but the own engine can. The choice is not remembered between runs.
 
+## UCI engine
+
+`BagiChessUci` is the own engine as a console program that speaks UCI on stdin and stdout, so that a tournament tool (cutechess-cli, fastchess) or a script can play it against another engine. It is built with everything else and opens no window:
+
+```bash
+build/ClangmacOS/BagiChessUci
+```
+
+Type `uci`, then for example `position startpos moves e2e4` and `go depth 3`; it answers `bestmove ...`. It understands `position`, `go` (`depth`, `movetime`, the clocks, `movestogo`, `infinite`), `stop`, `isready`, `ucinewgame`, `setoption` and `quit`. Its options are `Depth` (0 to 64, 0 is no limit), `BlunderPercent` (0 to 100, the share of random legal moves) and `Level` (`easy`, `medium`, `hard`, `max`, which sets the other two as the game plays that level). Details, and what is not supported, are in `src/Chess/Uci/CLAUDE.md`. To measure it against Stockfish, install Stockfish yourself; nothing of it is shipped.
+
 ## Layout
 
 | Path | What |
 |------|------|
 | `src/Chess/` | the game: rules (`Game/`), scene components, the control adapter. `CLAUDE.md` describes it |
+| `uci/` | `main.cpp` of `BagiChessUci`, the own engine as a UCI program (the server is `src/Chess/Uci/`) |
 | `config/`, `assets/` | scene, texture library, application config, piece atlas |
-| `tests/` | gtest cases and `control_smoke.py` |
+| `tests/` | gtest cases, `control_smoke.py` and `uci_smoke.py` |
 | `tools/` | the Stockfish bridge and its pytest tests (`engine/.venv/bin/python -m pytest tools/tests`) |
 | `todo/`, `TODO.md` | known problems, worked by the `todo-loop` skill (`todo/README.md`) |
 | `CI/` | environment setup (`setup_venv.*`) and the VS Code workspace `BagiChess.code-workspace` (CMake Tools on the engine's presets, CodeLLDB / MSVC launch, build tasks) |
