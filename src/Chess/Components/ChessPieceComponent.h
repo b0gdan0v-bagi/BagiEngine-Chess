@@ -41,6 +41,10 @@ namespace BECore::Chess {
      *     that undoes it), the sibling SpriteRendererComponent switches to the
      *     sprite of that piece; during a slide it waits for the end of it.
      *
+     * A piece that the board reports as lifted (ChessBoardComponent::GetLiftedPiece(), a drag past the threshold) is placed under the pointer instead, its node goes to kDragLayer
+     * and nothing slides it; the first update that does not lift it gives the layer back. A move played by the drop is not slid either: the piece was dropped on the square, so it
+     * stands there at once.
+     *
      * The tween runs a progress 0..1, not a pixel: while it runs, the position is a Lerp of the
      * pixels of the two squares taken from the board on every update, so a board that turns
      * or a changed geometry cannot leave the piece in a wrong place.
@@ -52,6 +56,8 @@ namespace BECore::Chess {
         static constexpr float kDefaultSlideDuration = 0.15f;
         /// The square of a piece that is not on the board (as the model reports a captured piece).
         static constexpr Square kOffBoard{-1, -1};
+        /// The layer of the node of a piece the person holds (a drag): over the pieces (0), the result bar (1) and the captured material (5), under the HUD (10) and the panels (20)
+        static constexpr int32_t kDragLayer = 6;
 
         ChessPieceComponent() = default;
         ~ChessPieceComponent() override;
@@ -72,6 +78,8 @@ namespace BECore::Chess {
         void Observe(const ChessGameModel& model, Square current, float deltaTime);
         void StartSlide(Square from, Square to);
         void EndSlide();
+        /// Gives the node the layer it had before the lift, when it was lifted
+        void EndLift();
         /// Forgets what was seen, so the next sighting places the piece at once.
         void ForgetSeen();
 
@@ -85,6 +93,9 @@ namespace BECore::Chess {
         float _slideProgress = 0.0f;    ///< 0..1, written by the tween.
         Square _slideFrom = kOffBoard;  ///< The square the slide leaves (a captured piece stays here).
         Square _slideTo = kOffBoard;    ///< The square the slide goes to; outside the board for a captured piece.
+
+        bool _lifted = false;          ///< True from the update that put the piece in the pointer's hand until the first one that does not: a move seen then is a drop and does not slide.
+        int32_t _layerBeforeLift = 0;  ///< The layer the node had when it was lifted.
 
         bool _seen = false;              ///< True once an update saw the model and the board.
         Square _lastSquare = kOffBoard;  ///< The square the model gave last update (outside the board when captured).

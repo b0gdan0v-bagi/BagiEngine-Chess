@@ -401,7 +401,8 @@ namespace BECore::Chess {
         // Only a legal target of the selected piece plays. Anywhere else nothing is called on the model: the piece goes back and the selection stays with its legal moves (and a release
         // on another own piece must not select it)
         const std::optional<Square> target = SquareUnder(e.button.x, e.button.y);
-        if (!target || eastl::find(model->GetLegalMoves().begin(), model->GetLegalMoves().end(), *target) == model->GetLegalMoves().end()) {
+        const auto& legalMoves = model->GetLegalMoves();
+        if (!target || eastl::find(legalMoves.begin(), legalMoves.end(), *target) == legalMoves.end()) {
             return;
         }
         if (model->OnSquareClicked(*target)) {

@@ -80,8 +80,14 @@ namespace BECore::Chess::Tests {
         constexpr size_t kPieceCount = 32;
         constexpr const char* kMaterialPieces[] = {"Queen", "Rook", "Bishop", "Knight", "Pawn"};  // the rows of a group of the captured material, in the order of the scene
         constexpr float kPixelTolerance = 0.01f;
-        constexpr float kDragStepPixels = 20.0f;  // a first motion of a drag: well past the threshold of the board (6 view units, about 5 px here)
-        constexpr float kGlyphTolerance = 1.0f;   // a glyph of a label is laid out to the pixel of the font, not to the unit
+        constexpr float kDragStepPixels = 20.0f;       // a first motion of a drag: well past the threshold of the board (6 view units, about 5 px here)
+        constexpr float kUnderThresholdPixels = 3.0f;  // a motion of a drag that stays under that threshold
+        constexpr float kPointerOffsetX = 60.0f;       // where a test holds the pointer, from the middle of the square it pressed (pixels)
+        constexpr float kPointerOffsetY = -50.0f;
+        constexpr float kHalfSquare = 40.0f;     // half the 80 units of a square: the piece in the hand is centered on the pointer
+        constexpr int32_t kPieceLayer = 0;       // the layer of a piece node in the scene
+        constexpr int32_t kDragLayer = 6;        // the layer of a piece in the hand: over the chips (5), under the HUD (10)
+        constexpr float kGlyphTolerance = 1.0f;  // a glyph of a label is laid out to the pixel of the font, not to the unit
 
         constexpr int kManyFrames = 200;                            // frames that must pass with nothing happening
         constexpr std::chrono::milliseconds kShutdownBudget{3000};  // a gated engine gives up after 10 s (kGateGiveUp): a shutdown that waited for it would not fit
@@ -882,6 +888,17 @@ namespace BECore::Chess::Tests {
             }
             ADD_FAILURE() << "no piece node " << nodeName;
             return {};
+        }
+
+        /// The draw layer of a node of the scene by its name
+        int32_t NodeLayer(const char* nodeName) const {
+            for (const auto& node : GetScene().GetRootNode().GetChildren()) {
+                if (node->GetName() == PoolString::Intern(nodeName)) {
+                    return node->GetLayer();
+                }
+            }
+            ADD_FAILURE() << "no node " << nodeName;
+            return -1;
         }
 
         /// Every piece node that stands on a square is at the cell that square has in the orientation asked for (after an update)
@@ -6315,6 +6332,8 @@ namespace BECore::Chess::Tests {
         MouseMove(reset.first, reset.second, true);
         EXPECT_TRUE(Lifted().has_value()) << "the button is still held";
         // The release over the Reset button is taken by the HUD: the board gets nothing. The next motion has no button held
+        Release(reset.first, reset.second);
+        EXPECT_TRUE(Lifted().has_value()) << "the release never reached the board";
         const auto board = SquareCenter("e3");
         MouseMove(board.first, board.second, false);
         EXPECT_FALSE(Lifted().has_value());
@@ -6339,17 +6358,17 @@ namespace BECore::Chess::Tests {
 
             CoreManager::GetUIInput().DispatchMouseButtonDown(Button(at.first, at.second, true));
             EXPECT_FALSE(Lifted().has_value()) << "right after the press";
-            MouseMove(at.first + 3.0f, at.second, true);
+            MouseMove(at.first + kUnderThresholdPixels, at.second, true);
             EXPECT_FALSE(Lifted().has_value()) << "under the threshold";
 
-            const float pointerX = at.first + 60.0f;
-            const float pointerY = at.second - 50.0f;
+            const float pointerX = at.first + kPointerOffsetX;
+            const float pointerY = at.second + kPointerOffsetY;
             MouseMove(pointerX, pointerY, true);
             const auto lifted = Lifted();
             ASSERT_TRUE(lifted.has_value());
             EXPECT_EQ(lifted->from, Sq(piece));
-            EXPECT_NEAR(lifted->x, GetScene().ScreenToSceneX(pointerX) - 40.0f, kPixelTolerance);
-            EXPECT_NEAR(lifted->y, GetScene().ScreenToSceneY(pointerY) - 40.0f, kPixelTolerance);
+            EXPECT_NEAR(lifted->x, GetScene().ScreenToSceneX(pointerX) - kHalfSquare, kPixelTolerance);
+            EXPECT_NEAR(lifted->y, GetScene().ScreenToSceneY(pointerY) - kHalfSquare, kPixelTolerance);
 
             MouseMove(at.first + 1.0f, at.second, true);
             EXPECT_TRUE(Lifted().has_value()) << "once lifted the piece stays lifted";
@@ -6373,6 +6392,194 @@ namespace BECore::Chess::Tests {
         ASSERT_EQ(Model().GetMoves().size(), 2u);
         EXPECT_EQ(Model().GetMoves().back().ToUci(), "e7e5");
         EXPECT_FALSE(Model().HasSelection());
+    }
+
+    TEST_F(ChessUiTest, ADraggedPieceIsCenteredUnderThePointerOnTheDragLayerAndGoesBackOrLandsOnTheTargetOnLetGo) {
+        CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        for (const bool turned : {false, true}) {
+            SCOPED_TRACE(turned ? "turned" : "White at the bottom");
+            ControlPlays(turned ? "white" : nullptr);
+            StartFrom(turned ? kBlackToMoveAfterE4 : "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+            ASSERT_EQ(BlackIsAtTheBottom(), turned);
+            const char* piece = turned ? "e7" : "e2";
+            const char* target = turned ? "e5" : "e4";
+            const char* node = turned ? "BlackPawn_e7" : "WhitePawn_e2";
+            const auto [homeColumn, homeRow] = CellOfSquare(Sq(piece), turned);
+            const auto [targetColumn, targetRow] = CellOfSquare(Sq(target), turned);
+            const auto home = CellOrigin(homeColumn, homeRow);
+            const auto landing = CellOrigin(targetColumn, targetRow);
+            ExpectPiecesAtTheCellsOf(turned);
+
+            // In the hand: the transform is the pointer minus half a square, the node is on the drag layer and no other piece is
+            Draw();
+            const auto at = SquareCenter(piece);
+            CoreManager::GetUIInput().DispatchMouseButtonDown(Button(at.first, at.second, true));
+            _manager->UpdateAll();
+            EXPECT_EQ(PieceOrigin(node), home) << "just pressed: not lifted yet";
+            EXPECT_EQ(NodeLayer(node), kPieceLayer);
+            const float pointerX = at.first + kPointerOffsetX;
+            const float pointerY = at.second + kPointerOffsetY;
+            MouseMove(pointerX, pointerY, true);
+            _manager->UpdateAll();
+            EXPECT_NEAR(PieceOrigin(node).first, GetScene().ScreenToSceneX(pointerX) - kHalfSquare, kPixelTolerance);
+            EXPECT_NEAR(PieceOrigin(node).second, GetScene().ScreenToSceneY(pointerY) - kHalfSquare, kPixelTolerance);
+            EXPECT_EQ(NodeLayer(node), kDragLayer);
+            size_t others = 0;
+            for (const auto& child : GetScene().GetRootNode().GetChildren()) {
+                if (child->GetComponent<ChessPieceComponent>() && child->GetName() != PoolString::Intern(node)) {
+                    EXPECT_EQ(child->GetLayer(), kPieceLayer) << child->GetName().CStr();
+                    ++others;
+                }
+            }
+            EXPECT_EQ(others, kPieceCount - 1);
+            for (const auto& child : GetScene().GetRootNode().GetChildren()) {
+                if (child->GetName() == PoolString::Intern(node)) {
+                    EXPECT_FLOAT_EQ(child->GetComponent<TransformComponent>()->_width, 2.0f * kHalfSquare) << "the size of a square";
+                }
+            }
+
+            // Let go off the board, in the margin: the piece is back on its cell and its layer, still selected
+            Release(PixelOf(50.0f, 400.0f).first, PixelOf(50.0f, 400.0f).second);
+            _manager->UpdateAll();
+            EXPECT_EQ(PieceOrigin(node), home) << "off the board";
+            EXPECT_EQ(NodeLayer(node), kPieceLayer);
+            EXPECT_TRUE(Model().HasSelection());
+
+            // Dragged onto its own square and let go there: back as well
+            Drag(piece, piece);
+            _manager->UpdateAll();
+            EXPECT_EQ(PieceOrigin(node), home) << "the start square";
+            EXPECT_EQ(NodeLayer(node), kPieceLayer);
+
+            // Let go on the target: on the target cell at once, on the piece layer
+            Click(piece);
+            MouseMove(at.first + kDragStepPixels, at.second, true);
+            _manager->UpdateAll();
+            EXPECT_EQ(NodeLayer(node), kDragLayer);
+            const auto over = SquareCenter(target);
+            MouseMove(over.first, over.second, true);
+            Release(over.first, over.second);
+            _manager->UpdateAll();
+            ASSERT_EQ(Model().GetMoves().size(), 1u);
+            EXPECT_EQ(PieceOrigin(node), landing) << "dropped on the target";
+            EXPECT_EQ(NodeLayer(node), kPieceLayer);
+            ExpectPiecesAtTheCellsOf(turned);
+        }
+    }
+
+    TEST_F(ChessUiTest, ADraggedPieceIsDrawnOverThePiecesAndTheChipsAndUnderTheHud) {
+        const auto pawn = GiveAtlasCell("WhitePawn_b2");
+        const auto king = GiveAtlasCell("WhiteKing_e1");
+        _manager->UpdateAll();                                      // the pieces register, so that the handles follow the moves
+        for (const char* uci : {"e2e4", "d7d5", "e4d5", "d8d5"}) {  // a pawn each is gone: there are chips to draw over, and White is to move
+            ASSERT_TRUE(Play(Model(), uci)) << uci;
+        }
+        _manager->UpdateAll();
+        Settle();
+        ASSERT_NE(ShownMaterialRows(), "");
+
+        const auto indexes = [&] {
+            struct Found {
+                long pawn = -1;
+                long king = -1;
+                long firstChip = -1;
+                long lastChip = -1;
+                long resetButton = -1;
+            } found;
+            for (size_t i = 0; i < _renderer->calls.size(); ++i) {
+                const DrawCall& call = _renderer->calls[i];
+                const long at = static_cast<long>(i);
+                if (call.kind == DrawKind::Texture && call.texture == pawn.Get()) {
+                    found.pawn = at;
+                } else if (call.kind == DrawKind::Texture && call.texture == king.Get()) {
+                    found.king = at;
+                } else if (call.kind == DrawKind::Rect && SameColor(call.color, kMaterialChipColor)) {
+                    found.firstChip = found.firstChip < 0 ? at : found.firstChip;
+                    found.lastChip = at;
+                } else if (call.kind == DrawKind::Rect && SameColor(call.color, kResetColor)) {
+                    found.resetButton = at;
+                }
+            }
+            return found;
+        };
+
+        Draw();
+        auto resting = indexes();
+        ASSERT_GE(resting.pawn, 0);
+        ASSERT_GE(resting.king, 0);
+        ASSERT_GE(resting.firstChip, 0);
+        EXPECT_LT(resting.pawn, resting.firstChip) << "a piece on the board is under the chips";
+
+        Click("b2");
+        const auto at = SquareCenter("b2");
+        MouseMove(at.first + kDragStepPixels, at.second, true);
+        ASSERT_TRUE(Lifted().has_value());
+        _manager->UpdateAll();
+        Draw();
+        const auto lifted = indexes();
+        ASSERT_GE(lifted.pawn, 0);
+        ASSERT_GE(lifted.king, 0);
+        ASSERT_GE(lifted.lastChip, 0);
+        ASSERT_GE(lifted.resetButton, 0);
+        EXPECT_GT(lifted.pawn, lifted.king) << "over the other pieces";
+        EXPECT_GT(lifted.pawn, lifted.lastChip) << "over the captured material";
+        EXPECT_LT(lifted.pawn, lifted.resetButton) << "under the HUD";
+
+        // The input order of the canvases follows the draw order, which the piece on its higher layer must not shuffle among them: the topmost is asked first
+        const auto rankOf = [&](const char* name) {
+            for (const auto& node : GetScene().GetRootNode().GetChildren()) {
+                if (node->GetName() == PoolString::Intern(name)) {
+                    return GetScene().GetDrawRank(*node);
+                }
+            }
+            ADD_FAILURE() << name;
+            return -1;
+        };
+        EXPECT_LT(rankOf("BoardCoordinates"), rankOf("Material"));
+        EXPECT_LT(rankOf("Material"), rankOf("Hud"));
+        EXPECT_LT(rankOf("Hud"), rankOf("OpponentPanel"));
+        EXPECT_LT(rankOf("OpponentPanel"), rankOf("PromotionPanel"));
+
+        Release(at.first, at.second);
+        _manager->UpdateAll();
+        Draw();
+        resting = indexes();
+        EXPECT_LT(resting.pawn, resting.firstChip) << "let go: under the chips again";
+    }
+
+    TEST_F(ChessUiTest, AGameThatMovesUnderTheHandPutsThePieceBackAtOnce) {
+        _manager->UpdateAll();
+        Draw();
+        const auto at = SquareCenter("e2");
+        const auto home = PieceOrigin("WhitePawn_e2");
+        const auto lift = [&] {
+            CoreManager::GetUIInput().DispatchMouseButtonDown(Button(at.first, at.second, true));
+            MouseMove(at.first + kDragStepPixels, at.second, true);
+            _manager->UpdateAll();
+            ASSERT_EQ(NodeLayer("WhitePawn_e2"), kDragLayer);
+            ASSERT_NE(PieceOrigin("WhitePawn_e2"), home);
+        };
+
+        lift();
+        Model().Reset();
+        _manager->UpdateAll();
+        EXPECT_FALSE(Lifted().has_value());
+        EXPECT_EQ(PieceOrigin("WhitePawn_e2"), home) << "a reset";
+        EXPECT_EQ(NodeLayer("WhitePawn_e2"), kPieceLayer);
+
+        lift();
+        ASSERT_TRUE(Play(Model(), "g1f3"));  // a move of the control API
+        _manager->UpdateAll();
+        EXPECT_EQ(PieceOrigin("WhitePawn_e2"), home) << "a move of someone else";
+        EXPECT_EQ(NodeLayer("WhitePawn_e2"), kPieceLayer);
+
+        Model().Reset();
+        lift();
+        Model().SetPosition(PositionFromFen(Position::kStartFen));
+        _manager->UpdateAll();
+        EXPECT_EQ(PieceOrigin("WhitePawn_e2"), home) << "a new position";
+        EXPECT_EQ(NodeLayer("WhitePawn_e2"), kPieceLayer);
     }
 
 }  // namespace BECore::Chess::Tests

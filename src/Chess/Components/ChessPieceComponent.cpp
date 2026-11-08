@@ -50,6 +50,7 @@ namespace BECore::Chess {
 
         if (!model || !board) {
             ForgetSeen();
+            EndLift();
             transform->_x = kHiddenX;
             transform->_y = kHiddenY;
             return;
@@ -57,6 +58,22 @@ namespace BECore::Chess {
 
         const Square cur = model->GetSquareOf(this);
         Observe(*model, cur, event.deltaTime);
+
+        // The piece the person holds is under the pointer, over the others, and nothing slides it
+        const std::optional<ChessBoardComponent::LiftedPiece> lifted = board->GetLiftedPiece();
+        if (lifted && cur.IsInside() && lifted->from == cur) {
+            if (!_lifted) {
+                _lifted = true;
+                _layerBeforeLift = GetNode().GetLayer();
+                GetNode().SetLayer(kDragLayer);
+            }
+            transform->_x = lifted->x;
+            transform->_y = lifted->y;
+            transform->_width = board->GetSquareSize();
+            transform->_height = board->GetSquareSize();
+            return;
+        }
+        EndLift();
 
         // The square drawn: the one the slide leaves while a slide runs (a captured piece waits there), else where the model has the piece.
         const Square shown = IsSliding() ? _slideFrom : cur;
@@ -98,7 +115,8 @@ namespace BECore::Chess {
 
         // A move of another piece (played, this piece on its square) leaves a slide of this one under way alone.
         if (!unchanged && !(played && current == _lastSquare)) {
-            if (played && deltaTime > 0.0f && _slideDuration > 0.0f && _lastSquare.IsInside()) {
+            // A piece that was held in the last update was dropped where it stands now: a slide from the square it left would be a jump back and forth
+            if (played && !_lifted && deltaTime > 0.0f && _slideDuration > 0.0f && _lastSquare.IsInside()) {
                 StartSlide(_lastSquare, current);
             } else {
                 // The first sighting, a reset, a new position, a frame with no time, a count that fell: at once.
@@ -125,6 +143,14 @@ namespace BECore::Chess {
 
     void ChessPieceComponent::EndSlide() {
         _slide.Reset();
+    }
+
+    void ChessPieceComponent::EndLift() {
+        if (!_lifted) {
+            return;
+        }
+        _lifted = false;
+        GetNode().SetLayer(_layerBeforeLift);
     }
 
     bool ChessPieceComponent::IsSliding() const {
