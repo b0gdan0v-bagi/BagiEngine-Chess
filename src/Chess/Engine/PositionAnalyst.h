@@ -18,6 +18,9 @@ namespace BECore::Chess {
     /// The same for a program that plays one color or none
     [[nodiscard]] std::optional<HintRefusal> HintRefusalFor(const ChessGameModel& model, std::optional<PieceColor> programPlays);
 
+    /// How many lines the analyst asks of the engine: the best one (the evaluation and the hint) and the second best, for whoever compares them (GetLines())
+    inline constexpr int kAnalysisLines = 2;
+
     /// Makes the engine that analyses for the picked kind, or says why there is none. A test gives a double; the default is MakeAnalysisEngine()
     using AnalysisEngineFactory = eastl::function<std::expected<eastl::shared_ptr<IChessEngine>, EngineError>(OpponentEngine)>;
 
@@ -35,10 +38,11 @@ namespace BECore::Chess {
      *
      * Two things are wanted of the engine: the score of the position (the evaluation, switched on with SetEvaluation() and then kept up to date as the game goes) and the
      * best move (the hint, asked for the position now on the board with RequestHint()). One search serves both: IChessEngine::Analyse() answers a line, its move is the hint and
-     * its score is the evaluation, so asking for both costs one search. The owner of the model calls Update() once per frame on the main thread. When something is wanted and no
-     * answer is held for the position, Update() copies the game into a SearchRequest (SearchRequest::FromModel) and hands Analyse() to TaskManager (the Background pool, where a call
-     * that blocks for seconds belongs); a later Update() finds the answer. One search runs at a time. TaskManager must be running (CoreManager starts it). Nothing starts while nothing is
-     * switched on or asked, and never for a finished game.
+     * its score is the evaluation, so asking for both costs one search. The search asks for kAnalysisLines = 2 lines (MultiPV): the second line is kept next to the best one for GetLines() and
+     * changes neither the evaluation nor the hint (the best line is the first one, as for one line); a position with one legal move has one line. The owner of the model calls Update() once per frame
+     * on the main thread. When something is wanted and no answer is held for the position, Update() copies the game into a SearchRequest (SearchRequest::FromModel) and hands Analyse() to TaskManager
+     * (the Background pool, where a call that blocks for seconds belongs); a later Update() finds the answer. One search runs at a time. TaskManager must be running (CoreManager starts it). Nothing
+     * starts while nothing is switched on or asked, and never for a finished game.
      *
      * **The version rule** (the pattern of EngineOpponent). The model's GetVersion() at the time of the request is remembered, and the answer is kept only for that version. A search whose
      * version has moved (a move, a reset, a position set from outside) is cancelled and its answer thrown away, also when the engine ignores the token, and a new search starts for the
@@ -139,6 +143,11 @@ namespace BECore::Chess {
         /// The line for the position of @p model when a hint was asked at this version and the answer for it has come; its move is the hint
         [[nodiscard]] std::optional<AnalysisLine> GetHint(const ChessGameModel& model) const;
 
+        /// The lines of the answer for the position of @p model, best first (the best one is what GetEvaluation() and GetHint() give, then the second best when the position has a second legal move),
+        /// as the engine gave them (the side to move's view). Empty unless the evaluation is on or a hint was asked at this version, and the answer for this very version has come: no line is
+        /// shown for another position, another engine pick or a search nobody wants, with the same drop rules as the hint
+        [[nodiscard]] eastl::vector<AnalysisLine> GetLines(const ChessGameModel& model) const;
+
         /// Why the last search failed (any EngineError, an engine that could not be made included); empty when none did or after it went with a new version, pick or request
         [[nodiscard]] const std::optional<EngineError>& GetError() const noexcept {
             return _error;
@@ -184,6 +193,7 @@ namespace BECore::Chess {
         OpponentEngine _searchEngine = kDefaultOpponentEngine;
 
         std::optional<AnalysisLine> _result;  ///< the answer, for _resultVersion and _resultEngine
+        std::optional<AnalysisLine> _second;  ///< its second line, when the engine gave one; goes with _result
         uint64_t _resultVersion = 0;
         OpponentEngine _resultEngine = kDefaultOpponentEngine;
 

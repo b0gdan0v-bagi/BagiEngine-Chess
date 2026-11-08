@@ -184,7 +184,9 @@ namespace BECore::Chess::Tests {
      *
      * It counts how often it is asked, keeps the latest request and can hold its answer at a gate until Open(): a gate that honors the CancellationToken returns Cancelled at once when the
      * token is cancelled (WasCancelled()), one that ignores it stays and answers when it is opened, which is how the tests show that a stale answer is thrown away. A gate that is never
-     * opened gives up with a Timeout after kGateGiveUp. FailWith() makes every Analyse() fail. Configure it while no search runs; the reads are thread safe (a search runs on a pool worker).
+     * opened gives up with a Timeout after kGateGiveUp. FailWith() makes every Analyse() fail. For a request of two lines or more it adds a second line: the first legal move that is not the
+     * first line's, with the score of SetSecondLine() (a position with no other legal move has one line, as an engine gives it). Configure it while no search runs; the reads are thread safe (a search
+     * runs on a pool worker).
      */
     class AnalysingEngine final : public IChessEngine {
     public:
@@ -198,6 +200,12 @@ namespace BECore::Chess::Tests {
 
         void Open() {
             _open.store(true);
+        }
+
+        /// The score and depth of the second line a request for two lines or more gets. Configure it while no search runs
+        void SetSecondLine(AnalysisScore score, int depth = 6) {
+            _secondScore = score;
+            _secondDepth = depth;
         }
 
         /// From now on Analyse() fails with @p error
@@ -268,12 +276,25 @@ namespace BECore::Chess::Tests {
             }
             Analysis analysis;
             analysis.lines.push_back(AnalysisLine{move, _score, _depth});
+            if (request.lines >= 2) {
+                const std::expected<Position, EngineError> position = request.FinalPosition();
+                if (position) {
+                    for (const Move other : MoveGenerator::GenerateLegal(*position)) {
+                        if (other != move) {
+                            analysis.lines.push_back(AnalysisLine{other, _secondScore, _secondDepth});
+                            break;
+                        }
+                    }
+                }
+            }
             return analysis;
         }
 
         AnalysisScore _score;
         std::optional<Move> _move;
         int _depth;
+        AnalysisScore _secondScore{AnalysisScoreKind::Centipawns, 10};
+        int _secondDepth = 6;
         bool _gated = false;
         bool _honorsToken = false;
         std::optional<EngineError> _error;
