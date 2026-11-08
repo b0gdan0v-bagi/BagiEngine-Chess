@@ -56,4 +56,14 @@ if(ENGINE_BUILD_TESTS)
 
     # Starts BagiChess with the control API and plays a few moves, a mate and a promotion over WebSocket
     be_add_game_control_tests(BagiChess SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/tests/control_smoke.py)
+
+    # Starts BagiChessUci and talks UCI to it over pipes (handshake, a game, a clock, stop, quit); skipped (77) when the executable is not built
+    if(Python3_FOUND)
+        add_test(NAME BagiChessUciSmoke COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/uci_smoke.py --exe $<TARGET_FILE:BagiChessUci>)
+        set_tests_properties(BagiChessUciSmoke PROPERTIES
+            SKIP_RETURN_CODE 77
+            TIMEOUT 120
+            RUN_SERIAL TRUE
+        )
+    endif()
 endif()

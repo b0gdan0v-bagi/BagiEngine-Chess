@@ -21,6 +21,7 @@ src/Chess/
 │   ├── Evaluation.*, Search.*, OwnEngine.*            the engine of our own
 │   ├── BlunderEngine.*, OpponentLevels.*, OpponentEngines.*, OpponentText.*, OpponentSettings.*   handicap, levels, engines, words, settings
 │   └── EngineOpponent.*, OpponentController.*, OpponentChoice.*   the opponent in a game, its seat, the person's choice
+├── Uci/                      the own engine as a UCI program, the server side: `BagiChessUci` (`uci/main.cpp`), command parser, clock rule, `UciServer`; no game, no scene (src/Chess/Uci/CLAUDE.md)
 └── Components/               scene glue: board, pieces, result, captured material (src/Chess/Components/CLAUDE.md)
 ```
 
@@ -32,6 +33,7 @@ src/Chess/
 |------|-------|
 | `src/Chess/Game/CLAUDE.md` | every file of the rules and what it guarantees |
 | `src/Chess/Engine/CLAUDE.md` | the opponent: the engine interface, UCI and Stockfish, the own engine, the levels and the handicap, the settings file, the controller and the choice, the opponent in the running game |
+| `src/Chess/Uci/CLAUDE.md` | `BagiChessUci`, the own engine speaking UCI on stdin / stdout: the files, the commands and options, the `stop` rule, the clock rule, how to run it and its smoke |
 | `src/Chess/Components/CLAUDE.md` | the scene and the UI: the pieces, the board geometry and orientation, the coordinates, the captured material, the HUD, the opponent panel, the promotion picker, the words of the HUD, the draw order; **read it before changing `config/SceneConfig.xml`** |
 | `tests/CLAUDE.md` | every test file and what it covers, the control smoke, the fake UCI engine, the test helpers |
 
