@@ -90,7 +90,7 @@ Fields the `clang-format` skill reads (the `strip-pch-includes` skill uses `Pyth
 
 | Field | Meaning | Value here |
 |-------|---------|------------|
-| Python | the interpreter `<py>`. The two scripts use only the standard library, so no venv is needed; `uv run python` also works. A repository may name its venv interpreter instead | `python3` (Windows: `engine\.venv\Scripts\python`) |
+| Python | the interpreter `<py>`. The two scripts use only the standard library, so no venv is needed; `uv run python` also works. A repository may name its venv interpreter instead | `python3` (Windows: `engine\.venv\Scripts\python` when the venv exists, else `python`; `python3` there is the Microsoft Store stub, "Python was not found") |
 | `<engine>` and `<R>` | the values of the two terms for the default run | `engine` and `.` (so `engine/CI/scripts/...` and `--root .`) |
 | Format scope | the folders `--all` covers (also for `strip-pch-includes`) | `src/`, `config/`, `tests/` (`--all` covers `tests/` here) |
 | Ignore file | the `.clang-format-ignore` in the root of `<R>`: required, one path or prefix per line, `#` comments, not merged with a default | the game's own: `engine/`, `build/`, `.venv/` |
@@ -103,6 +103,8 @@ The commands, written with the values of this game (run from the repository root
 python3 engine/CI/scripts/format_sources.py --changed --root .
 python3 engine/CI/scripts/format_sources.py --all --root .
 ```
+
+On Windows write the interpreter of the field `Python` in place of `python3`, here and in every command of this file.
 
 For engine work done from this checkout (`<R>` = `engine`), run the engine's commands from `engine/` with the rules file of `engine/`.
 

@@ -9,7 +9,7 @@ Read by the skills `todo-loop`, `todo-merge`, `todo-add`, `todo-db` and by the a
 | game | `chess` | `.` | `main` | `BagiEngine-Chess` |
 | engine | `engine` | `engine` | `games/chess` (the `branch` of `.gitmodules`) | `BagiEngine` |
 
-`<engine>` is `engine`. The CLI runs from this repository's root as `python3 engine/tools/todo/todo.py <command>` for both areas (an entry knows its area; `list --area chess|engine` narrows); `TODO_API_URL` and `TODO_API_TOKEN` come from the git-ignored `.env` of this repository (`.env.example`). The Vikunja project of an area is a setting of the store, not of the CLI: there is no push and no pull.
+`<engine>` is `engine`. The CLI runs from this repository's root as `python3 engine/tools/todo/todo.py <command>` (Windows: `python`, since `python3` there is the Microsoft Store stub; the same for `worker.py` and the scripts of `engine/CI/scripts/`, all standard library only) for both areas (an entry knows its area; `list --area chess|engine` narrows); `TODO_API_URL` and `TODO_API_TOKEN` come from the git-ignored `.env` of this repository (`.env.example`). The Vikunja project of an area is a setting of the store, not of the CLI: there is no push and no pull.
 
 An engine entry's branch `todo/<id>` is cut in `engine/` from `games/chess`; its commits and the merge are in the engine repository, its status is in the store. The game repository only ever changes the pointer of `engine/`, and only `todo-merge` does it, as a commit of its own, after the merge and the owner's yes (`Update engine: <title>`). A game entry that needs engine work waits (skip reason below) until the engine entry for it is merged.
 

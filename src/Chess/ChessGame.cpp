@@ -51,9 +51,9 @@ namespace BECore::Chess {
         _model.Reset();
         _opponent.SetSettings(OpponentSettings::Load());
         // Two people: nothing is looked up or started until a side is picked. Neither call can fail without a side
-        _opponent.SetSide(std::nullopt);
-        _opponent.SetLevel(kDefaultOpponentLevel);
-        _opponent.SetEngine(kDefaultOpponentEngine);
+        [[maybe_unused]] const auto side = _opponent.SetSide(std::nullopt);
+        [[maybe_unused]] const auto level = _opponent.SetLevel(kDefaultOpponentLevel);
+        [[maybe_unused]] const auto engine = _opponent.SetEngine(kDefaultOpponentEngine);
         _choice.Reset();      // a new game starts with White remembered as the person's color
         _analyst.Shutdown();  // nothing is analysed until the evaluation is switched on or a hint is asked for
     }
