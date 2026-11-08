@@ -150,6 +150,19 @@ class EstimateRatingTest(unittest.TestCase):
         loss = estimate_rating([(1500, 0.0)])
         self.assertTrue(loss.saturated)
 
+    def test_all_draws_against_one_opponent_have_an_unknown_bar(self):
+        rating = estimate_rating([(1700, 0.5)] * 20)
+        self.assertAlmostEqual(rating.elo, 1700.0, places=3)
+        self.assertTrue(math.isinf(rating.error))
+        self.assertFalse(rating.saturated)
+        self.assertEqual(format_rating(rating), "1700 +/- ?")
+
+    def test_all_draws_against_two_opponents_have_a_finite_bar(self):
+        rating = estimate_rating([(1700, 0.5)] * 10 + [(1800, 0.5)] * 10)
+        self.assertAlmostEqual(rating.elo, 1750.0, places=3)
+        self.assertTrue(0.0 < rating.error < math.inf)
+        self.assertNotIn("?", format_rating(rating))
+
     def test_no_results_raise(self):
         with self.assertRaises(ValueError):
             estimate_rating([])
@@ -171,6 +184,12 @@ class FormatRatingTest(unittest.TestCase):
 
     def test_an_upper_bound(self):
         self.assertEqual(format_rating(Rating(1249.6, 50.0, True, 20, elo_rating.BOUND_UPPER)), "<= 1250 (saturated)")
+
+    def test_a_rating_whose_saturated_and_bound_disagree_raises(self):
+        with self.assertRaises(ValueError):
+            Rating(1500.0, 50.0, True, 20)
+        with self.assertRaises(ValueError):
+            Rating(1500.0, 50.0, False, 20, elo_rating.BOUND_LOWER)
 
     def test_it_formats_what_estimate_rating_gives_in_ascii(self):
         for found in (estimate_rating(results(30, 10, 20)), estimate_rating(results(10, 0, 0)), estimate_rating(results(0, 0, 10))):

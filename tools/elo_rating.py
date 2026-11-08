@@ -1,7 +1,7 @@
 """Turns game scores against opponents of known Elo into an Elo with a 95 % error bar. Standard library only, no process, no I/O.
 
     from elo_rating import estimate_rating, format_rating
-    print(format_rating(estimate_rating([(1700, 1.0), (1700, 0.5), (1700, 0.0)])))      # 1700 +/- 0
+    print(format_rating(estimate_rating([(1700, 1.0), (1700, 0.5), (1700, 0.0)])))      # 1700 +/- 321
 
 A result is a pair `(opponent_elo, score)` with the score of one game from our side: 1.0 a win, 0.5 a draw, 0.0 a loss. The expected
 score against an opponent is the logistic curve `E(R) = 1 / (1 + 10^((opponent - R) / 400))`; the rating `R` is the one for which the
@@ -17,7 +17,8 @@ Two cases the formula cannot handle on its own:
   of the score one half game short of the extreme, `(n - 0.5) / n` resp. `0.5 / n`, to be read as a bound (`>=` / `<=`). All the
   residuals of that score are zero against one opponent, so the bar of such a result is the model one, `1 / sqrt(Fisher information)`
   with Bernoulli games: `1.96 / (ln(10) / 400 * sqrt(sum E_i (1 - E_i)))`.
-- Draws only against one opponent: the residuals are zero too and the sandwich bar is 0 (every game was equal to the expectation).
+- Draws only against one opponent: the residuals are zero too, so the sandwich bar would be 0 (a claim of perfect precision). The
+  error is `inf` then (`format_rating` prints `+/- ?`). Draws against two different opponents have residuals, hence a finite bar.
 """
 
 import math
@@ -30,6 +31,7 @@ RATING_LOWEST = -2000.0  # the bracket of the bisection; a result is clamped int
 RATING_HIGHEST = 6000.0
 RATING_TOLERANCE = 1e-6
 MAX_BISECTIONS = 200
+RESIDUAL_ZERO = 1e-12  # a sum of squared residuals below this is zero (the bisection leaves ~1e-18 of rounding)
 SATURATION_SHORTFALL = 0.5  # games short of the extreme score that stand in for "all won" / "all lost"
 
 BOUND_NONE = ""
@@ -48,6 +50,10 @@ class Rating:
     saturated: bool
     games: int
     bound: str = BOUND_NONE
+
+    def __post_init__(self):
+        if self.saturated != (self.bound != BOUND_NONE):
+            raise ValueError(f"saturated={self.saturated} does not match bound={self.bound!r}")
 
 
 def expected_score(rating: float, opponent_rating: float) -> float:
@@ -92,7 +98,10 @@ def _error(scores: list[float], expected: list[float], saturated: bool) -> float
         return math.inf
     if saturated:
         return Z_95 / math.sqrt(LOG_SLOPE * information)
-    return Z_95 * math.sqrt(sum((x - e) ** 2 for x, e in zip(scores, expected))) / information
+    residuals = sum((x - e) ** 2 for x, e in zip(scores, expected))
+    if residuals < RESIDUAL_ZERO:  # all draws against one opponent: no spread to measure, not "no error"
+        return math.inf
+    return Z_95 * math.sqrt(residuals) / information
 
 
 def estimate_rating(results: list[Result]) -> Rating:
