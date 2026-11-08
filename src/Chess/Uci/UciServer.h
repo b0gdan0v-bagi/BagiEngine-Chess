@@ -36,8 +36,10 @@ namespace BECore::Chess::Uci {
      * game plays it. A bounded `go` (a depth, a move time or a clock) is one FindMove() call. `go infinite` and `go ponder` deepen: depth 1, 2,
      * 3, ... with Analyse() until `stop`, a mate score or kMaxSearchDepth. `stop` cancels the search; the answer is then the move of the last
      * depth that finished, or, for a bounded `go` (or an infinite one stopped before depth 1 finished), the move of a search of depth 1.
-     * Every `go` is answered by exactly one `bestmove`; `quit` is a `stop` that also waits for that answer, so it never waits for a long search. HandleLine()
-     * is for one thread; the sink may be called from the worker.
+     * Every `go` is answered by exactly one `bestmove`. `stop` and `quit` cancel the search and wait for that answer (the cancelled search ends at once), so a
+     * `position` or `go` sent right behind a `stop`, before the GUI has read the `bestmove`, finds an idle server. Pondering is not supported: there is no Ponder
+     * option and no `ponder` move in a `bestmove`; `go ponder` is run as an infinite search and `ponderhit` is ignored. HandleLine() is for one thread; the sink
+     * may be called from the worker.
      */
     class UciServer {
     public:

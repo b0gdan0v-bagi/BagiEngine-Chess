@@ -44,19 +44,6 @@ namespace BECore::Chess::Uci {
             return result;
         }
 
-        /// A whole decimal number; nothing for an empty text, any other character or a value out of int
-        std::optional<int> ParseInt(eastl::string_view text) {
-            int value = 0;
-            if (text.empty()) {
-                return std::nullopt;
-            }
-            const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), value);
-            if (error != std::errc{} || end != text.data() + text.size()) {
-                return std::nullopt;
-            }
-            return value;
-        }
-
         /// The game of a `position`: the start FEN and the moves as Move values. The text of the reason when the FEN or a move is refused
         std::expected<SearchRequest, eastl::string> BuildGame(const PositionParams& params) {
             const auto start = Position::FromFen(eastl::string_view(params.startFen.data(), params.startFen.size()));
@@ -171,7 +158,9 @@ namespace BECore::Chess::Uci {
                 HandleGo(command.go);
                 break;
             case UciCommandKind::Stop:
+                // Synchronous like `quit`: a GUI may send `position` and `go` right after `stop`, before it has read the bestmove
                 StopSearch();
+                WaitIdle();
                 break;
             case UciCommandKind::Quit:
                 _quit.store(true);
@@ -216,7 +205,11 @@ namespace BECore::Chess::Uci {
             SayInfo(Format("option refused: '{}' is not a number from 0 to {}", value, top));
             return;
         }
-        (isDepth ? _depth : _blunderPercent) = *number;
+        if (isDepth) {
+            _depth = *number;
+        } else {
+            _blunderPercent = *number;
+        }
     }
 
     void UciServer::HandlePosition(const PositionParams& params) {

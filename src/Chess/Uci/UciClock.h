@@ -11,7 +11,10 @@ namespace BECore::Chess::Uci {
     inline constexpr int kIncrementShareDenominator = 4;
 
     /// Milliseconds always left on the clock after a move for the pipe, the process and the GUI: a move that takes the whole clock loses on time
-    inline constexpr int kClockMarginMs = 50;
+    inline constexpr int kClockMarginMs = 100;
+
+    /// One move never takes more than this part of the remaining time (1 over the divisor): the last move of a control must not spend the whole clock
+    inline constexpr int kMaxClockShareDivisor = 2;
 
     /// The least time of a move: a search asks for at least one millisecond
     inline constexpr int kMinMoveTimeMs = 1;
@@ -19,9 +22,9 @@ namespace BECore::Chess::Uci {
     /**
      * @brief How long to think on this move, from the clock of the side to move.
      *
-     * The remaining time divided by the moves it must last (@p movesToGo, else kDefaultMovesToGo) plus most of the increment, but never more than what the clock
-     * holds beyond kClockMarginMs, and never less than kMinMoveTimeMs (also for a clock that has run out). Integer arithmetic only, so the answer is the same on
-     * every machine, and a longer clock never gives a shorter time.
+     * The remaining time divided by the moves it must last (@p movesToGo, else kDefaultMovesToGo) plus most of the increment, but never more than the share
+     * 1 / kMaxClockShareDivisor of the clock or what it holds beyond kClockMarginMs, and never less than kMinMoveTimeMs (also for a clock that has run out). Integer arithmetic only, so the answer is
+     * the same on every machine, and a longer clock never gives a shorter time.
      *
      * @param remainingMs time left on the clock; 0 or less means none
      * @param incrementMs added to the clock after each move

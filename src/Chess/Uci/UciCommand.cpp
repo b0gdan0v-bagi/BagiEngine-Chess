@@ -57,15 +57,6 @@ namespace BECore::Chess::Uci {
             return eastl::string(text.data(), text.size());
         }
 
-        /// Reads @p text as a whole decimal number (a leading '-' allowed); false for any other character or a value out of int
-        bool ParseInt(eastl::string_view text, int& out) {
-            if (text.empty()) {
-                return false;
-            }
-            const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), out);
-            return error == std::errc{} && end == text.data() + text.size();
-        }
-
         /// The field a `go` keyword fills, nothing for a word that is not one
         std::optional<int>* GoField(GoParams& params, eastl::string_view token) {
             if (token == kDepthToken) {
@@ -101,10 +92,11 @@ namespace BECore::Chess::Uci {
                 if (token == kInfiniteToken || token == kPonderToken) {
                     params.infinite = true;
                 } else if (std::optional<int>* field = GoField(params, token)) {
-                    int value = 0;
-                    if (i + 1 < tokens.size() && ParseInt(tokens[i + 1], value)) {
-                        *field = value;
-                        ++i;
+                    if (i + 1 < tokens.size()) {
+                        if (const std::optional<int> value = ParseInt(tokens[i + 1])) {
+                            *field = value;
+                            ++i;
+                        }
                     }
                 }
             }
@@ -161,6 +153,18 @@ namespace BECore::Chess::Uci {
         }
 
     }  // namespace
+
+    std::optional<int> ParseInt(eastl::string_view text) {
+        int value = 0;
+        if (text.empty()) {
+            return std::nullopt;
+        }
+        const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), value);
+        if (error != std::errc{} || end != text.data() + text.size()) {
+            return std::nullopt;
+        }
+        return value;
+    }
 
     UciCommand ParseCommand(eastl::string_view line) {
         UciCommand command;

@@ -20,14 +20,21 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(MoveTimeFor(60000, 2000, 20), 3000 + 1500);
     }
 
-    TEST(UciClockTest, TheLastMoveOfAControlKeepsTheMargin) {
-        EXPECT_EQ(MoveTimeFor(10000, 0, 1), 10000 - Uci::kClockMarginMs);
-        EXPECT_EQ(MoveTimeFor(10000, 5000, 1), 10000 - Uci::kClockMarginMs);
+    TEST(UciClockTest, TheLastMoveOfAControlNeverTakesMoreThanHalfTheClock) {
+        EXPECT_EQ(MoveTimeFor(10000, 0, 1), 10000 / Uci::kMaxClockShareDivisor);
+        EXPECT_EQ(MoveTimeFor(10000, 5000, 1), 10000 / Uci::kMaxClockShareDivisor);
+        EXPECT_EQ(MoveTimeFor(2000, 0, 1), 1000);
     }
 
-    TEST(UciClockTest, AHugeIncrementNeverTakesMoreThanTheClock) {
-        EXPECT_EQ(MoveTimeFor(1000, 1000000, std::nullopt), 1000 - Uci::kClockMarginMs);
-        EXPECT_EQ(MoveTimeFor(1000, std::numeric_limits<int>::max(), std::nullopt), 1000 - Uci::kClockMarginMs);
+    TEST(UciClockTest, ASmallClockKeepsTheMarginWhenItIsLargerThanTheHalf) {
+        constexpr int kSmall = Uci::kClockMarginMs + Uci::kClockMarginMs / 2;
+        ASSERT_LT(kSmall - Uci::kClockMarginMs, kSmall / Uci::kMaxClockShareDivisor);
+        EXPECT_EQ(MoveTimeFor(kSmall, 0, 1), kSmall - Uci::kClockMarginMs);
+    }
+
+    TEST(UciClockTest, AHugeIncrementNeverTakesMoreThanHalfTheClock) {
+        EXPECT_EQ(MoveTimeFor(1000, 1000000, std::nullopt), 1000 / Uci::kMaxClockShareDivisor);
+        EXPECT_EQ(MoveTimeFor(1000, std::numeric_limits<int>::max(), std::nullopt), 1000 / Uci::kMaxClockShareDivisor);
     }
 
     TEST(UciClockTest, AClockThatHasRunOutStillGivesOneMillisecond) {
@@ -48,7 +55,7 @@ namespace BECore::Chess::Tests {
     TEST(UciClockTest, AHugeClockDoesNotOverflow) {
         constexpr int kHuge = std::numeric_limits<int>::max();
         EXPECT_EQ(MoveTimeFor(kHuge, 0, std::nullopt), kHuge / Uci::kDefaultMovesToGo);
-        EXPECT_EQ(MoveTimeFor(kHuge, 0, 1), kHuge - Uci::kClockMarginMs);
+        EXPECT_EQ(MoveTimeFor(kHuge, 0, 1), kHuge / Uci::kMaxClockShareDivisor);
         EXPECT_GT(MoveTimeFor(kHuge, kHuge, 1), 0);
     }
 
