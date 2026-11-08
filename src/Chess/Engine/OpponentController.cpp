@@ -55,20 +55,20 @@ namespace BECore::Chess {
         return ChooseSeats(ProgramSides::Of(computer), white, black);
     }
 
-    std::expected<void, EngineError> OpponentController::SetLevel(size_t level) {
+    std::expected<void, EngineError> OpponentController::ChooseLevel(ProgramSides plays, size_t level) {
         SeatChoice white = _seats[kWhite].choice;
         SeatChoice black = _seats[kBlack].choice;
         white.level = level;
         black.level = level;
-        return ChooseSeats(GetSides(), white, black);
+        return ChooseSeats(plays, white, black);
+    }
+
+    std::expected<void, EngineError> OpponentController::SetLevel(size_t level) {
+        return ChooseLevel(GetSides(), level);
     }
 
     std::expected<void, EngineError> OpponentController::Choose(std::optional<PieceColor> computer, size_t level) {
-        SeatChoice white = _seats[kWhite].choice;
-        SeatChoice black = _seats[kBlack].choice;
-        white.level = level;
-        black.level = level;
-        return ChooseSeats(ProgramSides::Of(computer), white, black);
+        return ChooseLevel(ProgramSides::Of(computer), level);
     }
 
     std::expected<void, EngineError> OpponentController::Choose(std::optional<PieceColor> computer, size_t level, OpponentEngine engine) {
@@ -132,7 +132,7 @@ namespace BECore::Chess {
 
     std::expected<void, EngineError> OpponentController::ChooseSeats(ProgramSides plays, SeatChoice white, SeatChoice black) {
         const eastl::span<const OpponentLevel> levels = GetOpponentLevels();
-        const SeatChoice picked[] = {white, black};
+        const eastl::array<SeatChoice, kSeatCount> picked = {white, black};
         for (const SeatChoice& choice : picked) {
             if (choice.level >= levels.size()) {
                 return std::unexpected(EngineError{EngineErrorKind::BadRequest, Format("there is no level {}, the levels are 0 to {}", choice.level, levels.size() - 1)});
@@ -157,8 +157,8 @@ namespace BECore::Chess {
         }
 
         // The engines first: a pick that finds none for any seat is refused and everything stays as it was, the running opponents and their searches included
-        bool remake[2] = {};
-        eastl::shared_ptr<IChessEngine> made[2];
+        eastl::array<bool, kSeatCount> remake = {};
+        eastl::array<eastl::shared_ptr<IChessEngine>, kSeatCount> made;
         for (const PieceColor color : EnumUtils<PieceColor>::Values()) {
             const size_t index = SeatIndex(color);
             const Seat& seat = _seats[index];

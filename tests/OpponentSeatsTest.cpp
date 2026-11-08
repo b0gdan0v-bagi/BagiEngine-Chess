@@ -325,7 +325,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OpponentSeatsTest, PlaysForCoversBothColorsGetPlaysIsNothingAndTheProgramIsWatching) {
         ChessGameModel model;
-        CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
+        CountingFactory factory({eastl::make_shared<GatedEngine>(true), eastl::make_shared<GatedEngine>(true)});
         OpponentController controller(model);
         controller.SetEngineFactory(factory.AsFactory());
         EXPECT_FALSE(controller.IsWatching());
@@ -510,7 +510,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OpponentSeatsTest, TheSingleSeatCallsWriteTheirValueIntoBothSeats) {
         ChessGameModel model;
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({eastl::make_shared<InstantEngine>(), eastl::make_shared<InstantEngine>()});
         OpponentController controller(model);
         controller.SetEngineFactory(factory.AsFactory());
         const size_t hard = LevelIndex("hard");
@@ -541,7 +541,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OpponentSeatsTest, TheSingleSeatCallsAgreeInAWatchByTheirValueAndKeepTheRest) {
         ChessGameModel model;
-        CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
+        CountingFactory factory({eastl::make_shared<GatedEngine>(true), eastl::make_shared<GatedEngine>(true)});
         OpponentController controller(model);
         controller.SetEngineFactory(factory.AsFactory());
         ASSERT_TRUE(controller.ChooseSeats(kBoth, Choice(OpponentEngine::Own, "easy"), Choice(OpponentEngine::Stockfish, "max")).has_value());
@@ -564,7 +564,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OpponentSeatsTest, PickingNobodyFromAWatchRemovesBothAndRemembersTheChoices) {
         ChessGameModel model;
-        CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
+        CountingFactory factory({eastl::make_shared<GatedEngine>(true), eastl::make_shared<GatedEngine>(true)});
         OpponentController controller(model);
         controller.SetEngineFactory(factory.AsFactory());
         ASSERT_TRUE(controller.ChooseSeats(kBoth, Choice(OpponentEngine::Own, "easy"), Choice(OpponentEngine::Stockfish, "max")).has_value());
@@ -583,7 +583,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OpponentSeatsTest, StartingAWatchDropsAHalfMadeMoveOfThePersonWhoseTurnItIs) {
         ChessGameModel model;
-        CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
+        CountingFactory factory({eastl::make_shared<GatedEngine>(true), eastl::make_shared<GatedEngine>(true)});
         OpponentController controller(model);
         controller.SetEngineFactory(factory.AsFactory());
         model.OnSquareClicked(Sq("g1"));
@@ -628,7 +628,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OpponentSeatsTest, TheChoiceOfThePersonOverTwoProgramsKeepsWorking) {
         ChessGameModel model;
-        CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
+        CountingFactory factory({eastl::make_shared<GatedEngine>(true), eastl::make_shared<GatedEngine>(true)});
         OpponentController controller(model);
         controller.SetEngineFactory(factory.AsFactory());
         OpponentChoice choice(controller);
