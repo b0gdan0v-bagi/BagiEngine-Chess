@@ -10,6 +10,9 @@ namespace BECore::Chess {
     /// for Own (which cannot fail); a test gives a double
     using EngineFactory = eastl::function<std::expected<eastl::shared_ptr<IChessEngine>, EngineError>(OpponentEngine, const OpponentLevel&)>;
 
+    /// Why no Stockfish was found: names the path that was tried when @p path is not empty, else the three places that are looked at. Shared with the analysis (PositionAnalyst)
+    [[nodiscard]] eastl::string NoStockfishDetail(const eastl::string& path);
+
     /**
      * @brief The seat of the computer opponent: which side the program plays (or none), which engine, at which strength, and the EngineOpponent behind that choice.
      *

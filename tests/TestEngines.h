@@ -3,6 +3,7 @@
 #include "ChessTestUtil.h"
 
 #include <Chess/Engine/OpponentController.h>
+#include <Chess/Engine/PositionAnalyst.h>
 #include <Chess/Engine/SearchRequest.h>
 #include <Chess/Game/GameStatus.h>
 #include <Chess/Game/MoveGenerator.h>
@@ -176,6 +177,155 @@ namespace BECore::Chess::Tests {
 
     private:
         EngineError _error;
+    };
+
+    /**
+     * @brief An engine for the tests of the analysis: Analyse() answers a scripted line, or the first legal move of the position with a given score. FindMove() is the first legal move.
+     *
+     * It counts how often it is asked, keeps the latest request and can hold its answer at a gate until Open(): a gate that honors the CancellationToken returns Cancelled at once when the
+     * token is cancelled (WasCancelled()), one that ignores it stays and answers when it is opened, which is how the tests show that a stale answer is thrown away. A gate that is never
+     * opened gives up with a Timeout after kGateGiveUp. FailWith() makes every Analyse() fail. Configure it before the first search; the reads are thread safe (a search runs on a pool worker).
+     */
+    class AnalysingEngine final : public IChessEngine {
+    public:
+        explicit AnalysingEngine(AnalysisScore score = {AnalysisScoreKind::Centipawns, 35}, std::optional<Move> move = std::nullopt, int depth = 7) : _score(score), _move(move), _depth(depth) {}
+
+        /// From now on Analyse() waits for Open() before it answers; @p honorsToken: a cancelled token ends the wait with Cancelled
+        void Gate(bool honorsToken) {
+            _gated = true;
+            _honorsToken = honorsToken;
+        }
+
+        void Open() {
+            _open.store(true);
+        }
+
+        /// From now on Analyse() fails with @p error
+        void FailWith(EngineError error) {
+            _error = std::move(error);
+        }
+
+        std::expected<Move, EngineError> FindMove(const SearchRequest& request, const CancellationToken&) override {
+            return FirstLegalMove(request);
+        }
+
+        std::expected<Analysis, EngineError> Analyse(const SearchRequest& request, const CancellationToken& token) override {
+            {
+                const std::lock_guard lock(_mutex);
+                _lastRequest = request;
+            }
+            _calls.fetch_add(1);  // after the request, so a test that waits for the call finds it
+            std::expected<Analysis, EngineError> answer = Answer(request, token);
+            _answered.fetch_add(1);
+            return answer;
+        }
+
+        /// How often Analyse() was asked, answered or not
+        [[nodiscard]] int Calls() const {
+            return _calls.load();
+        }
+
+        /// How often it has returned
+        [[nodiscard]] int Answered() const {
+            return _answered.load();
+        }
+
+        /// The latest request (empty before the first)
+        [[nodiscard]] SearchRequest LastRequest() const {
+            const std::lock_guard lock(_mutex);
+            return _lastRequest;
+        }
+
+        /// A search returned Cancelled because its token was cancelled at the gate
+        [[nodiscard]] bool WasCancelled() const {
+            return _cancelled.load();
+        }
+
+    private:
+        std::expected<Analysis, EngineError> Answer(const SearchRequest& request, const CancellationToken& token) {
+            if (_gated) {
+                const bool released = WaitUntil([&] { return _open.load() || (_honorsToken && token.IsCancelled()); }, kGateGiveUp);
+                if (_honorsToken && token.IsCancelled()) {
+                    _cancelled.store(true);
+                    return std::unexpected(EngineError{EngineErrorKind::Cancelled, "the search was cancelled at the gate"});
+                }
+                if (!released) {
+                    return std::unexpected(EngineError{EngineErrorKind::Timeout, "the gate was never opened"});
+                }
+            }
+            if (_error) {
+                return std::unexpected(*_error);
+            }
+            Move move;
+            if (_move) {
+                move = *_move;
+            } else {
+                const std::expected<Move, EngineError> first = FirstLegalMove(request);
+                if (!first) {
+                    return std::unexpected(first.error());
+                }
+                move = *first;
+            }
+            Analysis analysis;
+            analysis.lines.push_back(AnalysisLine{move, _score, _depth});
+            return analysis;
+        }
+
+        AnalysisScore _score;
+        std::optional<Move> _move;
+        int _depth;
+        bool _gated = false;
+        bool _honorsToken = false;
+        std::optional<EngineError> _error;
+        mutable std::mutex _mutex;  ///< guards _lastRequest
+        SearchRequest _lastRequest;
+        std::atomic<bool> _open{false};
+        std::atomic<bool> _cancelled{false};
+        std::atomic<int> _calls{0};
+        std::atomic<int> _answered{0};
+    };
+
+    /**
+     * @brief The AnalysisEngineFactory of a test: counts how often it is asked and for which engines, and hands out what the test decided.
+     *
+     * The first call gets the first engine, the second the second, and so on, the last engine repeating; or every call fails with one error. It is asked on the main thread only (where
+     * PositionAnalyst::Update() calls it). AsFactory() captures `this`: keep the object alive as long as the analyst can call it, and do not move it.
+     */
+    class CountingAnalysisFactory {
+    public:
+        CountingAnalysisFactory(std::initializer_list<eastl::shared_ptr<IChessEngine>> engines) : _engines(engines) {}
+        explicit CountingAnalysisFactory(EngineError error) : _error(std::move(error)) {}
+        CountingAnalysisFactory(const CountingAnalysisFactory&) = delete;
+        CountingAnalysisFactory& operator=(const CountingAnalysisFactory&) = delete;
+
+        [[nodiscard]] AnalysisEngineFactory AsFactory() {
+            return [this](OpponentEngine engine) { return Make(engine); };
+        }
+
+        /// How often the factory was asked
+        [[nodiscard]] int Calls() const {
+            return static_cast<int>(_engineIds.size());
+        }
+
+        /// The id of the engine ("stockfish", "own") of each call, in order
+        [[nodiscard]] const eastl::vector<eastl::string>& Engines() const {
+            return _engineIds;
+        }
+
+    private:
+        MadeEngine Make(OpponentEngine engine) {
+            const size_t call = _engineIds.size();
+            const eastl::string_view engineId = OpponentEngineId(engine);
+            _engineIds.emplace_back(engineId.data(), engineId.size());
+            if (_error) {
+                return std::unexpected(*_error);
+            }
+            return _engines[eastl::min(call, _engines.size() - 1)];
+        }
+
+        eastl::vector<eastl::shared_ptr<IChessEngine>> _engines;
+        std::optional<EngineError> _error;
+        eastl::vector<eastl::string> _engineIds;
     };
 
     /**
