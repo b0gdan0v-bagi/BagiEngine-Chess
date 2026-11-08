@@ -13,29 +13,63 @@ namespace BECore::Chess {
     /// Why no Stockfish was found: names the path that was tried when @p path is not empty, else the three places that are looked at. Shared with the analysis (PositionAnalyst)
     [[nodiscard]] eastl::string NoStockfishDetail(const eastl::string& path);
 
+    /// Which colors the program plays: nobody (two people), one side, or both (two programs)
+    struct ProgramSides {
+        bool white = false;
+        bool black = false;
+
+        [[nodiscard]] constexpr bool Plays(PieceColor color) const noexcept {
+            return color == PieceColor::White ? white : black;
+        }
+
+        /// Nobody, or the one color given
+        [[nodiscard]] static constexpr ProgramSides Of(std::optional<PieceColor> computer) noexcept {
+            return ProgramSides{computer == PieceColor::White, computer == PieceColor::Black};
+        }
+
+        [[nodiscard]] constexpr bool operator==(const ProgramSides&) const noexcept = default;
+    };
+
+    /// What a seat plays with: the engine and the strength (an index of GetOpponentLevels())
+    struct SeatChoice {
+        OpponentEngine engine = kDefaultOpponentEngine;
+        size_t level = kDefaultOpponentLevel;
+
+        [[nodiscard]] constexpr bool operator==(const SeatChoice&) const noexcept = default;
+    };
+
     /**
-     * @brief The seat of the computer opponent: which side the program plays (or none), which engine, at which strength, and the EngineOpponent behind that choice.
+     * @brief The seats of the computer opponent: which colors the program plays (nobody, one side or both), with which engine and strength each, and the EngineOpponents behind that choice.
      *
-     * A game starts with nobody as the opponent: two people on one screen, and nothing is looked up or started. SetSide() picks the side the program plays
-     * (the side of the program, not of the person: the HUD turns it around), asks the engine factory for an engine and makes an EngineOpponent for it.
+     * A seat is a color with a SeatChoice (engine and level). Both seats always have a choice, also when nobody plays them (the level is remembered while nobody plays); a seat that
+     * plays has an EngineOpponent made for exactly that choice. The program plays no side (two people on one screen, how a game starts: nothing is looked up or started), one side
+     * (the side of the program, not of the person: the HUD turns it around) or both (two programs, each with an engine of its own, never shared, since an engine searches one request
+     * at a time). ChooseSeats() is the one pick; SetSide(), SetLevel(), SetEngine(), Choose() and the Cycle*() calls are the single-seat API built on it, and they write the engine
+     * and level they are given into BOTH seat choices, so for a game of one program or of none the two seats are never told apart.
      *
-     * A pick that finds no engine is REFUSED: the engine is asked for first, and when there is none nothing changes (the side, the level, the engine and the running opponent with
-     * its search stay as they were), the error is kept in GetError(), the revision grows and one warning is logged. An engine that cannot be had cannot be saved, so a missing
-     * Stockfish never switches the program off; and a game that started with nobody stays with two people, so no one is locked out. Choose() is all or nothing. SetLevel()
-     * picks the strength, SetEngine() the engine (Stockfish or the own one; a game starts with kDefaultOpponentEngine). A change of side, level or engine destroys the old EngineOpponent first (it
-     * cancels its search and returns at once, and a late answer of that search is never played) and makes another, because the side is fixed by the EngineOpponent constructor and the Skill Level
-     * option is sent at the handshake. A pick that changes nothing (the same side, level and engine, no error) does nothing.
+     * GetPlays() is "the one color the program plays": nothing for nobody AND for both. The board and the choice of the person read it, and two programs leave White at the bottom.
+     * PlaysFor(color) is true for any seat of that color, IsWatching() for both. GetLevel() and GetEngine() are the choice of the seat that plays when exactly one plays, else of
+     * White's seat; GetSeatChoice(color) is any seat's.
      *
-     * The engine is part of the choice and nothing else picks it: there is no fallback from one engine to the other. A refused Stockfish pick keeps the old opponent and
+     * A pick that needs engines asks the factory for every seat that plays and is new, has another choice or whose opponent has failed, all of them BEFORE it changes anything.
+     * A pick that finds no engine is REFUSED: when any seat gets none nothing changes (the sides, the choices, and the running opponents with their searches stay as they
+     * were), the error is kept in GetError(), the revision grows and one warning is logged. An engine that cannot be had cannot be saved, so a missing Stockfish never switches
+     * the program off; and a game that started with nobody stays with two people, so no one is locked out. A change destroys the old EngineOpponent of a changed seat first (it
+     * cancels its search and returns at once, and a late answer of that search is never played) and makes another, because the side is fixed by the EngineOpponent constructor
+     * and the Skill Level option is sent at the handshake; a seat whose color and choice are unchanged keeps its opponent and its search. A pick that changes nothing (the same
+     * sides and choices, no error) does nothing.
+     *
+     * The engine is part of the choice and nothing else picks it: there is no fallback from one engine to the other. A refused Stockfish pick keeps the old opponents and
      * puts the error in GetError(); the person picks the other engine (SetEngine()), which clears the error, and then a side. While nobody plays, SetEngine() only changes the
      * choice: no factory call, nothing is looked up or started (so it cannot be refused).
      *
      * The error rule: an error belongs to the version of the game it came from (ChessGameModel::GetVersion()). When the version moves (a reset, a position set from
-     * outside, a move of someone else) Update() clears the error, the opponent's too, and a new pick clears it as well: the person has acted, so they have seen it.
+     * outside, a move of someone else) Update() clears the error, the opponents' too, and a new pick clears it as well: the person has acted, so they have seen it.
      * The program's own move does not take a refused pick's error away (the opponent that kept playing would otherwise erase the sentence before anyone read it).
-     * Until then the game waits and no search starts, so a broken engine is one error and not a try per frame. A person who does not want to wait picks nobody.
+     * Until then the game waits and no search starts, so a broken engine is one error and not a try per frame; the error of either seat stalls the game, since it is that
+     * seat's turn. A person who does not want to wait picks nobody.
      *
-     * GetRevision() grows whenever something a display shows changes: the side, the level, the engine, an error that appears or goes. It does not grow with a search that
+     * GetRevision() grows whenever something a display shows changes: the sides, a choice, an error that appears or goes; one pick grows it once. It does not grow with a search that
      * starts or ends (IsThinking()) or with a move of the game (GetVersion() of the model); a display that publishes these watches the three.
      *
      * Threads: main thread only (every call, Update() included). The engine is searched on the Background pool by EngineOpponent, which says more of stale answers
@@ -75,17 +109,27 @@ namespace BECore::Chess {
         void SetEngineFactory(EngineFactory factory);
 
         /**
+         * @brief The one pick: the colors the program plays and the choice of each seat.
+         *
+         * BadRequest, with nothing changed, for a level outside GetOpponentLevels() in either choice. A pick that needs engines asks the factory for each seat that plays and is new
+         * or changed (White's first, and no more once one fails), all before anything changes, and refuses the whole pick when one fails: nothing changed, GetError() has the error and the
+         * same error comes back. Then the old opponents of the changed seats are destroyed and new ones made; the unchanged seats keep theirs and their searches. When a program takes the side to
+         * move, a half-made move of the person is dropped (ChessGameModel::ClearSelection()). The choice of a seat that nobody plays is remembered, not used.
+         */
+        std::expected<void, EngineError> ChooseSeats(ProgramSides plays, SeatChoice white, SeatChoice black);
+
+        /**
          * @brief The side the program plays, or nobody (two people).
          *
-         * Remakes the opponent and clears the error, as described above. When the program takes the side to move, a half-made move of the person
-         * is dropped (ChessGameModel::ClearSelection()). Returns the engine factory's error when there is no engine: the pick is refused and nothing changed, GetError() has the error.
+         * A side takes the choice of its seat and writes it into the other seat as well (the single-seat API treats the seats alike); nobody keeps both choices as they are.
+         * Remakes the opponent and clears the error, as described above. Returns the engine factory's error when there is no engine: the pick is refused and nothing changed, GetError() has the error.
          */
         std::expected<void, EngineError> SetSide(std::optional<PieceColor> computer);
 
-        /// The strength, an index of GetOpponentLevels(); BadRequest (nothing changes) for one outside it. Remakes the opponent when the program plays
+        /// The strength, an index of GetOpponentLevels(), for both seats; BadRequest (nothing changes) for one outside it. Remakes the opponents of the seats that play
         std::expected<void, EngineError> SetLevel(size_t level);
 
-        /// Nobody, then the program plays Black (the person has White), then the program plays White, then nobody again
+        /// Nobody, then the program plays Black (the person has White), then the program plays White, then nobody again. Two programs go to nobody
         std::expected<void, EngineError> CycleSide();
 
         /// Side and strength in one pick, the engine kept: one engine is made, not two. The same rules as SetSide() and SetLevel(); BadRequest, with nothing changed, for a level outside
@@ -95,7 +139,7 @@ namespace BECore::Chess {
         /// Side, strength and engine in one pick: one engine is made, not three. BadRequest, with nothing changed, for a level outside GetOpponentLevels()
         std::expected<void, EngineError> Choose(std::optional<PieceColor> computer, size_t level, OpponentEngine engine);
 
-        /// The engine; remakes the opponent when the program plays (the factory is asked once for (engine, level)), else only changes the choice and clears a standing pick error
+        /// The engine, for both seats; remakes the opponents when the program plays (the factory is asked once per seat that plays), else only changes the choice and clears a standing pick error
         std::expected<void, EngineError> SetEngine(OpponentEngine engine);
 
         /// The next engine: Stockfish, Own, and back to Stockfish
@@ -104,66 +148,113 @@ namespace BECore::Chess {
         /// The next level, the first one after the last
         std::expected<void, EngineError> CycleLevel();
 
-        /// One step per frame, for the main thread; it never waits for the engine. Drops an error of an earlier version, runs EngineOpponent::Update() and notes a new error
+        /// One step per frame, for the main thread; it never waits for the engine. Drops an error of an earlier version, runs EngineOpponent::Update() of White's seat and then of Black's,
+        /// and notes a new error
         void Update();
 
-        /// Destroys the opponent (it cancels its search and returns at once); nobody plays afterwards and Update() does nothing, until a new pick
+        /// Destroys the opponents (they cancel their searches and return at once); nobody plays afterwards and Update() does nothing, until a new pick
         void Shutdown();
 
-        /// The side the program plays; nothing for two people
+        /// The one color the program plays; nothing for two people AND for two programs (see IsWatching())
         [[nodiscard]] std::optional<PieceColor> GetPlays() const noexcept {
-            return _opponent ? std::optional<PieceColor>(_opponent->GetSide()) : std::nullopt;
+            if (_seats[kWhite].opponent && !_seats[kBlack].opponent) {
+                return PieceColor::White;
+            }
+            if (_seats[kBlack].opponent && !_seats[kWhite].opponent) {
+                return PieceColor::Black;
+            }
+            return std::nullopt;
         }
 
-        /// The program plays @p color. Stays true while an error stands: that side is still the program's, and the game waits for the person to act
+        /// The colors the program plays
+        [[nodiscard]] ProgramSides GetSides() const noexcept {
+            return ProgramSides{_seats[kWhite].opponent != nullptr, _seats[kBlack].opponent != nullptr};
+        }
+
+        /// The program plays @p color (either seat). Stays true while an error stands: that side is still the program's, and the game waits for the person to act
         [[nodiscard]] bool PlaysFor(PieceColor color) const noexcept {
-            return _opponent && _opponent->GetSide() == color;
+            return _seats[SeatIndex(color)].opponent != nullptr;
         }
 
-        /// The index of the picked strength in GetOpponentLevels(); the level that would be used when a side is picked, also while nobody plays
+        /// The program plays both colors
+        [[nodiscard]] bool IsWatching() const noexcept {
+            return _seats[kWhite].opponent && _seats[kBlack].opponent;
+        }
+
+        /// The choice of the seat of @p color: what would be used when that color is picked, also while nobody plays it
+        [[nodiscard]] const SeatChoice& GetSeatChoice(PieceColor color) const noexcept {
+            return _seats[SeatIndex(color)].choice;
+        }
+
+        /// The index of the picked strength in GetOpponentLevels(), of the seat that plays when exactly one plays, else of White's; the level that would be used when a side is picked, also while
+        /// nobody plays
         [[nodiscard]] size_t GetLevel() const noexcept {
-            return _level;
+            return SingleSeatChoice().level;
         }
 
-        /// The picked engine; the one that would be used when a side is picked, also while nobody plays
+        /// The picked engine (of the same seat as GetLevel()); the one that would be used when a side is picked, also while nobody plays
         [[nodiscard]] OpponentEngine GetEngine() const noexcept {
-            return _engine;
+            return SingleSeatChoice().engine;
         }
 
-        /// The program is searching for its move
+        /// The program is searching for its move (either seat)
         [[nodiscard]] bool IsThinking() const {
-            return _opponent && _opponent->IsThinking();
+            return (_seats[kWhite].opponent && _seats[kWhite].opponent->IsThinking()) || (_seats[kBlack].opponent && _seats[kBlack].opponent->IsThinking());
         }
 
-        /// Why the program does not play as asked: the refused pick, else the failed search of the opponent; empty when nothing is wrong. A refused pick does not stop a running opponent
+        /// Why the program does not play as asked: the refused pick, else the failed search of an opponent (White's seat first); empty when nothing is wrong. A refused pick does not stop a running
+        /// opponent
         [[nodiscard]] const std::optional<EngineError>& GetError() const noexcept {
             if (_pickError) {
                 return _pickError;
             }
-            return _opponent ? _opponent->GetLastError() : _pickError;
+            for (const Seat& seat : _seats) {
+                if (seat.opponent && seat.opponent->GetLastError().has_value()) {
+                    return seat.opponent->GetLastError();
+                }
+            }
+            return _pickError;
         }
 
-        /// Grows with every change of the side, the level, the engine or the error that a display shows; never goes back
+        /// Grows with every change of the sides, a choice or the error that a display shows; never goes back
         [[nodiscard]] uint64_t GetRevision() const noexcept {
             return _revision;
         }
 
     private:
-        std::expected<void, EngineError> Remake(std::optional<PieceColor> computer, size_t level, OpponentEngine engine);
+        /// One color's place: what it plays with and the opponent that plays it (null: nobody)
+        struct Seat {
+            SeatChoice choice;
+            eastl::unique_ptr<EngineOpponent> opponent;
+            bool errorNoted = false;  ///< the error in `opponent` has been counted in the revision
+        };
+
+        static constexpr size_t kSeatCount = EnumUtils<PieceColor>::Count();  ///< one seat per color
+        static constexpr size_t kWhite = 0;                                   ///< the index of White's seat; Black's is 1
+        static constexpr size_t kBlack = 1;
+
+        [[nodiscard]] static constexpr size_t SeatIndex(PieceColor color) noexcept {
+            return color == PieceColor::White ? kWhite : kBlack;
+        }
+
+        /// The choice of the one seat that plays, else of White's
+        [[nodiscard]] const SeatChoice& SingleSeatChoice() const noexcept {
+            return _seats[GetPlays() == PieceColor::Black ? kBlack : kWhite].choice;
+        }
+
         [[nodiscard]] std::expected<eastl::shared_ptr<IChessEngine>, EngineError> MakeEngine(OpponentEngine engine, const OpponentLevel& level) const;
+        /// A pick of @p plays with @p level in both seats, the engines kept
+        std::expected<void, EngineError> ChooseLevel(ProgramSides plays, size_t level);
         void FailPick(EngineError error, PieceColor computer, OpponentEngine engine, const OpponentLevel& level);
         void DropStaleError();
-        void NoteOpponentError();
+        void NoteOpponentError(Seat& seat);
 
         ChessGameModel& _model;
         OpponentSettings _settings;
         EngineFactory _factory;  ///< empty: the Stockfish of _settings, the OwnEngine, each wrapped by WithHandicap
-        OpponentEngine _engine = kDefaultOpponentEngine;
-        size_t _level = kDefaultOpponentLevel;        ///< an index of GetOpponentLevels()
-        eastl::unique_ptr<EngineOpponent> _opponent;  ///< null: nobody, two people
-        std::optional<EngineError> _pickError;        ///< the factory's failure of the last pick; the old opponent (if any) goes on playing while it stands
-        bool _opponentErrorNoted = false;             ///< the error in _opponent has been counted in the revision
-        uint64_t _errorVersion = 0;                   ///< GetVersion() of the model when the standing error came
+        eastl::array<Seat, kSeatCount> _seats;
+        std::optional<EngineError> _pickError;  ///< the factory's failure of the last pick; the old opponents (if any) go on playing while it stands
+        uint64_t _errorVersion = 0;             ///< GetVersion() of the model when the standing error came
         uint64_t _revision = 0;
     };
 

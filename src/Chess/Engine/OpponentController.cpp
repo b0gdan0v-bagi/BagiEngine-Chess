@@ -49,109 +49,155 @@ namespace BECore::Chess {
     }
 
     std::expected<void, EngineError> OpponentController::SetSide(std::optional<PieceColor> computer) {
-        return Remake(computer, _level, _engine);
+        // A side takes the choice of its seat for both; nobody keeps the choices as they are
+        const SeatChoice white = computer ? _seats[SeatIndex(*computer)].choice : _seats[kWhite].choice;
+        const SeatChoice black = computer ? _seats[SeatIndex(*computer)].choice : _seats[kBlack].choice;
+        return ChooseSeats(ProgramSides::Of(computer), white, black);
+    }
+
+    std::expected<void, EngineError> OpponentController::ChooseLevel(ProgramSides plays, size_t level) {
+        SeatChoice white = _seats[kWhite].choice;
+        SeatChoice black = _seats[kBlack].choice;
+        white.level = level;
+        black.level = level;
+        return ChooseSeats(plays, white, black);
     }
 
     std::expected<void, EngineError> OpponentController::SetLevel(size_t level) {
-        return Remake(GetPlays(), level, _engine);
+        return ChooseLevel(GetSides(), level);
     }
 
     std::expected<void, EngineError> OpponentController::Choose(std::optional<PieceColor> computer, size_t level) {
-        return Remake(computer, level, _engine);
+        return ChooseLevel(ProgramSides::Of(computer), level);
     }
 
     std::expected<void, EngineError> OpponentController::Choose(std::optional<PieceColor> computer, size_t level, OpponentEngine engine) {
-        return Remake(computer, level, engine);
+        const SeatChoice choice{engine, level};
+        return ChooseSeats(ProgramSides::Of(computer), choice, choice);
     }
 
     std::expected<void, EngineError> OpponentController::SetEngine(OpponentEngine engine) {
-        return Remake(GetPlays(), _level, engine);
+        SeatChoice white = _seats[kWhite].choice;
+        SeatChoice black = _seats[kBlack].choice;
+        white.engine = engine;
+        black.engine = engine;
+        return ChooseSeats(GetSides(), white, black);
     }
 
     std::expected<void, EngineError> OpponentController::CycleEngine() {
-        return SetEngine(NextOpponentEngine(_engine));
+        return SetEngine(NextOpponentEngine(GetEngine()));
     }
 
     std::expected<void, EngineError> OpponentController::CycleSide() {
         const std::optional<PieceColor> plays = GetPlays();
         if (!plays) {
-            return SetSide(PieceColor::Black);
+            return SetSide(IsWatching() ? std::nullopt : std::optional<PieceColor>(PieceColor::Black));
         }
         return SetSide(*plays == PieceColor::Black ? std::optional<PieceColor>(PieceColor::White) : std::nullopt);
     }
 
     std::expected<void, EngineError> OpponentController::CycleLevel() {
-        return SetLevel((_level + 1) % GetOpponentLevels().size());
+        return SetLevel((GetLevel() + 1) % GetOpponentLevels().size());
     }
 
     void OpponentController::Update() {
         DropStaleError();
-        if (_opponent) {
-            const uint64_t version = _model.GetVersion();
-            _opponent->Update(_model);
-            if (_pickError && _errorVersion == version) {
-                // Only the opponent can have moved the game in the call above, and a refused pick that left it playing must not lose its sentence to the program's own move
-                _errorVersion = _model.GetVersion();
+        const uint64_t version = _model.GetVersion();
+        for (Seat& seat : _seats) {
+            if (seat.opponent) {
+                seat.opponent->Update(_model);
             }
-            NoteOpponentError();
+        }
+        if (_pickError && _errorVersion == version) {
+            // Only an opponent can have moved the game in the calls above, and a refused pick that left it playing must not lose its sentence to the program's own move
+            _errorVersion = _model.GetVersion();
+        }
+        for (Seat& seat : _seats) {
+            if (seat.opponent) {
+                NoteOpponentError(seat);
+            }
         }
     }
 
     void OpponentController::Shutdown() {
-        if (_opponent || _pickError) {
+        if (_seats[kWhite].opponent || _seats[kBlack].opponent || _pickError) {
             ++_revision;
         }
-        _opponent.reset();
+        for (Seat& seat : _seats) {
+            seat.opponent.reset();
+            seat.errorNoted = false;
+        }
         _pickError.reset();
-        _opponentErrorNoted = false;
     }
 
-    std::expected<void, EngineError> OpponentController::Remake(std::optional<PieceColor> computer, size_t level, OpponentEngine engine) {
+    std::expected<void, EngineError> OpponentController::ChooseSeats(ProgramSides plays, SeatChoice white, SeatChoice black) {
         const eastl::span<const OpponentLevel> levels = GetOpponentLevels();
-        if (level >= levels.size()) {
-            return std::unexpected(EngineError{EngineErrorKind::BadRequest, Format("there is no level {}, the levels are 0 to {}", level, levels.size() - 1)});
+        const eastl::array<SeatChoice, kSeatCount> picked = {white, black};
+        for (const SeatChoice& choice : picked) {
+            if (choice.level >= levels.size()) {
+                return std::unexpected(EngineError{EngineErrorKind::BadRequest, Format("there is no level {}, the levels are 0 to {}", choice.level, levels.size() - 1)});
+            }
         }
-        const bool unchanged = computer == GetPlays() && level == _level && engine == _engine;
+
+        bool unchanged = true;
+        bool opponentFailed = false;
+        for (const PieceColor color : EnumUtils<PieceColor>::Values()) {
+            const Seat& seat = _seats[SeatIndex(color)];
+            unchanged = unchanged && (seat.opponent != nullptr) == plays.Plays(color) && seat.choice == picked[SeatIndex(color)];
+            opponentFailed = opponentFailed || (seat.opponent && seat.opponent->GetLastError().has_value());
+        }
         if (unchanged && !GetError().has_value()) {
             return {};
         }
-        if (unchanged && _pickError && !(_opponent && _opponent->GetLastError().has_value())) {
-            // The person picks what already plays and only a refused pick is standing: they have seen it, nothing is remade and the running search stays
+        if (unchanged && _pickError && !opponentFailed) {
+            // The person picks what already plays and only a refused pick is standing: they have seen it, nothing is remade and the running searches stay
             _pickError.reset();
             ++_revision;
             return {};
         }
 
-        if (!computer) {
-            // Nobody needs no engine, so this pick cannot fail
-            _opponent.reset();
-            _pickError.reset();
-            _opponentErrorNoted = false;
-            _level = level;
-            _engine = engine;
-            ++_revision;
-            return {};
+        // The engines first: a pick that finds none for any seat is refused and everything stays as it was, the running opponents and their searches included
+        eastl::array<bool, kSeatCount> remake = {};
+        eastl::array<eastl::shared_ptr<IChessEngine>, kSeatCount> made;
+        for (const PieceColor color : EnumUtils<PieceColor>::Values()) {
+            const size_t index = SeatIndex(color);
+            const Seat& seat = _seats[index];
+            remake[index] = plays.Plays(color) && (!seat.opponent || seat.choice != picked[index] || seat.opponent->GetLastError().has_value());
+            if (!remake[index]) {
+                continue;
+            }
+            const OpponentLevel& chosen = levels[picked[index].level];
+            std::expected<eastl::shared_ptr<IChessEngine>, EngineError> engine = MakeEngine(picked[index].engine, chosen);
+            if (engine && !*engine) {
+                engine = std::unexpected(EngineError{EngineErrorKind::LaunchFailed, "the engine factory made no engine"});
+            }
+            if (!engine) {
+                FailPick(std::move(engine.error()), color, picked[index].engine, chosen);
+                return std::unexpected(*_pickError);
+            }
+            made[index] = std::move(*engine);
         }
 
-        // The engine first: a pick that finds none is refused and everything stays as it was, the running opponent and its search included
-        const OpponentLevel& chosen = levels[level];
-        std::expected<eastl::shared_ptr<IChessEngine>, EngineError> made = MakeEngine(engine, chosen);
-        if (made && !*made) {
-            made = std::unexpected(EngineError{EngineErrorKind::LaunchFailed, "the engine factory made no engine"});
+        // Past this point nothing can fail. The old opponents of the changed seats go first: they cancel their searches and return at once; a late answer stays with the worker
+        for (const PieceColor color : EnumUtils<PieceColor>::Values()) {
+            const size_t index = SeatIndex(color);
+            if (remake[index] || !plays.Plays(color)) {
+                _seats[index].opponent.reset();
+            }
+            _seats[index].errorNoted = false;
+            _seats[index].choice = picked[index];
         }
-        if (!made) {
-            FailPick(std::move(made.error()), *computer, engine, chosen);
-            return std::unexpected(*_pickError);
-        }
-        _opponent.reset();  // cancels the search of the old one and returns at once; its late answer stays with the worker
         _pickError.reset();
-        _opponentErrorNoted = false;
-        _level = level;
-        _engine = engine;
         ++_revision;
-        _opponent = eastl::make_unique<EngineOpponent>(std::move(*made), *computer, LimitsOf(engine, chosen));
-        if (_model.GetTurn() == *computer) {
-            _model.ClearSelection();
+        for (const PieceColor color : EnumUtils<PieceColor>::Values()) {
+            const size_t index = SeatIndex(color);
+            if (!remake[index]) {
+                continue;
+            }
+            _seats[index].opponent = eastl::make_unique<EngineOpponent>(std::move(made[index]), color, LimitsOf(picked[index].engine, levels[picked[index].level]));
+            if (_model.GetTurn() == color) {
+                _model.ClearSelection();
+            }
         }
         return {};
     }
@@ -182,18 +228,20 @@ namespace BECore::Chess {
             return;
         }
         _pickError.reset();
-        if (_opponent) {
-            _opponent->ClearError();
+        for (Seat& seat : _seats) {
+            if (seat.opponent) {
+                seat.opponent->ClearError();
+            }
+            seat.errorNoted = false;
         }
-        _opponentErrorNoted = false;
         ++_revision;
     }
 
-    void OpponentController::NoteOpponentError() {
-        if (_opponentErrorNoted || !_opponent->GetLastError().has_value()) {
+    void OpponentController::NoteOpponentError(Seat& seat) {
+        if (seat.errorNoted || !seat.opponent->GetLastError().has_value()) {
             return;
         }
-        _opponentErrorNoted = true;
+        seat.errorNoted = true;
         _errorVersion = _model.GetVersion();
         ++_revision;
     }

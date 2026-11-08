@@ -8,14 +8,18 @@
 
 namespace BECore::Chess {
 
-    std::optional<HintRefusal> HintRefusalFor(const ChessGameModel& model, std::optional<PieceColor> programPlays) {
+    std::optional<HintRefusal> HintRefusalFor(const ChessGameModel& model, ProgramSides programPlays) {
         if (model.IsGameOver()) {
             return HintRefusal::GameOver;
         }
-        if (programPlays && *programPlays == model.GetTurn()) {
+        if (programPlays.Plays(model.GetTurn())) {
             return HintRefusal::ProgramsTurn;
         }
         return std::nullopt;
+    }
+
+    std::optional<HintRefusal> HintRefusalFor(const ChessGameModel& model, std::optional<PieceColor> programPlays) {
+        return HintRefusalFor(model, ProgramSides::Of(programPlays));
     }
 
     std::expected<eastl::shared_ptr<IChessEngine>, EngineError> MakeAnalysisEngine(OpponentEngine engine, const OpponentSettings& settings) {

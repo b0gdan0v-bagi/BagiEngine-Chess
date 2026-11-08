@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Chess/Engine/OpponentController.h>
 #include <Chess/Engine/OpponentEngines.h>
 #include <Chess/Engine/OpponentSettings.h>
 #include <Chess/Engine/SearchRequest.h>
@@ -10,8 +11,11 @@ namespace BECore::Chess {
     /// Why a hint is refused. GameOver: the game has ended, there is nothing to hint. ProgramsTurn: the program plays the side to move, and a hint is for the person
     CORE_ENUM(HintRefusal, uint8_t, GameOver, ProgramsTurn)
 
-    /// The rule of who may ask for a hint, one pure function for every caller (the control API, the HUD button): refused on a finished game, and on the turn of the side the program
-    /// plays (@p programPlays; nothing for two people, where either side may ask). Nothing: the hint may be asked
+    /// The rule of who may ask for a hint, one pure function for every caller (the control API, the HUD button): refused on a finished game, and on the turn of any side the program
+    /// plays (@p programPlays; nobody for two people, where either side may ask; both for two programs, where a hint is refused on either turn). Nothing: the hint may be asked
+    [[nodiscard]] std::optional<HintRefusal> HintRefusalFor(const ChessGameModel& model, ProgramSides programPlays);
+
+    /// The same for a program that plays one color or none
     [[nodiscard]] std::optional<HintRefusal> HintRefusalFor(const ChessGameModel& model, std::optional<PieceColor> programPlays);
 
     /// Makes the engine that analyses for the picked kind, or says why there is none. A test gives a double; the default is MakeAnalysisEngine()
@@ -49,8 +53,8 @@ namespace BECore::Chess {
      * analysis has a process of its own and the opponent's search never waits for it. The limits are those of the strongest level (LimitsOf(picked, GetOpponentLevels().back())), no handicap:
      * the owner's rule is that nothing is spoilt or replaced behind the person's back. Nothing falls back to the other engine.
      *
-     * **The hint rule** lives in HintRefusalFor(): for the person, so refused on the program's turn and on a finished game. RequestHint() itself only refuses GameOver (the engine is not
-     * asked for a finished game); the control adapter and the HUD call HintRefusalFor() first, because only they know which side the program plays.
+     * **The hint rule** lives in HintRefusalFor(): for the person, so refused on a turn of any side the program plays (both, in a game of two programs) and on a finished game. RequestHint() itself
+     * only refuses GameOver (the engine is not asked for a finished game); the control adapter and the HUD call HintRefusalFor() first, because only they know which side the program plays.
      *
      * **Threads and shutdown.** Main thread only, as EngineOpponent: the model is read in Update() and in the reads, and the worker sees a copy of the request and a state of its own (the
      * engine, a CancellationToken, the answer behind a mutex, an atomic `done`) which it shares through a shared pointer, so nothing dangles whichever side ends first. The destructor,

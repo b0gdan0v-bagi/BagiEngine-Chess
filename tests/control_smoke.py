@@ -7,7 +7,9 @@ ctest runs it as BagiChessControlSmoke (be_add_game_control_tests). It builds on
 which it finds through the environment variable BAGI_ENGINE_DIR (set by ctest), or in the submodule engine/. The game is played on the real clock, with
 --manual-clock, and with moves before its first frame. The computer opponent is played on both clocks in two ways. The engine of our own ("own
 engine" scenarios, base ones) needs nothing from the environment: it runs inside the game, with no process, so it also runs where the next kind is left out;
-it answers the same move to the same position (a fixed depth), which the scenario checks after a reset. The analysis ("analysis" scenarios, base ones too) switches the evaluation of the own engine on, reads it from White's view on a mate in one, asks for a hint and reads it, and
+it answers the same move to the same position (a fixed depth), which the scenario checks after a reset. The watch ("watch" scenarios, base ones too) lets two own engines
+play each other (`set_state` with `"plays": "both"` and a seat each), reads the seats back, follows the game (the version only grows, the turns alternate), checks that a hint is refused,
+that a reset keeps both seats (and, on the manual clock, plays the same game again), that `"plays": "white"` is a takeover that leaves Black to the person, and that null ends it. The analysis ("analysis" scenarios, base ones too) switches the evaluation of the own engine on, reads it from White's view on a mate in one, asks for a hint and reads it, and
 leaves the game with the analyst running. The opponent panel ("opponent panel" scenarios, base
 ones too) is driven only by `ui_click` on the buttons and segments found by name, as a person would: open it with the Menu button, pick the own engine,
 Computer, a level and a color, read the pick back from `get_state` and from `ui_tree`, play, close it with OK. The captured material ("captured material"
@@ -45,7 +47,7 @@ ENGINE_TESTS_DIR = find_engine_tests_dir()
 sys.path.insert(0, str(ENGINE_TESTS_DIR))  # smoke.py
 sys.path.insert(0, str(ENGINE_TESTS_DIR.parent))  # bagi_control_client.py
 
-from bagi_control_client import BagiControlClient  # noqa: E402
+from bagi_control_client import BagiControlClient, ControlError  # noqa: E402
 from smoke import BOARD_COLORS, check, check_state_push, expect_error, find_ui_element, run_smoke, take_screenshot  # noqa: E402
 
 START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
@@ -357,6 +359,139 @@ def run_own_engine_scenario(client: BagiControlClient, headless: bool) -> None:
 
     if headless:
         check_the_board_turns_with_the_program(client)
+
+
+WATCH_PLIES = 20
+WATCH_SEATS = {"white": {"engine": "own", "level": "easy"}, "black": {"engine": "own", "level": "medium"}}
+
+
+class WatchedGame:
+    """What a client sees of a game of two programs: every read must agree with the ones before it (the version only grows, the moves only extend, the turns alternate)."""
+
+    def __init__(self, client: BagiControlClient) -> None:
+        self.client = client
+        self.version = 0
+        self.moves = []
+
+    def forget_moves(self) -> None:
+        """After a reset: the next moves are a new game."""
+        self.moves = []
+
+    def see(self) -> dict:
+        reply = self.client.call("get_state")
+        state = reply["state"]
+        check(reply["version"] >= self.version, f"the state version went back from {self.version} to {reply['version']}")
+        self.version = reply["version"]
+        check(state["moves"][: len(self.moves)] == self.moves, f"the moves {state['moves']} do not extend {self.moves}")
+        self.moves = state["moves"]
+        if state["status"] == "ongoing":
+            expected_turn = "white" if len(self.moves) % 2 == 0 else "black"
+            check(state["turn"] == expected_turn, f"the turn is {state['turn']} after {len(self.moves)} moves")
+        opponent = state["opponent"]
+        check(opponent["error"] is None, f"a program failed: {opponent['error']}")
+        return state
+
+    def wait_for(self, accept, what: str) -> dict:
+        """Until accept(state) holds; gives that state. Real clock: poll; manual clock: step a frame per poll. Limited by time, never a fixed sleep."""
+        deadline = time.monotonic() + OPPONENT_WAIT_SECONDS
+        manual = self.client.call("status")["manualClock"]
+        while True:
+            state = self.see()
+            if accept(state):
+                return state
+            check(time.monotonic() < deadline, f"the game did not reach ({what}) in {OPPONENT_WAIT_SECONDS} s: moves {state['moves']}, opponent {state['opponent']}")
+            if manual:
+                self.client.call("step")
+            time.sleep(POLL_SECONDS)
+
+    def play_to_the_plies(self) -> list:
+        """Until WATCH_PLIES moves are played or the game is over; gives the moves."""
+        return self.wait_for(lambda state: len(state["moves"]) >= WATCH_PLIES or state["status"] != "ongoing", f"{WATCH_PLIES} moves")["moves"]
+
+
+def check_the_watch_is_set(client: BagiControlClient, plays) -> None:
+    opponent = get_opponent(client)
+    check(opponent["plays"] == plays and opponent["error"] is None, f"the opponent is not read back as plays {plays}: {opponent}")
+    check(opponent["seats"] == WATCH_SEATS, f"the seats were not kept: {opponent['seats']}")
+
+
+def check_a_hint_is_refused(client: BagiControlClient, may_be_over: bool = False) -> None:
+    """A hint is for the person: while the programs play it is refused (`not_your_turn`), and the switch of that call is not applied either.
+    `may_be_over`: the programs keep playing between the previous read and this call, so on the real clock the game may have ended in the meantime;
+    then `game_over` is the right answer, but only when the state really says the game is not ongoing."""
+    request = {"analysis": {"evaluation": True, "hint": True}}
+    if may_be_over:
+        try:
+            client.call("set_state", request)
+            check(False, "a hint while the programs play was accepted")
+        except ControlError as error:
+            if error.code == "game_over":
+                status = client.call("get_state")["state"]["status"]
+                check(status != "ongoing", f"a hint was refused as game_over while the game is {status}")
+            else:
+                check(error.code == "not_your_turn", f"a hint while the programs play was refused as {error.code}: {error.message}")
+    else:
+        expect_error("not_your_turn", lambda: client.call("set_state", request), "a hint while the programs play")
+    analysis = get_analysis(client)
+    check(analysis["evaluationOn"] is False and analysis["hintRequested"] is False, f"a refused hint changed the analysis: {analysis}")
+
+
+def run_watch_scenario(client: BagiControlClient, headless: bool) -> None:
+    """Two own engines (easy against medium, no process) play each other, and the person takes a side over. Needs nothing from the environment."""
+    manual = client.call("status")["manualClock"]
+    if manual:
+        client.call("step")
+    client.call("reset")
+    game = WatchedGame(client)
+
+    version = client.call("get_state")["version"]
+    picked = client.call("set_state", {"opponent": {"plays": "both", "white": WATCH_SEATS["white"], "black": WATCH_SEATS["black"]}})
+    check(picked["version"] > version, "picking two programs did not move the state version")
+    check_the_watch_is_set(client, "both")
+    opponent = get_opponent(client)
+    check(opponent["engine"] == "own" and opponent["level"] == "easy", f"the single-seat answer is not White's seat: {opponent}")
+    if manual:
+        check(get_moves(client) == [], "picking the programs played a move")  # no frame has run since the pick
+    check_a_hint_is_refused(client)  # the programs are playing and the game cannot be over yet
+
+    first = game.play_to_the_plies()
+    check(len(first) >= 1, "the programs played nothing")
+    check_the_watch_is_set(client, "both")
+    check_a_hint_is_refused(client, may_be_over=True)  # after moves: the programs may have ended the game since the last read
+
+    # A reset starts a new game and keeps both programs; on the manual clock the same two programs play the same game
+    client.call("reset")
+    game.forget_moves()
+    check_the_watch_is_set(client, "both")
+    if manual:
+        check(get_moves(client) == [], "a reset left moves behind")
+        second = game.play_to_the_plies()
+        check(second[:WATCH_PLIES] == first[:WATCH_PLIES], f"the same programs played another game after a reset: {first[:WATCH_PLIES]} then {second[:WATCH_PLIES]}")
+
+    # A takeover: the person has Black, the program plays White and waits for the person's move
+    client.call("reset")
+    game.forget_moves()
+    client.call("set_state", {"opponent": {"plays": "white"}})
+    opponent = get_opponent(client)
+    check(opponent["plays"] == "white" and opponent["seats"] == WATCH_SEATS, f"the takeover was not read back: {opponent}")
+    state = game.wait_for(lambda s: s["turn"] == "black" and not s["opponent"]["thinking"], "the program's move and Black's turn")
+    waiting_moves = state["moves"]
+    let_frames_pass(client, FRAMES_WITHOUT_AN_ANSWER)
+    state = game.see()
+    check(state["moves"] == waiting_moves and state["turn"] == "black" and state["opponent"]["thinking"] is False, f"Black's program played or thinks after the takeover: {state}")
+    legal = [action["uci"] for action in client.call("list_actions")["actions"]]
+    check(bool(legal), "no legal move for the person")
+    client.call("perform_action", move(legal[0]))
+    state = game.wait_for(lambda s: len(s["moves"]) == len(waiting_moves) + 2 and not s["opponent"]["thinking"], "White's answer to the person's move")
+    check(state["moves"][len(waiting_moves)] == legal[0] and state["turn"] == "black", f"unexpected game after the person's move {legal[0]}: {state['moves']}")
+
+    # Nobody: the game stays where it is
+    client.call("set_state", {"opponent": {"plays": None}})
+    check(get_opponent(client)["plays"] is None and get_opponent(client)["thinking"] is False, f"plays: null did not end the programs: {get_opponent(client)}")
+    stopped_moves = get_moves(client)
+    let_frames_pass(client, FRAMES_WITHOUT_AN_ANSWER)
+    check(get_moves(client) == stopped_moves, "a program played after plays: null")
+    check(get_opponent(client)["error"] is None, f"the opponent has an error: {get_opponent(client)['error']}")
 
 
 def get_analysis(client: BagiControlClient) -> dict:
@@ -777,6 +912,8 @@ BASE_SCENARIOS = [
     ("moves before the first frame", ["--manual-clock"], run_moves_before_the_first_frame),
     ("own engine, real clock", [], run_own_engine_scenario),
     ("own engine, manual clock", ["--manual-clock"], run_own_engine_scenario),
+    ("watch, real clock", [], run_watch_scenario),
+    ("watch, manual clock", ["--manual-clock"], run_watch_scenario),
     ("analysis, real clock", [], run_analysis_scenario),
     ("analysis, manual clock", ["--manual-clock"], run_analysis_scenario),
     ("opponent panel, real clock", [], run_opponent_panel_scenario),

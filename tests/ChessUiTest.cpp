@@ -5696,4 +5696,267 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(RectCalls(kLightSquareColor).size() + RectCalls(kDarkSquareColor).size(), 64u) << "the squares are still drawn";
     }
 
+    // A watch: both colors are programs (OpponentController::ChooseSeats). Gated engines that never answer keep the turn where it is, so the guard of the board is what is looked at.
+    namespace {
+        constexpr ProgramSides kWatchBoth{true, true};
+        constexpr const char* kWatchBlackToMove = "rnbqkbnr/ppp1pppp/8/3P4/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 3";      // White has taken a pawn, Black to move
+        constexpr const char* kWatchWhiteIsMated = "rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3";  // the fool's mate: the game is over
+    }  // namespace
+
+    TEST_F(ChessUiTest, WatchTheBoardTakesNoClickOnWhitesTurnAndKeepsTheSearchAlone) {
+        const auto white = eastl::make_shared<GatedEngine>(true);
+        const auto black = eastl::make_shared<GatedEngine>(true);
+        CountingFactory factory({white, black});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        ASSERT_TRUE(Opponent().ChooseSeats(kWatchBoth, {}, {}).has_value());
+        ASSERT_TRUE(FramesUntil([&] { return white->Calls() == 1; })) << "White's program has the search and waits at its gate";
+        ASSERT_EQ(Model().GetTurn(), PieceColor::White);
+        const uint64_t version = Model().GetVersion();
+
+        for (const char* square : {"e2", "e4", "d2", "d4", "a4", "e7", "g1"}) {
+            Click(square);
+            EXPECT_FALSE(Model().HasSelection()) << square;
+        }
+        IdleFrames();
+
+        EXPECT_TRUE(Model().GetMoves().empty());
+        EXPECT_FALSE(Model().HasSelection());
+        EXPECT_FALSE(Model().HasPendingPromotion());
+        EXPECT_EQ(Model().GetVersion(), version) << "the clicks did not move the game, so the search is not stale";
+        EXPECT_TRUE(Opponent().IsThinking());
+        EXPECT_FALSE(white->WasCancelled());
+        EXPECT_EQ(white->Calls(), 1);
+        EXPECT_EQ(black->Calls(), 0);
+    }
+
+    TEST_F(ChessUiTest, WatchTheBoardTakesNoClickOnBlacksTurnEither) {
+        const auto white = eastl::make_shared<GatedEngine>(true);
+        const auto black = eastl::make_shared<GatedEngine>(true);
+        CountingFactory factory({white, black});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        StartFrom(kWatchBlackToMove);
+        ASSERT_TRUE(Opponent().ChooseSeats(kWatchBoth, {}, {}).has_value());
+        ASSERT_TRUE(FramesUntil([&] { return black->Calls() == 1; })) << "Black's program has the search and waits at its gate";
+        ASSERT_EQ(Model().GetTurn(), PieceColor::Black);
+        const uint64_t version = Model().GetVersion();
+
+        for (const char* square : {"e7", "e5", "d7", "d6", "a2", "d5", "g8"}) {
+            Click(square);
+            EXPECT_FALSE(Model().HasSelection()) << square;
+        }
+        IdleFrames();
+
+        EXPECT_TRUE(Model().GetMoves().empty());
+        EXPECT_EQ(Model().GetVersion(), version);
+        EXPECT_TRUE(Opponent().IsThinking());
+        EXPECT_FALSE(black->WasCancelled());
+        EXPECT_EQ(black->Calls(), 1);
+    }
+
+    TEST_F(ChessUiTest, WatchNoClickStartsAPromotion) {
+        const auto white = eastl::make_shared<GatedEngine>(true);
+        const auto black = eastl::make_shared<GatedEngine>(true);
+        CountingFactory factory({white, black});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        StartFrom(kPromotionFen);  // the pawn on a7 would promote on a8 for a person
+        ASSERT_TRUE(Opponent().ChooseSeats(kWatchBoth, {}, {}).has_value());
+        ASSERT_TRUE(FramesUntil([&] { return white->Calls() == 1; }));
+        const uint64_t version = Model().GetVersion();
+
+        ClickMove("a7", "a8");
+        IdleFrames(5);
+
+        EXPECT_FALSE(Model().HasSelection());
+        EXPECT_FALSE(Model().HasPendingPromotion());
+        EXPECT_FALSE(PromotionShown());
+        EXPECT_EQ(Model().GetVersion(), version);
+        EXPECT_TRUE(Model().GetMoves().empty());
+    }
+
+    TEST_F(ChessUiTest, WatchStartingDropsTheSelectionOfThePersonWhoseTurnItIs) {
+        const auto white = eastl::make_shared<GatedEngine>(true);
+        const auto black = eastl::make_shared<GatedEngine>(true);
+        CountingFactory factory({white, black});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        Click("e2");
+        ASSERT_TRUE(Model().HasSelection()) << "two people: the click selects";
+
+        ASSERT_TRUE(Opponent().ChooseSeats(kWatchBoth, {}, {}).has_value());
+
+        EXPECT_FALSE(Model().HasSelection()) << "the program took the turn: the half-made move of the person goes";
+        Draw();
+        EXPECT_TRUE(RectCalls(kSelectedColor).empty()) << "and no selection is drawn";
+        ASSERT_TRUE(FramesUntil([&] { return white->Calls() == 1; }));
+    }
+
+    TEST_F(ChessUiTest, WatchWhiteStaysAtTheBottomAndTheMaterialGroupsAreNotSwapped) {
+        CountingFactory factory({eastl::make_shared<GatedEngine>(true), eastl::make_shared<GatedEngine>(true)});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        StartFrom(kWhiteTookAPawn);
+        Settle();
+        ASSERT_EQ(ShownMaterialRows(), "BottomPawn");
+
+        ASSERT_TRUE(Opponent().ChooseSeats(kWatchBoth, {}, {}).has_value());
+        _manager->UpdateAll();
+        Settle();
+
+        EXPECT_TRUE(Opponent().IsWatching());
+        EXPECT_FALSE(Opponent().GetPlays().has_value());
+        EXPECT_FALSE(BlackIsAtTheBottom());
+        ExpectPiecesAtTheCellsOf(false);
+        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (std::pair<float, float>{100.0f, 640.0f}));
+        EXPECT_EQ(Coordinates(true), "abcdefgh");
+        EXPECT_EQ(Coordinates(false), "87654321");
+        EXPECT_EQ(ShownMaterialRows(), "BottomPawn") << "White's captures stay in the lower group";
+        EXPECT_EQ(MaterialSprite("Bottom", "Pawn"), "BlackPawn");
+        EXPECT_EQ(Var("materialBottomBalance"), "+1");
+        EXPECT_EQ(Var("materialTopBalance"), "");
+    }
+
+    TEST_F(ChessUiTest, WatchAClickAfterTheEndStartsANewGameAndTheProgramsOpenIt) {
+        const auto white = eastl::make_shared<GatedEngine>(true);
+        const auto black = eastl::make_shared<GatedEngine>(true);
+        CountingFactory factory({white, black});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        StartFrom(kWatchWhiteIsMated);
+        ASSERT_TRUE(Model().IsGameOver());
+        ASSERT_TRUE(Opponent().ChooseSeats(kWatchBoth, {}, {}).has_value());
+        IdleFrames(10);
+        EXPECT_EQ(white->Calls(), 0) << "nothing is asked for a finished game";
+        EXPECT_EQ(black->Calls(), 0);
+        const uint64_t version = Model().GetVersion();
+
+        Click("e4");  // the game is over, so this is the "next game" click, also while two programs play
+
+        EXPECT_FALSE(Model().IsGameOver());
+        EXPECT_GT(Model().GetVersion(), version);
+        EXPECT_EQ(Model().GetPosition().ToFen(), eastl::string(Position::kStartFen));
+        EXPECT_FALSE(Model().HasSelection());
+        ASSERT_TRUE(FramesUntil([&] { return white->Calls() == 1; })) << "the new game opens with White's program";
+        EXPECT_TRUE(Opponent().IsWatching()) << "the click starts the next game, not a person's game";
+
+        Click("e2");
+        EXPECT_FALSE(Model().HasSelection()) << "and the board is locked again";
+    }
+
+    TEST_F(ChessUiTest, WatchTheResetButtonStartsAgainAndTheBoardStaysLocked) {
+        const auto white = eastl::make_shared<GatedEngine>(true);
+        const auto black = eastl::make_shared<GatedEngine>(true);
+        CountingFactory factory({white, black});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        StartFrom(kWatchBlackToMove);
+        ASSERT_TRUE(Opponent().ChooseSeats(kWatchBoth, {}, {}).has_value());
+        ASSERT_TRUE(FramesUntil([&] { return black->Calls() == 1; }));
+
+        Press("ChessReset");
+        _manager->UpdateAll();
+
+        EXPECT_EQ(Model().GetPosition().ToFen(), eastl::string(Position::kStartFen));
+        EXPECT_TRUE(Opponent().IsWatching()) << "Reset keeps the opponent";
+        ASSERT_TRUE(FramesUntil([&] { return white->Calls() == 1; })) << "and the program opens the new game";
+        Click("e2");
+        EXPECT_FALSE(Model().HasSelection());
+        EXPECT_EQ(factory.Calls(), 2) << "no new engine for a reset";
+    }
+
+    TEST_F(ChessUiTest, WatchTwoPlayersInThePanelGivesTheBoardBackToClicks) {
+        const auto white = eastl::make_shared<GatedEngine>(true);
+        const auto black = eastl::make_shared<GatedEngine>(true);
+        CountingFactory factory({white, black});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        ASSERT_TRUE(Opponent().ChooseSeats(kWatchBoth, {}, {}).has_value());
+        ASSERT_TRUE(FramesUntil([&] { return white->Calls() == 1; }));
+        Click("e2");
+        ASSERT_FALSE(Model().HasSelection());
+
+        PressWith(kSetModeAction, "two");
+        _manager->UpdateAll();
+
+        EXPECT_FALSE(Opponent().IsWatching());
+        EXPECT_FALSE(Opponent().PlaysFor(PieceColor::White));
+        EXPECT_FALSE(Opponent().PlaysFor(PieceColor::Black));
+        EXPECT_FALSE(Opponent().IsThinking());
+        EXPECT_TRUE(WaitUntil([&] { return white->WasCancelled(); })) << "the search of the program that left is cancelled";
+        ClickMove("e2", "e4");
+        EXPECT_EQ(Model().GetMoves().size(), 1u) << "both colors move by clicks again";
+        ClickMove("e7", "e5");
+        EXPECT_EQ(Model().GetMoves().size(), 2u);
+    }
+
+    TEST_F(ChessUiTest, WatchNobodyThroughTheControlApiGivesTheBoardBackToClicks) {
+        CountingFactory factory({eastl::make_shared<GatedEngine>(true), eastl::make_shared<GatedEngine>(true)});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        ControlPlays("both");
+        _manager->UpdateAll();
+        ASSERT_TRUE(Opponent().IsWatching());
+        Click("e2");
+        ASSERT_FALSE(Model().HasSelection());
+
+        ControlPlays(nullptr);
+        _manager->UpdateAll();
+
+        EXPECT_FALSE(Opponent().IsWatching());
+        Click("e2");
+        EXPECT_TRUE(Model().HasSelection());
+    }
+
+    TEST_F(ChessUiTest, WatchATakeoverLeavesTheClicksToThePersonsColorOnly) {
+        const auto white = eastl::make_shared<GatedEngine>(true);
+        const auto black = eastl::make_shared<GatedEngine>(true);
+        CountingFactory factory({white, black});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        ASSERT_TRUE(Opponent().ChooseSeats(kWatchBoth, {}, {}).has_value());
+        ASSERT_TRUE(FramesUntil([&] { return white->Calls() == 1; }));
+
+        ASSERT_TRUE(Opponent().ChooseSeats(ProgramSides{true, false}, {}, {}).has_value());  // the person takes Black over
+        _manager->UpdateAll();
+        EXPECT_FALSE(Opponent().IsWatching());
+        EXPECT_EQ(Opponent().GetPlays(), std::optional<PieceColor>(PieceColor::White));
+        EXPECT_TRUE(BlackIsAtTheBottom()) << "one program: the board is turned for the person";
+        EXPECT_FALSE(white->WasCancelled()) << "White's seat is unchanged: its search stays";
+
+        Click("e2");
+        EXPECT_FALSE(Model().HasSelection()) << "White's turn is the program's";
+        white->Open();
+        ASSERT_TRUE(FramesUntil([&] { return Model().GetMoves().size() == 1; }));
+        EXPECT_EQ(Model().GetTurn(), PieceColor::Black);
+
+        Click("a2");
+        EXPECT_FALSE(Model().HasSelection()) << "a white piece is not the person's";
+        Click("e7");
+        EXPECT_TRUE(Model().HasSelection()) << "Black's turn is the person's";
+        EXPECT_EQ(black->Calls(), 0) << "Black's program left, and nothing asked it";
+    }
+
+    TEST_F(ChessUiTest, WatchAnErrorOfOneSeatDoesNotUnlockTheBoard) {
+        const auto white = eastl::make_shared<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "no engine in the test"});
+        const auto black = eastl::make_shared<GatedEngine>(true);
+        CountingFactory factory({white, black});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        ASSERT_TRUE(Opponent().ChooseSeats(kWatchBoth, {}, {}).has_value());
+        ASSERT_TRUE(FramesUntil([&] { return Opponent().GetError().has_value(); })) << "White's program failed";
+        const uint64_t version = Model().GetVersion();
+
+        Click("e2");
+        Click("e4");
+        IdleFrames(20);
+
+        EXPECT_TRUE(Opponent().GetError().has_value()) << "the error stands until the game moves";
+        EXPECT_TRUE(Opponent().PlaysFor(PieceColor::White));
+        EXPECT_FALSE(Model().HasSelection());
+        EXPECT_TRUE(Model().GetMoves().empty());
+        EXPECT_EQ(Model().GetVersion(), version);
+    }
+
 }  // namespace BECore::Chess::Tests
