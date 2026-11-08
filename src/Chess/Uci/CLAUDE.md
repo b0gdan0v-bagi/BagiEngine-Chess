@@ -80,6 +80,16 @@ In a tournament tool: the command is the path of `BagiChessUci`, protocol `uci`,
 
 `tests/UciCommandTest.cpp` and `tests/UciClockTest.cpp` (pure), `tests/UciServerTest.cpp` (the server over `OwnEngine` and a gated fake engine defined in the file; the `bestmove` is read with `UciProtocol::ParseBestMove`, so the two sides of the protocol check each other), and the ctest `BagiChessUciSmoke` (`tests/uci_smoke.py`), which drives the real executable over pipes. Rows in `tests/CLAUDE.md`.
 
-## What comes next
+## Measuring
 
-This folder is slice 1 of the measurement of the own engine. The measuring script (a match against Stockfish at fixed `UCI_Elo` steps, an Elo with an error bar, results recorded) and the README section for it are the next slice. The ladder (`OpponentLevels`, `ownDepth`) is the owner's to retune after that measurement; nothing here changes it. Nothing of Stockfish is shipped.
+`tools/uci_match.py` (README, "Measuring the strength", has the command line and the options; `tools/elo_rating.py` the Elo and its bar, `tools/match_steps.py` the steps, the openings and the record) plays `BagiChessUci` against Stockfish (or any UCI engine with an Elo option) at fixed `UCI_Elo` steps and prints an Elo with a 95 % error bar for each step of the own engine (a level, or `depth=N[,blunder=P]`), and records every game in a JSON file.
+
+- **The game is the referee.** The tool starts `BagiChess --control --headless --manual-clock` and sends each engine the position as `position fen <startFen> moves ...`; it plays the `bestmove` with `perform_action`. The engines do not report repetition, the 50-move rule or insufficient material, and Python has no chess, so the game's `status` ends a game and its `list_actions` checks every engine move (an illegal one stops the match with an error). A game that reaches `--max-plies` is a draw.
+- **How the own engine is driven:** `setoption` before a pair (`Level`, or `Depth` and `BlunderPercent`), then `go` (the depth comes from the option, as the game plays a level, without its 10 s cap) or `go depth N`. A `go` with no depth would deepen until `stop`, so a step without a depth is refused. The opponent gets `UCI_LimitStrength` and `UCI_Elo` and `go movetime`.
+- **The scale.** The Elo is on Stockfish's `UCI_Elo` scale at the chosen move time, not CCRL and not a person's rating; it moves with the Stockfish version, the machine and the build type (Release to measure). A step that won or lost every game is only a bound (`saturated`); a bound from very few games says little; draws only, or nearly only, against several close opponents give a finite bar that is too small; all draws against one opponent print `+/- ?`.
+- **Where the results go.** `--out` is the raw record. The owner pastes the table into "Measured strength" below, and retunes `OpponentLevels` only if the numbers ask for it; nothing in the loop writes a number here or changes the ladder. Nothing of Stockfish is shipped.
+- **Tests:** the ctest `BagiChessMatchSmoke` (`tests/match_smoke.py`: `BagiChessUci` against `BagiChessUci` under `BagiChess`, `Depth` standing in for the Elo option, so it needs no Stockfish) and `BagiChessMatchToolTests` (`tools/tests/test_match_*.py`, `unittest`). Rows in `tests/CLAUDE.md`.
+
+## Measured strength
+
+No numbers yet: the owner runs the match and pastes the table here with the date, the Stockfish version, the build type and the machine.

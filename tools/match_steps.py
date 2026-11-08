@@ -36,7 +36,7 @@ LEVEL_IDS = ("easy", "medium", "hard", "max")
 DEFAULT_OWN_STEPS = LEVEL_IDS
 
 DEPTH_MIN = 1  # `Depth` 0 is "no limit from the option"; a step must have a depth
-DEPTH_MAX = 64  # the maximum of the option `Depth` (kMaxSearchDepth)
+DEPTH_MAX = 64  # the maximum of the option `Depth` (kMaxDepthOption)
 BLUNDER_MIN = 0
 BLUNDER_MAX = 100
 

@@ -18,9 +18,12 @@ errors; a step that won, or lost, every game is only a bound, marked `saturated`
 chosen movetime**: not a CCRL rating and not a rating of a person; it moves with the Stockfish version, the machine and the build type
 (a Debug build is slow, measure with Release). `--out` is rewritten after every finished pair.
 
-The opponent is looked for in --opponent, the environment variable STOCKFISH, then PATH.
-Exit code: 0 done, 1 a failure (a refused move, an engine that died or did not answer, an illegal engine move, a bad argument), 77 no
-opponent engine found.
+The opponent is looked for in --opponent, the environment variable STOCKFISH, then PATH. With `--port` (no `--referee`) the tool joins a game
+that runs with `--control`; that game's opponent must play nobody (the start of every game does; clear it with
+`set_state {"opponent": {"plays": null}}` otherwise), or the program would move for a side of the match.
+Exit code: 0 done, 1 a failure (a refused move, an engine that died or did not answer, an illegal engine move, a bad value of an argument or
+of a step), 2 a command line that argparse cannot read (an unknown option, `--games x`), 77 no opponent engine found. A match that stops
+early still writes what was played to `--out`, with `"stopped_early": true` among the settings.
 """
 
 import argparse
@@ -65,6 +68,7 @@ from stockfish_bridge import (  # noqa: E402
     EXIT_FAILED,
     EXIT_PASSED,
     EXIT_SKIPPED,
+    MANUAL_CLOCK_STEP_FRAMES,
     STATUS_ONGOING,
     UCI_ANSWER_SLACK_SECONDS,
     BridgeError,
@@ -83,7 +87,6 @@ DEFAULT_OPPONENT_ELO_OPTION = "UCI_Elo"
 DEFAULT_OPPONENT_OPTIONS = {"UCI_LimitStrength": "true"}
 # The owner picks the steps near the expected strength of the own engine; these three bracket a program that is neither very weak nor strong.
 DEFAULT_OPPONENT_ELOS = ("1400", "1700", "2000")
-MANUAL_CLOCK_STEP_FRAMES = 1  # frames run after a move so that the scene follows it
 
 STATUS_CHECKMATE = "checkmate"
 STATUS_STALEMATE = "stalemate"
@@ -298,6 +301,39 @@ def play_match(
                 on_pair(pair)
 
 
+def play_and_record(
+    client: BagiControlClient,
+    own: UciEngine,
+    opponent: UciEngine,
+    steps: list[OwnStep],
+    elos: list[int],
+    config: MatchConfig,
+    settings: dict,
+    out: Path | None,
+    pairs: list[PairRecord],
+    log: TextIO | None = None,
+) -> None:
+    """The match with its record, `pairs` filled in place: `out` is rewritten after every finished pair and a progress line goes to
+    stderr. When the match does not finish (an error, an interrupt) the games played so far are written with `"stopped_early": true`
+    and the error goes on; with no game played there is nothing to write."""
+    total = len(steps) * len(elos)
+
+    def finished(pair: PairRecord) -> None:
+        if out is not None:
+            write_record(out, settings, pairs)
+        fraction = pair.score_fraction() or 0.0
+        print(f"[{len(pairs)}/{total}] {pair.own_label} vs {pair.opponent_elo}: +{pair.wins} ={pair.draws} -{pair.losses} ({fraction * 100:.0f} %)", file=sys.stderr, flush=True)
+
+    completed = False
+    try:
+        play_match(client, own, opponent, steps, elos, config, pairs, finished, log)
+        completed = True
+    finally:
+        played = [pair for pair in pairs if pair.games]  # the pair the failure interrupted may have no game yet
+        if not completed and out is not None and played:
+            write_record(out, {**settings, "stopped_early": True}, played)
+
+
 def verify_openings(client: BagiControlClient, openings: tuple[tuple[str, ...], ...], out: TextIO) -> bool:
     """Plays each opening once on the referee; prints `ok` per line or the line the game refused. True when all were taken."""
     allowed = True
@@ -370,6 +406,8 @@ def run(args: argparse.Namespace) -> int:
             return fail(f"there is no own engine at {args.own}")
     if args.referee is not None and not args.referee.is_file():
         return fail(f"there is no game executable at {args.referee}")
+    if args.out is not None and not args.out.resolve().parent.is_dir():
+        return fail(f"the folder of --out {args.out} does not exist")
 
     config = MatchConfig(
         games=args.games,
@@ -405,7 +443,10 @@ def run(args: argparse.Namespace) -> int:
         elo_range = parse_elo_range(opponent.uci_lines, config.opponent_elo_option)
         if elo_range is None:
             print(f"the opponent has no option {config.opponent_elo_option}; it is set anyway", file=sys.stderr)
-        check_elo_steps(elos, elo_range, config.opponent_elo_option)
+        try:
+            check_elo_steps(elos, elo_range, config.opponent_elo_option)
+        except ValueError as error:
+            return fail(str(error))
 
         settings = {
             "referee": str(args.referee) if args.referee is not None else f"{args.host}:{args.port}",
@@ -421,24 +462,9 @@ def run(args: argparse.Namespace) -> int:
             "games_per_pair": config.games,
             "max_plies": config.max_plies,
         }
-        total = len(steps) * len(elos)
-
-        def finished(pair: PairRecord) -> None:
-            if args.out is not None:
-                write_record(args.out, settings, pairs)
-            fraction = pair.score_fraction() or 0.0
-            print(f"[{len(pairs)}/{total}] {pair.own_label} vs {pair.opponent_elo}: +{pair.wins} ={pair.draws} -{pair.losses} ({fraction * 100:.0f} %)", file=sys.stderr, flush=True)
-
-        try:
-            play_match(client, own, opponent, steps, elos, config, pairs, finished, sys.stderr if args.trace else None)
-        finally:
-            if args.out is not None and pairs and pairs[-1].games and len(pairs[-1].games) < config.games:
-                # a failure in the middle of a pair: keep its finished games next to the finished pairs
-                write_record(args.out, {**settings, "stopped_early": True}, pairs)
+        play_and_record(client, own, opponent, steps, elos, config, settings, args.out, pairs, trace)
         print(format_table(pairs))
         return EXIT_PASSED
-    except ValueError as error:
-        return fail(str(error))
     except (BridgeError, ControlError, ConnectionClosed, GameLaunchError, OSError) as error:
         print(f"failed: {error}", file=sys.stderr)
         if game is not None:

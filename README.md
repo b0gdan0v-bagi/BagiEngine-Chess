@@ -133,7 +133,46 @@ With none of the three the game still runs as two people, and picking Computer w
 build/ClangmacOS/BagiChessUci
 ```
 
-Type `uci`, then for example `position startpos moves e2e4` and `go depth 3`; it answers `bestmove ...`. It understands `position`, `go` (`depth`, `movetime`, the clocks, `movestogo`, `infinite`), `stop`, `isready`, `ucinewgame`, `setoption` and `quit`. Its options are `Depth` (0 to 64, 0 is no limit), `BlunderPercent` (0 to 100, the share of random legal moves) and `Level` (`easy`, `medium`, `hard`, `max`, which sets the other two as the game plays that level). Details, and what is not supported, are in `src/Chess/Uci/CLAUDE.md`. To measure it against Stockfish, install Stockfish yourself; nothing of it is shipped.
+Type `uci`, then for example `position startpos moves e2e4` and `go depth 3`; it answers `bestmove ...`. It understands `position`, `go` (`depth`, `movetime`, the clocks, `movestogo`, `infinite`), `stop`, `isready`, `ucinewgame`, `setoption` and `quit`. Its options are `Depth` (0 to 64, 0 is no limit), `BlunderPercent` (0 to 100, the share of random legal moves) and `Level` (`easy`, `medium`, `hard`, `max`, which sets the other two as the game plays that level). Details, and what is not supported, are in `src/Chess/Uci/CLAUDE.md`. To measure it against Stockfish, install Stockfish yourself (nothing of it is shipped) and see "Measuring the strength".
+
+## Measuring the strength
+
+`tools/uci_match.py` plays `BagiChessUci` against Stockfish (or any other UCI engine that has an Elo option) and prints, for every step of the own engine, an Elo with a 95 % error bar. Standard library only; the games are judged by the game itself: the tool starts `BagiChess --control --headless` as the referee, so repetition, the 50-move rule and insufficient material are decided by our rules and every move of both engines is checked against the legal moves.
+
+**What the number means.** It is an Elo **on Stockfish's `UCI_Elo` scale at the chosen move time** (default 100 ms): not a CCRL rating and not the rating of a person. It moves with the Stockfish version, the machine and the build type. Use it to compare the steps of the own engine with each other and to place them roughly on Stockfish's scale, not as a title.
+
+Stockfish is your own install (it is not shipped and no code of it is here): the tool takes `--opponent`, then `$STOCKFISH`, then `stockfish` on `PATH`, and exits with code 77 (nothing done) when there is none. Use a **Release** build to measure: a Debug build searches several times slower, so the numbers are of a slower program and a match takes much longer.
+
+```bash
+# macOS
+python3 tools/uci_match.py --referee build/ClangmacOS/BagiChess --own build/ClangmacOS/BagiChessUci \
+    --opponent /opt/homebrew/bin/stockfish --opponent-elo 1400 --opponent-elo 1700 --opponent-elo 2000 --games 20 --out match.json
+
+# Windows (the interpreter is `python`)
+python tools/uci_match.py --referee build/MSVCWindows/Release/BagiChess.exe --own build/MSVCWindows/Release/BagiChessUci.exe ^
+    --opponent C:/tools/stockfish/stockfish.exe --games 20 --out match.json
+```
+
+`python3 tools/uci_match.py --referee ... --verify-openings` first checks that the game takes every opening line of the tool (it needs no opponent). Start small, for example `--games 4 --own-step hard`: the full default match (4 steps x 3 Elo steps x 20 games, 12 pairs) takes **an hour or more** at 100 ms a move.
+
+| Option | Meaning (default) |
+|--------|-------------------|
+| `--referee PATH` | the `BagiChess` executable, started headless on the manual clock; or `--port N` (and `--host`) to join a game already running with `--control`, whose opponent must play nobody |
+| `--own PATH` | the `BagiChessUci` executable |
+| `--own-step TEXT` | a strength of the own engine: `easy`, `medium`, `hard`, `max`, or `depth=N[,blunder=P]`; repeatable (default: the four levels) |
+| `--opponent PATH` | the opponent engine (`$STOCKFISH`, then `PATH`) |
+| `--opponent-elo N` | an Elo step of the opponent; repeatable (1400 1700 2000); a step outside the engine's `UCI_Elo` range is refused before the first game; **pick steps near the expected strength** |
+| `--opponent-elo-option NAME` | the UCI option that holds the step (`UCI_Elo`) |
+| `--opponent-option NAME=VALUE` | a UCI option set before each pair; repeatable; giving any replaces the default (`UCI_LimitStrength=true`) |
+| `--opponent-movetime MS` | time per move of the opponent (100); the own engine plays as the game plays it (the depth of its level, no clock) |
+| `--games N` | games per pair (own step x opponent step), even (20); every opening is played from both sides |
+| `--max-plies N` | a game that reaches this many plies is a draw, marked `max_plies` (300) |
+| `--out FILE` | the record as JSON, rewritten after every finished pair (settings, every game with its moves, the summary per step); a match that stops early keeps what was played, with `"stopped_early": true` |
+| `--own-timeout S`, `--trace`, `--verify-openings` | the own engine's time for one move (120 s); print the UCI conversation to stderr; check the openings and exit |
+
+**Reading the output.** A table goes to stdout: one row per pair (W/D/L, score, the Elo of that pair) and one line per step, for example `hard  Elo 1523 +/- 87  (60 games)`: the Elo that scores as the step did against all the opponent steps, with the 95 % bar (1.96 standard errors). A step that won every game, or lost every game, has no estimate: it is printed as a bound (`>= 1810 (saturated)` / `<= 1250 (saturated)`; in the JSON `saturated` is true and `bound` is `">="` or `"<="`), so **move the Elo steps** (higher or lower) and run again. Three cautions: a bound from very few games says little (one won game is already `>=` the opponent's Elo); a step whose games are all draws, or nearly all, against several close opponents gets a finite bar that is much too small; and all draws against one opponent print `+/- ?` (the bar is unknown; `null` in the JSON). Prefer more games over more steps.
+
+The ladder (`OpponentLevels`, `ownDepth`) is retuned only by the owner, from numbers like these; the tool changes nothing. `BagiChessUci` can also be put into cutechess-cli or fastchess as an engine (command: its path, protocol `uci`, `option.Level=hard`); that is not tested here, `tools/uci_match.py` is the documented way.
 
 ## Layout
 
@@ -142,8 +181,8 @@ Type `uci`, then for example `position startpos moves e2e4` and `go depth 3`; it
 | `src/Chess/` | the game: rules (`Game/`), scene components, the control adapter. `CLAUDE.md` describes it |
 | `uci/` | `main.cpp` of `BagiChessUci`, the own engine as a UCI program (the server is `src/Chess/Uci/`) |
 | `config/`, `assets/` | scene, texture library, application config, piece atlas |
-| `tests/` | gtest cases, `control_smoke.py` and `uci_smoke.py` |
-| `tools/` | the Stockfish bridge and its pytest tests (`engine/.venv/bin/python -m pytest tools/tests`) |
+| `tests/` | gtest cases, `control_smoke.py`, `uci_smoke.py` and `match_smoke.py` |
+| `tools/` | the Stockfish bridge and its pytest tests (`engine/.venv/bin/python -m pytest tools/tests`), the match tool `uci_match.py` (with `elo_rating.py` and `match_steps.py`) and its unit tests (`python3 -m unittest discover -s tools/tests -p "test_match_*.py"`) |
 | `todo/`, `TODO.md` | known problems, worked by the `todo-loop` skill (`todo/README.md`) |
 | `CI/` | environment setup (`setup_venv.*`) and the VS Code workspace `BagiChess.code-workspace` (CMake Tools on the engine's presets, CodeLLDB / MSVC launch, build tasks) |
 | `engine/` | the engine (submodule); not edited from here |

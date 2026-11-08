@@ -169,7 +169,7 @@ class GameLoopTest(RunnerTestCase):
                     uci_match.play_game(client, own, opponent, "", True, OPENING, self.config())
 
     def test_the_cap_makes_a_draw(self):
-        game, _, client = self.start_game()
+        _, _, client = self.start_game()
         own, _ = self.start_engine("own")
         opponent, _ = self.start_engine("opponent")
         record = uci_match.play_game(client, own, opponent, "", True, OPENING, self.config(max_plies=3))
@@ -289,6 +289,43 @@ class PairAndMatchTest(RunnerTestCase):
         self.assertEqual(record["settings"], {"games_per_pair": 2})
         self.assertFalse((self.directory / "match.json.tmp").exists())
 
+    def test_a_match_that_stops_early_is_marked_even_when_the_failing_pair_has_no_game_yet(self):
+        _, _, client = self.start_game()
+        own, _ = self.start_engine("own")
+        opponent, _ = self.start_engine("opponent")
+        steps = [parse_own_step("depth=1")]
+        out = self.directory / "match.json"
+        calls = {"count": 0}
+        original = own.search
+
+        def search(position, go_arguments, timeout):
+            calls["count"] += 1
+            return "a1a8" if calls["count"] > 2 else original(position, go_arguments, timeout)  # the second pair fails in its first game
+
+        own.search = search
+        pairs: list[PairRecord] = []
+        with contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(MatchError):
+                uci_match.play_and_record(client, own, opponent, steps, [1500, 1600], self.config(games=2), {"games_per_pair": 2}, out, pairs)
+        record = json.loads(out.read_text())
+        self.assertTrue(record["settings"]["stopped_early"])
+        self.assertEqual([(pair["opponent_elo"], len(pair["games"])) for pair in record["pairs"]], [(1500, 2)])
+        self.assertEqual(len(pairs), 2)  # the caller still sees the pair that failed, for its own report
+
+    def test_a_failure_before_any_game_writes_nothing_and_a_finished_match_has_no_flag(self):
+        _, _, client = self.start_game()
+        own, _ = self.start_engine("own")
+        opponent, _ = self.start_engine("opponent", {AFTER_KNIGHT: "a1a8"})
+        out = self.directory / "match.json"
+        steps = [parse_own_step("depth=1")]
+        with contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(MatchError):
+                uci_match.play_and_record(client, own, opponent, steps, [1500], self.config(games=2), {}, out, [])
+            self.assertFalse(out.exists())
+            opponent, _ = self.start_engine("opponent2")
+            uci_match.play_and_record(client, own, opponent, steps, [1500], self.config(games=2), {}, out, [])
+        self.assertNotIn("stopped_early", json.loads(out.read_text())["settings"])
+
     def test_verify_openings_reports_ok_and_the_line_the_game_refuses(self):
         _, _, client = self.start_game()
         out = io.StringIO()
@@ -388,6 +425,13 @@ class CommandLineTest(RunnerTestCase):
         self.assertEqual(self.run_main("--opponent-elo", "x", "--verify-openings")[0], 1)
         self.assertEqual(self.run_main("--opponent-option", "novalue", "--verify-openings")[0], 1)
         self.assertEqual(self.run_main("--max-plies", "0", "--verify-openings")[0], 1)
+
+    def test_an_out_folder_that_does_not_exist_exits_1_before_any_engine_starts(self):
+        engine = self.directory / "engine"
+        engine.write_text("")  # not runnable: reaching the start of the engines would fail differently
+        code, _, err = self.run_main("--own", str(engine), "--opponent", str(engine), "--out", str(self.directory / "no-such-folder" / "match.json"))
+        self.assertEqual(code, 1)
+        self.assertIn("--out", err)
 
     def test_a_missing_opponent_engine_exits_77(self):
         own = self.directory / "own"

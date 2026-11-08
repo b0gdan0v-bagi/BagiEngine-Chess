@@ -65,5 +65,17 @@ if(ENGINE_BUILD_TESTS)
             TIMEOUT 120
             RUN_SERIAL TRUE
         )
+
+        # Runs tools/uci_match.py for real: BagiChessUci against BagiChessUci under BagiChess as referee (no Stockfish); skipped (77) when an executable is missing
+        add_test(NAME BagiChessMatchSmoke COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/match_smoke.py --game-exe $<TARGET_FILE:BagiChess> --uci-exe $<TARGET_FILE:BagiChessUci>)
+        set_tests_properties(BagiChessMatchSmoke PROPERTIES
+            SKIP_RETURN_CODE 77
+            TIMEOUT 300
+            RUN_SERIAL TRUE
+        )
+
+        # The unit tests of the match tool (standard library unittest, no Stockfish, no executable)
+        add_test(NAME BagiChessMatchToolTests COMMAND ${Python3_EXECUTABLE} -m unittest discover -s ${CMAKE_CURRENT_SOURCE_DIR}/tools/tests -p "test_match_*.py" WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+        set_tests_properties(BagiChessMatchToolTests PROPERTIES TIMEOUT 120)
     endif()
 endif()

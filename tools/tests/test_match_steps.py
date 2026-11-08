@@ -137,7 +137,7 @@ class OpeningsTest(unittest.TestCase):
             for first, second in zip(line, line[1:]):
                 self.assertNotEqual(first[:2], second[2:4], line)
 
-    def test_every_line_starts_from_the_initial_position(self):
+    def test_every_line_starts_with_a_mainline_first_move(self):
         for line in OPENINGS:
             self.assertRegex(line[0], r"^(e2e4|d2d4|c2c4|g1f3)$")  # White's first moves with a clear mainline
 
