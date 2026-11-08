@@ -1,7 +1,5 @@
 #pragma once
 
-#include <Chess/Engine/SearchRequest.h>
-
 namespace BECore::Chess::Uci {
 
     /// What a line from the GUI asks. Unknown is every line that names no command we answer, an empty line and a `position` we cannot read: UCI says to skip them

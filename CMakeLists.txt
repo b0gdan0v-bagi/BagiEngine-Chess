@@ -22,6 +22,23 @@ be_add_game_executable(BagiChess
     MODULES ChessModule
 )
 
+# The own engine as a UCI program (uci/main.cpp): a console executable with no window and no engine services, built always.
+# Its main is outside src/ because ChessModule globs src/*.cpp. Linked as the tests are, minus gtest
+add_executable(BagiChessUci uci/main.cpp)
+target_precompile_headers(BagiChessUci REUSE_FROM BECoreModule)
+be_force_include_pch(BagiChessUci)
+target_compile_definitions(BagiChessUci PRIVATE IMGUI_VULKAN_AVAILABLE=1 REFLECTION_GENERATED=1)
+target_include_directories(BagiChessUci PRIVATE ${BAGI_ENGINE_DIR}/src ${CMAKE_BINARY_DIR})
+be_link_engine(BagiChessUci)
+target_link_libraries(BagiChessUci PRIVATE ChessModule SDLModule GamesModule)
+if(APPLE)
+    set_target_properties(BagiChessUci PROPERTIES
+        BUILD_RPATH "@executable_path"
+        INSTALL_RPATH "@executable_path"
+    )
+endif()
+be_deploy_runtime_libs(BagiChessUci)
+
 if(ENGINE_BUILD_TESTS)
     file(GLOB CHESS_TEST_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/tests/*.cpp")
     # WHOLE_ARCHIVE: ChessUiTest loads the shipped SceneConfig.xml, which names components no test references
