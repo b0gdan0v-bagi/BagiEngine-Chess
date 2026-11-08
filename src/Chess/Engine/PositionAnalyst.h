@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Chess/Engine/AnalysisEngineFactory.h>
 #include <Chess/Engine/OpponentController.h>
 #include <Chess/Engine/OpponentEngines.h>
 #include <Chess/Engine/OpponentSettings.h>
@@ -20,9 +21,6 @@ namespace BECore::Chess {
 
     /// How many lines the analyst asks of the engine: the best one (the evaluation and the hint) and the second best, for whoever compares them (GetLines())
     inline constexpr int kAnalysisLines = 2;
-
-    /// Makes the engine that analyses for the picked kind, or says why there is none. A test gives a double; the default is MakeAnalysisEngine()
-    using AnalysisEngineFactory = eastl::function<std::expected<eastl::shared_ptr<IChessEngine>, EngineError>(OpponentEngine)>;
 
     /**
      * @brief The default analysis engine: a UciEngine over the Stockfish that FindStockfish(settings.stockfishPath) finds for Stockfish, an OwnEngine for Own.

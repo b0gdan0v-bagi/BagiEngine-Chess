@@ -23,8 +23,12 @@ namespace BECore::Chess {
     /// The gap between the first two lines, in centipawns (two pawns), from which the best move is "the only reasonable one" (`Obvious`). A gap of kForcedMargin - 1 still is a choice
     inline constexpr int kForcedMargin = 200;
 
-    /// The scale on which a mate is compared with centipawns: a mate in m moves by the side to move is `kMateCentipawns - 100 * m`, the side to move mated in m moves is its negation
+    /// The scale on which a mate is compared with centipawns: a mate in m moves by the side to move is `kMateCentipawns - kCentipawnsPerMateMove * m`, the side to move mated in m moves is its
+    /// negation
     inline constexpr int kMateCentipawns = 100000;
+
+    /// How much a mate one move closer is worth more on that scale
+    inline constexpr int kCentipawnsPerMateMove = 100;
 
     /// The rating of one played move
     struct MoveRating {
@@ -40,7 +44,7 @@ namespace BECore::Chess {
     /**
      * @brief @p score (from the side to move's view, as the analysis gives it) on one scale of centipawns, so that two lines can be subtracted.
      *
-     * Centipawns as they are. A mate in m moves is `kMateCentipawns - 100 * m` for the side that mates and its negation for the side that is mated:
+     * Centipawns as they are. A mate in m moves is `kMateCentipawns - kCentipawnsPerMateMove * m` for the side that mates and its negation for the side that is mated:
      * any mate beats any centipawn score (the search keeps those far below kMateCentipawns - 100 * 128), a closer mate is larger, and a closer mate
      * against the side to move is smaller.
      */

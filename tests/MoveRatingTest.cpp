@@ -186,7 +186,7 @@ namespace BECore::Chess::Tests {
             }
             seen.push_back(id);
         }
-        EXPECT_EQ(seen.size(), 4u);
+        EXPECT_EQ(seen.size(), EnumUtils<MoveRatingReason>::Values().size());
     }
 
 }  // namespace BECore::Chess::Tests

@@ -2,18 +2,12 @@
 
 namespace BECore::Chess {
 
-    namespace {
-
-        constexpr int kCentipawnsPerMateMove = 100;
-
-    }  // namespace
-
     int ScoreToCentipawns(const AnalysisScore& score) noexcept {
         switch (score.kind) {
             case AnalysisScoreKind::Centipawns:
                 return score.value;
             case AnalysisScoreKind::Mate: {
-                const int moves = score.value < 0 ? -score.value : score.value;
+                const int moves = std::abs(score.value);
                 const int closer = kMateCentipawns - kCentipawnsPerMateMove * moves;
                 return score.value < 0 ? -closer : closer;
             }
@@ -43,7 +37,7 @@ namespace BECore::Chess {
         if (second == nullptr) {
             return {MoveRatingReason::Forced};
         }
-        const int gap = ScoreToCentipawns(before.Best().score) - ScoreToCentipawns(second->score);
+        const int gap = eastl::max(ScoreToCentipawns(before.Best().score) - ScoreToCentipawns(second->score), 0);  // line 2 may score above line 1
         return {gap >= kForcedMargin ? MoveRatingReason::Obvious : MoveRatingReason::Brilliant};
     }
 
