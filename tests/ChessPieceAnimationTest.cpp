@@ -5,6 +5,7 @@
 #include <BECore/Animation/Lerp.h>
 #include <BECore/GameManager/CoreManager.h>
 #include <BECore/Reflection/XmlDeserializer.h>
+#include <BECore/Renderer/ViewTransform.h>
 #include <BECore/Scene/Components/SpriteRendererComponent.h>
 #include <BECore/Scene/Components/TransformComponent.h>
 #include <BECore/Scene/Scene.h>
@@ -17,6 +18,7 @@
 #include <Chess/Game/MoveGenerator.h>
 #include <Common/EngineEnvironment.h>
 #include <Common/RecordingRenderer.h>
+#include <CoreSDL/SDLEvents.h>
 #include <Games/GameManager.h>
 
 /**
@@ -40,6 +42,12 @@ namespace BECore::Chess::Tests {
         constexpr float kThreeQuarters = 0.75f;  // progress after three
         constexpr float kDefaultSlide = 0.15f;   // what SceneConfig.xml gets from the code
         constexpr int kStepsToEnd = 4;           // tween steps (frames after the first) until the slide ends
+        constexpr float kViewWidth = 840.0f;     // the view of the scene (SceneConfig.xml) and half a square, to turn a square into the output pixel of its middle
+        constexpr float kViewHeight = 800.0f;
+        constexpr float kHalfSquare = 40.0f;
+        constexpr float kDragStepPixels = 20.0f;  // a first motion of a drag, well past the threshold of the board
+        constexpr int32_t kPieceLayer = 0;        // the layer of a piece node in the scene
+        constexpr int32_t kDragLayer = 6;         // the layer of a piece in the hand (ChessPieceComponent::kDragLayer, written out here to pin it)
 
         const char* const kCaptureFen = "4k3/8/8/3p4/4P3/8/8/4K3 w - - 0 1";    // e4xd5
         const char* const kEnPassantFen = "4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 1";  // e5xd6 en passant
@@ -266,6 +274,56 @@ namespace BECore::Chess::Tests {
             EXPECT_TRUE(Play(Model(), uci)) << uci;
             Frame();
             return node;
+        }
+
+        /// The middle of a square in output pixels, for the fit of the view into the output and the orientation the board has now
+        Origin ScreenOf(const char* square) const {
+            const Origin cell = PixelOf(square);
+            const Rect at = ViewTransform::Fit(kViewWidth, kViewHeight, _renderer->width, _renderer->height).ToOutput(cell.first + kHalfSquare, cell.second + kHalfSquare, 0.0f, 0.0f);
+            return {at.x, at.y};
+        }
+
+        static SDL_MouseButtonEvent Button(Origin at, bool down) {
+            SDL_MouseButtonEvent event{};
+            event.type = down ? SDL_EVENT_MOUSE_BUTTON_DOWN : SDL_EVENT_MOUSE_BUTTON_UP;
+            event.button = SDL_BUTTON_LEFT;
+            event.down = down;
+            event.x = at.first;
+            event.y = at.second;
+            return event;
+        }
+
+        static void MoveHeld(Origin at) {
+            SDL_MouseMotionEvent event{};
+            event.type = SDL_EVENT_MOUSE_MOTION;
+            event.state = SDL_BUTTON_LMASK;
+            event.x = at.first;
+            event.y = at.second;
+            CoreManager::GetUIInput().DispatchMouseMotion(event);
+        }
+
+        /// The output is mapped back to the view of the last draw, so the scene is drawn once before the first event
+        void PressOn(const char* square) {
+            _manager->DrawAll();
+            CoreManager::GetUIInput().DispatchMouseButtonDown(Button(ScreenOf(square), true));
+        }
+
+        void ReleaseOn(const char* square) const {
+            CoreManager::GetUIInput().DispatchMouseButtonUp(Button(ScreenOf(square), false));
+        }
+
+        /// A press on the piece, a motion past the threshold and a frame that sees the piece in the hand
+        void Lift(const char* square) {
+            PressOn(square);
+            const Origin at = ScreenOf(square);
+            MoveHeld({at.first + kDragStepPixels, at.second});
+            Frame();
+        }
+
+        /// The pointer goes to @p square and the button is released there; no frame in between
+        void DropOn(const char* square) const {
+            MoveHeld(ScreenOf(square));
+            ReleaseOn(square);
         }
 
         IntrusivePtr<RecordingRenderer> _renderer;
@@ -561,6 +619,118 @@ namespace BECore::Chess::Tests {
         const auto plain = play(0.0f);
         EXPECT_EQ(std::get<0>(animated), 3u);
         EXPECT_EQ(animated, plain);
+    }
+
+    TEST_F(ChessPieceAnimationTest, AMoveDroppedByADragStandsOnTheTargetInTheFirstFrameAfterTheRelease) {
+        Settle();
+        const auto pawn = NodeAt("e2");
+        Lift("e2");
+        EXPECT_EQ(pawn->GetLayer(), kDragLayer);
+        EXPECT_NE(OriginOf(pawn), PixelOf("e2")) << "the piece is in the hand";
+        const uint64_t version = Model().GetVersion();
+
+        DropOn("e4");
+        ASSERT_EQ(Model().GetMoves().size(), 1u);
+        EXPECT_EQ(Model().GetVersion(), version + 1);
+        for (int frame = 0; frame <= kStepsToEnd + 1; ++frame) {
+            Frame();
+            ExpectOn(pawn, "e4", "dropped: never between e2 and e4");
+            EXPECT_EQ(pawn->GetLayer(), kPieceLayer) << "frame " << frame;
+        }
+        ExpectEveryPieceOnItsSquare();
+    }
+
+    TEST_F(ChessPieceAnimationTest, ADropInTheTurnedBoardStandsOnTheTargetAtOnceToo) {
+        TurnTheBoard();
+        Settle();
+        StartFrom("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1");
+        SetSlideDuration(kDuration);
+        const auto pawn = NodeAt("e7");
+        Lift("e7");
+        DropOn("e5");
+        ASSERT_EQ(Model().GetMoves().size(), 1u);
+        Frame();
+        ExpectOn(pawn, "e5", "the turned cell of e5");
+        EXPECT_EQ(pawn->GetLayer(), kPieceLayer);
+    }
+
+    TEST_F(ChessPieceAnimationTest, ADropThatPlaysNothingPutsThePieceBackAtOnce) {
+        Settle();
+        const auto pawn = NodeAt("e2");
+        Lift("e2");
+        DropOn("e5");  // not a target of the pawn
+        EXPECT_TRUE(Model().GetMoves().empty());
+        Frame();
+        ExpectOn(pawn, "e2", "back on its square");
+        EXPECT_EQ(pawn->GetLayer(), kPieceLayer);
+        ExpectEveryPieceOnItsSquare();
+    }
+
+    TEST_F(ChessPieceAnimationTest, TheMoveOfTheOtherSideAfterADragSlidesAsUsual) {
+        Settle();
+        const auto pawn = NodeAt("e2");
+        const auto reply = NodeAt("e7");
+        Lift("e2");
+        DropOn("e4");
+        Frame();
+        ExpectOn(pawn, "e4");
+
+        ASSERT_TRUE(Play(Model(), "e7e5"));  // what the answer of the program is
+        Frame();
+        ExpectOn(reply, "e7", "the frame that sees the move still draws the old square");
+        Frame();
+        ExpectSliding(reply, "e7", "e5", kQuarter);
+        ExpectOn(pawn, "e4");
+        Frame();
+        ExpectSliding(reply, "e7", "e5", kHalf);
+        Frames(kStepsToEnd);
+        ExpectOn(reply, "e5");
+        ExpectEveryPieceOnItsSquare();
+    }
+
+    TEST_F(ChessPieceAnimationTest, TheSameMoveByTwoMouseClicksStillSlides) {
+        Settle();
+        const auto pawn = NodeAt("e2");
+        PressOn("e2");
+        ReleaseOn("e2");
+        PressOn("e4");
+        ReleaseOn("e4");
+        ASSERT_EQ(Model().GetMoves().size(), 1u);
+        Frame();
+        ExpectOn(pawn, "e2", "the frame that sees the move");
+        Frame();
+        ExpectSliding(pawn, "e2", "e4", kQuarter);
+        Frames(kStepsToEnd);
+        ExpectOn(pawn, "e4");
+    }
+
+    TEST_F(ChessPieceAnimationTest, ADragWithNoSlideTimeIsUnchanged) {
+        Settle();
+        SetSlideDuration(0.0f);
+        const auto pawn = NodeAt("e2");
+        Lift("e2");
+        EXPECT_EQ(pawn->GetLayer(), kDragLayer);
+        DropOn("e4");
+        Frame();
+        ExpectOn(pawn, "e4");
+        EXPECT_EQ(pawn->GetLayer(), kPieceLayer);
+    }
+
+    TEST_F(ChessPieceAnimationTest, ACaptureByADropLandsAtOnceAndTheTakenPieceStaysUnderItForTheSlideTime) {
+        Settle();
+        StartFrom(kCaptureFen);
+        SetSlideDuration(kDuration);
+        const auto taker = NodeAt("e4");
+        const auto taken = NodeAt("d5");
+        Lift("e4");
+        DropOn("d5");
+        ASSERT_EQ(Model().GetMoves().size(), 1u);
+        Frame();
+        ExpectOn(taker, "d5", "dropped on the square of the taken piece");
+        ExpectOn(taken, "d5", "the taken piece waits there for the slide time, as before");
+        Frames(kStepsToEnd);
+        ExpectOn(taker, "d5");
+        ExpectHidden(taken);
     }
 
 }  // namespace BECore::Chess::Tests

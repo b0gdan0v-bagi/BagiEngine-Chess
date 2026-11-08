@@ -7,7 +7,9 @@ namespace BECore {
 
     namespace SDLEvents {
         struct MouseButtonDownEvent;
-    }
+        struct MouseButtonUpEvent;
+        struct MouseMotionEvent;
+    }  // namespace SDLEvents
 
     namespace InputEvents {
         struct ActionEvent;
@@ -63,6 +65,12 @@ namespace BECore::Chess {
      * of the node `BoardCoordinates` in SceneConfig.xml (RankLabel0..7, FileLabel0..7), which show these variables; their boxes stay at the same cells of the screen and their text turns with the
      * board.
      *
+     * A piece can also be dragged, next to the two-click move. The press acts at once, exactly as a click (OnMouseDown), and when it left the piece of the side to move selected it also arms a
+     * drag; motion past kDragThreshold lifts the piece (GetLiftedPiece() tells the picture where the pointer holds it); the release over a legal target of the selected piece plays the move through
+     * ChessGameModel::OnSquareClicked(), the very path of a second click. A release anywhere else (the start square, another square, off the board) calls nothing on the model, so the piece goes back
+     * and stays selected with its legal moves and the move can be finished by a click. The drag is dropped by the release, by a motion with the button no longer held (a release that a canvas took
+     * never reaches the board), by the next press and as soon as the game moved under it (another model, another version, a game over, the selection gone, a promotion pending, the program to move).
+     *
      * Its node sits on a layer below the pieces (`layer` in SceneConfig.xml), so the
      * squares and highlights are drawn first and the piece sprites on top.
      */
@@ -107,8 +115,38 @@ namespace BECore::Chess {
             return s_active;
         }
 
+        /// A piece held by the pointer: the square it was lifted from and the top-left of the piece in scene units (the pointer minus half a square)
+        struct LiftedPiece {
+            Square from;
+            float x = 0.0f;
+            float y = 0.0f;
+        };
+
+        /// The piece the person is dragging, engaged only while a drag is armed, still valid (see IsDragValid()) and lifted past kDragThreshold; the piece component asks it on every update
+        [[nodiscard]] std::optional<LiftedPiece> GetLiftedPiece() const;
+
     private:
+        /// A press that left a piece selected: where, for which game, at which version, and where the pointer is now (scene units)
+        struct Drag {
+            Square from;
+            const ChessGameModel* model = nullptr;
+            uint64_t version = 0;
+            float pressX = 0.0f;
+            float pressY = 0.0f;
+            float pointerX = 0.0f;
+            float pointerY = 0.0f;
+            bool lifted = false;
+        };
+
         void OnMouseDown(const SDLEvents::MouseButtonDownEvent&);
+        void OnMouseUp(const SDLEvents::MouseButtonUpEvent&);
+        void OnMouseMotion(const SDLEvents::MouseMotionEvent&);
+
+        /// The square drawn under a point of the screen (scene units through Scene::ScreenToSceneX/Y, the orientation of GetBottomColor()), none off the board
+        [[nodiscard]] std::optional<Square> SquareUnder(float screenX, float screenY) const;
+
+        /// Whether the drag still holds: the same game at the same version, not over, the dragged square still selected, no promotion pending and the program not to move
+        [[nodiscard]] static bool IsDragValid(const Drag& drag, const ChessGameModel* model);
         void OnAction(const InputEvents::ActionEvent&);
 
         /// The four actions of the choice groups of the opponent panel (ChessSetMode, ChessSetColor, ChessSetEngine, ChessSetLevel, the id in `value`); any other action is ignored
@@ -144,6 +182,8 @@ namespace BECore::Chess {
         const void* _loggedModel = nullptr;  // the model it was logged for
 
         bool _promotionPanelShown = false;  // what SyncPromotionPanel() last set: the canvas starts hidden
+
+        std::optional<Drag> _drag;  // armed by a press that left a piece selected, cleared by every release, a motion without the button, the next press and a failed IsDragValid()
 
         static ChessBoardComponent* s_active;
     };
