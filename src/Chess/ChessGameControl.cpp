@@ -415,8 +415,9 @@ namespace BECore::Chess {
         const Json* opponentMember = FindJsonMember(state, "opponent");
         const Json* analysisMember = FindJsonMember(state, "analysis");
         if (!fenMember && !opponentMember && !analysisMember) {
-            return std::unexpected(MakeControlError(ControlErrors::kInvalidParams,
-                                                    "'fen' (a FEN string), 'opponent' ({\"plays\", \"level\", \"engine\"}), both, or 'analysis' ({\"evaluation\", \"hint\"}) alone are needed"));
+            return std::unexpected(
+                MakeControlError(ControlErrors::kInvalidParams,
+                                 "'fen' (a FEN string), 'opponent' ({\"plays\", \"level\", \"engine\", \"white\", \"black\"}), both, or 'analysis' ({\"evaluation\", \"hint\"}) alone are needed"));
         }
         if (analysisMember && (fenMember || opponentMember)) {
             return std::unexpected(MakeControlError(ControlErrors::kInvalidParams,

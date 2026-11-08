@@ -626,6 +626,51 @@ namespace BECore::Chess::Tests {
         EXPECT_TRUE(model.GetMoves().empty());
     }
 
+    TEST_F(OpponentSeatsTest, TwoOwnEnginesOfTheDefaultFactoryPlayALegalGameAndPlayItAgainAfterAReset) {
+        constexpr size_t kPlyCap = 60;
+        constexpr std::chrono::milliseconds kGameBudget{60000};
+        ChessGameModel model;
+        OpponentController controller(model);  // no factory, no settings: the default factory makes the own engine, no process
+
+        // Two engines at depths 1 and 2, each behind the deterministic handicap of its level, so the game is the same every time
+        ASSERT_TRUE(controller.ChooseSeats(kBoth, Choice(OpponentEngine::Own, "easy"), Choice(OpponentEngine::Own, "medium")).has_value());
+        ASSERT_FALSE(controller.GetError().has_value());
+
+        const auto playedTheGame = [&] {
+            const bool done = WaitUntil(
+                [&] {
+                    controller.Update();
+                    return model.IsGameOver() || model.GetMoves().size() >= kPlyCap;
+                },
+                kGameBudget);
+            EXPECT_TRUE(done) << "moves so far: " << model.GetMoves().size() << ", " << DescribeError(controller.GetError()).c_str();
+            EXPECT_FALSE(controller.GetError().has_value()) << DescribeError(controller.GetError()).c_str();
+            eastl::vector<eastl::string> moves;
+            for (const Move& played : model.GetMoves()) {
+                if (moves.size() == kPlyCap) {
+                    break;  // a search that was already running when the cap was reached may have played one more
+                }
+                moves.push_back(played.ToUci());
+            }
+            return moves;
+        };
+
+        const eastl::vector<eastl::string> first = playedTheGame();
+        ASSERT_FALSE(first.empty());
+
+        // Every move is legal in its position and the turns alternate: the moves replayed on a model of our own
+        ChessGameModel replay;
+        for (size_t ply = 0; ply < first.size(); ++ply) {
+            EXPECT_EQ(replay.GetTurn(), ply % 2 == 0 ? PieceColor::White : PieceColor::Black) << "ply " << ply;
+            ASSERT_TRUE(Play(replay, first[ply])) << "ply " << ply << " " << first[ply].c_str() << " is not legal";
+        }
+
+        // A reset starts the game again, with the same two programs, and it goes the same way
+        model.Reset();
+        const eastl::vector<eastl::string> second = playedTheGame();
+        EXPECT_EQ(first, second);
+    }
+
     TEST_F(OpponentSeatsTest, TheChoiceOfThePersonOverTwoProgramsKeepsWorking) {
         ChessGameModel model;
         CountingFactory factory({eastl::make_shared<GatedEngine>(true), eastl::make_shared<GatedEngine>(true)});

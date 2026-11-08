@@ -1928,7 +1928,7 @@ namespace BECore::Chess::Tests {
         EXPECT_NE(std::string(result.error().message.c_str()).find("no Stockfish in the test"), std::string::npos);
         EXPECT_EQ(StringMember(State(), "fen"), fenBefore) << "the position is not replaced";
         const Json computer = OpponentOfState();
-        EXPECT_TRUE(FindJsonMember(computer, "plays")->is_null()) << "White's seat was fine and is not kept either";
+        EXPECT_TRUE(FindJsonMember(computer, "plays")->is_null()) << "the new choice of White's seat was fine and is not applied either";
         EXPECT_FALSE(opponent.PlaysFor(PieceColor::White));
         const Json* seats = FindJsonMember(computer, "seats");
         EXPECT_EQ(StringMember(*FindJsonMember(*seats, "white"), "engine"), "stockfish") << "the choices of a refused pick are not saved";
@@ -2000,7 +2000,14 @@ namespace BECore::Chess::Tests {
 
         const Json state = State();
         EXPECT_TRUE(FindJsonMember(OpponentOfState(), "error")->is_null());
-        EXPECT_EQ(model.GetMoves().size() % 2, GetJsonString(state, "turn") == eastl::string("white") ? 0u : 1u) << "the turns alternate from White";
+        EXPECT_EQ(model.GetMoves().size() % 2, GetJsonString(state, "turn") == eastl::string("white") ? 0u : 1u) << "the turn follows the number of moves";
+
+        // The pieces that moved are White's, Black's, White's...: the moves replayed on a model of our own
+        ChessGameModel replay;
+        for (const Move& played : model.GetMoves()) {
+            EXPECT_EQ(replay.GetPosition().GetPieceAt(played.From()).color, replay.GetTurn()) << played.ToUci().c_str();
+            ASSERT_TRUE(replay.TryMove(played).has_value()) << played.ToUci().c_str();
+        }
     }
 
     TEST_F(ChessGameControlTest, ThinkingIsTrueWhileEitherSeatSearches) {
@@ -2019,8 +2026,9 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, PerformActionIsNotBlockedWhileTwoProgramsPlay) {
-        const auto whiteGate = eastl::make_shared<GatedEngine>(true);
-        CountingFactory factory({whiteGate, eastl::make_shared<GatedEngine>(true)});
+        const auto whiteGate = eastl::make_shared<GatedEngine>(false);  // ignores its token: only the version tells that its answer is stale
+        const auto blackGate = eastl::make_shared<GatedEngine>(true);
+        CountingFactory factory({whiteGate, blackGate});
         opponent.SetEngineFactory(factory.AsFactory());
         SetOpponent(OpponentRequest("both"));
         ASSERT_TRUE(UpdateUntil([&] { return whiteGate->Calls() == 1; }));
@@ -2029,6 +2037,15 @@ namespace BECore::Chess::Tests {
 
         EXPECT_EQ(StringMember(outcome, "move"), "e2e4");
         EXPECT_EQ(MoveCount(), 1u);
+        ASSERT_TRUE(UpdateUntil([&] { return blackGate->Calls() == 1; })) << "Black's program searches the position after the controller's move";
+        whiteGate->Open();
+        ASSERT_TRUE(UpdateUntil([&] { return whiteGate->Answered() == 1; }));
+        for (int frame = 0; frame < 200; ++frame) {
+            opponent.Update();
+        }
+        EXPECT_EQ(MoveCount(), 1u) << "White's stale answer is not played";
+        EXPECT_TRUE(FindJsonMember(OpponentOfState(), "error")->is_null()) << "and it is no error either";
+        EXPECT_EQ(blackGate->Calls(), 1);
         EXPECT_EQ(ActionMoves().empty(), false) << "the list of actions is unchanged by the programs";
     }
 
