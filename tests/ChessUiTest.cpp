@@ -5299,7 +5299,7 @@ namespace BECore::Chess::Tests {
                 ++notchCases;
                 if (!controls.empty()) {
                     ++notchCasesWithAnOverlap;
-                    // Not only close: the Turn label lies on top of the balance of the upper group, and of its first rows (CLAUDE.md, "The captured material", limit (b))
+                    // Not only close: the Turn label lies on top of the balance of the upper group, and of its first rows (src/Chess/Components/CLAUDE.md, "The captured material", limit (b))
                     const eastl::string touching = MaterialClearance(material->GetLayout(), hud->GetLayout(), 0.0f);
                     EXPECT_NE(touching.find("MaterialTopBalance ("), eastl::string::npos) << matrixCase.label.c_str() << ":\n" << touching.c_str();
                     EXPECT_NE(touching.find("MaterialTopQueenRow ("), eastl::string::npos) << matrixCase.label.c_str() << ":\n" << touching.c_str();
@@ -5312,11 +5312,11 @@ namespace BECore::Chess::Tests {
         material->GetLayout().Invalidate();
         hud->GetLayout().Invalidate();
         coordinates->GetLayout().Invalidate();
-        // The count is pinned: CLAUDE.md names 32 of 46 notch cases, and each of them was asserted above
+        // The count is pinned: src/Chess/Components/CLAUDE.md names 32 of 46 notch cases, and each of them was asserted above
         EXPECT_EQ(notchCases, 46u);
         EXPECT_EQ(notchCasesWithAnOverlap, 32u);
         // The HUD keeps clear of the safe area, and a notch pushes its top row down by 7 % of the short side, onto the first rows and the balance of the upper group (as it does onto the board:
-        // CLAUDE.md, "The HUD")
+        // src/Chess/Components/CLAUDE.md, "The HUD")
         std::cout << "[   INFO   ] the HUD reaches the top group in " << notchCasesWithAnOverlap << " of " << notchCases << " notch cases\n";
     }
 
