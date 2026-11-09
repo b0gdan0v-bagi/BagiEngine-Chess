@@ -321,6 +321,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(OwnEngineTest, ShutdownDuringADeepSearchReturnsAtOnceAndTheSearchEndsSoon) {
+        SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
         ASSERT_TRUE(Play(model, "e2e4"));
         const auto engine = eastl::make_shared<LimitedEngine>(eastl::make_shared<OwnEngine>(), Depth(kDepthThatNeverEnds));

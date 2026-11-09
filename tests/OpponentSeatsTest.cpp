@@ -55,6 +55,7 @@ namespace BECore::Chess::Tests {
     };
 
     TEST_F(OpponentSeatsTest, BothSeatsPlayAndTakeTurns) {
+        SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
         const auto white = eastl::make_shared<GatedEngine>(true, Mv("e2e4"));
         const auto black = eastl::make_shared<GatedEngine>(true, Mv("e7e5"));
@@ -137,6 +138,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(OpponentSeatsTest, ASeatChangedWhileTheOtherThinksKeepsTheOthersSearch) {
+        SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
         const auto white = eastl::make_shared<GatedEngine>(true, Mv("e2e4"));
         const auto black = eastl::make_shared<InstantEngine>();
@@ -173,6 +175,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(OpponentSeatsTest, ChangingTheSeatThatThinksCancelsItsSearch) {
+        SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
         const auto white = eastl::make_shared<GatedEngine>(true, Mv("e2e4"));
         const auto newWhite = eastl::make_shared<GatedEngine>(true, Mv("d2d4"));
@@ -196,6 +199,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(OpponentSeatsTest, ARefusedSeatRefusesTheWholePick) {
+        SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
         const auto white = eastl::make_shared<GatedEngine>(true, Mv("e2e4"));
         const auto black = eastl::make_shared<InstantEngine>();
@@ -425,6 +429,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(OpponentSeatsTest, AStaleAnswerOfWhitesSeatIsDroppedAfterASetPosition) {
+        SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
         // White's engine ignores its token and holds e2e4 until it is opened; Black's seat never answers, so a dropped answer leaves the game as the position was set
         const auto white = eastl::make_shared<GatedEngine>(false, Mv("e2e4"));
@@ -450,6 +455,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(OpponentSeatsTest, AStaleAnswerOfBlacksSeatIsDroppedAfterAReset) {
+        SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
         const auto white = eastl::make_shared<GatedEngine>(true);
         const auto black = eastl::make_shared<GatedEngine>(false, Mv("e7e5"));
@@ -474,6 +480,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(OpponentSeatsTest, ASideTakesTheChoiceOfItsSeatFromAWatchAndKeepsItsOpponent) {
+        SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
         const auto white = eastl::make_shared<GatedEngine>(true, Mv("e2e4"));
         const auto black = eastl::make_shared<InstantEngine>();

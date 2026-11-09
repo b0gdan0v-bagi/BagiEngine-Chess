@@ -1111,6 +1111,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, ThinkingIsTrueWhileTheEngineSearches) {
+        SKIP_WITHOUT_WORKER_THREADS();
         const auto engine = eastl::make_shared<GatedEngine>(true);
         CountingFactory factory({engine});
         opponent.SetEngineFactory(factory.AsFactory());
@@ -1659,6 +1660,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, TheAnalysisIsThinkingWhileItsEngineSearches) {
+        SKIP_WITHOUT_WORKER_THREADS();
         const auto engine = eastl::make_shared<AnalysingEngine>(kPawnUp, std::nullopt, 7);
         engine->Gate(true);
         CountingAnalysisFactory factory{engine};
@@ -2041,6 +2043,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, ARefusedSeatKeepsTheRunningSearchAndTheSides) {
+        SKIP_WITHOUT_WORKER_THREADS();
         const auto gate = eastl::make_shared<GatedEngine>(true);
         OwnOnlyFactory factory{gate, {}};
         opponent.SetEngineFactory(factory.AsFactory());
@@ -2114,6 +2117,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, ThinkingIsTrueWhileEitherSeatSearches) {
+        SKIP_WITHOUT_WORKER_THREADS();
         const auto whiteGate = eastl::make_shared<GatedEngine>(true);
         const auto blackGate = eastl::make_shared<GatedEngine>(true);
         CountingFactory factory({whiteGate, blackGate});
@@ -2129,6 +2133,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, PerformActionIsNotBlockedWhileTwoProgramsPlay) {
+        SKIP_WITHOUT_WORKER_THREADS();
         const auto whiteGate = eastl::make_shared<GatedEngine>(false);  // ignores its token: only the version tells that its answer is stale
         const auto blackGate = eastl::make_shared<GatedEngine>(true);
         CountingFactory factory({whiteGate, blackGate});

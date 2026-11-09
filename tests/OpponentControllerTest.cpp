@@ -105,6 +105,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(OpponentControllerTest, PickingBlackMakesTheProgramAnswerAPersonsMove) {
+        SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
         const auto engine = eastl::make_shared<GatedEngine>(true);
         CountingFactory factory({engine});
@@ -221,6 +222,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(OpponentControllerTest, ThePickOfTheSameSideAndLevelKeepsTheSearch) {
+        SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
         const auto engine = eastl::make_shared<GatedEngine>(true);
         CountingFactory factory({engine});
@@ -328,6 +330,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(OpponentControllerTest, ARefusedStockfishPickKeepsTheRunningOpponentAndItsSearch) {
+        SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
         // The own engine is there (gated, honors its token); Stockfish is not
         const auto own = eastl::make_shared<GatedEngine>(true, Mv("e7e5"));
@@ -411,6 +414,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(OpponentControllerTest, AfterARefusedPickThePickOfWhatPlaysClearsTheErrorWithoutRemakingTheOpponent) {
+        SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
         const auto own = eastl::make_shared<GatedEngine>(true, Mv("e7e5"));
         CountingFactory factory({own});
@@ -499,6 +503,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(OpponentControllerTest, ChangingFromWhiteToBlackRemakesTheOpponentAndCancelsTheOldSearch) {
+        SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
         const auto asWhite = eastl::make_shared<GatedEngine>(true);
         const auto asBlack = eastl::make_shared<InstantEngine>();
@@ -610,6 +615,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(OpponentControllerTest, ShutdownCancelsTheSearchAndLaterUpdatesDoNothing) {
+        SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
         const auto engine = eastl::make_shared<GatedEngine>(true);
         CountingFactory factory({engine});
@@ -637,6 +643,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(OpponentControllerTest, DestroyingTheControllerCancelsTheSearch) {
+        SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
         const auto engine = eastl::make_shared<GatedEngine>(true);
         CountingFactory factory({engine});
@@ -842,6 +849,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(OpponentControllerTest, ChooseWithAnEngineMakesOneEngineAndTheSamePickAgainKeepsTheSearch) {
+        SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
         const auto engine = eastl::make_shared<GatedEngine>(true);
         CountingFactory factory({engine});

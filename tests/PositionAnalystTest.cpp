@@ -150,6 +150,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(PositionAnalystTest, TheOldAnswerOfAnEngineThatIgnoresItsTokenIsDropped) {
+        SKIP_WITHOUT_WORKER_THREADS();
         const auto engine = MakeEngine();
         engine->Gate(false);
         CountingAnalysisFactory factory{engine};
@@ -175,6 +176,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(PositionAnalystTest, UpdateDoesNotWaitForTheEngine) {
+        SKIP_WITHOUT_WORKER_THREADS();
         const auto engine = MakeEngine();
         engine->Gate(false);
         CountingAnalysisFactory factory{engine};
@@ -382,6 +384,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(PositionAnalystTest, SetPickedCancelsTheSearchOfTheOtherEngineAndDropsItsError) {
+        SKIP_WITHOUT_WORKER_THREADS();
         const auto stockfish = MakeEngine({AnalysisScoreKind::Centipawns, 10});
         stockfish->Gate(true);
         const auto own = MakeEngine({AnalysisScoreKind::Centipawns, 20});
@@ -404,6 +407,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(PositionAnalystTest, AnAnswerOfTheOldEngineIsDroppedWhenThePickChangesWhileItThinks) {
+        SKIP_WITHOUT_WORKER_THREADS();
         const auto stockfish = MakeEngine({AnalysisScoreKind::Centipawns, 10});
         stockfish->Gate(false);
         const auto own = MakeEngine({AnalysisScoreKind::Centipawns, 20});
@@ -459,6 +463,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(PositionAnalystTest, SwitchingTheEvaluationOffStopsTheSearchNobodyWantsAnyMore) {
+        SKIP_WITHOUT_WORKER_THREADS();
         const auto engine = MakeEngine();
         engine->Gate(true);
         CountingAnalysisFactory factory{engine};
@@ -480,6 +485,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(PositionAnalystTest, CancelAndTheDestructorReturnAtOnceWithASearchThatIgnoresItsToken) {
+        SKIP_WITHOUT_WORKER_THREADS();
         const auto engine = MakeEngine();
         engine->Gate(false);
         CountingAnalysisFactory factory{engine};
@@ -548,6 +554,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(PositionAnalystTest, TheRevisionGrowsWithWhatADisplayShowsAndNeverGoesBack) {
+        SKIP_WITHOUT_WORKER_THREADS();
         const auto engine = MakeEngine();
         engine->Gate(false);
         CountingAnalysisFactory factory{engine};
@@ -709,6 +716,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(PositionAnalystTest, AStaleAnswerWithTwoLinesIsDropped) {
+        SKIP_WITHOUT_WORKER_THREADS();
         const auto engine = MakeEngine();
         engine->Gate(false);
         CountingAnalysisFactory factory{engine};

@@ -2853,6 +2853,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, WhileTheProgramThinksAClickOnTheBoardDoesNothing) {
+        SKIP_WITHOUT_WORKER_THREADS();
         const auto engine = eastl::make_shared<GatedEngine>(true);
         CountingFactory factory({engine});
         Opponent().SetEngineFactory(factory.AsFactory());
@@ -3032,6 +3033,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, StoppingTheGameDestroysTheOpponentAndCancelsItsSearch) {
+        SKIP_WITHOUT_WORKER_THREADS();
         const auto engine = eastl::make_shared<GatedEngine>(true);
         CountingFactory factory({engine});
         Opponent().SetEngineFactory(factory.AsFactory());
@@ -3051,6 +3053,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, ShuttingTheGameDownWithASearchInFlightReturnsAtOnce) {
+        SKIP_WITHOUT_WORKER_THREADS();
         const auto engine = eastl::make_shared<GatedEngine>(false);  // never looks at its token: only the gate can end its search
         CountingFactory factory({engine});
         Opponent().SetEngineFactory(factory.AsFactory());
@@ -3195,6 +3198,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, WhileTheProgramThinksTheTurnSaysSoAndTheAnswerBringsTheUsualWordsBack) {
+        SKIP_WITHOUT_WORKER_THREADS();
         const auto engine = eastl::make_shared<GatedEngine>(true);
         CountingFactory factory({engine});
         Opponent().SetEngineFactory(factory.AsFactory());
@@ -5724,6 +5728,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, WhileTheEngineStillThinksNothingIsDrawnAndTheAnswerBringsTheHint) {
+        SKIP_WITHOUT_WORKER_THREADS();
         const auto engine = eastl::make_shared<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"));
         engine->Gate(true);
         CountingAnalysisFactory factory({engine});
@@ -6017,6 +6022,7 @@ namespace BECore::Chess::Tests {
     }  // namespace
 
     TEST_F(ChessUiTest, WatchTheBoardTakesNoClickOnWhitesTurnAndKeepsTheSearchAlone) {
+        SKIP_WITHOUT_WORKER_THREADS();
         const auto white = eastl::make_shared<GatedEngine>(true);
         const auto black = eastl::make_shared<GatedEngine>(true);
         CountingFactory factory({white, black});
@@ -6044,6 +6050,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, WatchTheBoardTakesNoClickOnBlacksTurnEither) {
+        SKIP_WITHOUT_WORKER_THREADS();
         const auto white = eastl::make_shared<GatedEngine>(true);
         const auto black = eastl::make_shared<GatedEngine>(true);
         CountingFactory factory({white, black});
@@ -6180,6 +6187,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, WatchTwoPlayersInThePanelGivesTheBoardBackToClicks) {
+        SKIP_WITHOUT_WORKER_THREADS();
         const auto white = eastl::make_shared<GatedEngine>(true);
         const auto black = eastl::make_shared<GatedEngine>(true);
         CountingFactory factory({white, black});
@@ -6223,6 +6231,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, WatchATakeoverLeavesTheClicksToThePersonsColorOnly) {
+        SKIP_WITHOUT_WORKER_THREADS();
         const auto white = eastl::make_shared<GatedEngine>(true);
         const auto black = eastl::make_shared<GatedEngine>(true);
         CountingFactory factory({white, black});
@@ -6394,6 +6403,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheProgramsTurnTakesNoDragAndDoesNotCancelItsSearch) {
+        SKIP_WITHOUT_WORKER_THREADS();
         const auto engine = eastl::make_shared<GatedEngine>(true);
         CountingFactory factory({engine});
         Opponent().SetEngineFactory(factory.AsFactory());
