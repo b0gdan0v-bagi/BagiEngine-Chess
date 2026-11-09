@@ -858,4 +858,372 @@ namespace BECore::Chess::Tests {
         EXPECT_FALSE(model.GetSquareOf(handles.At("a2")).IsInside());
     }
 
+    // ---- Taking moves back ----
+
+    namespace {
+
+        void PlayAll(ChessGameModel& model, const eastl::vector<const char*>& moves, size_t count) {
+            for (size_t i = 0; i < count; ++i) {
+                ASSERT_TRUE(Play(model, moves[i])) << "move " << i << ": " << moves[i];
+            }
+        }
+
+        /// Every handle that started on a square of the opening stands where, and is what, the other model's handle says
+        void ExpectSameHandles(const ChessGameModel& left, const Handles& leftHandles, const ChessGameModel& right, const Handles& rightHandles) {
+            const Position opening = Position::Start();
+            for (int sq = 0; sq < kSquareCount; ++sq) {
+                if (opening.GetPieceAt(Square::FromIndex(sq)).IsEmpty()) {
+                    continue;
+                }
+                const void* leftHandle = leftHandles.AtIndex(sq);
+                const void* rightHandle = rightHandles.AtIndex(sq);
+                EXPECT_EQ(left.IsActive(leftHandle), right.IsActive(rightHandle)) << "the handle that started on square " << sq;
+                EXPECT_EQ(left.GetSquareOf(leftHandle), right.GetSquareOf(rightHandle)) << "the handle that started on square " << sq;
+                EXPECT_TRUE(left.GetPieceOf(leftHandle) == right.GetPieceOf(rightHandle)) << "the handle that started on square " << sq;
+            }
+        }
+
+        /// The handles are consistent with the board, also when pieces are gone: each active handle stands on a square that holds
+        /// the piece it reports, no two share a square, and the active handles are exactly the pieces of the position
+        void ExpectHandlesMatchTheBoard(const ChessGameModel& model, const Handles& handles) {
+            const Position opening = Position::Start();
+            eastl::array<int, kSquareCount> handlesOnSquare{};
+            for (int start = 0; start < kSquareCount; ++start) {
+                const void* handle = handles.AtIndex(start);
+                if (opening.GetPieceAt(Square::FromIndex(start)).IsEmpty() || !model.IsActive(handle)) {
+                    continue;
+                }
+                const Square at = model.GetSquareOf(handle);
+                ASSERT_TRUE(at.IsInside());
+                EXPECT_TRUE(model.GetPieceOf(handle) == model.GetPieceAt(at)) << "the handle that started on square " << start;
+                ++handlesOnSquare[static_cast<size_t>(at.Index())];
+            }
+            for (int sq = 0; sq < kSquareCount; ++sq) {
+                EXPECT_EQ(handlesOnSquare[static_cast<size_t>(sq)], model.GetPieceAt(Square::FromIndex(sq)).IsEmpty() ? 0 : 1) << "square " << sq;
+            }
+        }
+
+        /// What a game is, as far as the rules and the scene can tell: both models must agree on all of it
+        void ExpectSameGame(const ChessGameModel& left, const Handles& leftHandles, const ChessGameModel& right, const Handles& rightHandles) {
+            EXPECT_EQ(left.GetPosition().ToFen(), right.GetPosition().ToFen());
+            EXPECT_EQ(left.GetPosition().RepetitionCount(), right.GetPosition().RepetitionCount());
+            EXPECT_EQ(left.GetStartFen(), right.GetStartFen());
+            EXPECT_TRUE(left.GetMoves() == right.GetMoves());
+            EXPECT_EQ(left.GetStatus(), right.GetStatus());
+            EXPECT_TRUE(left.GetTurn() == right.GetTurn());
+            EXPECT_TRUE(left.GetWinner() == right.GetWinner());
+            ExpectSameHandles(left, leftHandles, right, rightHandles);
+        }
+
+        /// For every k, TakeBack(k) on a model that played all of @p moves equals a model that played the first moves.size() - k.
+        /// An empty @p startFen is the opening; else the game begins from that FEN through SetPosition().
+        void ExpectTakeBackMatchesAFreshModel(eastl::string_view startFen, const eastl::vector<const char*>& moves) {
+            for (size_t back = 1; back <= moves.size(); ++back) {
+                SCOPED_TRACE(testing::Message() << "taken back: " << back);
+                ChessGameModel taken;
+                const Handles takenHandles(taken);
+                ChessGameModel fresh;
+                const Handles freshHandles(fresh);
+                if (!startFen.empty()) {
+                    taken.SetPosition(PositionFromFen(startFen));
+                    fresh.SetPosition(PositionFromFen(startFen));
+                }
+                PlayAll(taken, moves, moves.size());
+                PlayAll(fresh, moves, moves.size() - back);
+                ASSERT_EQ(taken.TakeBack(back), back);
+
+                ExpectSameGame(taken, takenHandles, fresh, freshHandles);
+                ExpectHandlesMatchTheBoard(taken, takenHandles);
+            }
+        }
+
+    }  // namespace
+
+    TEST(ChessGameModelTest, TakeBackOneMoveGivesTheOpeningBack) {
+        ChessGameModel model;
+        ASSERT_TRUE(Play(model, "e2e4"));
+        const uint64_t version = model.GetVersion();
+
+        EXPECT_EQ(model.TakeBack(), 1u);
+
+        EXPECT_EQ(model.GetPosition().ToFen(), eastl::string(Position::kStartFen));
+        EXPECT_TRUE(model.GetMoves().empty());
+        EXPECT_EQ(model.GetVersion(), version + 1);
+        EXPECT_TRUE(model.GetTurn() == PieceColor::White);
+        EXPECT_EQ(model.GetStartFen(), eastl::string(Position::kStartFen));
+    }
+
+    TEST(ChessGameModelTest, TakeBackOfNothingChangesNothingAndKeepsTheVersion) {
+        ChessGameModel model;
+        uint64_t version = model.GetVersion();
+        EXPECT_EQ(model.TakeBack(), 0u) << "no moves";
+        EXPECT_EQ(model.TakeBack(5), 0u);
+        EXPECT_EQ(model.GetVersion(), version);
+        EXPECT_EQ(model.GetPosition().ToFen(), eastl::string(Position::kStartFen));
+
+        ASSERT_TRUE(Play(model, "e2e4"));
+        ASSERT_TRUE(Play(model, "e7e5"));
+        Click(model, "g1");
+        version = model.GetVersion();
+        EXPECT_EQ(model.TakeBack(0), 0u);
+        EXPECT_EQ(model.GetVersion(), version);
+        EXPECT_EQ(model.GetMoves().size(), 2u);
+        EXPECT_TRUE(model.HasSelection()) << "a takeback of nothing leaves the selection alone";
+    }
+
+    TEST(ChessGameModelTest, TakeBackTwoEqualsAGameOfTwoMovesLess) {
+        const eastl::vector<const char*> moves = {"e2e4", "e7e5", "g1f3", "b8c6", "f1c4"};
+        ChessGameModel model;
+        PlayAll(model, moves, moves.size());
+        EXPECT_EQ(model.TakeBack(2), 2u);
+
+        ChessGameModel fresh;
+        PlayAll(fresh, moves, 3);
+        EXPECT_EQ(model.GetPosition().ToFen(), fresh.GetPosition().ToFen());
+        EXPECT_TRUE(model.GetMoves() == fresh.GetMoves());
+        EXPECT_EQ(model.GetStatus(), fresh.GetStatus());
+        EXPECT_TRUE(model.GetTurn() == fresh.GetTurn());
+        EXPECT_TRUE(model.GetTurn() == PieceColor::Black);
+    }
+
+    TEST(ChessGameModelTest, TakeBackMoreThanThereAreTakesAll) {
+        ChessGameModel model;
+        for (const char* uci : {"e2e4", "e7e5", "g1f3"}) {
+            ASSERT_TRUE(Play(model, uci)) << uci;
+        }
+        EXPECT_EQ(model.TakeBack(100), 3u);
+        EXPECT_TRUE(model.GetMoves().empty());
+        EXPECT_EQ(model.GetPosition().ToFen(), eastl::string(Position::kStartFen));
+        EXPECT_EQ(model.TakeBack(100), 0u);
+    }
+
+    TEST(ChessGameModelTest, TakeBackMovesTheVersionOncePerCallAndNeverBack) {
+        ChessGameModel model;
+        for (const char* uci : {"e2e4", "e7e5", "g1f3", "b8c6"}) {
+            ASSERT_TRUE(Play(model, uci)) << uci;
+        }
+        uint64_t version = model.GetVersion();
+
+        EXPECT_EQ(model.TakeBack(3), 3u);
+        EXPECT_EQ(model.GetVersion(), version + 1) << "three plies are one step";
+        version = model.GetVersion();
+
+        EXPECT_EQ(model.TakeBack(1), 1u);
+        EXPECT_EQ(model.GetVersion(), version + 1);
+        version = model.GetVersion();
+
+        EXPECT_EQ(model.TakeBack(1), 0u);
+        EXPECT_EQ(model.GetVersion(), version);
+
+        ASSERT_TRUE(Play(model, "d2d4"));
+        EXPECT_EQ(model.GetVersion(), version + 1) << "a move after a takeback is a step as before";
+    }
+
+    TEST(ChessGameModelTest, TakeBackPutsAFinishedGameOnAgain) {
+        ChessGameModel model;
+        ClickMoves(model, {"f2", "f3", "e7", "e5", "g2", "g4", "d8", "h4"});
+        ASSERT_EQ(model.GetStatus(), GameStatus::Checkmate);
+        ASSERT_TRUE(model.GetWinner().has_value());
+
+        EXPECT_EQ(model.TakeBack(), 1u);
+        EXPECT_EQ(model.GetStatus(), GameStatus::Ongoing);
+        EXPECT_FALSE(model.IsGameOver());
+        EXPECT_FALSE(model.GetWinner().has_value());
+        EXPECT_FALSE(model.IsInCheck());
+        EXPECT_TRUE(Play(model, "a7a6")) << "a move is accepted again";
+    }
+
+    TEST(ChessGameModelTest, TakeBackPutsAStalematedGameOnAgain) {
+        ChessGameModel model;
+        model.SetPosition(PositionFromFen("7k/8/5K2/8/8/8/8/6Q1 w - - 0 1"));
+        ASSERT_TRUE(Play(model, "g1g6"));
+        ASSERT_EQ(model.GetStatus(), GameStatus::Stalemate);
+        ASSERT_FALSE(model.TryMove(Mv("h8g8")).has_value());
+
+        EXPECT_EQ(model.TakeBack(), 1u);
+        EXPECT_EQ(model.GetStatus(), GameStatus::Ongoing);
+        EXPECT_FALSE(model.GetWinner().has_value());
+        EXPECT_TRUE(Play(model, "g1g2"));
+    }
+
+    TEST(ChessGameModelTest, TakeBackFromAThreefoldDrawKeepsTheRepetitionCountRight) {
+        const eastl::vector<const char*> cycle = {"g1f3", "g8f6", "f3g1", "f6g8"};
+        ChessGameModel model;
+        for (int round = 0; round < 2; ++round) {
+            PlayAll(model, cycle, cycle.size());
+        }
+        ASSERT_EQ(model.GetStatus(), GameStatus::DrawThreefold);
+
+        // One ply back: that position has occurred twice, so the game is on, and the same move ends it again.
+        EXPECT_EQ(model.TakeBack(), 1u);
+        EXPECT_EQ(model.GetStatus(), GameStatus::Ongoing);
+        EXPECT_EQ(model.GetPosition().RepetitionCount(), 2) << "the position after seven plies is the one after three";
+        ASSERT_TRUE(Play(model, "f6g8"));
+        EXPECT_EQ(model.GetStatus(), GameStatus::DrawThreefold);
+
+        // A whole round back: the opening has occurred twice, and the round played again draws on its last ply, not before.
+        EXPECT_EQ(model.TakeBack(4), 4u);
+        EXPECT_EQ(model.GetStatus(), GameStatus::Ongoing);
+        EXPECT_EQ(model.GetPosition().RepetitionCount(), 2);
+        for (size_t i = 0; i < cycle.size(); ++i) {
+            EXPECT_EQ(model.GetStatus(), GameStatus::Ongoing) << "before ply " << i;
+            ASSERT_TRUE(Play(model, cycle[i])) << cycle[i];
+        }
+        EXPECT_EQ(model.GetStatus(), GameStatus::DrawThreefold);
+    }
+
+    TEST(ChessGameModelTest, TakeBackGoesNoFurtherThanASetPosition) {
+        ChessGameModel model;
+        model.SetPosition(PositionFromFen(kKiwipeteFen));
+        ASSERT_TRUE(Play(model, "e1g1"));
+        ASSERT_TRUE(Play(model, "e8c8"));
+
+        EXPECT_EQ(model.TakeBack(10), 2u);
+        EXPECT_EQ(model.GetPosition().ToFen(), eastl::string(kKiwipeteFen));
+        EXPECT_EQ(model.GetStartFen(), eastl::string(kKiwipeteFen));
+        EXPECT_TRUE(model.GetMoves().empty());
+        EXPECT_EQ(model.TakeBack(), 0u);
+        EXPECT_EQ(model.GetPosition().ToFen(), eastl::string(kKiwipeteFen));
+    }
+
+    TEST(ChessGameModelTest, TakeBackOfAGameThatBeganFinishedChangesNothing) {
+        ChessGameModel model;
+        model.SetPosition(PositionFromFen("7k/5Q2/6K1/8/8/8/8/8 b - - 0 1"));
+        ASSERT_EQ(model.GetStatus(), GameStatus::Stalemate);
+        const uint64_t version = model.GetVersion();
+
+        EXPECT_EQ(model.TakeBack(), 0u);
+        EXPECT_EQ(model.GetStatus(), GameStatus::Stalemate);
+        EXPECT_EQ(model.GetVersion(), version);
+    }
+
+    TEST(ChessGameModelTest, TakeBackDropsTheSelectionAndAPendingPromotion) {
+        ChessGameModel model;
+        model.SetPosition(PositionFromFen("7k/P7/8/8/8/8/8/K7 w - - 0 1"));
+        ASSERT_TRUE(Play(model, "a1b1"));
+        Click(model, "h8");
+        ASSERT_TRUE(model.HasSelection());
+        EXPECT_EQ(model.TakeBack(), 1u);
+        EXPECT_FALSE(model.HasSelection());
+        EXPECT_TRUE(model.GetLegalMoves().empty());
+
+        ASSERT_TRUE(Play(model, "a1b1"));
+        ASSERT_TRUE(Play(model, "h8g8"));
+        Click(model, "a7");
+        Click(model, "a8");
+        ASSERT_TRUE(model.HasPendingPromotion());
+        EXPECT_EQ(model.TakeBack(), 1u);
+        EXPECT_FALSE(model.HasPendingPromotion());
+        EXPECT_FALSE(model.HasSelection());
+    }
+
+    TEST(ChessGameModelTest, TakeBackLeavesTheHandlesRightAfterCapturesAndKingSideCastlings) {
+        ExpectTakeBackMatchesAFreshModel("", {"e2e4", "d7d5", "e4d5", "g8f6", "g1f3", "f6d5", "f1c4", "c8e6", "e1g1", "g7g6", "d2d3", "f8g7", "c4d5", "e6d5", "b1c3", "e8g8"});
+    }
+
+    TEST(ChessGameModelTest, TakeBackLeavesTheHandlesRightAfterQueenSideCastlingsAndCaptures) {
+        ExpectTakeBackMatchesAFreshModel("", {"d2d4", "d7d5", "b1c3", "b8c6", "c1f4", "c8f5", "d1d2", "d8d7", "e1c1", "e8c8", "f4c7", "d7c7"});
+    }
+
+    TEST(ChessGameModelTest, TakeBackLeavesTheHandlesRightAfterEnPassant) {
+        ExpectTakeBackMatchesAFreshModel("", {"e2e4", "a7a6", "e4e5", "d7d5", "e5d6", "c7d6"});
+    }
+
+    TEST(ChessGameModelTest, TakeBackBringsThePassedPawnBackOnItsSquare) {
+        ChessGameModel model;
+        const Handles handles(model);
+        for (const char* uci : {"e2e4", "a7a6", "e4e5", "d7d5", "e5d6"}) {
+            ASSERT_TRUE(Play(model, uci)) << uci;
+        }
+        ASSERT_FALSE(model.IsActive(handles.At("d7")));
+
+        EXPECT_EQ(model.TakeBack(), 1u);
+        EXPECT_TRUE(model.IsActive(handles.At("d7")));
+        EXPECT_EQ(model.GetSquareOf(handles.At("d7")), Sq("d5"));
+        EXPECT_EQ(model.GetSquareOf(handles.At("e2")), Sq("e5"));
+        EXPECT_TRUE(Play(model, "e5d6")) << "the en passant capture is there to play again";
+        EXPECT_FALSE(model.IsActive(handles.At("d7")));
+    }
+
+    TEST(ChessGameModelTest, TakeBackLeavesTheHandlesRightAfterAPromotionWithACapture) {
+        ExpectTakeBackMatchesAFreshModel("", {"h2h4", "g7g5", "h4g5", "h7h6", "g5h6", "a7a6", "h6h7", "b7b6", "h7g8q"});
+    }
+
+    TEST(ChessGameModelTest, TakeBackTurnsAPromotedPieceBackIntoAPawnAndReturnsTheCapturedKnight) {
+        ChessGameModel model;
+        const Handles handles(model);
+        for (const char* uci : {"h2h4", "g7g5", "h4g5", "h7h6", "g5h6", "a7a6", "h6h7", "b7b6", "h7g8q"}) {
+            ASSERT_TRUE(Play(model, uci)) << uci;
+        }
+        ASSERT_TRUE(model.GetPieceOf(handles.At("h2")).type == PieceType::Queen);
+
+        EXPECT_EQ(model.TakeBack(), 1u);
+        EXPECT_EQ(model.GetSquareOf(handles.At("h2")), Sq("h7"));
+        EXPECT_TRUE(model.GetPieceOf(handles.At("h2")).type == PieceType::Pawn);
+        EXPECT_TRUE(model.IsActive(handles.At("g8")));
+        EXPECT_EQ(model.GetSquareOf(handles.At("g8")), Sq("g8"));
+        ExpectHandlesMatchTheBoard(model, handles);
+
+        // The promotion can be made again, as another piece
+        ASSERT_TRUE(Play(model, "h7g8n"));
+        EXPECT_TRUE(model.GetPieceOf(handles.At("h2")).type == PieceType::Knight);
+    }
+
+    TEST(ChessGameModelTest, TakeBackLeavesTheHandlesOfASetPositionGameRight) {
+        // Kiwipete: a capture, both castlings, a capture by a pawn and one by the queen
+        ExpectTakeBackMatchesAFreshModel(kKiwipeteFen, {"e5f7", "e8g8", "e1c1", "h3g2", "f3g2"});
+    }
+
+    TEST(ChessGameModelTest, TakeBackLeavesTheHandlesRightAfterAPromotionWithoutACapture) {
+        ExpectTakeBackMatchesAFreshModel("7k/P7/8/8/8/8/8/K7 w - - 0 1", {"a7a8q", "h8g7", "a8a2"});
+    }
+
+    TEST(ChessGameModelTest, TakeBackOfASetPositionGameKeepsEveryPieceOfThePositionOnAHandle) {
+        ChessGameModel model;
+        const Handles handles(model);
+        model.SetPosition(PositionFromFen(kKiwipeteFen));
+        for (const char* uci : {"e5f7", "e8g8", "e1c1"}) {
+            ASSERT_TRUE(Play(model, uci)) << uci;
+        }
+        EXPECT_EQ(model.TakeBack(3), 3u);
+        ExpectEveryPieceHasOneHandle(model, handles);
+    }
+
+    TEST(ChessGameModelTest, AMoveAfterATakeBackIsLegalAndTheHandlesFollowIt) {
+        ChessGameModel model;
+        const Handles handles(model);
+        for (const char* uci : {"e2e4", "e7e5", "g1f3"}) {
+            ASSERT_TRUE(Play(model, uci)) << uci;
+        }
+        ASSERT_EQ(model.TakeBack(2), 2u);
+
+        ASSERT_TRUE(Play(model, "d7d5"));
+        ASSERT_TRUE(Play(model, "e4d5"));
+        EXPECT_FALSE(model.IsActive(handles.At("d7")));
+        EXPECT_EQ(model.GetSquareOf(handles.At("e2")), Sq("d5"));
+        EXPECT_EQ(model.GetSquareOf(handles.At("e7")), Sq("e7")) << "the pawn that was moved and taken back stands at home";
+        ExpectHandlesMatchTheBoard(model, handles);
+        ASSERT_EQ(model.GetMoves().size(), 3u);
+        EXPECT_EQ(model.GetMoves()[1], Mv("d7d5"));
+    }
+
+    TEST(ChessGameModelTest, TakeBackOneMoveAtATimeIsAFreshModelEveryTime) {
+        const eastl::vector<const char*> moves = {"e2e4", "e7e5", "g1f3", "b8c6", "f1c4", "f8c5"};
+        ChessGameModel model;
+        const Handles handles(model);
+        for (size_t i = 0; i < moves.size(); ++i) {
+            SCOPED_TRACE(testing::Message() << "move " << i);
+            ASSERT_TRUE(Play(model, moves[i]));
+            ASSERT_EQ(model.TakeBack(), 1u);
+
+            ChessGameModel fresh;
+            const Handles freshHandles(fresh);
+            PlayAll(fresh, moves, i);
+            ExpectSameGame(model, handles, fresh, freshHandles);
+
+            ASSERT_TRUE(Play(model, moves[i])) << "the move can be played again";
+        }
+        EXPECT_EQ(model.GetMoves().size(), moves.size());
+    }
+
 }  // namespace BECore::Chess::Tests
