@@ -28,7 +28,8 @@ namespace BECore::Chess {
      *
      * Never handicapped (no WithHandicap: an analysis is not spoilt on purpose) and with no `Skill Level` option: full strength, within the limits the analyst gives. LaunchFailed, naming the
      * path that was tried, when there is no Stockfish; nothing falls back to the other engine, nor to `$STOCKFISH` after a path that names no file (FindStockfish's rule). The engine is a new
-     * object each time, so it is a second process, never the opponent's.
+     * object each time, so it is a second process, never the opponent's. Without Stockfish in the build (CHESS_NO_STOCKFISH) Stockfish is `Unsupported` (UnavailableEngineError) and the picked engine,
+     * which a game starts with, is Own.
      */
     [[nodiscard]] std::expected<eastl::shared_ptr<IChessEngine>, EngineError> MakeAnalysisEngine(OpponentEngine engine, const OpponentSettings& settings);
 

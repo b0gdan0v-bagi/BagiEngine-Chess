@@ -9,15 +9,15 @@
 #define SKIP_WITHOUT_STOCKFISH(path)                                                                                                                                                                   \
     const std::optional<eastl::string> path = ::BECore::Chess::Tests::StockfishPath();                                                                                                                 \
     if (!path.has_value()) {                                                                                                                                                                           \
-        GTEST_SKIP() << "no Stockfish (or no process code on this platform): set STOCKFISH to its executable or put stockfish on PATH";                                                                \
+        GTEST_SKIP() << "no Stockfish (or no process code in this build): set STOCKFISH to its executable or put stockfish on PATH";                                                                   \
     }
 
 /// The real Stockfish, which the tests neither ship nor install: they find it like the bridge does (STOCKFISH, then PATH) and skip without it
 namespace BECore::Chess::Tests {
 
-    /// Where Stockfish is, or nothing; nothing too where the process code is not there
+    /// Where Stockfish is, or nothing; nothing too where the process code is not there (Windows, CHESS_NO_STOCKFISH, the web)
     inline std::optional<eastl::string> StockfishPath() {
-#if defined(_WIN32)
+#if !CHESS_HAS_UCI_PROCESS
         return std::nullopt;
 #else
         return FindStockfish({});

@@ -105,6 +105,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(OpponentControllerTest, PickingBlackMakesTheProgramAnswerAPersonsMove) {
+        SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
         const auto engine = eastl::make_shared<GatedEngine>(true);
         CountingFactory factory({engine});
@@ -131,7 +132,7 @@ namespace BECore::Chess::Tests {
         controller.Update();
         EXPECT_TRUE(controller.IsThinking());
         ASSERT_TRUE(WaitUntil([&] { return engine->Calls() == 1; })) << "the engine has the search and waits at its gate";
-        EXPECT_EQ(engine->LastLimits().moveTimeMs, GetOpponentLevels()[kDefaultOpponentLevel].moveTimeMs) << "the limits are the level's";
+        EXPECT_EQ(engine->LastLimits().moveTimeMs, LimitsOf(controller.GetEngine(), GetOpponentLevels()[kDefaultOpponentLevel]).moveTimeMs) << "the limits are the level's for the engine";
         for (int frame = 0; frame < kManyUpdates; ++frame) {
             controller.Update();
         }
@@ -221,6 +222,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(OpponentControllerTest, ThePickOfTheSameSideAndLevelKeepsTheSearch) {
+        SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
         const auto engine = eastl::make_shared<GatedEngine>(true);
         CountingFactory factory({engine});
@@ -328,6 +330,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(OpponentControllerTest, ARefusedStockfishPickKeepsTheRunningOpponentAndItsSearch) {
+        SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
         // The own engine is there (gated, honors its token); Stockfish is not
         const auto own = eastl::make_shared<GatedEngine>(true, Mv("e7e5"));
@@ -411,6 +414,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(OpponentControllerTest, AfterARefusedPickThePickOfWhatPlaysClearsTheErrorWithoutRemakingTheOpponent) {
+        SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
         const auto own = eastl::make_shared<GatedEngine>(true, Mv("e7e5"));
         CountingFactory factory({own});
@@ -457,6 +461,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(OpponentControllerTest, AChangeOfLevelDropsTheRunningSearchAndItsStaleAnswer) {
+        SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
         // The first engine ignores its token and holds the answer h7h5 until the end of the test; the second answers at once
         const auto slow = eastl::make_shared<GatedEngine>(false, Mv("h7h5"));
@@ -486,7 +491,7 @@ namespace BECore::Chess::Tests {
         controller.Update();
         EXPECT_TRUE(controller.IsThinking());
         ASSERT_TRUE(UpdateUntil(controller, [&] { return model.GetMoves().size() == 2; })) << DescribeError(controller.GetError()).c_str();
-        EXPECT_EQ(quick->LastLimits().moveTimeMs, GetOpponentLevels()[hard].moveTimeMs);
+        EXPECT_EQ(quick->LastLimits().moveTimeMs, LimitsOf(controller.GetEngine(), GetOpponentLevels()[hard]).moveTimeMs);
         slow->Open();  // and now the old search answers h7h5, into a game that has moved on
         ASSERT_TRUE(WaitUntil([&] { return slow->Answered() == 1; }));
         for (int frame = 0; frame < kManyUpdates; ++frame) {
@@ -499,6 +504,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(OpponentControllerTest, ChangingFromWhiteToBlackRemakesTheOpponentAndCancelsTheOldSearch) {
+        SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
         const auto asWhite = eastl::make_shared<GatedEngine>(true);
         const auto asBlack = eastl::make_shared<InstantEngine>();
@@ -610,6 +616,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(OpponentControllerTest, ShutdownCancelsTheSearchAndLaterUpdatesDoNothing) {
+        SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
         const auto engine = eastl::make_shared<GatedEngine>(true);
         CountingFactory factory({engine});
@@ -637,6 +644,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(OpponentControllerTest, DestroyingTheControllerCancelsTheSearch) {
+        SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
         const auto engine = eastl::make_shared<GatedEngine>(true);
         CountingFactory factory({engine});
@@ -652,6 +660,76 @@ namespace BECore::Chess::Tests {
         EXPECT_TRUE(WaitUntil([&] { return engine->WasCancelled(); }));
         EXPECT_EQ(model.GetMoves().size(), 1u);
     }
+
+#if CHESS_NO_STOCKFISH
+
+    TEST_F(OpponentControllerTest, WithoutStockfishThePickOfStockfishIsRefusedAlsoWhileNobodyPlaysAndNothingChanges) {
+        ChessGameModel model;
+        OpponentController controller(model);  // the default factory: no SetEngineFactory
+        ASSERT_EQ(controller.GetEngine(), OpponentEngine::Own);
+        const uint64_t revision = controller.GetRevision();
+
+        const auto refused = controller.SetEngine(OpponentEngine::Stockfish);
+
+        ASSERT_FALSE(refused.has_value());
+        EXPECT_EQ(refused.error().kind, EngineErrorKind::Unsupported);
+        EXPECT_FALSE(refused.error().detail.empty());
+        EXPECT_EQ(controller.GetEngine(), OpponentEngine::Own) << "an engine that cannot be had cannot be saved";
+        EXPECT_FALSE(controller.GetPlays().has_value());
+        ASSERT_TRUE(controller.GetError().has_value());
+        EXPECT_EQ(controller.GetError()->kind, EngineErrorKind::Unsupported);
+        EXPECT_EQ(controller.GetRevision(), revision + 1) << "the error that appeared is shown once";
+
+        // The same refusal again is the person's retry: still refused, and nothing else changes
+        EXPECT_FALSE(controller.SetEngine(OpponentEngine::Stockfish).has_value());
+        EXPECT_EQ(controller.GetEngine(), OpponentEngine::Own);
+        EXPECT_FALSE(controller.GetPlays().has_value());
+    }
+
+    TEST_F(OpponentControllerTest, WithoutStockfishAPickWithAStockfishSeatIsRefusedAsAWholeAlsoForTheSeatNobodyPlays) {
+        ChessGameModel model;
+        OpponentController controller(model);
+        const size_t easy = LevelIndex("easy");
+        const SeatChoice own{OpponentEngine::Own, easy};
+        const SeatChoice stockfish{OpponentEngine::Stockfish, easy};
+
+        const auto refused = controller.ChooseSeats(ProgramSides::Of(PieceColor::White), own, stockfish);  // Black's seat is not played, and still refused
+
+        ASSERT_FALSE(refused.has_value());
+        EXPECT_EQ(refused.error().kind, EngineErrorKind::Unsupported);
+        EXPECT_FALSE(controller.PlaysFor(PieceColor::White)) << "the whole pick is refused: White's good seat is not applied either";
+        EXPECT_EQ(controller.GetSeatChoice(PieceColor::Black).engine, OpponentEngine::Own);
+        EXPECT_FALSE(controller.Choose(PieceColor::Black, easy, OpponentEngine::Stockfish).has_value());
+        EXPECT_FALSE(controller.GetPlays().has_value());
+    }
+
+    TEST_F(OpponentControllerTest, WithoutStockfishTheOwnEnginePlaysThroughTheDefaultFactory) {
+        ChessGameModel model;
+        OpponentController controller(model);
+        ASSERT_TRUE(controller.SetSide(PieceColor::Black).has_value()) << "the default engine is the own one: nothing to refuse";
+        ASSERT_TRUE(controller.SetLevel(LevelIndex("easy")).has_value());
+        EXPECT_FALSE(controller.GetError().has_value());
+        ASSERT_TRUE(Play(model, "e2e4"));
+
+        ASSERT_TRUE(UpdateUntil(controller, [&] { return model.GetMoves().size() == 2; })) << DescribeError(controller.GetError()).c_str();
+
+        EXPECT_EQ(model.GetTurn(), PieceColor::White);
+        EXPECT_EQ(controller.GetEngine(), OpponentEngine::Own);
+    }
+
+    TEST_F(OpponentControllerTest, WithoutStockfishAFactoryOfTheTestIsStillAskedForStockfish) {
+        ChessGameModel model;
+        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        OpponentController controller(model);
+        controller.SetEngineFactory(factory.AsFactory());  // the test world: its doubles are called Stockfish and Own
+
+        ASSERT_TRUE(controller.Choose(PieceColor::Black, LevelIndex("easy"), OpponentEngine::Stockfish).has_value());
+
+        ASSERT_EQ(factory.Calls(), 1);
+        EXPECT_EQ(factory.Engines()[0], OpponentEngineId(OpponentEngine::Stockfish));
+    }
+
+#else
 
     TEST_F(OpponentControllerTest, TheDefaultFactoryNamesThePathItTriedWhenThereIsNoFile) {
         ChessGameModel model;
@@ -674,6 +752,8 @@ namespace BECore::Chess::Tests {
         EXPECT_TRUE(Contains(tilde.error().detail, kTildePath)) << tilde.error().detail.c_str();
         EXPECT_TRUE(Contains(tilde.error().detail, "'~'")) << tilde.error().detail.c_str();
     }
+
+#endif  // CHESS_NO_STOCKFISH
 
     namespace {
 
@@ -767,39 +847,48 @@ namespace BECore::Chess::Tests {
         EXPECT_LT(closing, kShutdownBudget) << "the default grace of a UciEngine is " << UciEngineSettings::kDefaultQuitGraceMs << " ms";
     }
 
-    TEST_F(OpponentControllerTest, ANewControllerHasStockfishAndPickingTheEngineWithNobodyPlayingStartsNothing) {
+    TEST_F(OpponentControllerTest, ANewControllerHasTheDefaultEngineAndPickingTheOtherWithNobodyPlayingStartsNothing) {
         ChessGameModel model;
         CountingFactory factory({eastl::make_shared<InstantEngine>()});
         OpponentController controller(model);
         controller.SetEngineFactory(factory.AsFactory());
-        EXPECT_EQ(controller.GetEngine(), OpponentEngine::Stockfish);
         EXPECT_EQ(controller.GetEngine(), kDefaultOpponentEngine);
+        EXPECT_EQ(controller.GetEngine(), kStockfishAvailable ? OpponentEngine::Stockfish : OpponentEngine::Own);
+        const OpponentEngine other = kDefaultOpponentEngine == OpponentEngine::Own ? OpponentEngine::Stockfish : OpponentEngine::Own;  // a factory of the test is asked for either
 
-        EXPECT_TRUE(controller.SetEngine(OpponentEngine::Own).has_value());
+        EXPECT_TRUE(controller.SetEngine(other).has_value());
 
-        EXPECT_EQ(controller.GetEngine(), OpponentEngine::Own);
+        EXPECT_EQ(controller.GetEngine(), other);
         EXPECT_EQ(controller.GetRevision(), 1u) << "a display of the engine has to redraw";
         EXPECT_EQ(factory.Calls(), 0) << "nobody plays: nothing is looked up or started";
         EXPECT_FALSE(controller.GetPlays().has_value());
 
-        EXPECT_TRUE(controller.SetEngine(OpponentEngine::Own).has_value());
+        EXPECT_TRUE(controller.SetEngine(other).has_value());
         EXPECT_EQ(controller.GetRevision(), 1u) << "the same pick again changes nothing";
         EXPECT_EQ(factory.Calls(), 0);
     }
 
-    TEST_F(OpponentControllerTest, AnEngineCycleWalksStockfishOwnStockfish) {
+    TEST_F(OpponentControllerTest, AnEngineCycleWalksStockfishOwnStockfishWhereStockfishIsAvailableElseStaysOnOwn) {
         ChessGameModel model;
         OpponentController controller(model);
 
-        EXPECT_EQ(controller.GetEngine(), OpponentEngine::Stockfish);
-        EXPECT_TRUE(controller.CycleEngine().has_value());
-        EXPECT_EQ(controller.GetEngine(), OpponentEngine::Own);
-        EXPECT_TRUE(controller.CycleEngine().has_value());
-        EXPECT_EQ(controller.GetEngine(), OpponentEngine::Stockfish);
-        EXPECT_EQ(controller.GetRevision(), 2u);
+        EXPECT_EQ(controller.GetEngine(), kDefaultOpponentEngine);
+        if constexpr (kStockfishAvailable) {
+            EXPECT_TRUE(controller.CycleEngine().has_value());
+            EXPECT_EQ(controller.GetEngine(), OpponentEngine::Own);
+            EXPECT_TRUE(controller.CycleEngine().has_value());
+            EXPECT_EQ(controller.GetEngine(), OpponentEngine::Stockfish);
+            EXPECT_EQ(controller.GetRevision(), 2u);
+        } else {
+            EXPECT_TRUE(controller.CycleEngine().has_value());
+            EXPECT_EQ(controller.GetEngine(), OpponentEngine::Own) << "the cycle skips the engine this build cannot run";
+            EXPECT_EQ(controller.GetRevision(), 0u) << "and the pick changes nothing";
+            EXPECT_FALSE(controller.GetError().has_value());
+        }
     }
 
     TEST_F(OpponentControllerTest, ChangingTheEngineWhileTheProgramPlaysRemakesTheOpponentAndDropsTheStaleAnswer) {
+        SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
         // The first (Stockfish) engine ignores its token and holds h7h5 until the end of the test; the second (Own) answers at once
         const auto slow = eastl::make_shared<GatedEngine>(false, Mv("h7h5"));
@@ -807,7 +896,7 @@ namespace BECore::Chess::Tests {
         CountingFactory factory({slow, quick});
         OpponentController controller(model);
         controller.SetEngineFactory(factory.AsFactory());
-        ASSERT_TRUE(controller.SetSide(PieceColor::Black).has_value());
+        ASSERT_TRUE(controller.Choose(PieceColor::Black, controller.GetLevel(), OpponentEngine::Stockfish).has_value());  // a factory of the test is asked for Stockfish in a build without it too
         ASSERT_TRUE(Play(model, "e2e4"));
         controller.Update();
         ASSERT_TRUE(WaitUntil([&] { return slow->Calls() == 1; }));
@@ -842,6 +931,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(OpponentControllerTest, ChooseWithAnEngineMakesOneEngineAndTheSamePickAgainKeepsTheSearch) {
+        SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
         const auto engine = eastl::make_shared<GatedEngine>(true);
         CountingFactory factory({engine});
@@ -895,6 +985,7 @@ namespace BECore::Chess::Tests {
             }
             return instant;
         });
+        ASSERT_TRUE(controller.SetEngine(OpponentEngine::Stockfish).has_value());  // the engine the person had picked (already the default where Stockfish is available); nobody plays: no factory call
 
         const auto first = controller.SetSide(PieceColor::Black);
 
@@ -975,8 +1066,12 @@ namespace BECore::Chess::Tests {
         const auto stockfish = controller.SetEngine(OpponentEngine::Stockfish);
 
         ASSERT_FALSE(stockfish.has_value()) << "no fallback to the own engine";
+#if CHESS_NO_STOCKFISH
+        EXPECT_EQ(stockfish.error().kind, EngineErrorKind::Unsupported) << "the path is not even looked at";
+#else
         EXPECT_EQ(stockfish.error().kind, EngineErrorKind::LaunchFailed);
         EXPECT_TRUE(Contains(stockfish.error().detail, kMissingPath)) << stockfish.error().detail.c_str();
+#endif
         EXPECT_EQ(controller.GetEngine(), OpponentEngine::Own) << "a failed pick is refused: nothing changes";
         EXPECT_TRUE(controller.PlaysFor(PieceColor::Black));
         EXPECT_TRUE(controller.GetError().has_value());

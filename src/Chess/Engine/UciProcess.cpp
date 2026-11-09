@@ -1,6 +1,6 @@
 #include "UciProcess.h"
 
-#if !defined(_WIN32)
+#if CHESS_HAS_UCI_PROCESS
 #include <fcntl.h>
 #include <poll.h>
 #include <signal.h>
@@ -28,7 +28,7 @@ namespace BECore::Chess {
             return std::unexpected(EngineError{kind, std::move(detail)});
         }
 
-#if !defined(_WIN32)
+#if CHESS_HAS_UCI_PROCESS
 
         constexpr size_t kReadChunkBytes = 4096;
         constexpr size_t kCompactBytes = 64 * 1024;                // the consumed front of the line buffer is dropped once it is this big and half of the buffer
@@ -173,14 +173,28 @@ namespace BECore::Chess {
             posix_spawnattr_t _attributes;
         };
 
-#endif  // !defined(_WIN32)
+#endif  // CHESS_HAS_UCI_PROCESS
 
     }  // namespace
 
+#if !CHESS_HAS_UCI_PROCESS
+
+    namespace {
+
+        /// Why there is no process here, one sentence per case
+        constexpr const char* kNoProcessDetail =
 #if defined(_WIN32)
+            "a UCI engine process is not implemented on Windows yet";
+#elif defined(__EMSCRIPTEN__)
+            "a UCI engine cannot run in a browser";
+#else
+            "a UCI engine process is switched off in this build (CHESS_NO_STOCKFISH)";
+#endif
+
+    }  // namespace
 
     std::expected<eastl::unique_ptr<UciProcess>, EngineError> UciProcess::Start(const ProcessLaunch&) {
-        return Fail(EngineErrorKind::Unsupported, "a UCI engine process is not implemented on Windows yet");
+        return Fail(EngineErrorKind::Unsupported, kNoProcessDetail);
     }
 
     UciProcess::UciProcess(int processId, int inputDescriptor, int outputDescriptor) : _pid(processId), _inputDescriptor(inputDescriptor), _outputDescriptor(outputDescriptor) {}
@@ -188,11 +202,11 @@ namespace BECore::Chess {
     UciProcess::~UciProcess() = default;
 
     std::expected<void, EngineError> UciProcess::WriteLine(eastl::string_view) {
-        return Fail(EngineErrorKind::Unsupported, "a UCI engine process is not implemented on Windows yet");
+        return Fail(EngineErrorKind::Unsupported, kNoProcessDetail);
     }
 
     std::expected<eastl::string, EngineError> UciProcess::ReadLine(std::chrono::milliseconds) {
-        return Fail(EngineErrorKind::Unsupported, "a UCI engine process is not implemented on Windows yet");
+        return Fail(EngineErrorKind::Unsupported, kNoProcessDetail);
     }
 
     void UciProcess::Close(std::chrono::milliseconds) {}
@@ -425,6 +439,6 @@ namespace BECore::Chess {
         return true;
     }
 
-#endif  // defined(_WIN32)
+#endif  // !CHESS_HAS_UCI_PROCESS
 
 }  // namespace BECore::Chess

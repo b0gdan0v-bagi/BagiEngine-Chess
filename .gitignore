@@ -1,5 +1,6 @@
 # CMake and build output
 /build/
+/dist/
 /out/
 /.cmake/
 

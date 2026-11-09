@@ -88,6 +88,7 @@ namespace BECore::Chess {
      * fail) is engine_unavailable (with the sentence of the engine's error) and is refused as a whole, whichever seat has no engine: the position is not replaced and the opponent is unchanged (sides,
      * seats and a running search stay as they were), the error is in the state, so a client can ask again with "engine": "own". A pick that changes nothing (the same sides and seats, no error
      * standing) does nothing: a running Stockfish is not restarted. With an error standing, the same "plays" asks for an engine again, and plays null clears it.
+     * Without Stockfish (CHESS_NO_STOCKFISH) "stockfish" is engine_unavailable in "engine" and in the seat objects, also while nobody plays, and the default engine is "own".
      *
      * The state version is the version of the game plus the revision of the opponent (a pick, an error that appears or goes) plus the revision of the analyst (a switch,
      * a hint asked or dropped, an answer that arrives, an error that appears or goes, a switch of the ratings, a rating that arrives or is dropped; an error of the rater that appears

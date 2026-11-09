@@ -50,7 +50,8 @@ namespace BECore::Chess {
     void ChessGame::Start() {
         _model.Reset();
         _opponent.SetSettings(OpponentSettings::Load());
-        // Two people: nothing is looked up or started until a side is picked. Neither call can fail without a side
+        // Two people: nothing is looked up or started until a side is picked. Neither call can fail without a side (kDefaultOpponentEngine is the one engine this build can run: Stockfish, or
+        // Own with CHESS_NO_STOCKFISH, so the refusal of an engine that is not available never meets the default)
         [[maybe_unused]] const auto side = _opponent.SetSide(std::nullopt);
         [[maybe_unused]] const auto level = _opponent.SetLevel(kDefaultOpponentLevel);
         [[maybe_unused]] const auto engine = _opponent.SetEngine(kDefaultOpponentEngine);

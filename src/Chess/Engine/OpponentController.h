@@ -13,6 +13,9 @@ namespace BECore::Chess {
     /// Why no Stockfish was found: names the path that was tried when @p path is not empty, else the three places that are looked at. Shared with the analysis (PositionAnalyst)
     [[nodiscard]] eastl::string NoStockfishDetail(const eastl::string& path);
 
+    /// The error for an engine this build cannot run (IsOpponentEngineAvailable is false: Stockfish with CHESS_NO_STOCKFISH): `Unsupported`, with a sentence that says why. Shared with the analysis
+    [[nodiscard]] EngineError UnavailableEngineError(OpponentEngine engine);
+
     /// Which colors the program plays: nobody (two people), one side, or both (two programs)
     struct ProgramSides {
         bool white = false;
@@ -59,9 +62,13 @@ namespace BECore::Chess {
      * and the Skill Level option is sent at the handshake; a seat whose color and choice are unchanged keeps its opponent and its search. A pick that changes nothing (the same
      * sides and choices, no error) does nothing.
      *
+     * In a build without Stockfish (CHESS_NO_STOCKFISH) a pick of Stockfish is refused the same way, for any seat and also while nobody plays it (`Unsupported`), as long as the controller uses
+     * its default factory: a factory given by SetEngineFactory() is the caller's own world and is asked as before.
+     *
      * The engine is part of the choice and nothing else picks it: there is no fallback from one engine to the other. A refused Stockfish pick keeps the old opponents and
      * puts the error in GetError(); the person picks the other engine (SetEngine()), which clears the error, and then a side. While nobody plays, SetEngine() only changes the
-     * choice: no factory call, nothing is looked up or started (so it cannot be refused).
+     * choice: no factory call, nothing is looked up or started (so it cannot be refused), except in a build with CHESS_NO_STOCKFISH and the default factory, where a pick of
+     * Stockfish is refused whoever plays (above).
      *
      * The error rule: an error belongs to the version of the game it came from (ChessGameModel::GetVersion()). When the version moves (a reset, a position set from
      * outside, a move of someone else) Update() clears the error, the opponents' too, and a new pick clears it as well: the person has acted, so they have seen it.
@@ -105,7 +112,7 @@ namespace BECore::Chess {
         }
 
         /// The factory that makes the engine at a pick, asked for (engine, level); an empty one puts the default back (the Stockfish of the settings, the OwnEngine, each under the handicap of the
-        /// level: WithHandicap; a factory given here is never wrapped)
+        /// level: WithHandicap; a factory given here is never wrapped, and is asked for an engine this build could not run too)
         void SetEngineFactory(EngineFactory factory);
 
         /**
@@ -243,6 +250,8 @@ namespace BECore::Chess {
         }
 
         [[nodiscard]] std::expected<eastl::shared_ptr<IChessEngine>, EngineError> MakeEngine(OpponentEngine engine, const OpponentLevel& level) const;
+        /// The color of the first seat (White's first) whose picked engine this build cannot run, while the default factory is in use; nothing for a factory given by a test
+        [[nodiscard]] std::optional<PieceColor> FindUnavailableSeat(const eastl::array<SeatChoice, kSeatCount>& picked) const;
         /// A pick of @p plays with @p level in both seats, the engines kept
         std::expected<void, EngineError> ChooseLevel(ProgramSides plays, size_t level);
         void FailPick(EngineError error, PieceColor computer, OpponentEngine engine, const OpponentLevel& level);

@@ -134,9 +134,9 @@ namespace BECore::Chess::Tests {
 
     }  // namespace
 
-#if defined(_WIN32)
+#if !CHESS_HAS_UCI_PROCESS
 
-    TEST(UciEngineTest, ASearchIsUnsupportedOnWindows) {
+    TEST(UciEngineTest, ASearchIsUnsupportedWithoutProcessCode) {
         UciEngineSettings settings;
         settings.launch.path = "engine.exe";
         UciEngine engine(std::move(settings));
@@ -144,7 +144,7 @@ namespace BECore::Chess::Tests {
         ExpectError(engine.FindMove(MakeRequest({}), CancellationToken()), EngineErrorKind::Unsupported);
     }
 
-    TEST(UciEngineTest, AnAnalysisIsUnsupportedOnWindows) {
+    TEST(UciEngineTest, AnAnalysisIsUnsupportedWithoutProcessCode) {
         UciEngineSettings settings;
         settings.launch.path = "engine.exe";
         UciEngine engine(std::move(settings));
@@ -992,7 +992,24 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(CountMultiPvOptions(ReadFileLines(directory.File(kLogName))), 0u) << "a move is one line";
     }
 
-#endif  // defined(_WIN32)
+#endif  // !CHESS_HAS_UCI_PROCESS
+
+#if CHESS_NO_STOCKFISH
+
+    TEST(UciEngineTest, FindStockfishFindsNothingWithoutStockfishWhateverIsThere) {
+        const TempDirectory directory;
+        const std::filesystem::path file = directory.File("stockfish-copy");
+        {
+            std::ofstream stream(file);
+            stream << "not a program\n";
+        }
+        const std::string text = file.string();
+
+        EXPECT_FALSE(FindStockfish(eastl::string_view(text.data(), text.size())).has_value()) << "an explicit file that is there is not looked at";
+        EXPECT_FALSE(FindStockfish({}).has_value());
+    }
+
+#else
 
     TEST(UciEngineTest, FindStockfishTakesAnExplicitExistingFile) {
         const TempDirectory directory;
@@ -1018,7 +1035,9 @@ namespace BECore::Chess::Tests {
         EXPECT_FALSE(FindStockfish(eastl::string_view(folder.data(), folder.size())).has_value()) << "a directory is no executable";
     }
 
-#if !defined(_WIN32)
+#endif  // CHESS_NO_STOCKFISH
+
+#if !defined(_WIN32) && !CHESS_NO_STOCKFISH
 
     namespace {
 
@@ -1114,7 +1133,7 @@ namespace BECore::Chess::Tests {
         }
     }
 
-#endif  // !defined(_WIN32)
+#endif  // !defined(_WIN32) && !CHESS_NO_STOCKFISH
 
     // The same class against a real Stockfish, which the tests neither ship nor install: they find it like the bridge does (STOCKFISH, then PATH) and skip without it
 
