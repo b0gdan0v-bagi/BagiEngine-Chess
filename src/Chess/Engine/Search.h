@@ -107,8 +107,71 @@ namespace BECore::Chess {
      * searched ends the iterations early (a deeper one cannot find a shorter mate).
      *
      * @p position is the game; the search plays moves on it and takes them back, and hands it back equal (same key, same FEN),
-     * also when it was stopped. It must not be used by another thread meanwhile. No allocation beyond the position's own history and the table.
+     * also when it was stopped. It must not be used by another thread meanwhile. The line being searched is not on the native stack: the
+     * frames of the plies live on the heap in the search's own storage (SearchJob below is the same machine, driven in slices), so the
+     * search needs a few tens of kilobytes of stack at any depth. Beyond that it allocates the frames of the plies it reaches (about 2 KB
+     * each, once per call), the position's own history and the table.
      */
     [[nodiscard]] SearchResult Search(Position& position, const SearchSettings& settings, const SearchControl& control = {});
+
+    /// Whether SearchJob::Advance() stopped to give the caller the thread, or the search is over
+    CORE_ENUM(SearchProgress, uint8_t, Paused, Done)
+
+    /// The nodes of a slice that a caller which must stay responsive hands to SearchJob::Advance(): a node is 1 to 3 microseconds, so a slice is
+    /// well under a frame budget of a few milliseconds even in a slow build (a browser), and the call costs nothing against the nodes it runs
+    inline constexpr uint64_t kSearchSliceNodes = 256;
+
+    /**
+     * @brief The search of Search(), as a state machine that a caller drives a few nodes at a time.
+     *
+     * The same code as Search(), which is this machine run to the end on the caller's position: iterative deepening, the order of the
+     * moves, the killers, the history, the transposition table and the stops are the same, so a job gives, slice by slice, the best move,
+     * score, depth, node count and stop flag that Search() gives in one call, for any sizes of the slices. The job owns copies of
+     * the position (with its history), the settings and the control, so a coroutine that drives it may outlive the objects it was made
+     * from, and it owns its table, killers, history and stack of plies (the table is SearchSettings::tableEntries x 16 bytes, freed with the job).
+     * It is moved, never copied; its address may change with a move (the machine lives behind a pointer).
+     *
+     * Not thread safe: one thread drives a job at a time, though not always the same one. SearchControl::token may be cancelled from any thread.
+     */
+    class SearchJob {
+    public:
+        SearchJob(Position position, SearchSettings settings, SearchControl control = {});
+        ~SearchJob();
+        SearchJob(SearchJob&&) noexcept;
+        SearchJob& operator=(SearchJob&&) noexcept;
+        SearchJob(const SearchJob&) = delete;
+        SearchJob& operator=(const SearchJob&) = delete;
+
+        /**
+         * @brief Runs the search for about @p maxNodes more nodes and answers whether it is over.
+         *
+         * `Paused` means the search goes on at the next call, `Done` that it ended (the depth was reached, a forced mate was found, or the
+         * control stopped it); after `Done` a call does nothing and answers `Done`. UINT64_MAX runs to the end, and 0 is read as 1, so every call
+         * makes progress.
+         *
+         * A slice ends only between two nodes, just before a move is tried, so the position is whole at the pause and nothing about the search
+         * (a count, an order, a limit) depends on where the pauses are. A slice runs at most @p maxNodes nodes plus one: a node at the
+         * horizon is counted twice (as a full-width node and as the quiescence node it turns into, as in Search()), and the pause is looked for before
+         * the next move, so the last node of a slice may take that one extra. The node limit is looked at in every node, as in Search(); the clock and the
+         * token every kSearchPollInterval nodes counted from the start of the search, not of the slice, **and at the start of every call** once the
+         * first iteration is done (a search must finish its first iteration, so it can be stopped from the second one only): a token cancelled
+         * or a deadline passed while the job was paused ends it at once, with the nodes of the call at 0.
+         */
+        [[nodiscard]] SearchProgress Advance(uint64_t maxNodes = kSearchSliceNodes);
+
+        [[nodiscard]] bool IsDone() const noexcept;
+
+        /// What the search has found so far, as SearchResult says: the best move, score and depth of the last iteration that finished (none until one
+        /// does), and the nodes searched so far, those of an iteration still running included. Final once IsDone(); `stopped` is
+        /// then whether the control ended the search
+        [[nodiscard]] SearchResult GetResult() const noexcept;
+
+        /// The depth of the last iteration that finished, 0 while none has
+        [[nodiscard]] int FinishedDepth() const noexcept;
+
+    private:
+        struct Impl;
+        eastl::unique_ptr<Impl> _impl;
+    };
 
 }  // namespace BECore::Chess

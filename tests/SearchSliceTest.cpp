@@ -2,8 +2,10 @@
 
 #include <Chess/Engine/Search.h>
 #include <Chess/Game/MoveGenerator.h>
+#include <TaskSystem/TaskManager.h>
 #include <iomanip>
 #include <iostream>
+#include <thread>
 #include <vector>
 
 /// The search as a machine that can be driven in slices: the golden results of the recursive search it replaces and the speed benchmark.
@@ -21,6 +23,12 @@ namespace BECore::Chess::Tests {
         constexpr int kGoldenDeepDepth = 5;
         constexpr int kGoldenDeepestDepth = 8;
         constexpr int kGoldenForeverDepth = 64;
+        /// The 1 and 2 plies of the easy and the medium level, and the depths of the mate and perpetual check positions
+        constexpr int kGoldenEasyDepth = 1;
+        constexpr int kGoldenMediumDepth = 2;
+        constexpr int kGoldenChecksDepth = 6;
+        /// The word that ends the name of a default row, which the rows with no table replace
+        constexpr eastl::string_view kDefaultWord = "default";
         /// The nodes after which the node-limited rows stop: a node limit is a clock that does not tick, so the result is deterministic
         constexpr uint64_t kGoldenNodeLimits[] = {1, 3000, 4000, 20000};
 
@@ -29,6 +37,9 @@ namespace BECore::Chess::Tests {
             const char* name;
             eastl::string_view fen;
         };
+
+        /// Both queens can give check again and again (the fixture of SearchTest.ChecksThatCanGoOnForeverEndTheSearch)
+        constexpr eastl::string_view kChecksFen = "7k/6q1/8/8/8/8/1Q6/K7 w - - 0 1";
 
         const NamedFen kPerftPositions[] = {
             {"start", Position::kStartFen}, {"kiwipete", kKiwipeteFen}, {"pos3", kPosition3Fen}, {"pos4", kPosition4Fen}, {"pos5", kPosition5Fen}, {"pos6", kPosition6Fen},
@@ -92,7 +103,7 @@ namespace BECore::Chess::Tests {
             }
             // The shallow levels of the game (easy and medium search 1 and 2 plies)
             for (const NamedFen& position : kPerftPositions) {
-                for (const int depth : {1, 2}) {
+                for (const int depth : {kGoldenEasyDepth, kGoldenMediumDepth}) {
                     cases.push_back(Case(Format("{} d{} default", position.name, depth), position.fen, depth));
                 }
             }
@@ -127,19 +138,18 @@ namespace BECore::Chess::Tests {
             for (const GoldenCase& history : {repetition, clock, shuffle}) {
                 cases.push_back(history);
                 GoldenCase noTable = history;
-                noTable.name = history.name;
-                noTable.name.replace(noTable.name.size() - 7, 7, "no table");
+                noTable.name.replace(noTable.name.size() - kDefaultWord.size(), kDefaultWord.size(), "no table");
                 noTable.table = false;
                 cases.push_back(noTable);
             }
             // Mates, a game that is over, and the stops before the first node
             GoldenCase mateInOne = Case("mate in one d64", "6k1/5ppp/8/8/8/8/8/R3K3 w - - 0 1", kGoldenForeverDepth);
             cases.push_back(mateInOne);
-            cases.push_back(Case("mate in two d4", "kbK5/pp6/1P6/8/8/8/8/R7 w - - 0 1", 4));
-            cases.push_back(Case("mate in three d8", "k7/8/8/3K4/8/8/8/7R w - - 0 1", 8));
+            cases.push_back(Case("mate in two d4", "kbK5/pp6/1P6/8/8/8/8/R7 w - - 0 1", kGoldenDepth));
+            cases.push_back(Case("mate in three d8", "k7/8/8/3K4/8/8/8/7R w - - 0 1", kGoldenDeepestDepth));
             cases.push_back(Case("mated root d3", "R5k1/5ppp/8/8/8/8/8/4K3 b - - 0 1", kGoldenShallowDepth));
             cases.push_back(Case("stalemate root d3", "7k/5Q2/6K1/8/8/8/8/8 b - - 0 1", kGoldenShallowDepth));
-            cases.push_back(Case("checks forever d6", "7k/6q1/8/8/8/8/1Q6/K7 w - - 0 1", 6));
+            cases.push_back(Case("checks forever d6", kChecksFen, kGoldenChecksDepth));
             GoldenCase cancelled = Case("cancelled before d64", kKiwipeteFen, kGoldenForeverDepth);
             cancelled.cancelled = true;
             cases.push_back(cancelled);
@@ -156,25 +166,73 @@ namespace BECore::Chess::Tests {
             return settings;
         }
 
-        /// The search of a case through the one-call Search()
-        SearchResult RunGoldenCase(const GoldenCase& c) {
-            Position position = PositionFromFen(c.fen);
+        /// What a case hands to a search
+        struct SearchInputs {
+            Position position;
+            SearchSettings settings;
+            SearchControl control;
+        };
+
+        SearchInputs InputsOf(const GoldenCase& c) {
+            SearchInputs inputs{PositionFromFen(c.fen), SettingsOf(c), {}};
             for (const char* uci : c.moves) {
-                position.DoMove(Mv(uci));
+                inputs.position.DoMove(Mv(uci));
             }
-            SearchSettings settings = SettingsOf(c);
             if (c.excludeDefaultBest) {
                 SearchSettings first;
                 first.maxDepth = kGoldenShallowDepth;
-                settings.excludedRootMoves.push_back(Search(position, first).best);
+                inputs.settings.excludedRootMoves.push_back(Search(inputs.position, first).best);
             }
-            SearchControl control;
-            control.nodeLimit = c.nodeLimit;
+            inputs.control.nodeLimit = c.nodeLimit;
             if (c.cancelled) {
-                control.token = CancellationToken::Create();
-                control.token.Cancel();
+                inputs.control.token = CancellationToken::Create();
+                inputs.control.token.Cancel();
             }
-            return Search(position, settings, control);
+            return inputs;
+        }
+
+        /// The search of a case through the one-call Search()
+        SearchResult RunGoldenCase(const GoldenCase& c) {
+            SearchInputs inputs = InputsOf(c);
+            return Search(inputs.position, inputs.settings, inputs.control);
+        }
+
+        /// The nodes to give the call number @p call of a job (0, 1, ...)
+        using SlicePolicy = std::function<uint64_t(size_t call)>;
+
+        /// The same slice every time
+        SlicePolicy Fixed(uint64_t nodes) {
+            return [nodes](size_t) { return nodes; };
+        }
+
+        /// A slice that changes with every call: 1 to 300 nodes in a fixed, uneven order
+        constexpr uint64_t kVaryingSliceModulus = 300;
+        constexpr size_t kVaryingSliceStride = 37;
+        uint64_t Varying(size_t call) {
+            return 1 + (call * kVaryingSliceStride) % kVaryingSliceModulus;
+        }
+
+        /// Drives @p job to the end with the slices of @p policy; the number of calls it took
+        size_t Drive(SearchJob& job, const SlicePolicy& policy) {
+            size_t calls = 0;
+            while (!job.IsDone()) {
+                (void)job.Advance(policy(calls));
+                ++calls;
+            }
+            return calls;
+        }
+
+        /// The search of a case through a SearchJob built from copies of its inputs
+        SearchResult RunSlicedGoldenCase(const GoldenCase& c, const SlicePolicy& policy) {
+            SearchInputs inputs = InputsOf(c);
+            SearchJob job(inputs.position, inputs.settings, inputs.control);
+            (void)Drive(job, policy);
+            return job.GetResult();
+        }
+
+        bool IsLegalIn(const Position& position, Move move) {
+            const MoveList moves = MoveGenerator::GenerateLegal(position);
+            return eastl::find(moves.begin(), moves.end(), move) != moves.end();
         }
 
         // clang-format off
@@ -319,6 +377,351 @@ namespace BECore::Chess::Tests {
         }
     }
 
+    // -- the search in slices ------------------------------------------------------------------------------------------------
+
+    namespace {
+
+        /// The rows up to this many nodes are driven with every slice size (1 node a call too); the larger ones with the varying one, to keep the run short
+        constexpr uint64_t kSmallRowNodes = 12000;
+        constexpr uint64_t kSliceOfOneNode = 1;
+        constexpr uint64_t kSliceOfSevenNodes = 7;
+        constexpr uint64_t kSliceOfManyNodes = 1000;
+
+        struct NamedPolicy {
+            const char* name;
+            SlicePolicy policy;
+        };
+
+        size_t IndexOfCase(const std::vector<GoldenCase>& cases, const char* name) {
+            for (size_t i = 0; i < cases.size(); ++i) {
+                if (cases[i].name == name) {
+                    return i;
+                }
+            }
+            return cases.size();
+        }
+
+        /// A deadline far enough that a test never reaches it by accident, and short enough that a hang ends
+        constexpr std::chrono::seconds kSafetyDeadline{60};
+        /// The perpetual checks of kChecksFen at depth 64 go on for ever (17 plies in 45 million nodes), so the deep search is stopped by its nodes
+        constexpr uint64_t kDeepSearchNodes = 300000;
+        /// The iteration the deep search has reached by then (measured: more than this), which is past the 6 of the golden row
+        constexpr int kDeepSearchIterations = 8;
+
+    }  // namespace
+
+    TEST(SearchSliceTest, TheSlicedSearchGivesTheOneCallResult) {
+        // Every row of the golden table (the six perft positions with and without the table, the old quiet order and an excluded root move, the
+        // positions with a history, the mates, the node limits) driven in slices gives the numbers of the one call
+        const std::vector<GoldenCase> cases = BuildGoldenCases();
+        ASSERT_EQ(std::size(kGoldenRows), cases.size());
+
+        const NamedPolicy everySize[] = {
+            {"1 node", Fixed(kSliceOfOneNode)}, {"7 nodes", Fixed(kSliceOfSevenNodes)}, {"256 nodes", Fixed(kSearchSliceNodes)}, {"1000 nodes", Fixed(kSliceOfManyNodes)}, {"varying", Varying},
+        };
+        const NamedPolicy fewSizes[] = {{"varying", Varying}};
+
+        for (size_t i = 0; i < cases.size(); ++i) {
+            const bool small = kGoldenRows[i].nodes <= kSmallRowNodes;
+            const auto check = [&](const NamedPolicy& slices) {
+                const SearchResult result = RunSlicedGoldenCase(cases[i], slices.policy);
+                EXPECT_TRUE(Matches(kGoldenRows[i], result)) << "row \"" << cases[i].name.c_str() << "\" in slices of " << slices.name << ": " << Describe(kGoldenRows[i], result);
+            };
+            if (small) {
+                for (const NamedPolicy& slices : everySize) {
+                    check(slices);
+                }
+            } else {
+                for (const NamedPolicy& slices : fewSizes) {
+                    check(slices);
+                }
+            }
+        }
+    }
+
+    TEST(SearchSliceTest, ASliceRunsAtMostItsNodes) {
+        // A pause is before a move is tried, so a slice is exact but for the node at the horizon, which is counted twice: at most one more
+        constexpr uint64_t kOverrun = 1;
+        for (const NamedFen& position : {kPerftPositions[0], kPerftPositions[2]}) {
+            SearchSettings settings;
+            settings.maxDepth = kGoldenDepth;
+            Position reference = PositionFromFen(position.fen);
+            const SearchResult whole = Search(reference, settings);
+
+            for (const uint64_t slice : {kSliceOfOneNode, uint64_t{5}, uint64_t{100}}) {
+                SearchJob job(PositionFromFen(position.fen), settings);
+                size_t calls = 0;
+                while (!job.IsDone()) {
+                    const uint64_t before = job.GetResult().nodes;
+                    (void)job.Advance(slice);
+                    const uint64_t grew = job.GetResult().nodes - before;
+                    ASSERT_LE(grew, slice + kOverrun) << position.name << " slice " << slice << " call " << calls;
+                    ++calls;
+                    ASSERT_LE(calls, whole.nodes + 1) << position.name << ": a slice that makes no progress";
+                }
+
+                EXPECT_EQ(job.GetResult().nodes, whole.nodes) << position.name << " slice " << slice;
+                EXPECT_EQ(job.GetResult().best, whole.best) << position.name << " slice " << slice;
+                // The slices are not far below their size: a call that ran a few nodes is the last of an iteration or of the search
+                EXPECT_GE(calls, whole.nodes / (slice + kOverrun)) << position.name << " slice " << slice;
+            }
+        }
+    }
+
+    TEST(SearchSliceTest, ASliceOfNothingIsASliceOfOneNode) {
+        SearchSettings settings;
+        settings.maxDepth = kGoldenShallowDepth;
+        SearchJob job(PositionFromFen(Position::kStartFen), settings);
+
+        EXPECT_EQ(job.Advance(0), SearchProgress::Paused);
+
+        EXPECT_GE(job.GetResult().nodes, 1u);
+        EXPECT_LE(job.GetResult().nodes, 2u);
+    }
+
+    TEST(SearchSliceTest, AJobThatIsDoneStaysDone) {
+        SearchSettings settings;
+        settings.maxDepth = kGoldenEasyDepth;
+        SearchJob job(PositionFromFen(Position::kStartFen), settings);
+
+        EXPECT_EQ(job.Advance(UINT64_MAX), SearchProgress::Done);
+        const SearchResult done = job.GetResult();
+
+        EXPECT_TRUE(job.IsDone());
+        EXPECT_EQ(job.Advance(), SearchProgress::Done);
+        EXPECT_EQ(job.GetResult().nodes, done.nodes);
+        EXPECT_EQ(job.GetResult().best, done.best);
+        EXPECT_EQ(job.FinishedDepth(), kGoldenEasyDepth);
+    }
+
+    TEST(SearchSliceTest, TheNodeLimitIsTheSameInSlices) {
+        const std::vector<GoldenCase> cases = BuildGoldenCases();
+        const NamedPolicy sizes[] = {
+            {"1 node", Fixed(kSliceOfOneNode)}, {"7 nodes", Fixed(kSliceOfSevenNodes)}, {"256 nodes", Fixed(kSearchSliceNodes)}, {"1000 nodes", Fixed(kSliceOfManyNodes)}, {"varying", Varying},
+        };
+
+        for (const char* name : {"start d8 nodes 3000", "start d8 nodes 20000", "kiwipete d64 nodes 4000"}) {
+            const size_t row = IndexOfCase(cases, name);
+            ASSERT_LT(row, cases.size()) << name;
+            ASSERT_TRUE(kGoldenRows[row].stopped) << name;
+
+            for (const NamedPolicy& slices : sizes) {
+                const SearchResult result = RunSlicedGoldenCase(cases[row], slices.policy);
+
+                EXPECT_TRUE(Matches(kGoldenRows[row], result)) << name << " in slices of " << slices.name << ": " << Describe(kGoldenRows[row], result);
+            }
+        }
+    }
+
+    TEST(SearchSliceTest, ACancelledTokenBetweenSlicesStopsTheJob) {
+        SearchSettings settings;
+        settings.maxDepth = kGoldenForeverDepth;
+        SearchControl control;
+        control.token = CancellationToken::Create();
+        Position position = PositionFromFen(kKiwipeteFen);
+        SearchJob job(position, settings, control);
+
+        // The first iteration is never stopped; two finished, the job is in the third, where a stop is looked at
+        constexpr int kIterations = 2;
+        constexpr size_t kCallLimit = 100000;
+        size_t calls = 0;
+        while (job.FinishedDepth() < kIterations && calls < kCallLimit) {
+            ASSERT_EQ(job.Advance(), SearchProgress::Paused);
+            ++calls;
+        }
+        ASSERT_GE(job.FinishedDepth(), kIterations);
+        const uint64_t nodesBefore = job.GetResult().nodes;
+        control.token.Cancel();
+
+        EXPECT_EQ(job.Advance(), SearchProgress::Done);
+
+        const SearchResult result = job.GetResult();
+        EXPECT_TRUE(job.IsDone());
+        EXPECT_TRUE(result.stopped);
+        EXPECT_TRUE(result.complete);
+        EXPECT_EQ(result.nodes, nodesBefore) << "the cancel is seen at the start of the call, before a node is searched";
+        EXPECT_FALSE(result.best.IsNull());
+        EXPECT_TRUE(IsLegalIn(position, result.best));
+        EXPECT_GE(result.depth, kIterations);
+        EXPECT_EQ(job.FinishedDepth(), result.depth);
+    }
+
+    TEST(SearchSliceTest, ACancelledTokenBeforeTheFirstSliceGivesNoResult) {
+        SearchSettings settings;
+        settings.maxDepth = kGoldenDepth;
+        SearchControl control;
+        control.token = CancellationToken::Create();
+        control.token.Cancel();
+        SearchJob job(PositionFromFen(kKiwipeteFen), settings, control);
+
+        EXPECT_EQ(job.Advance(), SearchProgress::Done);
+
+        const SearchResult result = job.GetResult();
+        EXPECT_TRUE(result.stopped);
+        EXPECT_FALSE(result.complete);
+        EXPECT_TRUE(result.best.IsNull());
+        EXPECT_EQ(result.nodes, 0u);
+    }
+
+    TEST(SearchSliceTest, TheFirstIterationIsNotStoppedBetweenSlices) {
+        // A token cancelled in the middle of the first iteration is not looked at: the answer has to exist
+        SearchSettings settings;
+        settings.maxDepth = kGoldenForeverDepth;
+        SearchControl control;
+        control.token = CancellationToken::Create();
+        SearchJob job(PositionFromFen(kKiwipeteFen), settings, control);
+
+        EXPECT_EQ(job.Advance(kSliceOfOneNode), SearchProgress::Paused);
+        control.token.Cancel();
+
+        // The first iteration of Kiwipete is 5180 nodes; nothing stops it, and the job stops at the end of it
+        while (!job.IsDone() && job.FinishedDepth() < 1) {
+            (void)job.Advance(kSearchSliceNodes);
+        }
+        EXPECT_GE(job.FinishedDepth(), 1);
+        EXPECT_FALSE(job.GetResult().best.IsNull());
+        (void)job.Advance(kSearchSliceNodes);
+        EXPECT_TRUE(job.IsDone());
+        EXPECT_TRUE(job.GetResult().stopped);
+        EXPECT_EQ(job.GetResult().depth, 1);
+    }
+
+    TEST(SearchSliceTest, ADeadlineBetweenSlicesStopsTheJob) {
+        SearchSettings settings;
+        settings.maxDepth = kGoldenForeverDepth;
+        constexpr int kIterations = 2;
+
+        // The deadline has to pass while the job is paused after its second iteration (204 nodes of the start position, a millisecond), and not before;
+        // on a machine so busy that it passes earlier the attempt is made again with a deadline four times as far
+        bool tried = false;
+        for (std::chrono::milliseconds wait{150}; wait <= std::chrono::milliseconds{9600} && !tried; wait *= 4) {
+            SearchControl control;
+            const Clock::time_point deadline = Clock::now() + wait;
+            control.deadline = deadline;
+            SearchJob job(PositionFromFen(Position::kStartFen), settings, control);
+            while (!job.IsDone() && job.FinishedDepth() < kIterations) {
+                (void)job.Advance();
+            }
+            if (job.IsDone() || Clock::now() >= deadline) {
+                continue;
+            }
+            tried = true;
+            const uint64_t nodesBefore = job.GetResult().nodes;
+            std::this_thread::sleep_until(deadline + std::chrono::milliseconds(2));
+
+            EXPECT_EQ(job.Advance(), SearchProgress::Done);
+
+            const SearchResult result = job.GetResult();
+            EXPECT_TRUE(result.stopped);
+            EXPECT_EQ(result.nodes, nodesBefore);
+            EXPECT_GE(result.depth, kIterations);
+            EXPECT_FALSE(result.best.IsNull());
+        }
+        EXPECT_TRUE(tried) << "the machine was too slow for every deadline";
+    }
+
+    TEST(SearchSliceTest, AJobStoppedByTheNodeLimitInTheMiddleOfAnIterationBringsItsPositionBack) {
+        // The job's own position is not visible; the stop is the same as Search()'s, whose position is: the same numbers, so the unwinding is the same
+        SearchSettings settings;
+        settings.maxDepth = kGoldenDeepestDepth;
+        SearchControl control;
+        control.nodeLimit = 3000;
+        Position position = PositionFromFen(Position::kStartFen);
+        const eastl::string fenBefore = position.ToFen();
+        const ZobristKey keyBefore = position.Key();
+        SearchJob job(position, settings, control);
+
+        (void)Drive(job, Fixed(kSliceOfSevenNodes));
+
+        EXPECT_TRUE(job.GetResult().stopped);
+        EXPECT_EQ(position.ToFen(), fenBefore);
+        EXPECT_EQ(position.Key(), keyBefore);
+    }
+
+    TEST(SearchSliceTest, TheJobOwnsItsPosition) {
+        // The job works on a copy: the caller's position is the same after a job that ran to the end, and a stopped Search() hands it back equal
+        Position position = PositionFromFen(kKiwipeteFen);
+        position.DoMove(Mv("e2a6"));
+        const eastl::string fenBefore = position.ToFen();
+        const ZobristKey keyBefore = position.Key();
+        SearchSettings settings;
+        settings.maxDepth = kGoldenShallowDepth;
+
+        SearchJob job(position, settings);
+        (void)Drive(job, Fixed(kSearchSliceNodes));
+
+        EXPECT_TRUE(job.IsDone());
+        EXPECT_EQ(position.ToFen(), fenBefore);
+        EXPECT_EQ(position.Key(), keyBefore);
+
+        SearchControl limited;
+        limited.nodeLimit = 3000;
+        settings.maxDepth = kGoldenDeepestDepth;
+        const SearchResult stopped = Search(position, settings, limited);
+
+        EXPECT_TRUE(stopped.stopped);
+        EXPECT_EQ(position.ToFen(), fenBefore);
+        EXPECT_EQ(position.Key(), keyBefore);
+    }
+
+    TEST(SearchSliceTest, TheJobOutlivesItsInputs) {
+        SearchSettings reference;
+        reference.maxDepth = kGoldenDepth;
+        Position referencePosition = PositionFromFen(kKiwipeteFen);
+        const Move excluded = Search(referencePosition, reference).best;
+        reference.excludedRootMoves.push_back(excluded);
+        const SearchResult expected = Search(referencePosition, reference);
+        ASSERT_NE(expected.best, excluded);
+
+        std::optional<SearchJob> job;
+        {
+            // Everything the job was made from is gone at the end of the block
+            Position position = PositionFromFen(kKiwipeteFen);
+            SearchSettings settings;
+            settings.maxDepth = kGoldenDepth;
+            settings.excludedRootMoves.push_back(excluded);
+            SearchControl control;
+            control.nodeLimit = kDeepSearchNodes;
+            job.emplace(eastl::move(position), eastl::move(settings), eastl::move(control));
+            (void)job->Advance(kSearchSliceNodes);
+        }
+        // A moved job works on as well: the machine behind it does not move
+        SearchJob moved = eastl::move(*job);
+        job.reset();
+        (void)Drive(moved, Fixed(kSearchSliceNodes));
+
+        const SearchResult result = moved.GetResult();
+        EXPECT_EQ(result.best, expected.best);
+        EXPECT_EQ(result.score, expected.score);
+        EXPECT_EQ(result.nodes, expected.nodes);
+    }
+
+    TEST(SearchSliceTest, ADeepSearchNeedsNoDeepStack) {
+        // The plies of the line are frames on the heap, not calls: a search of the perpetual checks at depth 64 (the extension, then the iterations
+        // that deepen the line one ply each) is driven on a thread of the default stack and ends when its nodes do. It does not reach the 96 plies
+        // of the limit in a test run (it would need the iteration 64), so this guards the shape, not the limit
+        SearchResult result;
+        std::thread worker([&result]() {
+            Position position = PositionFromFen(kChecksFen);
+            SearchSettings settings;
+            settings.maxDepth = kGoldenForeverDepth;
+            settings.tableEntries = 0;
+            SearchControl control;
+            control.deadline = Clock::now() + kSafetyDeadline;
+            control.nodeLimit = kDeepSearchNodes;
+            SearchJob job(position, settings, control);
+            (void)Drive(job, Fixed(kSearchSliceNodes));
+            result = job.GetResult();
+        });
+        worker.join();
+
+        EXPECT_TRUE(result.complete);
+        EXPECT_TRUE(result.stopped);
+        EXPECT_FALSE(result.best.IsNull());
+        EXPECT_GE(result.depth, kDeepSearchIterations);
+        EXPECT_GE(result.nodes, kDeepSearchNodes);
+    }
+
     // -- the benchmark -------------------------------------------------------------------------------------------------------
 
     namespace {
@@ -331,14 +734,14 @@ namespace BECore::Chess::Tests {
             int depth;
         };
 
-        /// Depth 4 on the six positions, depth 5 on the start position and Kiwipete: about a second of work in Release
+        /// Depth 4 on the six positions, depth 5 on the start position and Kiwipete: about 70 ms of work in Release (one pass over the rows)
         std::vector<BenchmarkPosition> BenchmarkPositions() {
             std::vector<BenchmarkPosition> positions;
             for (const NamedFen& position : kPerftPositions) {
-                positions.push_back({position.name, position.fen, 4});
+                positions.push_back({position.name, position.fen, kGoldenDepth});
             }
-            positions.push_back({kPerftPositions[0].name, kPerftPositions[0].fen, 5});
-            positions.push_back({kPerftPositions[1].name, kPerftPositions[1].fen, 5});
+            positions.push_back({kPerftPositions[0].name, kPerftPositions[0].fen, kGoldenDeepDepth});
+            positions.push_back({kPerftPositions[1].name, kPerftPositions[1].fen, kGoldenDeepDepth});
             return positions;
         }
 
@@ -404,12 +807,36 @@ namespace BECore::Chess::Tests {
             return Search(position, settings).nodes;
         }
 
+        /// A SearchJob driven to the end in slices of kSearchSliceNodes, as a coroutine caller does it
+        uint64_t JobInSlices(eastl::string_view fen, int depth) {
+            SearchSettings settings;
+            settings.maxDepth = depth;
+            SearchJob job(PositionFromFen(fen), settings);
+            while (job.Advance(kSearchSliceNodes) == SearchProgress::Paused) {
+            }
+            return job.GetResult().nodes;
+        }
+
+        /// The same, with the cheap look that a coroutine caller takes between slices: whether the frame budget is spent (it never is here,
+        /// no task runs, so this is the cost of the call and of the pointer test)
+        uint64_t JobInSlicesWithAPoll(eastl::string_view fen, int depth) {
+            SearchSettings settings;
+            settings.maxDepth = depth;
+            SearchJob job(PositionFromFen(fen), settings);
+            uint64_t polls = 0;
+            while (!job.IsDone()) {
+                polls += TaskManager::GetInstance().ShouldYield() ? 1 : 0;
+                (void)job.Advance(kSearchSliceNodes);
+            }
+            return job.GetResult().nodes + polls;
+        }
+
     }  // namespace
 
     // Run by hand, in a Release build, on a quiet machine: ChessTests --gtest_also_run_disabled_tests --gtest_filter='SearchSliceBenchmark.*'
-    // ctest does not run it. It uses the public Search() only, so the same file measures the code before and after a change
+    // ctest does not run it. The first column uses the public Search() only, so the same file measures the code before and after a change
     TEST(SearchSliceBenchmark, DISABLED_NodesPerSecond) {
-        RunBenchmark({{"Search() one call", SearchToTheEnd}});
+        RunBenchmark({{"Search() one call", SearchToTheEnd}, {"SearchJob in slices of kSearchSliceNodes", JobInSlices}, {"SearchJob in slices with a ShouldYield() poll", JobInSlicesWithAPoll}});
     }
 
 }  // namespace BECore::Chess::Tests
