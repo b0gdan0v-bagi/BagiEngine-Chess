@@ -45,6 +45,7 @@ namespace BECore::Chess {
     }
 
     void PositionAnalyst::SetEngineFactory(AnalysisEngineFactory factory) {
+        _rater.SetEngineFactory(factory);
         _factory = std::move(factory);
     }
 
@@ -67,6 +68,11 @@ namespace BECore::Chess {
     }
 
     void PositionAnalyst::Update(const ChessGameModel& model, OpponentEngine picked) {
+        UpdateSearch(model, picked);
+        _rater.Update(model);
+    }
+
+    void PositionAnalyst::UpdateSearch(const ChessGameModel& model, OpponentEngine picked) {
         SetPicked(picked);
         if (_search && _search->done.load(std::memory_order_acquire)) {
             TakeAnswer(model, picked);
@@ -111,7 +117,12 @@ namespace BECore::Chess {
         }
     }
 
+    void PositionAnalyst::SetRatings(bool on) {
+        _rater.SetOn(on);
+    }
+
     void PositionAnalyst::Cancel() {
+        _rater.Cancel();
         if (_search) {
             _search->token.Cancel();
         }
@@ -128,6 +139,7 @@ namespace BECore::Chess {
         CancelHint();
         ClearError();
         _engine.reset();
+        _rater.Shutdown();
     }
 
     bool PositionAnalyst::IsThinking() const {

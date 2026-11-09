@@ -10,7 +10,8 @@ engine" scenarios, base ones) needs nothing from the environment: it runs inside
 it answers the same move to the same position (a fixed depth), which the scenario checks after a reset. The watch ("watch" scenarios, base ones too) lets two own engines
 play each other (`set_state` with `"plays": "both"` and a seat each), reads the seats back, follows the game (the version only grows, the turns alternate), checks that a hint is refused,
 that a reset keeps both seats (and, on the manual clock, plays the same game again), that `"plays": "white"` is a takeover that leaves Black to the person, and that null ends it. The analysis ("analysis" scenarios, base ones too) switches the evaluation of the own engine on, reads it from White's view on a mate in one, asks for a hint and reads it, and
-leaves the game with the analyst running. The opponent panel ("opponent panel" scenarios, base
+leaves the game with the analyst running; it also switches the ratings of the moves on (the own engine, in the background), plays a short game, waits until every entry of
+`analysis.ratings` is set and checks its shape and the pinned reasons of the game, and, after a reset and a frame (so that the old ratings are dropped), plays the same game again for the same ratings. The opponent panel ("opponent panel" scenarios, base
 ones too) is driven only by `ui_click` on the buttons and segments found by name, as a person would: open it with the Menu button, pick the own engine,
 Computer, a level and a color, read the pick back from `get_state` and from `ui_tree`, play, close it with OK. The captured material ("captured material"
 scenarios, base ones too, no engine) reads `get_state.material` after a capture, after a position set from outside and after a reset, and, on the headless
@@ -535,6 +536,56 @@ def wait_for_the_analysis(client: BagiControlClient, accept, what: str) -> dict:
         time.sleep(POLL_SECONDS)
 
 
+RATING_REASONS = ("brilliant", "not_best", "forced", "obvious")
+PINNED_GAME_REASONS = ["not_best", "brilliant", "not_best", "brilliant"]  # e2e4 e7e5 g1f3 b8c6 by the own engine at depth 5 (MoveRaterTest pins the same)
+
+
+def check_the_ratings_are_complete(ratings: list, expected_count: int, when: str) -> None:
+    check(len(ratings) == expected_count, f"{when}: {len(ratings)} ratings for {expected_count} moves: {ratings}")
+    for rating in ratings:
+        check(rating is not None, f"{when}: a move is not rated: {ratings}")
+        check(isinstance(rating["brilliant"], bool) and rating["reason"] in RATING_REASONS, f"{when}: unexpected rating {rating}")
+        check(rating["brilliant"] == (rating["reason"] == "brilliant"), f"{when}: brilliant does not agree with the reason in {rating}")
+
+
+def play_and_wait_for_the_ratings(client: BagiControlClient, ucis: list) -> list:
+    """Plays the moves from the opening position (two people) and gives the ratings once every move has one."""
+    for uci in ucis:
+        client.call("perform_action", move(uci))
+    analysis = wait_for_the_analysis(client, lambda a: len(a["ratings"]) == len(ucis) and all(rating is not None for rating in a["ratings"]), "the ratings of the moves")
+    check_the_ratings_are_complete(analysis["ratings"], len(ucis), "the ratings of a played game")
+    return analysis["ratings"]
+
+
+def check_the_ratings(client: BagiControlClient) -> None:
+    """The ratings of the moves (always the own engine at depth 5): off at the start, switched on, one entry per move, the same for the same game played twice after a reset. Ends with them off."""
+    client.call("reset")
+    analysis = get_analysis(client)
+    check(analysis["ratingsOn"] is False and analysis["ratings"] == [], f"the default ratings are not off and empty: {analysis}")
+    expect_error("invalid_params", lambda: client.call("set_state", {"analysis": {"ratings": 1}}), "ratings that is not a boolean")
+    expect_error("invalid_params", lambda: client.call("set_state", {"fen": MATE_IN_ONE_FEN, "analysis": {"ratings": True}}), "ratings with a fen")
+    check(get_analysis(client)["ratingsOn"] is False, "a refused call switched the ratings on")
+
+    version = client.call("get_state")["version"]
+    switched = client.call("set_state", {"analysis": {"ratings": True}})
+    check(switched["version"] > version and get_analysis(client)["ratingsOn"] is True, "switching the ratings on did not show")
+    game = ["e2e4", "e7e5", "g1f3", "b8c6"]
+    first = play_and_wait_for_the_ratings(client, game)
+    check([rating["reason"] for rating in first] == PINNED_GAME_REASONS, f"the own engine rated the game differently from the pinned list {PINNED_GAME_REASONS}: {first}")
+
+    # A reset drops the ratings and keeps the switch; the same game gets the same ratings (a fixed depth, no clock). A frame passes before the moves are replayed: the rater
+    # drops the old ratings when it sees the empty game, and a replay before that frame would be taken for the same game going on and keep them
+    client.call("reset")
+    let_frames_pass(client, 2)
+    after_reset = get_analysis(client)
+    check(after_reset["ratingsOn"] is True and after_reset["ratings"] == [], f"a reset did not drop the ratings and keep the switch: {after_reset}")
+    check(play_and_wait_for_the_ratings(client, game) == first, "the same game was rated differently the second time")
+
+    client.call("set_state", {"analysis": {"ratings": False}})
+    check(get_analysis(client)["ratingsOn"] is False, "the ratings are still on")
+    client.call("reset")
+
+
 def run_analysis_scenario(client: BagiControlClient, headless: bool) -> None:
     """The engine of our own analyses: the evaluation is switched on and read from White's view, a hint is asked for and bound to its position, and a hint on the program's turn is refused.
 
@@ -567,6 +618,8 @@ def run_analysis_scenario(client: BagiControlClient, headless: bool) -> None:
     expect_error("invalid_params", lambda: client.call("set_state", {"analysis": {"evaluation": True, "hint": "yes"}}), "a hint that is not a boolean")
     expect_error("invalid_params", lambda: client.call("set_state", {"analysis": {"evaluation": True, "hnt": True}}), "a member that is not one of the two")
     check(get_analysis(client)["evaluationOn"] is False, "a refused call switched the evaluation on")
+
+    check_the_ratings(client)  # two people play, the own engine rates in the background; it ends with the ratings off and a reset
 
     # The own engine analyses; the evaluation is switched on and read back
     client.call("reset")

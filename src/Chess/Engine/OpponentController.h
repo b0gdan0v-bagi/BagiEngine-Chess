@@ -78,7 +78,7 @@ namespace BECore::Chess {
      * whose engine ignores its CancellationToken keeps that engine alive on the pool until it returns. Call Shutdown() (or destroy the controller) before
      * TaskManager::Shutdown().
      *
-     * This class, EngineOpponent and PositionAnalyst are the only ones of Engine/ that log.
+     * This class, EngineOpponent, PositionAnalyst and MoveRater are the only ones of Engine/ that log.
      */
     class OpponentController {
     public:
