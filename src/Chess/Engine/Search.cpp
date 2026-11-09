@@ -18,8 +18,10 @@ namespace BECore::Chess {
         /// are not on the native stack: the search is a loop over frames (one per ply, below) that live on the heap and are made when a
         /// ply is first reached, so a deep line costs no stack, only the killers and the history (QuietMoves, about 33 KB) are in the Searcher itself
         constexpr int kMaxPly = kMaxSearchDepth + kMaxExtensionPly;
-        /// What the Searcher may take of the stack of the caller of Search(): the stack of a Background pool thread is 512 KB on macOS
+        /// The stack of a Background pool thread (512 KB on macOS); the budget for the Searcher, which Search() puts on the caller's stack
         constexpr size_t kBackgroundStackBytes = 512 * 1024;
+        /// The share of that stack that the killers and the history (QuietMoves) may take: one eighth
+        constexpr size_t kQuietMovesStackShare = 8;
 
         /// A position that has occurred this many times (itself counted) scores as a draw inside the tree: once before is enough
         constexpr int kRepetitionDrawCount = 2;
@@ -140,10 +142,10 @@ namespace BECore::Chess {
             Move _killers[kMaxPly + 1][kKillersPerPly] = {};
             int _history[kColorCount][kSquareCount][kSquareCount] = {};
         };
-        static_assert(sizeof(QuietMoves) < kBackgroundStackBytes / 8, "the killers and the history live in the Searcher, which Search() puts on the caller's stack");
+        static_assert(sizeof(QuietMoves) < kBackgroundStackBytes / kQuietMovesStackShare, "the killers and the history live in the Searcher, which Search() puts on the caller's stack");
 
         /// What a frame searches: the root (the moves of the iteration, no cutoff, no table), a full-width node, or a quiescence node
-        enum class FrameKind : uint8_t { Root, Full, Quiet };
+        CORE_ENUM(FrameKind, uint8_t, Root, Full, Quiet)
 
         /// One ply of the line being searched, the state that a recursive call kept in its locals: the moves of the node in the order
         /// they are tried, the one being searched, and the window. The frame of ply p is _frames[p]; it is made when the ply is first reached
@@ -170,19 +172,22 @@ namespace BECore::Chess {
             bool currentQuiet = false;
         };
 
-        /// The iterative deepening search as a loop over the frames, run on a position; SearchJob and Search() are this class. The recursion of
-        /// the plain form (Negamax, Quiescence and the root calling each other) is the loop of Loop(): a node is entered by EnterFull() or EnterQuiet(),
-        /// which either answer at once (a leaf: the value is left in _value) or push a frame, and a finished frame hands its value to the frame
-        /// below it (_returning). The order of every check, count and update is that of the recursion it replaces, which the pinned node counts of the tests hold.
-        /// The loop keeps the window and the best of the frame it is in in locals and writes them to the frame only when it leaves it (to descend, to pause or
-        /// to finish), which is what keeps the machine as fast as the recursion: through the frame in memory it was a sixth slower (Release, measured)
+        /// Where a Searcher is: before its first Advance(), searching, or over
+        CORE_ENUM(SearchPhase, uint8_t, NotStarted, Searching, Finished)
+
+        /// The iterative deepening search as a loop over the frames, run on a position; SearchJob and Search() are this class. Loop() is the
+        /// whole search: a node is entered by EnterFull() or EnterQuiet(), which either answer at once (a leaf: the value is left in _value) or
+        /// push a frame, and a finished frame hands its value to the frame below it (_returning). The order of every check, count and update is
+        /// that of a plain recursive negamax, which the pinned node counts of the tests hold.
+        /// Loop() keeps the window and the best of the frame it is in in locals and writes them to the frame only when it leaves it (to descend,
+        /// to pause or to finish): the registers do the work that the stack did in the recursive form, and the frame in memory is not read per move
         class Searcher {
         public:
             Searcher(Position& position, const SearchSettings& settings, const SearchControl& control) : _position(position), _settings(settings), _control(control) {}
 
             [[nodiscard]] SearchProgress Advance(uint64_t maxNodes);
             [[nodiscard]] bool IsDone() const noexcept {
-                return _phase == Phase::Finished;
+                return _phase == SearchPhase::Finished;
             }
             [[nodiscard]] SearchResult GetResult() const noexcept;
             [[nodiscard]] int FinishedDepth() const noexcept {
@@ -190,8 +195,6 @@ namespace BECore::Chess {
             }
 
         private:
-            enum class Phase : uint8_t { NotStarted, Searching, Finished };
-
             /// Counts a node and looks at the limits: the node limit in every node, the clock and the token every kSearchPollInterval nodes
             void CountNode() noexcept;
             [[nodiscard]] bool LimitsReached() const;
@@ -232,7 +235,7 @@ namespace BECore::Chess {
             /// whose subtree moved it stores nothing
             uint64_t _historyDraws = 0;
 
-            Phase _phase = Phase::NotStarted;
+            SearchPhase _phase = SearchPhase::NotStarted;
             SearchResult _result;
             MoveList _rootMoves;
             int _maxDepth = 1;
@@ -464,12 +467,12 @@ namespace BECore::Chess {
             _top = -1;
             // A mate that is already inside the depth searched cannot get shorter with more depth
             if (IsMateWithin(root.best, _depth)) {
-                _phase = Phase::Finished;
+                _phase = SearchPhase::Finished;
             } else if (_depth < _maxDepth && LimitsReached()) {
                 _stopped = true;
-                _phase = Phase::Finished;
+                _phase = SearchPhase::Finished;
             } else if (_depth >= _maxDepth) {
-                _phase = Phase::Finished;
+                _phase = SearchPhase::Finished;
             } else {
                 ++_depth;
             }
@@ -480,13 +483,13 @@ namespace BECore::Chess {
                 _position.UndoMove();
             }
             _top = -1;
-            _phase = Phase::Finished;
+            _phase = SearchPhase::Finished;
         }
 
         bool Searcher::Begin() {
             if (LimitsReached()) {
                 _stopped = true;
-                _phase = Phase::Finished;
+                _phase = SearchPhase::Finished;
                 return false;
             }
 
@@ -494,7 +497,7 @@ namespace BECore::Chess {
             if (_rootMoves.empty()) {
                 _result.complete = true;
                 _result.score = _position.IsInCheck() ? -MateIn(0) : kDrawScore;
-                _phase = Phase::Finished;
+                _phase = SearchPhase::Finished;
                 return false;
             }
             if (!_settings.excludedRootMoves.empty()) {
@@ -502,7 +505,7 @@ namespace BECore::Chess {
                 _rootMoves.erase(eastl::remove_if(_rootMoves.begin(), _rootMoves.end(), excluded), _rootMoves.end());
                 ASSERT(!_rootMoves.empty(), "Search: every legal root move is excluded");
                 if (_rootMoves.empty()) {
-                    _phase = Phase::Finished;
+                    _phase = SearchPhase::Finished;
                     return false;
                 }
             }
@@ -512,7 +515,7 @@ namespace BECore::Chess {
                 _table.emplace(_settings.tableEntries);
             }
             _depth = 1;
-            _phase = Phase::Searching;
+            _phase = SearchPhase::Searching;
             return true;
         }
 
@@ -621,17 +624,17 @@ namespace BECore::Chess {
                     continue;
                 }
                 Finish(frame);
-                if (_phase == Phase::Finished) {
+                if (_phase == SearchPhase::Finished) {
                     return SearchProgress::Done;
                 }
             }
         }
 
         SearchProgress Searcher::Advance(uint64_t maxNodes) {
-            if (_phase == Phase::Finished) {
+            if (_phase == SearchPhase::Finished) {
                 return SearchProgress::Done;
             }
-            if (_phase == Phase::NotStarted) {
+            if (_phase == SearchPhase::NotStarted) {
                 if (!Begin()) {
                     return SearchProgress::Done;
                 }

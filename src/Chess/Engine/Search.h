@@ -117,8 +117,9 @@ namespace BECore::Chess {
     /// Whether SearchJob::Advance() stopped to give the caller the thread, or the search is over
     CORE_ENUM(SearchProgress, uint8_t, Paused, Done)
 
-    /// The nodes of a slice that a caller which must stay responsive hands to SearchJob::Advance(): a node is 1 to 3 microseconds, so a slice is
-    /// well under a frame budget of a few milliseconds even in a slow build (a browser), and the call costs nothing against the nodes it runs
+    /// The nodes of a slice that a caller which must stay responsive hands to SearchJob::Advance(): a node is about 0.14 microseconds on a desktop
+    /// Release build (measured, Clang Release), so a slice is some 36 microseconds there; Debug and the browser (wasm) are several times slower
+    /// per node, and a slice is still well under a frame budget of a few milliseconds, while the call costs nothing against the nodes it runs
     inline constexpr uint64_t kSearchSliceNodes = 256;
 
     /**

@@ -384,7 +384,9 @@ namespace BECore::Chess::Tests {
         /// The rows up to this many nodes are driven with every slice size (1 node a call too); the larger ones with the varying one, to keep the run short
         constexpr uint64_t kSmallRowNodes = 12000;
         constexpr uint64_t kSliceOfOneNode = 1;
+        constexpr uint64_t kSliceOfFiveNodes = 5;
         constexpr uint64_t kSliceOfSevenNodes = 7;
+        constexpr uint64_t kSliceOfAHundredNodes = 100;
         constexpr uint64_t kSliceOfManyNodes = 1000;
 
         struct NamedPolicy {
@@ -407,6 +409,14 @@ namespace BECore::Chess::Tests {
         constexpr uint64_t kDeepSearchNodes = 300000;
         /// The iteration the deep search has reached by then (measured: more than this), which is past the 6 of the golden row
         constexpr int kDeepSearchIterations = 8;
+        /// A node limit that stops a search of kGoldenDeepestDepth inside an iteration
+        constexpr uint64_t kMidIterationNodeLimit = 3000;
+        /// The deadline test: the first wait, the factor between attempts and the last wait worth trying (150, 600, 2400, 9600 ms)
+        constexpr std::chrono::milliseconds kFirstDeadlineWait{150};
+        constexpr int kDeadlineWaitFactor = 4;
+        constexpr std::chrono::milliseconds kLastDeadlineWait{9600};
+        /// How far past the deadline the paused job sleeps, so that the deadline has certainly passed
+        constexpr std::chrono::milliseconds kPastTheDeadline{2};
 
     }  // namespace
 
@@ -448,7 +458,7 @@ namespace BECore::Chess::Tests {
             Position reference = PositionFromFen(position.fen);
             const SearchResult whole = Search(reference, settings);
 
-            for (const uint64_t slice : {kSliceOfOneNode, uint64_t{5}, uint64_t{100}}) {
+            for (const uint64_t slice : {kSliceOfOneNode, kSliceOfFiveNodes, kSliceOfAHundredNodes}) {
                 SearchJob job(PositionFromFen(position.fen), settings);
                 size_t calls = 0;
                 while (!job.IsDone()) {
@@ -592,9 +602,9 @@ namespace BECore::Chess::Tests {
         constexpr int kIterations = 2;
 
         // The deadline has to pass while the job is paused after its second iteration (204 nodes of the start position, a millisecond), and not before;
-        // on a machine so busy that it passes earlier the attempt is made again with a deadline four times as far
+        // on a machine so busy that it passes earlier the attempt is made again with a deadline kDeadlineWaitFactor times as far
         bool tried = false;
-        for (std::chrono::milliseconds wait{150}; wait <= std::chrono::milliseconds{9600} && !tried; wait *= 4) {
+        for (std::chrono::milliseconds wait = kFirstDeadlineWait; wait <= kLastDeadlineWait && !tried; wait *= kDeadlineWaitFactor) {
             SearchControl control;
             const Clock::time_point deadline = Clock::now() + wait;
             control.deadline = deadline;
@@ -607,7 +617,7 @@ namespace BECore::Chess::Tests {
             }
             tried = true;
             const uint64_t nodesBefore = job.GetResult().nodes;
-            std::this_thread::sleep_until(deadline + std::chrono::milliseconds(2));
+            std::this_thread::sleep_until(deadline + kPastTheDeadline);
 
             EXPECT_EQ(job.Advance(), SearchProgress::Done);
 
@@ -618,24 +628,6 @@ namespace BECore::Chess::Tests {
             EXPECT_FALSE(result.best.IsNull());
         }
         EXPECT_TRUE(tried) << "the machine was too slow for every deadline";
-    }
-
-    TEST(SearchSliceTest, AJobStoppedByTheNodeLimitInTheMiddleOfAnIterationBringsItsPositionBack) {
-        // The job's own position is not visible; the stop is the same as Search()'s, whose position is: the same numbers, so the unwinding is the same
-        SearchSettings settings;
-        settings.maxDepth = kGoldenDeepestDepth;
-        SearchControl control;
-        control.nodeLimit = 3000;
-        Position position = PositionFromFen(Position::kStartFen);
-        const eastl::string fenBefore = position.ToFen();
-        const ZobristKey keyBefore = position.Key();
-        SearchJob job(position, settings, control);
-
-        (void)Drive(job, Fixed(kSliceOfSevenNodes));
-
-        EXPECT_TRUE(job.GetResult().stopped);
-        EXPECT_EQ(position.ToFen(), fenBefore);
-        EXPECT_EQ(position.Key(), keyBefore);
     }
 
     TEST(SearchSliceTest, TheJobOwnsItsPosition) {
@@ -655,7 +647,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(position.Key(), keyBefore);
 
         SearchControl limited;
-        limited.nodeLimit = 3000;
+        limited.nodeLimit = kMidIterationNodeLimit;
         settings.maxDepth = kGoldenDeepestDepth;
         const SearchResult stopped = Search(position, settings, limited);
 
@@ -818,7 +810,8 @@ namespace BECore::Chess::Tests {
         }
 
         /// The same, with the cheap look that a coroutine caller takes between slices: whether the frame budget is spent (it never is here,
-        /// no task runs, so this is the cost of the call and of the pointer test)
+        /// no task runs, so this is the cost of the call and of the pointer test). The result is the nodes plus the polls that said yes (none),
+        /// so it is comparable with the other two and the poll cannot be optimized away
         uint64_t JobInSlicesWithAPoll(eastl::string_view fen, int depth) {
             SearchSettings settings;
             settings.maxDepth = depth;
