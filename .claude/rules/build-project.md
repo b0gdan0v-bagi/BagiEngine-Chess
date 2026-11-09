@@ -28,6 +28,7 @@ Fields the `build` skill reads. The presets are the engine's (`CMakePresets.json
 | Extra gotchas | facts about the output, the tests or the run that hold only here | see "Gotchas" |
 | Test run | what `ctest --preset <p>` runs here and what it needs | see "Tests" |
 | Local overrides, editor | where per-machine settings and the IDE setup are described | below, "Local overrides" and "VS Code" |
+| Windows preset | what the `build` skill picks on Windows and how it runs it | `windows-clang-debug` / `windows-clang-release` (Clang + Ninja, `build/ClangWindows/`), every `cmake --preset` and `cmake --build --preset` through `python engine/CI/scripts/vs_env.py` (the x64 Visual Studio environment); MSVC only by explicit name, see "Gotchas" |
 
 The common configure triggers (the skill states them; this repository adds the one above): no `build/<p>/CMakeCache.txt`, the argument `configure`, added, deleted, renamed or untracked files under the source paths (sources are globbed without `CONFIGURE_DEPENDS`), a change in `CMakePresets.json`, `CMakeUserPresets.json` or any `*.cmake`, and a changed or new file under the source paths that contains `BE_CLASS`, `BE_EVENT` or `BE_REFLECT_FIELD` (reflection code is generated only at configure time).
 
@@ -36,11 +37,14 @@ The common configure triggers (the skill states them; this repository adds the o
 - A missing `engine/external/*` (the submodule is not initialised): `git -C engine submodule update --init`.
 - A missing `jinja2` (the reflection generator): `CI/setup_venv.*` creates `engine/.venv`; `engine/.venv/bin` must be on `PATH` for `cmake --preset` (`export PATH="$PWD/engine/.venv/bin:$PATH"`, as the README does).
 - `glslc not found`: install the Vulkan SDK or set `VULKAN_SDK` in `CMakeUserPresets.json` (see "Local overrides").
+- Windows, `No CMAKE_RC_COMPILER could be found` (configure) or `CMAKE_AR-NOTFOUND` / `rc.exe` failing on `version.rc` (build): the Ninja preset ran without the Visual Studio environment. Run the command through `python engine/CI/scripts/vs_env.py`; after a configure that failed this way, delete `build/<p>/` first (the cache keeps the `NOTFOUND`).
+- Windows, `CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS-NOTFOUND`: a configure of `windows-clang-*` from before the preset turned the module scan off (`no-module-scan`); configure again.
 
 ### Gotchas
 
 - The engine is another repository: a build never edits `engine/`. A missing engine feature is `needs engine change`, not a patch here.
-- Executables land in `build/{Clang|MSVC}{macOS|Windows}/BagiChess[.exe]` and `ChessTests`, not in the preset folder; Debug and Release overwrite each other.
+- Executables land in `build/{Clang|MSVC}{macOS|Windows}/BagiChess[.exe]` and `ChessTests`, not in the preset folder; Debug and Release overwrite each other. On Windows that is `build/ClangWindows/` (the default presets) or `build/MSVCWindows/` (MSVC).
+- **Why MSVC is not the default on Windows.** `windows-vs2022-*` (MSBuild, `/Zi`) failed the first run now and then with `LNK4020 ... BECoreModule.pdb is corrupted`, `LNK1103 debugging information corrupt`, sometimes `C1090` / `C1041` / `LNK1104` / `LNK1201`, and passed the second: every module takes the PCH of `BECoreModule` (`REUSE_FROM`) with a PDB of its own, MSBuild builds them in parallel, and one `mspdbsrv.exe` serves every build on the machine (the main checkout and the workers). Clang writes no `cl` PDB and uses no `mspdbsrv`. The MSVC presets stay for a run by explicit name.
 - `BagiChess` opens a window, so it is never started to check a build (to launch it use the `run` skill). `ChessTests` opens none.
 
 ### Tests
@@ -74,7 +78,34 @@ The common configure triggers (the skill states them; this repository adds the o
 }
 ```
 
-`VULKAN_SDK` is only needed when `glslc` is not on PATH. `.claude/settings.local.json` is git-ignored and per machine too.
+`VULKAN_SDK` is only needed when `glslc` is not on PATH.
+
+On Windows, the default preset with ccache (configured and built through `python engine/CI/scripts/vs_env.py`, like the shared one):
+
+```json
+{
+    "version": 6,
+    "configurePresets": [
+        {
+            "name": "windows-clang-debug-ccache",
+            "inherits": "windows-clang-debug",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER_LAUNCHER": "ccache",
+                "CMAKE_CXX_COMPILER_LAUNCHER": "ccache"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "windows-clang-debug-ccache",
+            "inherits": "windows-clang-debug",
+            "configurePreset": "windows-clang-debug-ccache"
+        }
+    ]
+}
+```
+
+`.claude/settings.local.json` is git-ignored and per machine too.
 
 ### VS Code
 
