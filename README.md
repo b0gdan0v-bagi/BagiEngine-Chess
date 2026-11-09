@@ -133,6 +133,19 @@ A value that is set but names no file is not skipped: a wrong `stockfishPath` do
 
 With none of the three the game still runs as two people, and picking Computer with "Stockfish" says "Engine not found" and changes nothing else (the panel stays on Two players). The way out is the **Engine** row of the panel: pick "Own engine" (that clears the message), then Computer again. The game starts Stockfish as a child process, which is only written for macOS and Linux so far (macOS is what it is tested on); on Windows Stockfish cannot play yet (the status line says "Engine not supported here"), but the own engine can. The choice is not remembered between runs.
 
+## Browser build
+
+Chess can be built for the browser with the engine's Emscripten presets (`web-release`, `web-debug`). **None of this part has been run with emsdk yet** (slice 2 of the todo entry `chess-web-build`, which waits for the engine's own browser build, the entry `web-build`): the steps below are taken from the engine's `CLAUDE.md` ("Build" table) and `engine/tools/web/CLAUDE.md` and are **not yet run**. What has been checked is the web-like build on the desktop (below).
+
+1. Install the Emscripten SDK as the engine's documentation says and run its `emsdk_env`, so that the environment variable `EMSDK` is set (the web presets are shown only then). The setup is the engine's, not this repository's: see `engine/CLAUDE.md` and the `build` skill.
+2. Configure and build, from the root of this repository: `cmake --preset web-release`, then `cmake --build --preset web-release --target BagiChess`. The output is `build/ClangWeb/BagiChess.html` with its script, `.wasm` and the preloaded content package `BagiChess.data` (`config/` and `assets/`; `cmake/ChessWeb.cmake` keeps the docs, `*.local.xml` and `imgui.ini` out of it).
+3. Package it: `python engine/tools/web/package.py build/ClangWeb dist --game BagiChess` (`dist/` is git-ignored).
+4. Serve it: `python engine/tools/web/serve.py --root dist` (add `--cross-origin-isolation` for a threaded build), then open http://localhost:8080.
+
+**What is different in the browser.** Only the **own engine** plays: there is no Stockfish (a browser cannot start a program; the Engine row of the panel has just "Own engine" and `stockfish` is refused as unavailable), no control API (the engine drops `RemoteControl` on the web) and no scene editor. The single-thread build has no worker thread, so **the page freezes while the computer thinks** until the entries `chess-search-resumable` and `tasks-frame-budget` are done: Easy and Medium answer at once, Hard and Max may take seconds. The browser's `ApplicationConfig.xml` is the engine's own overlay; Chess's differs from it only in the renderer, and a test keeps it so (root `CLAUDE.md`, "The web build").
+
+**The web-like check on the desktop** (no emsdk needed): the same code with the web options, `-DENGINE_WITH_VULKAN=OFF -DENGINE_SINGLE_THREAD=ON -DENGINE_STATIC_SDL=ON -DCHESS_NO_STOCKFISH=ON`, in a build folder of its own, runs `ChessTests` (the tests that need a worker thread skip themselves). `BagiChess` does not start in that build (its `ApplicationConfig.xml` names the Vulkan renderer). The commands, and the warning that every build writes into `build/ClangWindows/` and so overwrites the desktop one, are in `tests/CLAUDE.md`, "Under `ENGINE_SINGLE_THREAD`". A desktop build with only `-DCHESS_NO_STOCKFISH=ON` (Vulkan on) starts the game without Stockfish and `python tests/control_smoke.py --exe <BagiChess>` checks it.
+
 ## UCI engine
 
 `BagiChessUci` is the own engine as a console program that speaks UCI on stdin and stdout, so that a tournament tool (cutechess-cli, fastchess) or a script can play it against another engine. It is built with everything else and opens no window:
@@ -192,6 +205,7 @@ The ladder (`OpponentLevels`, `ownDepth`) is retuned only by the owner, from num
 | `src/Chess/` | the game: rules (`Game/`), scene components, the control adapter. `CLAUDE.md` describes it |
 | `uci/` | `main.cpp` of `BagiChessUci`, the own engine as a UCI program (the server is `src/Chess/Uci/`) |
 | `config/`, `assets/` | scene, texture library, application config, piece atlas |
+| `cmake/` | `ChessWeb.cmake`: the files of the browser package (see "Browser build") |
 | `tests/` | gtest cases, `control_smoke.py`, `uci_smoke.py` and `match_smoke.py` |
 | `tools/` | the Stockfish bridge and its pytest tests (`engine/.venv/bin/python -m pytest tools/tests`), the match tool `uci_match.py` (with `elo_rating.py` and `match_steps.py`) and its unit tests (`python3 -m unittest discover -s tools/tests -p "test_match_*.py"`) |
 | `todo/`, `TODO.md` | known problems, worked by the `todo-loop` skill (`todo/README.md`) |

@@ -93,8 +93,8 @@ namespace BECore::Chess {
             return;
         }
         _enginesChecked = true;
-        // A scene without the panel has nothing to hide
         if (!IsOpponentEngineAvailable(OpponentEngine::Stockfish)) {
+            // A scene without the panel has nothing to hide: the call finds no element and does nothing
             UICanvasComponent::SetElementVisibleByName(GetScene(), "EngineStockfish"_intern, false);
         }
     }

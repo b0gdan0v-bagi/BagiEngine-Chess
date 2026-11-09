@@ -26,7 +26,6 @@ function(chess_web_exclude_patterns)
     endif()
     # Only "*", "?" and literal characters (a dot is literal): chess_web_excluded turns them into a regular expression
     set(${ARG_OUT}
-        "*/CLAUDE.md"
         "*.md"
         "*.local.xml"
         "*/imgui.ini"
@@ -42,7 +41,8 @@ function(chess_web_excluded PATH)
         message(FATAL_ERROR "chess_web_excluded: OUT is required")
     endif()
     chess_web_exclude_patterns(OUT _patterns)
-    # emcc matches the full path, so the relative one gets a leading "/" and "*/name" matches a file of any folder
+    # emcc matches the full path, so the relative one gets a leading "/" and "*/name" matches a file of any folder. The match is case
+    # sensitive (fnmatch on the build machine): "README.MD" would stay in, none of the files of the game is spelled so
     set(_subject "/${PATH}")
     set(_excluded FALSE)
     foreach(_pattern IN LISTS _patterns)

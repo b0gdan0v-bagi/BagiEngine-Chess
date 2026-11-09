@@ -2,7 +2,7 @@
 
 ## Overview
 
-`ChessGame` is an `IGame` (name `Chess`, scene `ChessScene`). Executable `BagiChess`. Infrastructure and how a game is registered: `engine/src/Modules/Games/CLAUDE.md`. Namespace `BECore::Chess`. The game's content is in `config/` (`ApplicationConfig.xml`, `SceneConfig.xml`, `TextureLibrary.xml`, `ChessSettings.xml`) and `assets/`. `BagiChess` starts in Game mode (`mode="Game"` in its `ApplicationConfig.xml`, no editor); set `mode="Editor"` to open it in the scene editor.
+`ChessGame` is an `IGame` (name `Chess`, scene `ChessScene`). Executable `BagiChess`. Infrastructure and how a game is registered: `engine/src/Modules/Games/CLAUDE.md`. Namespace `BECore::Chess`. The game's content is in `config/` (`ApplicationConfig.xml`, `SceneConfig.xml`, `TextureLibrary.xml`, `ChessSettings.xml`) and `assets/`. `BagiChess` starts in Game mode (`mode="Game"` in its `ApplicationConfig.xml`, no editor); set `mode="Editor"` to open it in the scene editor (a local edit only: `ChessWebConfigTest` fails with it, see "The web build"). The game has a web target with the own engine only (CMake switch `CHESS_NO_STOCKFISH`, no Stockfish, no control API, no editor there): see "The web build".
 
 ## Layout
 
@@ -26,6 +26,7 @@ src/Chess/
 │   └── MoveRating.*, MoveRater.*   the rating of the played moves: `MoveRating` is the pure rule (a move is brilliant when it is the engine's best move and it was a choice), `MoveRater` rates a game in the background with the own engine at depth 5
 ├── Uci/                      the own engine as a UCI program, the server side: `BagiChessUci` (`uci/main.cpp`), command parser, clock rule, `UciServer`; no game, no scene (src/Chess/Uci/CLAUDE.md)
 └── Components/               scene glue: board, hint, pieces, result, captured material (src/Chess/Components/CLAUDE.md)
+cmake/ChessWeb.cmake          the web build: which files of config/ and assets/ go into the preload package (the exclude patterns), included by CMakeLists.txt and by tests/check_web_package.cmake
 ```
 
 - State lives in `ChessGameModel`. Components never keep game state: they reach the model through `ChessGame::GetActiveModel()` (null when Chess is not the active game, and then they do nothing).

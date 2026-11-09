@@ -7,8 +7,9 @@
 #include <Common/Printers.h>
 
 // A test that needs a worker thread (a gate that a worker holds while the test thread opens it, a wait for IsThinking()
-// while a search blocks) begins with this: under ENGINE_SINGLE_THREAD (BE_SINGLE_THREAD=1) the task system runs a job on the
-// calling thread, so the test would hang or fail. The same text as the engine's cases of TaskSystemTest.
+// while a search blocks, an engine that only stands in as "never answers") begins with this: under ENGINE_SINGLE_THREAD
+// (BE_SINGLE_THREAD=1) the task system runs a job on the calling thread, so the test would hang, or pass on a Timeout
+// without testing what it claims. The same text as the engine's cases of TaskSystemTest.
 #if BE_SINGLE_THREAD
 #define SKIP_WITHOUT_WORKER_THREADS() GTEST_SKIP() << "needs worker threads (BE_SINGLE_THREAD)"
 #else

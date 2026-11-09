@@ -1,5 +1,7 @@
 #include <Common/Printers.h>
 #include <gtest/gtest.h>
+#include <map>
+#include <set>
 
 /// The web build's overlay (engine/web/config/) replaces a config file of the game whole, so a game file with the name of an overlay file
 /// must say what the overlay says, or the browser plays another game. Plain files read from the source tree: no engine services, no scene
