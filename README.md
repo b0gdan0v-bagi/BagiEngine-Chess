@@ -12,8 +12,8 @@ From a clean `git clone` to a running game and a green test run. The commands ar
 |------|-----------------------------------|
 | `git` | The engine is the submodule `engine/` and it has submodules of its own (SDL, SDL_image with its codecs, Vulkan-Headers, googletest): the clone must be recursive. |
 | CMake 3.31 or newer | `cmake_minimum_required(VERSION 3.31)` in `CMakeLists.txt` and `cmakeMinimumRequired` 3.31 in `CMakePresets.json`. |
-| Ninja | The macOS presets and the `windows-msvc-*` / `windows-clang-*` presets use the Ninja generator (the `windows-vs2022*` presets use Visual Studio 2022 instead). |
-| A C++23 compiler | `CMAKE_CXX_STANDARD 23` (`engine/cmake/BagiEngine.cmake`). macOS: Clang, the presets set `clang` / `clang++` (Apple Clang, e.g. from Xcode or its command line tools, builds it). Windows: MSVC or Clang, see "Windows". |
+| Ninja | The macOS presets and the `windows-clang-*` / `windows-msvc-*` presets use the Ninja generator (the `windows-vs2022*` presets use Visual Studio 2022 instead). |
+| A C++23 compiler | `CMAKE_CXX_STANDARD 23` (`engine/cmake/BagiEngine.cmake`). macOS: Clang, the presets set `clang` / `clang++` (Apple Clang, e.g. from Xcode or its command line tools, builds it). Windows: Clang (the default) or MSVC, see "Windows". |
 | [`uv`](https://docs.astral.sh/uv/) and a Python 3 | `CI/setup_venv.*` calls `uv` to create `engine/.venv`, which holds the reflection generator's dependencies (Jinja2) and the Python of the control smoke test. Install it from its page (Homebrew, `pip install uv`, or the installer script). |
 | `glslc` (from the Vulkan SDK or the `shaderc` tools); on macOS the Vulkan SDK itself | The engine compiles its Vulkan shaders at build time. Configure stops with "glslc not found" when it is on neither `PATH` nor under `VULKAN_SDK` (`engine/src/Modules/Vulkan/CMakeLists.txt`). Install the [Vulkan SDK](https://vulkan.lunarg.com/) or put `glslc` on `PATH`; if it is somewhere else, pass `VULKAN_SDK` (see "Your own settings"). **On macOS install the Vulkan SDK**, a recent one (1.4.363.0 is the version this game is run with): `BagiChess` opens its window through Vulkan (`renderer="VulkanRendererBackend"` in `config/ApplicationConfig.xml`, with no fallback renderer), and macOS has no Vulkan driver of its own, the vendored loader is only the loader. The driver it runs on is KosmicKrisp (`libkosmickrisp_icd.json`), which the SDK installs (an optional component of its installer) next to MoltenVK. **MoltenVK alone does not work** (Homebrew `molten-vk`, or an SDK without KosmicKrisp): its driver is a portability driver, the engine does not enable portability enumeration, and `vkCreateInstance` fails with `VK_ERROR_INCOMPATIBLE_DRIVER`. The loader finds the driver, and `glslc` is on `PATH`, because the installer's "System Global Installation" component puts the driver manifests in `/usr/local/share/vulkan/icd.d` and `glslc` in `/usr/local/bin`; without it, source the SDK's `setup-env.sh` (it sets `VK_DRIVER_FILES`) and pass `VULKAN_SDK` (the SDK's `macOS` folder) to configure. `glslc` from `shaderc` alone is enough to configure, build and run the tests, which need no Vulkan driver and no GPU (the gtests record their draws, and the control smoke runs headless on the SDL renderer), but not to open the game window. |
 
@@ -82,23 +82,31 @@ Release is the same with `macos-release`. The `*-rmlui-*` presets also build the
 
 ### Windows
 
-The presets for Windows are in `engine/CMakePresets.json`; they are written from that file and not run on a Windows machine for this README. Steps 1 to 3 and 5 to 7 are the same, with these changes:
+The presets for Windows are in `engine/CMakePresets.json`. `windows-clang-debug` is the one built and tested on Windows (Clang 19, Visual Studio 2022, Ninja); the MSVC presets are kept as fallbacks. Steps 1 to 3 and 5 to 7 are the same, with these changes:
 
-- Tools: Visual Studio 2022 with the "Desktop development with C++" workload (it brings MSVC), CMake 3.31 or newer and Ninja (for the Ninja presets), `git`, `uv`, and the Vulkan SDK. The `VULKAN_SDK` cache variable defaults to `C:/VulkanSDK/1.4.341.1` (`engine/cmake/BagiEngine.cmake`); with another version installed, pass the real path (see below). Without an SDK the build links the vendored import library `engine/external/Vulkan-Loader/Windows/Lib/vulkan-1.lib` (no loader DLL is vendored for Windows: `vulkan-1.dll` comes from the GPU driver or the SDK), and `glslc` is still needed.
+- Tools: Visual Studio 2022 with the "Desktop development with C++" workload (it brings the Windows SDK, the linker and MSVC), LLVM (`clang` / `clang++` on `PATH`, 19 or newer), CMake 3.31 or newer and Ninja (for the Ninja presets), `git`, `uv`, and the Vulkan SDK. The `VULKAN_SDK` cache variable defaults to `C:/VulkanSDK/1.4.341.1` (`engine/cmake/BagiEngine.cmake`); with another version installed, pass the real path (see below). Without an SDK the build links the vendored import library `engine/external/Vulkan-Loader/Windows/Lib/vulkan-1.lib` (no loader DLL is vendored for Windows: `vulkan-1.dll` comes from the GPU driver or the SDK), and `glslc` is still needed.
 - Step 2: `CI\setup_venv.bat` (cmd) or `CI\setup_venv.ps1` (PowerShell); the venv's Python is `engine\.venv\Scripts\python.exe`, and step 3 is `set PATH=%CD%\engine\.venv\Scripts;%PATH%` (cmd) or `$env:PATH = "$PWD\engine\.venv\Scripts;$env:PATH"` (PowerShell).
-- Step 4, one of:
-  - `windows-msvc-debug` / `windows-msvc-release`: MSVC (`cl`) with Ninja. These presets do not load the Visual Studio environment themselves (`vs-env` is the `external` strategy: the caller does), so configure from a shell where `cl` works, an x64 Visual Studio developer prompt, or let VS Code CMake Tools load it (see "VS Code").
-  - `windows-vs2022`: the Visual Studio 2022 generator, x64, MSVC; it needs no developer prompt. The build and test presets are `windows-vs2022-debug` and `windows-vs2022-release` (`cmake --build --preset windows-vs2022-debug`, `ctest --preset windows-vs2022-debug`).
-  - `windows-clang-debug` / `windows-clang-release` (Clang with Ninja, same `vs-env` rule) and `windows-vs2022-clangcl` (build presets `windows-vs2022-clangcl-debug` / `-release`) are there too.
-- Step 6: the executable is `build/MSVCWindows/BagiChess.exe` for MSVC (`build/ClangWindows/` for Clang); a Visual Studio configuration may add `Debug/` or `Release/` below that folder.
+- Steps 4 and 5: `windows-clang-debug` / `windows-clang-release`, Clang with Ninja. The Ninja presets do not load the Visual Studio environment themselves (`vs-env` is the `external` strategy: the caller does), and Clang needs it for the resource compiler `rc` and the archiver `lib`. From a plain shell run configure and build through `engine/CI/scripts/vs_env.py`, which finds Visual Studio (vswhere), loads `vcvarsall.bat x64` and runs the command (in a developer prompt it only runs it); VS Code CMake Tools loads the environment itself (see "VS Code"). `ctest` needs no environment:
+
+  ```bat
+  python engine/CI/scripts/vs_env.py cmake --preset windows-clang-debug
+  python engine/CI/scripts/vs_env.py cmake --build --preset windows-clang-debug
+  ctest --preset windows-clang-debug
+  ```
+
+  The fallbacks, MSVC:
+  - `windows-msvc-debug` / `windows-msvc-release`: MSVC (`cl`) with Ninja, the same environment rule.
+  - `windows-vs2022`: the Visual Studio 2022 generator, x64, MSVC; it needs no developer prompt. The build and test presets are `windows-vs2022-debug` and `windows-vs2022-release`. `windows-vs2022-clangcl` (build presets `windows-vs2022-clangcl-debug` / `-release`) is there too.
+  - MSVC is not the default because its debug information (`/Zi`, a PDB per module beside the shared PCH, one `mspdbsrv` for every build on the machine) breaks a parallel build now and then (`LNK1103`, `LNK4020 ... pdb is corrupted`, `C1090`); a second run passes.
+- Step 6: the executable is `build/ClangWindows/BagiChess.exe` (`build/MSVCWindows/` for MSVC; a Visual Studio configuration adds `Debug/` or `Release/` below that folder).
 - Stockfish does not play on Windows yet, only the own engine does (see "Playing against the computer").
 
 ### VS Code
 
 Open `CI/BagiChess.code-workspace` (File, Open Workspace from File). It recommends the extensions (C/C++, CMake Tools, `twxs.cmake`, CodeLLDB), sets `cmake.useCMakePresets` to `always`, and has the launch configurations and build tasks. Then:
 
-1. Run "CMake: Select Configure Preset" and pick the preset for your OS (`macOS Clang Debug`, `Windows MSVC Ninja Debug`, ...), and "CMake: Select Build Preset" for the matching build preset. Only the presets whose host matches your OS are offered.
-2. "CMake: Configure" is step 4, "Build" (F7) is step 5. The default build task builds `BagiChess`; the debug configurations (F5) build first, except the one named "No Build", and start the CMake launch target. With the `windows-msvc-*` presets CMake Tools loads the Visual Studio environment itself.
+1. Run "CMake: Select Configure Preset" and pick the preset for your OS (`macOS Clang Debug`, `Windows Clang Ninja Debug`, ...), and "CMake: Select Build Preset" for the matching build preset. Only the presets whose host matches your OS are offered.
+2. "CMake: Configure" is step 4, "Build" (F7) is step 5. The default build task builds `BagiChess`; the debug configurations (F5) build first, except the one named "No Build", and start the CMake launch target. With the Windows Ninja presets (`windows-clang-*`, `windows-msvc-*`) CMake Tools loads the Visual Studio environment itself.
 3. The workspace does not run `CI/setup_venv.*` for you: do step 2 above once, in a terminal. The workspace does not put the venv on `PATH`, which is fine, CMake finds `engine/.venv` itself.
 
 ### Your own settings
@@ -152,7 +160,7 @@ python3 tools/uci_match.py --referee build/ClangmacOS/BagiChess --own build/Clan
 Windows (the interpreter is `python`; cmd syntax, `^` continues the line):
 
 ```bat
-python tools/uci_match.py --referee build/MSVCWindows/Release/BagiChess.exe --own build/MSVCWindows/Release/BagiChessUci.exe ^
+python tools/uci_match.py --referee build/ClangWindows/BagiChess.exe --own build/ClangWindows/BagiChessUci.exe ^
     --opponent C:/tools/stockfish/stockfish.exe --games 20 --out match.json
 ```
 
