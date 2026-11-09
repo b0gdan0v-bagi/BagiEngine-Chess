@@ -52,7 +52,8 @@ namespace BECore::Chess {
         Impl(Position startPosition, MoveList legalMoves, const SearchLimits& searchLimits, std::chrono::steady_clock::time_point begun, const CancellationToken& cancelToken, size_t lines)
             : position(std::move(startPosition)), legal(std::move(legalMoves)), limits(searchLimits), start(begun), token(cancelToken), lineCount(lines) {}
 
-        /// Starts the search of line `excluded.size() + 1`: with the limits and the deadline of the line, or (@p retry) the first iteration alone, which no limit can stop
+        /// Starts the search of line `excluded.size() + 1`: with the limits and the deadline of the line, or (@p retry) the first iteration alone, which no limit can stop.
+        /// There is no job running (the caller has reset the last one), so the new one never lives beside the old table
         void StartJob(bool retry) {
             SearchSettings settings;
             settings.maxDepth = retry ? 1 : MaxDepthOf(limits);
@@ -62,8 +63,7 @@ namespace BECore::Chess {
                 control.token = token;
                 control.deadline = DeadlineOfLine(start, limits, excluded.size() + 1, lineCount);
             }
-            job.reset();
-            job.emplace(position, eastl::move(settings), eastl::move(control));
+            job.emplace(position, std::move(settings), std::move(control));
         }
 
         void Finish(EngineErrorKind kind, eastl::string detail) {
@@ -102,14 +102,14 @@ namespace BECore::Chess {
             analysis.lines.push_back(AnalysisLine{found.best, ScoreFromSearch(found.score), found.depth});
             excluded.push_back(found.best);
             if (excluded.size() >= lineCount) {
-                result = eastl::move(analysis);
+                result = std::move(analysis);
                 return;
             }
             StartJob(false);
         }
     };
 
-    OwnSearch::OwnSearch(eastl::unique_ptr<Impl> impl) noexcept : _impl(eastl::move(impl)) {}
+    OwnSearch::OwnSearch(eastl::unique_ptr<Impl> impl) noexcept : _impl(std::move(impl)) {}
     OwnSearch::~OwnSearch() = default;
     OwnSearch::OwnSearch(OwnSearch&&) noexcept = default;
     OwnSearch& OwnSearch::operator=(OwnSearch&&) noexcept = default;
@@ -135,7 +135,7 @@ namespace BECore::Chess {
         const size_t lineCount = eastl::min(static_cast<size_t>(lines), static_cast<size_t>(legal.size()));
         auto impl = eastl::make_unique<Impl>(std::move(*found), std::move(legal), request.limits, start, token, lineCount);
         impl->StartJob(false);
-        return OwnSearch(eastl::move(impl));
+        return OwnSearch(std::move(impl));
     }
 
     SearchProgress OwnSearch::Advance(uint64_t maxNodes) {

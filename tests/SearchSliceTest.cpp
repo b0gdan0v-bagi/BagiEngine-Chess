@@ -734,10 +734,16 @@ namespace BECore::Chess::Tests {
         /// The move time of the deadline test, and the pause that lets it run out before the first slice
         constexpr int kTinyMoveTimeMs = 1;
         constexpr std::chrono::milliseconds kPastTinyMoveTime{20};
-        /// The slices before a cancel in the cancel tests, and the slice size that does not finish a depth-64 search in them
+        /// The slices a cancel test drives before it cancels (of kSearchSliceNodes each: a depth-64 search is far from its end by then)
         constexpr int kSlicesBeforeCancel = 3;
         /// The most a coroutine test waits for the pool: a passing test never waits it out
         constexpr std::chrono::seconds kPoolWaitLimit{30};
+        /// How often a test polls for the pool's answer
+        constexpr std::chrono::milliseconds kPoolPollInterval{1};
+        /// How long a coroutine searches before its test cancels the token
+        constexpr std::chrono::milliseconds kRunBeforeCancel{20};
+        /// The most rounds of the interleaving test: a search that makes no progress ends the test
+        constexpr size_t kInterleaveRoundLimit = 100000;
 
         SearchRequest RequestFor(eastl::string_view fen, int depth, int lines = 1) {
             SearchRequest request = SearchRequest::FromPosition(PositionFromFen(fen), SearchLimits{0, depth});
@@ -758,14 +764,13 @@ namespace BECore::Chess::Tests {
         }
 
         /// Drives @p search to its end with slices of the policy; the call count is bounded, so a search that makes no progress ends the test
-        size_t DriveToTheEnd(OwnSearch& search, const SlicePolicy& slices) {
+        void DriveToTheEnd(OwnSearch& search, const SlicePolicy& slices) {
             constexpr size_t kCallLimit = 5000000;
             size_t calls = 0;
             while (!search.IsDone() && calls < kCallLimit) {
                 (void)search.Advance(slices(calls));
                 ++calls;
             }
-            return calls;
         }
 
         /// The kind of an error, or nothing for a value: a form that EXPECT_EQ can compare and print
@@ -810,7 +815,7 @@ namespace BECore::Chess::Tests {
             uint64_t slices = 0;
         };
 
-        Task<void> DriveOnThePool(const OwnEngine& engine, SearchRequest request, CancellationToken token, eastl::shared_ptr<CoroutineAnswer> out) {
+        Task<void> DriveOnThePool(OwnEngine engine, SearchRequest request, CancellationToken token, eastl::shared_ptr<CoroutineAnswer> out) {
             auto search = engine.BeginFindMove(request, token);
             if (!search) {
                 out->answer = std::unexpected(std::move(search.error()));
@@ -833,7 +838,7 @@ namespace BECore::Chess::Tests {
                 if (Clock::now() >= deadline) {
                     return false;
                 }
-                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                std::this_thread::sleep_for(kPoolPollInterval);
             }
             return true;
         }
@@ -870,7 +875,7 @@ namespace BECore::Chess::Tests {
                     }
                     auto search = engine.BeginFindMove(request, CancellationToken::Create());
                     ASSERT_TRUE(search.has_value());
-                    (void)DriveToTheEnd(*search, slices.policy);
+                    DriveToTheEnd(*search, slices.policy);
 
                     ASSERT_TRUE(search->IsDone()) << name << " d" << depth << " in slices of " << slices.name;
                     const auto answer = search->Result();
@@ -899,7 +904,7 @@ namespace BECore::Chess::Tests {
                 for (const NamedPolicy& slices : sizes) {
                     auto search = engine.BeginAnalyse(request, CancellationToken::Create());
                     ASSERT_TRUE(search.has_value());
-                    (void)DriveToTheEnd(*search, slices.policy);
+                    DriveToTheEnd(*search, slices.policy);
 
                     ASSERT_TRUE(search->IsDone());
                     const auto answer = search->Result();
@@ -923,7 +928,7 @@ namespace BECore::Chess::Tests {
 
         auto search = engine.BeginAnalyse(request, CancellationToken::Create());
         ASSERT_TRUE(search.has_value());
-        (void)DriveToTheEnd(*search, Fixed(kSliceOfSevenNodes));
+        DriveToTheEnd(*search, Fixed(kSliceOfSevenNodes));
 
         ASSERT_TRUE(search->Result().has_value());
         EXPECT_TRUE(SameLines(*search->Result(), *expected));
@@ -936,7 +941,7 @@ namespace BECore::Chess::Tests {
         for (const int lines : kAnalysisLineCounts) {
             auto search = engine.BeginAnalyse(RequestFor(kOneLegalMoveFen, kEngineShallowDepth, lines), CancellationToken::Create());
             ASSERT_TRUE(search.has_value()) << lines;
-            (void)DriveToTheEnd(*search, Fixed(kSliceOfFiveNodes));
+            DriveToTheEnd(*search, Fixed(kSliceOfFiveNodes));
 
             ASSERT_TRUE(search->Result().has_value()) << lines;
             EXPECT_EQ(search->Result()->LineCount(), 1u) << lines;
@@ -1014,7 +1019,7 @@ namespace BECore::Chess::Tests {
         std::this_thread::sleep_for(kPastTinyMoveTime);
 
         // The deadline has passed before the first node: the retry at depth 1 answers, as the blocking call does
-        (void)DriveToTheEnd(*search, Fixed(kSearchSliceNodes));
+        DriveToTheEnd(*search, Fixed(kSearchSliceNodes));
 
         ASSERT_TRUE(search->IsDone());
         ASSERT_TRUE(search->Result().has_value());
@@ -1028,7 +1033,7 @@ namespace BECore::Chess::Tests {
         auto lines = engine.BeginAnalyse(request, CancellationToken::Create());
         ASSERT_TRUE(lines.has_value());
         std::this_thread::sleep_for(kPastTinyMoveTime);
-        (void)DriveToTheEnd(*lines, Fixed(kSearchSliceNodes));
+        DriveToTheEnd(*lines, Fixed(kSearchSliceNodes));
 
         ASSERT_TRUE(lines->Result().has_value());
         ASSERT_EQ(lines->Result()->LineCount(), 3u);
@@ -1055,7 +1060,7 @@ namespace BECore::Chess::Tests {
         }
         OwnSearch moved = std::move(*search);
         search.reset();
-        (void)DriveToTheEnd(moved, Fixed(kSearchSliceNodes));
+        DriveToTheEnd(moved, Fixed(kSearchSliceNodes));
 
         ASSERT_TRUE(moved.Result().has_value());
         EXPECT_TRUE(SameLines(*moved.Result(), *expected));
@@ -1075,7 +1080,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(a.has_value());
         ASSERT_TRUE(b.has_value());
         size_t rounds = 0;
-        while ((!a->IsDone() || !b->IsDone()) && ++rounds < 100000) {
+        while ((!a->IsDone() || !b->IsDone()) && ++rounds < kInterleaveRoundLimit) {
             (void)a->Advance(kSliceOfAHundredNodes);
             (void)b->Advance(kSliceOfSevenNodes);
         }
@@ -1096,7 +1101,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OwnSearchOnThePoolTest, ACoroutineCanDriveTheSearchOnThePool) {
 #if BE_SINGLE_THREAD
-        // A single-thread build runs the slices in TaskManager::Update, which only CoreManager may call, and a Wait() on a task that yielded would block for ever
+        // A single-thread build resumes a task that yielded only in TaskManager::Update, which only CoreManager calls, so nothing here would ever finish the coroutine
         GTEST_SKIP() << "needs worker threads (BE_SINGLE_THREAD)";
 #else
         OwnEngine engine;
@@ -1105,7 +1110,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(expected.has_value());
 
         auto out = eastl::make_shared<CoroutineAnswer>();
-        auto handle = TaskManager::GetInstance().Run(DriveOnThePool(engine, request, CancellationToken::Create(), out));
+        TaskManager::GetInstance().Run(DriveOnThePool(engine, request, CancellationToken::Create(), out));
 
         ASSERT_TRUE(WaitFor(*out)) << "the coroutine did not finish";
         ASSERT_TRUE(out->answer.has_value());
@@ -1121,9 +1126,9 @@ namespace BECore::Chess::Tests {
         OwnEngine engine;
         CancellationToken token = CancellationToken::Create();
         auto out = eastl::make_shared<CoroutineAnswer>();
-        auto handle = TaskManager::GetInstance().Run(DriveOnThePool(engine, RequestFor(kKiwipeteFen, kGoldenForeverDepth), token, out));
+        TaskManager::GetInstance().Run(DriveOnThePool(engine, RequestFor(kKiwipeteFen, kGoldenForeverDepth), token, out));
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        std::this_thread::sleep_for(kRunBeforeCancel);
         token.Cancel();
 
         ASSERT_TRUE(WaitFor(*out)) << "the coroutine did not finish";

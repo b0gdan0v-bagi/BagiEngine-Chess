@@ -180,7 +180,7 @@ namespace BECore::Chess {
         /// push a frame, and a finished frame hands its value to the frame below it (_returning). The order of every check, count and update is
         /// that of a plain recursive negamax, which the pinned node counts of the tests hold.
         /// Loop() keeps the window and the best of the frame it is in in locals and writes them to the frame only when it leaves it (to descend,
-        /// to pause or to finish): the window and the best are not read from the frame per move
+        /// to pause or to finish), so the moves of a node cost no reads of the frame for them
         class Searcher {
         public:
             Searcher(Position& position, const SearchSettings& settings, const SearchControl& control) : _position(position), _settings(settings), _control(control) {}
