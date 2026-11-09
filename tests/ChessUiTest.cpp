@@ -579,6 +579,14 @@ namespace BECore::Chess::Tests {
         }
     }  // namespace
 
+// The panel of a build without Stockfish (CHESS_NO_STOCKFISH) hides the segment EngineStockfish (ChessBoardComponent::HideUnavailableEngines), so a case that clicks it, or counts ten
+// segments, has nothing to click there; the cases at "TheStockfishSegment..." and "WithoutStockfish..." say what that build does instead
+#if CHESS_NO_STOCKFISH
+#define SKIP_WITHOUT_STOCKFISH_SEGMENT() GTEST_SKIP() << "the Stockfish segment of the panel is hidden (CHESS_NO_STOCKFISH)"
+#else
+#define SKIP_WITHOUT_STOCKFISH_SEGMENT() static_cast<void>(0)
+#endif
+
     class ChessUiTest : public ::testing::Test {
     protected:
         static void SetUpTestSuite() {
@@ -2219,6 +2227,7 @@ namespace BECore::Chess::Tests {
             return eastl::make_shared<GatedEngine>(true);
         });
         _manager->UpdateAll();
+        StartFromTheStockfishName();
 
         // Computer with a Stockfish that is not there changes nothing, a color picked before it included
         PressWith("ChessSetColor", "black");
@@ -3193,6 +3202,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, TheEngineSegmentsPickBothEnginesAndTheDefaultIsStockfish) {
         // Was TheEngineWordStartsAsStockfishAndTheActionWalksTheEnginesAndWraps (the cycle and the `engine` word are gone with the Engine button)
+        SKIP_WITHOUT_STOCKFISH_SEGMENT();
         CountingFactory factory({eastl::make_shared<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -3316,8 +3326,10 @@ namespace BECore::Chess::Tests {
             EXPECT_FALSE(PanelControl<UIButton>("EngineOwn").rect.IsEmpty());
             ASSERT_TRUE(ClickPanel("EngineOwn").Both());
             EXPECT_EQ(Opponent().GetEngine(), OpponentEngine::Own);
-            ASSERT_TRUE(ClickPanel("EngineStockfish").Both());
-            EXPECT_EQ(Opponent().GetEngine(), OpponentEngine::Stockfish);
+            if constexpr (kStockfishAvailable) {
+                ASSERT_TRUE(ClickPanel("EngineStockfish").Both());
+                EXPECT_EQ(Opponent().GetEngine(), OpponentEngine::Stockfish);
+            }
         };
         engineGroupWorks("nobody plays: it is how the person gets to the own engine");
         ASSERT_TRUE(ClickPanel("ModeComputer").Both());
@@ -3362,6 +3374,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, ClickingAnEngineSegmentOnTheScreenPicksTheEngineAndAPressAloneDoesNothing) {
         // Was ClickingTheEngineButtonOnTheScreenCyclesTheEngineAndAPressAloneDoesNothing
+        SKIP_WITHOUT_STOCKFISH_SEGMENT();
         CountingFactory factory({eastl::make_shared<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -3828,11 +3841,13 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(OpenThePanel());
         ActionLog log;
         const eastl::vector<PanelSegment> segments = ExpectedPanelSegments();
+        // A build without Stockfish hides its segment: nine are on the screen to click
+        const auto IsShown = [](const PanelSegment& segment) { return kStockfishAvailable || segment.name != "EngineStockfish"; };
 
         // Two people play first: only the mode and the engine groups take clicks. Computer is picked in the middle, which wakes the other two; then back to two
         const auto clickGroup = [&](const char* group) {
             for (const PanelSegment& segment : segments) {
-                if (std::string_view(segment.group) != group) {
+                if (std::string_view(segment.group) != group || !IsShown(segment)) {
                     continue;
                 }
                 SCOPED_TRACE(segment.name.c_str());
@@ -3845,7 +3860,7 @@ namespace BECore::Chess::Tests {
 
                 Draw();  // the board answered with the variable; the next draw moves the selection
                 for (const PanelSegment& other : segments) {
-                    if (std::string_view(other.group) == group) {
+                    if (std::string_view(other.group) == group && IsShown(other)) {
                         EXPECT_EQ(PanelControl<UIButton>(other.name.c_str()).selected, other.name == segment.name) << other.name.c_str();
                     }
                 }
@@ -3871,7 +3886,7 @@ namespace BECore::Chess::Tests {
         EXPECT_TRUE(PanelControl<UIButton>("ModeTwo").selected);
         EXPECT_TRUE(PanelControl<UIButton>("LevelMax").selected) << "the level that was picked stays shown while two people play";
         EXPECT_TRUE(PanelControl<UIButton>("ColorBlack").selected) << "and so does the person's color";
-        EXPECT_EQ(log.Total(), 11u) << "ten segments, and ModeTwo again";
+        EXPECT_EQ(log.Total(), kStockfishAvailable ? 11u : 10u) << "every segment shown (ten, nine without Stockfish), and ModeTwo again";
     }
 
     TEST_F(ChessUiTest, AClickWithoutAnAnswerLeavesTheGroupAlone) {
@@ -3994,6 +4009,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, ARefusedStockfishPickOnThePanelKeepsComputerTheOwnEngineAndTheLevelAndTheProgramStillAnswers) {
         // The owner's report: choosing Stockfish switched the mode to Two players. An engine that cannot be had cannot be saved: nothing changes and the error is said
+        SKIP_WITHOUT_STOCKFISH_SEGMENT();  // the pick of the name is the action's in that build: WithoutStockfishThePickOfTheNameOnTheActionIsRefused...
         eastl::vector<eastl::string> asked;
         Opponent().SetEngineFactory([&asked](OpponentEngine engine, const OpponentLevel&) -> MadeEngine {
             const eastl::string_view id = OpponentEngineId(engine);
@@ -4037,6 +4053,83 @@ namespace BECore::Chess::Tests {
         Draw();
         EXPECT_EQ(Var("opponentError"), "") << "the move of the person took the sentence away (the controller test pins that the program's own move does not)";
     }
+
+    TEST_F(ChessUiTest, TheStockfishSegmentIsHiddenExactlyWhenTheBuildHasNoStockfishAndTheOwnSegmentFillsTheGroupThen) {
+        // The scene file is the same in every build; ChessBoardComponent::HideUnavailableEngines hides the segment once, at the first update or draw
+        ASSERT_TRUE(OpenThePanel());
+        Draw();
+        const UIButton& stockfish = PanelControl<UIButton>("EngineStockfish");
+        const UIButton& own = PanelControl<UIButton>("EngineOwn");
+        const UISegmented& group = PanelControl<UISegmented>("EngineGroup");
+        EXPECT_EQ(stockfish.active.visible, kStockfishAvailable);
+        EXPECT_TRUE(own.active.visible);
+        ASSERT_FALSE(own.rect.IsEmpty());
+        EXPECT_NEAR(own.rect.h, kSegmentHeight, kPixelTolerance);
+        if constexpr (kStockfishAvailable) {
+            ASSERT_FALSE(stockfish.rect.IsEmpty());
+            EXPECT_NEAR(stockfish.rect.x, group.rect.x, kPixelTolerance) << "two segments share the group";
+            EXPECT_NEAR(stockfish.rect.w, own.rect.w, kPixelTolerance);
+            EXPECT_NEAR(own.rect.x + own.rect.w, group.rect.x + group.rect.w, kPixelTolerance);
+        } else {
+            EXPECT_TRUE(stockfish.rect.IsEmpty()) << "a hidden segment takes no room";
+            EXPECT_NEAR(own.rect.x, group.rect.x, kPixelTolerance) << "Own engine fills the group";
+            EXPECT_NEAR(own.rect.w, group.rect.w, kPixelTolerance);
+            EXPECT_EQ(Var("opponentEngine"), "own");
+            Draw();
+            EXPECT_TRUE(own.selected) << "and it is the selected one";
+            EXPECT_FALSE(stockfish.selected);
+            ActionLog log;
+            ASSERT_TRUE(ClickPanel("EngineOwn").Both()) << "the one segment takes its click";
+            EXPECT_EQ(log.Total(), 1u);
+            EXPECT_EQ(log.LastValue(), PoolString::Intern("own"));
+        }
+    }
+
+    TEST_F(ChessUiTest, ThePanelWithTheStockfishSegmentHiddenPassesTheMatrixAndOwnEngineIsATouchTargetInTheNarrowestWindow) {
+        // The layout rules for the group of one segment, in every build: the segment is hidden by hand here, so the desktop build holds the web one's panel too
+        auto panel = Panel();
+        ASSERT_TRUE(panel);
+        panel->UpdateLayout(1280.0f, 720.0f);
+        ASSERT_TRUE(panel->SetElementVisible(PoolString::Intern("EngineStockfish"), false));
+        UICanvasLayout& layout = panel->GetLayout();
+
+        const auto failures = ValidateWithWords(layout);
+        EXPECT_TRUE(failures.empty()) << DescribeMatrixFailures(failures).c_str();
+        const eastl::string problems = PanelProblemsOnMatrix(layout);
+        EXPECT_TRUE(problems.empty()) << problems.c_str();
+
+        LayOutInTheNarrowestWindow(layout);
+        const UIButton& own = PanelControl<UIButton>("EngineOwn");
+        const UIElement& group = PanelControl<UISegmented>("EngineGroup");
+        EXPECT_TRUE(PanelControl<UIButton>("EngineStockfish").rect.IsEmpty());
+        EXPECT_NEAR(own.rect.x, group.rect.x, kPixelTolerance);
+        EXPECT_NEAR(own.rect.w, group.rect.w, kPixelTolerance);
+        EXPECT_GE(std::min(own.rect.w, own.rect.h) * layout.GetResolved().scale, CoreManager::GetUIEnvironment().GetSettings().minTouchSize - kPixelTolerance);
+        const UIContentFit fit = own.CheckContent(own.rect.w - 2.0f * kButtonAir, own.rect.h, layout.GetResolved().scale);
+        EXPECT_TRUE(fit.hasContent && fit.fits) << "'" << ShownText(own).c_str() << "' in " << own.rect.w << " units";
+        layout.Invalidate();
+    }
+
+#if CHESS_NO_STOCKFISH
+    TEST_F(ChessUiTest, WithoutStockfishThePickOfTheNameOnTheActionIsRefusedAndTheOwnEngineStaysTheWayOnIsComputer) {
+        // The default factory (no SetEngineFactory): the panel has no segment for the name, but the action can still carry it (a hand-made press, the web build's scene editor)
+        _manager->UpdateAll();
+        EXPECT_EQ(Var("opponentEngine"), "own") << "a game starts with the own engine";
+
+        PressWith(kSetEngineAction, "stockfish");
+
+        EXPECT_EQ(Var("opponentEngine"), "own") << "refused as a whole, nothing falls back";
+        EXPECT_EQ(Var("opponentError"), "Engine not supported here");
+        EXPECT_EQ(Var("status"), "Engine not supported here");
+        EXPECT_FALSE(Opponent().GetPlays().has_value());
+
+        PressWith(kSetModeAction, "computer");
+
+        EXPECT_EQ(Var("opponentMode"), "computer") << "the own engine plays";
+        EXPECT_EQ(Var("opponentError"), "") << "a new pick: the person has seen the sentence";
+        EXPECT_EQ(Opponent().GetEngine(), OpponentEngine::Own);
+    }
+#endif
 
     TEST_F(ChessUiTest, TheMenuButtonSaysMenuWhateverIsPickedAndThePanelNamesTheColors) {
         CountingFactory factory({eastl::make_shared<InstantEngine>()});
@@ -4115,7 +4208,10 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(Label("Status").GetDisplayText(), "Engine not found");
         EXPECT_TRUE(PanelControl<UIButton>("ModeTwo").selected) << "the screen shows the truth: nobody plays";
         EXPECT_FALSE(PanelControl<UIButton>("ModeComputer").selected);
-        EXPECT_TRUE(PanelControl<UIButton>("EngineStockfish").selected) << "the pick failed and the choice is still Stockfish: no silent switch";
+        if constexpr (kStockfishAvailable) {
+            EXPECT_TRUE(PanelControl<UIButton>("EngineStockfish").selected) << "the pick failed and the choice is still Stockfish: no silent switch";
+        }
+        EXPECT_EQ(Var("opponentEngine"), "stockfish") << "no silent switch (the segment is hidden without Stockfish)";
         EXPECT_EQ(ShownText(*HudElement("Menu")), "Menu");
         ASSERT_EQ(asked.size(), 1u);
         EXPECT_EQ(asked[0], "stockfish");

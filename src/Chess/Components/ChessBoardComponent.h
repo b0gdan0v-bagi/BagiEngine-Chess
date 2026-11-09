@@ -159,6 +159,10 @@ namespace BECore::Chess {
         void SyncPromotionPanel(const ChessGameModel& model);
         void OnUpdate(const SceneEvents::SceneUpdateEvent&);
 
+        /// Without Stockfish in this build (CHESS_NO_STOCKFISH) hides its segment of the opponent panel, `EngineStockfish`, so Own engine fills the group; once, at the first update or draw, when
+        /// every node of the scene is attached. The scene file is the same in every build; a build with Stockfish does nothing
+        void HideUnavailableEngines();
+
         /// One line in the log when a game has ended, the first time it is seen: whether the person, the program or the control API played the last move
         void LogResultOnce(const ChessGameModel& model);
 
@@ -182,6 +186,7 @@ namespace BECore::Chess {
         const void* _loggedModel = nullptr;  // the model it was logged for
 
         bool _promotionPanelShown = false;  // what SyncPromotionPanel() last set: the canvas starts hidden
+        bool _enginesChecked = false;       // HideUnavailableEngines() has run
 
         std::optional<Drag> _drag;  // armed by a press that left a piece selected, cleared by every release, a motion without the button, the next press and a failed IsDragValid()
 

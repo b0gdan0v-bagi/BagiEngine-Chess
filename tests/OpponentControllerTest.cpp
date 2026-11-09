@@ -132,7 +132,7 @@ namespace BECore::Chess::Tests {
         controller.Update();
         EXPECT_TRUE(controller.IsThinking());
         ASSERT_TRUE(WaitUntil([&] { return engine->Calls() == 1; })) << "the engine has the search and waits at its gate";
-        EXPECT_EQ(engine->LastLimits().moveTimeMs, GetOpponentLevels()[kDefaultOpponentLevel].moveTimeMs) << "the limits are the level's";
+        EXPECT_EQ(engine->LastLimits().moveTimeMs, LimitsOf(controller.GetEngine(), GetOpponentLevels()[kDefaultOpponentLevel]).moveTimeMs) << "the limits are the level's for the engine";
         for (int frame = 0; frame < kManyUpdates; ++frame) {
             controller.Update();
         }
@@ -491,7 +491,7 @@ namespace BECore::Chess::Tests {
         controller.Update();
         EXPECT_TRUE(controller.IsThinking());
         ASSERT_TRUE(UpdateUntil(controller, [&] { return model.GetMoves().size() == 2; })) << DescribeError(controller.GetError()).c_str();
-        EXPECT_EQ(quick->LastLimits().moveTimeMs, GetOpponentLevels()[hard].moveTimeMs);
+        EXPECT_EQ(quick->LastLimits().moveTimeMs, LimitsOf(controller.GetEngine(), GetOpponentLevels()[hard]).moveTimeMs);
         slow->Open();  // and now the old search answers h7h5, into a game that has moved on
         ASSERT_TRUE(WaitUntil([&] { return slow->Answered() == 1; }));
         for (int frame = 0; frame < kManyUpdates; ++frame) {

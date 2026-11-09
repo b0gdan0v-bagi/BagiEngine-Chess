@@ -6,6 +6,7 @@
 #include <BECore/Scene/SceneNode.h>
 #include <BECore/UI/UICanvasComponent.h>
 #include <Chess/ChessGame.h>
+#include <Chess/Engine/OpponentEngines.h>
 #include <Chess/Engine/OpponentText.h>
 #include <Chess/Engine/PositionAnalyst.h>
 #include <Chess/Game/BoardCoordinates.h>
@@ -87,7 +88,19 @@ namespace BECore::Chess {
         SubscribeInScene<SceneEvents::SceneUpdateEvent, &ChessBoardComponent::OnUpdate>(this);
     }
 
+    void ChessBoardComponent::HideUnavailableEngines() {
+        if (_enginesChecked) {
+            return;
+        }
+        _enginesChecked = true;
+        // A scene without the panel has nothing to hide
+        if (!IsOpponentEngineAvailable(OpponentEngine::Stockfish)) {
+            UICanvasComponent::SetElementVisibleByName(GetScene(), "EngineStockfish"_intern, false);
+        }
+    }
+
     void ChessBoardComponent::OnUpdate(const SceneEvents::SceneUpdateEvent&) {
+        HideUnavailableEngines();
         ChessGame* game = ChessGame::GetActive();
         if (!game) {
             return;
@@ -259,6 +272,7 @@ namespace BECore::Chess {
     }
 
     void ChessBoardComponent::OnDraw() {
+        HideUnavailableEngines();  // the panel is drawn after the board, so a frame with no update before it already lacks the segment
         PublishUiVars();
         auto& renderer = *CoreManager::GetRenderer();
         const PieceColor bottom = GetBottomColor();  // once per draw: every square of this frame is placed for the same orientation

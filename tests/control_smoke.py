@@ -19,7 +19,11 @@ run, compares the left margin of a screenshot (the display of the captured piece
 tests/fake_uci_engine.py: main() writes a wrapper script that starts it into a temporary directory and puts the script in STOCKFISH of the environment,
 which the game inherits. STOCKFISH comes before PATH in the game's search for an engine and the committed config has no path, so a Stockfish installed on
 this machine is never used. A config/ChessSettings.local.xml (a person's own path, which would win over STOCKFISH) leaves the Stockfish scenarios out, as
-does Windows; the smoke never edits a person's files. Exit code: 0 passed, 1 failed, 77 skipped (the executable does not exist).
+does Windows; the smoke never edits a person's files. A build without Stockfish (CHESS_NO_STOCKFISH, the web build's world, or a desktop build that switches it on) is
+recognised by the script itself, with no environment variable: the first get_state of a game says `opponent.engine` "own" instead of "stockfish". Then the scenarios that
+need the fake Stockfish end at once, and the base scenario "without Stockfish" checks what that build does instead (the default engine is own, `stockfish` is `engine_unavailable`
+in `engine`, in a seat object and with a side, with the opponent unchanged, the panel has no visible Stockfish segment and Own engine is selected, and the own engine plays);
+in a build with Stockfish that scenario ends at once. Exit code: 0 passed, 1 failed, 77 skipped (the executable does not exist).
 """
 
 import os
@@ -245,6 +249,13 @@ def get_opponent(client: BagiControlClient) -> dict:
     return client.call("get_state")["state"]["opponent"]
 
 
+def default_engine(client: BagiControlClient) -> str:
+    """The engine a game starts with, which is also how the script tells the build: "stockfish" where Stockfish can run, "own" in a build without it (CHESS_NO_STOCKFISH)."""
+    engine = get_opponent(client)["engine"]
+    check(engine in ("stockfish", "own"), f"the default engine is neither stockfish nor own: {get_opponent(client)}")
+    return engine
+
+
 def get_moves(client: BagiControlClient) -> list:
     return client.call("get_state")["state"]["moves"]
 
@@ -301,6 +312,9 @@ def run_opponent_scenario(client: BagiControlClient, headless: bool) -> None:
     if client.call("status")["manualClock"]:
         client.call("step")  # the scene registers its pieces and the board starts updating the opponent in the first frame
     client.call("reset")
+    if default_engine(client) != "stockfish":
+        print("NOTICE: this build has no Stockfish (the default engine is own): the scenario of the fake Stockfish is left out; 'without Stockfish' checks the build", flush=True)
+        return
 
     opponent = get_opponent(client)
     check(opponent["plays"] is None and opponent["level"] == "medium" and opponent["thinking"] is False and opponent["error"] is None, f"unexpected default opponent {opponent}")
@@ -348,7 +362,7 @@ def run_own_engine_scenario(client: BagiControlClient, headless: bool) -> None:
     if client.call("status")["manualClock"]:
         client.call("step")
     client.call("reset")
-    check(get_opponent(client)["engine"] == "stockfish", f"the default engine is not stockfish: {get_opponent(client)}")
+    default = default_engine(client)  # "stockfish", or "own" in a build without Stockfish: the switch back below goes to it
 
     version = client.call("get_state")["version"]
     picked = client.call("set_state", {"opponent": {"engine": "own", "plays": "black", "level": "easy"}})
@@ -365,10 +379,10 @@ def run_own_engine_scenario(client: BagiControlClient, headless: bool) -> None:
     second = play_against_the_own_engine(client)
     check(first == second, f"the own engine answered e2e4 with {first}, then with {second}")
 
-    # Back to Stockfish and to two people: the program stays out of the game
-    client.call("set_state", {"opponent": {"engine": "stockfish", "plays": None}})
+    # Back to the engine of the start (Stockfish, or the own engine in a build without it) and to two people: the program stays out of the game
+    client.call("set_state", {"opponent": {"engine": default, "plays": None}})
     opponent = get_opponent(client)
-    check(opponent["engine"] == "stockfish" and opponent["plays"] is None and opponent["error"] is None, f"the switch back was not read: {opponent}")
+    check(opponent["engine"] == default and opponent["plays"] is None and opponent["error"] is None, f"the switch back was not read: {opponent}")
     # The moves are taken from the list, not typed: which reply the own engine gave is not this scenario's business
     by_hand = []
     for _ in range(2):
@@ -912,10 +926,17 @@ def run_opponent_panel_scenario(client: BagiControlClient, headless: bool) -> No
     check(menu_button is not None and menu_button["text"] == "Menu" and menu_button["action"] == "ChessOpenOpponent", f"the Menu button: {menu_button}")
     check(get_opponent(client)["plays"] is None, f"unexpected opponent at the start: {get_opponent(client)}")
 
-    # One press on the HUD button opens the panel, which shows what the game has: two people, White, Stockfish, medium
+    # One press on the HUD button opens the panel, which shows what the game has: two people, White, Stockfish (the own engine in a build without Stockfish, which hides the
+    # Stockfish segment so that Own engine fills the group), medium
+    stockfish = default_engine(client) == "stockfish"
     tree = press_in_the_panel(client, "Menu", "ChessOpenOpponent", "")
     check(find_ui_canvas(tree, "OpponentPanel")["visible"] is True, "the Menu button did not open the panel")
-    check_selected(tree, ["ModeTwo", "ColorWhite", "EngineStockfish", "LevelMedium"], ["ModeComputer", "ColorBlack", "EngineOwn", "LevelEasy", "LevelHard", "LevelMax"])
+    if stockfish:
+        check_selected(tree, ["ModeTwo", "ColorWhite", "EngineStockfish", "LevelMedium"], ["ModeComputer", "ColorBlack", "EngineOwn", "LevelEasy", "LevelHard", "LevelMax"])
+    else:
+        check_selected(tree, ["ModeTwo", "ColorWhite", "EngineOwn", "LevelMedium"], ["ModeComputer", "ColorBlack", "LevelEasy", "LevelHard", "LevelMax"])
+        check(panel_element(tree, "EngineStockfish")["visible"] is False, f"the Stockfish segment is shown in a build without Stockfish: {panel_element(tree, 'EngineStockfish')}")
+        check(panel_element(tree, "EngineOwn")["visible"] is True, f"the Own engine segment is not shown: {panel_element(tree, 'EngineOwn')}")
     check_no_group_disabled(tree)
     check(panel_element(tree, "OpponentError")["text"] == "", f"the error line is not empty: {panel_element(tree, 'OpponentError')}")
 
@@ -933,7 +954,7 @@ def run_opponent_panel_scenario(client: BagiControlClient, headless: bool) -> No
 
     # The engine, then the mode: nothing is asked of Stockfish, the own engine is made when the program is picked
     tree = press_in_the_panel(client, "EngineOwn", "ChessSetEngine", "own")
-    check_selected(tree, ["EngineOwn"], ["EngineStockfish"])
+    check_selected(tree, ["EngineOwn"], ["EngineStockfish"] if stockfish else [])
     opponent = get_opponent(client)
     check(opponent["engine"] == "own" and opponent["plays"] is None and opponent["error"] is None, f"the engine was not read back: {opponent}")
 
@@ -986,6 +1007,59 @@ def run_opponent_panel_scenario(client: BagiControlClient, headless: bool) -> No
     expect_error("not_clickable", lambda: client.call("ui_click", {"name": "ModeComputer"}), "a click on a segment of the closed panel")
 
 
+def run_without_stockfish_scenario(client: BagiControlClient, headless: bool) -> None:
+    """A build without Stockfish (CHESS_NO_STOCKFISH): the game starts with the own engine, `stockfish` is refused everywhere it can be named, the panel does not offer it and the
+    own engine plays. A build with Stockfish has nothing to check here. Needs nothing from the environment."""
+    if client.call("status")["manualClock"]:
+        client.call("step")
+    client.call("reset")
+    if default_engine(client) == "stockfish":
+        print("NOTICE: this build has Stockfish: the scenario 'without Stockfish' has nothing to check", flush=True)
+        return
+
+    opponent = get_opponent(client)
+    check(opponent["plays"] is None and opponent["engine"] == "own" and opponent["error"] is None, f"unexpected default opponent {opponent}")
+
+    # The panel: no Stockfish segment, Own engine selected
+    let_frames_pass(client, 2)
+    tree = press_in_the_panel(client, "Menu", "ChessOpenOpponent", "")
+    check(panel_element(tree, "EngineStockfish")["visible"] is False, f"the Stockfish segment is shown: {panel_element(tree, 'EngineStockfish')}")
+    check(panel_element(tree, "EngineOwn")["visible"] is True, f"the Own engine segment is not shown: {panel_element(tree, 'EngineOwn')}")
+    check_selected(tree, ["EngineOwn"], [])
+    tree = press_in_the_panel(client, "Ok", "ChessCloseOpponent", "")
+    check(find_ui_canvas(tree, "OpponentPanel")["visible"] is False, "OK did not close the panel")
+
+    # Stockfish is refused wherever it can be named, also while nobody plays; the opponent stays as it was and the error says why
+    refused = [
+        ("engine alone", {"engine": "stockfish"}),
+        ("engine with a side", {"plays": "black", "engine": "stockfish"}),
+        ("White's seat", {"plays": "black", "white": {"engine": "stockfish"}}),
+        ("Black's seat", {"black": {"engine": "stockfish", "level": "hard"}}),
+    ]
+    for what, pick in refused:
+        version = client.call("get_state")["version"]
+        expect_error("engine_unavailable", lambda pick=pick: client.call("set_state", {"opponent": pick}), what)
+        state = client.call("get_state")
+        opponent = state["state"]["opponent"]
+        check(opponent["plays"] is None and opponent["engine"] == "own" and opponent["level"] == "medium", f"{what}: the refused pick changed the opponent: {opponent}")
+        check(opponent["seats"]["white"]["engine"] == "own" and opponent["seats"]["black"]["engine"] == "own", f"{what}: the refused pick changed a seat: {opponent['seats']}")
+        check(opponent["error"] is not None and opponent["error"]["kind"] == "unsupported", f"{what}: the reason is not in opponent.error: {opponent['error']}")
+        check(state["version"] > version, f"{what}: the refusal did not move the state version")
+        check(get_moves(client) == [], f"{what}: a refused pick played a move")
+        client.call("set_state", {"opponent": {"plays": None}})  # a pick that changes nothing but clears the standing error
+        check(get_opponent(client)["error"] is None, f"{what}: plays null did not clear the error")
+    # A position next to the refused pick is not set either
+    expect_error("engine_unavailable", lambda: client.call("set_state", {"fen": MATE_IN_ONE_FEN, "opponent": {"engine": "stockfish"}}), "a fen with the refused pick")
+    check(client.call("get_state")["state"]["fen"] == START_FEN, "the position was replaced by a refused call")
+    client.call("set_state", {"opponent": {"plays": None}})
+
+    # The way on is a side with the own engine: the program answers
+    client.call("set_state", {"opponent": {"plays": "black"}})
+    opponent = get_opponent(client)
+    check(opponent["plays"] == "black" and opponent["engine"] == "own" and opponent["error"] is None, f"a side alone was not read back: {opponent}")
+    play_against_the_own_engine(client)
+
+
 def local_settings_exist() -> bool:
     return LOCAL_SETTINGS.exists()
 
@@ -1008,6 +1082,8 @@ BASE_SCENARIOS = [
     ("watch, manual clock", ["--manual-clock"], run_watch_scenario),
     ("analysis, real clock", [], run_analysis_scenario),
     ("analysis, manual clock", ["--manual-clock"], run_analysis_scenario),
+    ("without Stockfish, real clock", [], run_without_stockfish_scenario),
+    ("without Stockfish, manual clock", ["--manual-clock"], run_without_stockfish_scenario),
     ("opponent panel, real clock", [], run_opponent_panel_scenario),
     ("opponent panel, manual clock", ["--manual-clock"], run_opponent_panel_scenario),
     ("captured material, real clock", [], run_material_scenario),
