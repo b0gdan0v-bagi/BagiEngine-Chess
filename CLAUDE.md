@@ -13,8 +13,8 @@ src/Chess/
 ├── Game/                     plain C++ rules, no scene or renderer (src/Chess/Game/CLAUDE.md)
 │   ├── ChessTypes.h, Bitboard.h, Move.h, Attacks.*   squares, pieces, bitboards, moves, attack tables and magics
 │   ├── Position.*, MoveGenerator.*, GameStatus.*      position and FEN, legal moves and UCI, mate / stalemate / draws
-│   ├── ChessGameModel.*      the state of the game: selection, moves, history, version, piece handles, pending promotion
-│   └── StatusText.*, BoardOrientation.h, BoardCoordinates.h, PromotionChoices.*, CapturedMaterial.*, MaterialLayout.h   pure helpers of the UI
+│   ├── ChessGameModel.*      the state of the game: selection, moves, history, version, piece handles, pending promotion; `TakeBack(plies)` (rules side of the takeback, no caller yet)
+│   └── StatusText.*, BoardOrientation.h, BoardCoordinates.h, PromotionChoices.*, CapturedMaterial.*, MaterialLayout.h, MoveNotation.*, MoveList.*   pure helpers of the UI (`MoveNotation.*`: `SanOf`, the standard algebraic notation of a move; `MoveList.*`: `BuildMoveList`, the rows of a move list, not to be confused with the `MoveList` alias of `MoveGenerator.h`)
 ├── Engine/                   the computer opponent (src/Chess/Engine/CLAUDE.md)
 │   ├── ChessEngine.h, Analysis.*, SearchRequest.*     IChessEngine (FindMove, Analyse), the request and the analysis
 │   ├── UciProtocol.*, UciProcess.*, UciEngine.*       Stockfish over UCI in a child process (POSIX)

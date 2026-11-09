@@ -23,6 +23,10 @@ namespace BECore::Chess {
 
     void ChessGameModel::Reset() {
         BeginGame(Position::Start());
+        PlaceHandlesAtStart();
+    }
+
+    void ChessGameModel::PlaceHandlesAtStart() {
         for (auto& [handle, track] : _pieces) {
             track.current = track.start;
             track.piece = track.startPiece;
@@ -32,10 +36,10 @@ namespace BECore::Chess {
 
     void ChessGameModel::SetPosition(const Position& position) {
         BeginGame(position);
-        DealPieces();
+        DealPieces(_position);
     }
 
-    void ChessGameModel::DealPieces() {
+    void ChessGameModel::DealPieces(const Position& position) {
         for (const PieceColor color : {PieceColor::White, PieceColor::Black}) {
             // The map has no order of its own; the order of the start squares makes the deal the same on every run.
             eastl::vector<PieceTrack*> tracks;
@@ -48,7 +52,7 @@ namespace BECore::Chess {
 
             size_t next = 0;
             for (int sq = 0; sq < kSquareCount && next < tracks.size(); ++sq) {
-                const Piece piece = _position.PieceAt(sq);
+                const Piece piece = position.PieceAt(sq);
                 if (piece.IsEmpty() || piece.color != color) {
                     continue;
                 }
@@ -153,6 +157,35 @@ namespace BECore::Chess {
         return {};
     }
 
+    size_t ChessGameModel::TakeBack(size_t plies) {
+        const size_t count = eastl::min(plies, _moves.size());
+        if (count == 0) {
+            return 0;
+        }
+        for (size_t taken = 0; taken < count; ++taken) {
+            _position.UndoMove();
+            _moves.pop_back();
+        }
+        ReplayPieces();
+        ClearSelection();
+        _status = EvaluateStatus(_position);
+        ++_version;
+        return count;
+    }
+
+    void ChessGameModel::ReplayPieces() {
+        if (_startFen == Position::kStartFen) {
+            PlaceHandlesAtStart();
+        } else if (const auto start = Position::FromFen(_startFen)) {
+            DealPieces(*start);
+        } else {
+            return;  // the model only stores FENs of its own positions, so this is not reached
+        }
+        for (const Move move : _moves) {
+            RelocatePieces(move);
+        }
+    }
+
     void ChessGameModel::RegisterPiece(PieceHandle handle, Square startSquare) {
         auto& track = _pieces[handle];
         track.start = startSquare;
@@ -164,7 +197,7 @@ namespace BECore::Chess {
         // The scene registers its pieces in its first frame, which a client that acts at once (the control API on the manual
         // clock) can precede: a game that has moved on, or began from another position, is dealt again with this piece in it.
         if (!_moves.empty() || _startFen != Position::kStartFen) {
-            DealPieces();
+            DealPieces(_position);
         }
     }
 

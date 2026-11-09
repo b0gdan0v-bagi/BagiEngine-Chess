@@ -20,7 +20,7 @@ namespace BECore::Chess {
      * Once the status is not Ongoing no move is accepted until Reset() or SetPosition().
      *
      * GetVersion() grows with every change a controller has to see (a new game, a position set from outside, a played
-     * move) and never goes back; selecting a piece does not move it. A click on the last rank does not move the pawn either:
+     * move, a takeback) and never goes back; selecting a piece does not move it. A click on the last rank does not move the pawn either:
      * it leaves a promotion pending (HasPendingPromotion()) until the person names the piece (ChoosePromotion()) or drops it
      * (CancelPromotion()); a pending promotion is not a change of the game, so the version stays.
      *
@@ -108,6 +108,19 @@ namespace BECore::Chess {
         /// Drops the selection and its legal targets and any pending promotion, for an owner that takes over the turn (the computer opponent); the version does not move.
         void ClearSelection();
 
+        /**
+         * @brief Takes back the last @p plies moves in one step (all there are when fewer).
+         *
+         * The position goes back (its history of repetitions with it, so the threefold rule stays right), the status is worked
+         * out again (a finished game is on again), the selection and a pending promotion are dropped, and the piece handles
+         * stand where a game that played only the kept moves would have them (a captured piece is back, a promoted one is a
+         * pawn again). The version grows once, whatever the number of plies. The game goes back at most to its start: the
+         * opening position, or the one given to SetPosition() (GetStartFen() does not change).
+         *
+         * @return how many moves were taken back; 0 (no moves, or @p plies is 0) changes nothing, the version included.
+         */
+        size_t TakeBack(size_t plies = 1);
+
         /// A selected pawn was clicked onto its last rank and waits for the piece it becomes (ChoosePromotion()); nothing has moved
         [[nodiscard]] bool HasPendingPromotion() const noexcept {
             return _hasPendingPromotion;
@@ -186,8 +199,14 @@ namespace BECore::Chess {
 
         void BeginGame(const Position& position);
 
-        /// Hands the pieces of the current position out to the registered handles; the handles left over go off the board
-        void DealPieces();
+        /// Sends every handle back to its start square, as the opening position has it
+        void PlaceHandlesAtStart();
+
+        /// Hands the pieces of @p position out to the registered handles; the handles left over go off the board
+        void DealPieces(const Position& position);
+
+        /// Puts the handles where the game has them: dealt to the position it began from, then moved by each move played
+        void ReplayPieces();
 
         Position _position = Position::Start();
         eastl::string _startFen;
