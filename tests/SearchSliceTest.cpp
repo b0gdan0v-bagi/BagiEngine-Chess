@@ -1,7 +1,11 @@
 #include "ChessTestUtil.h"
 
+#include <Chess/Engine/OwnEngine.h>
 #include <Chess/Engine/Search.h>
+#include <Chess/Game/ChessGameModel.h>
 #include <Chess/Game/MoveGenerator.h>
+#include <Common/EngineEnvironment.h>
+#include <TaskSystem/Awaitables.h>
 #include <TaskSystem/TaskManager.h>
 #include <iomanip>
 #include <iostream>
@@ -714,6 +718,420 @@ namespace BECore::Chess::Tests {
         EXPECT_GE(result.nodes, kDeepSearchNodes);
     }
 
+    // -- the own engine in slices --------------------------------------------------------------------------------------------
+
+    namespace {
+
+        constexpr int kEngineShallowDepth = 3;
+        constexpr int kEngineDepths[] = {3, 4};
+        constexpr int kAnalysisLineCounts[] = {1, 2, 3, 8};
+        /// A position where Black has the king move a7 and nothing else, a mate and a stalemate
+        constexpr eastl::string_view kOneLegalMoveFen = "k7/8/2K5/8/8/8/8/1R6 b - - 0 1";
+        constexpr eastl::string_view kMatedFen = "R5k1/5ppp/8/8/8/8/8/4K3 b - - 0 1";
+        constexpr eastl::string_view kStalematedFen = "7k/5Q2/6K1/8/8/8/8/8 b - - 0 1";
+        /// The game behind a request that has a history (the Italian opening)
+        constexpr const char* kHistoryMoves[] = {"e2e4", "e7e5", "g1f3", "b8c6", "f1c4"};
+        /// The move time of the deadline test, and the pause that lets it run out before the first slice
+        constexpr int kTinyMoveTimeMs = 1;
+        constexpr std::chrono::milliseconds kPastTinyMoveTime{20};
+        /// The slices before a cancel in the cancel tests, and the slice size that does not finish a depth-64 search in them
+        constexpr int kSlicesBeforeCancel = 3;
+        /// The most a coroutine test waits for the pool: a passing test never waits it out
+        constexpr std::chrono::seconds kPoolWaitLimit{30};
+
+        SearchRequest RequestFor(eastl::string_view fen, int depth, int lines = 1) {
+            SearchRequest request = SearchRequest::FromPosition(PositionFromFen(fen), SearchLimits{0, depth});
+            request.lines = lines;
+            return request;
+        }
+
+        /// A request with a game behind it: the start position and the moves of kHistoryMoves
+        SearchRequest RequestWithHistory(int depth, int lines = 1) {
+            ChessGameModel model;
+            for (const char* uci : kHistoryMoves) {
+                const auto move = MoveGenerator::ParseUci(model.GetPosition(), uci);
+                EXPECT_TRUE(move.has_value() && model.TryMove(*move).has_value()) << uci;
+            }
+            SearchRequest request = SearchRequest::FromModel(model, SearchLimits{0, depth});
+            request.lines = lines;
+            return request;
+        }
+
+        /// Drives @p search to its end with slices of the policy; the call count is bounded, so a search that makes no progress ends the test
+        size_t DriveToTheEnd(OwnSearch& search, const SlicePolicy& slices) {
+            constexpr size_t kCallLimit = 5000000;
+            size_t calls = 0;
+            while (!search.IsDone() && calls < kCallLimit) {
+                (void)search.Advance(slices(calls));
+                ++calls;
+            }
+            return calls;
+        }
+
+        /// The kind of an error, or nothing for a value: a form that EXPECT_EQ can compare and print
+        std::optional<EngineErrorKind> KindOf(const std::expected<OwnSearch, EngineError>& begun) {
+            return begun ? std::nullopt : std::optional<EngineErrorKind>(begun.error().kind);
+        }
+
+        std::optional<EngineErrorKind> KindOf(const std::expected<Analysis, EngineError>& answer) {
+            return answer ? std::nullopt : std::optional<EngineErrorKind>(answer.error().kind);
+        }
+
+        std::string Describe(const AnalysisLine& line) {
+            return std::string(line.move.ToUci().c_str()) + " " + (line.score.kind == AnalysisScoreKind::Mate ? "mate " : "cp ") + std::to_string(line.score.value) + " depth " +
+                   std::to_string(line.depth);
+        }
+
+        /// Whether two analyses have the same lines: move, score (kind and value) and depth
+        bool SameLines(const Analysis& a, const Analysis& b) {
+            if (a.lines.size() != b.lines.size()) {
+                return false;
+            }
+            for (size_t i = 0; i < a.lines.size(); ++i) {
+                if (a.lines[i].move != b.lines[i].move || !(a.lines[i].score == b.lines[i].score) || a.lines[i].depth != b.lines[i].depth) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        std::string Describe(const Analysis& analysis) {
+            std::string text;
+            for (const AnalysisLine& line : analysis.lines) {
+                text += "[" + Describe(line) + "] ";
+            }
+            return text;
+        }
+
+        /// The slice 2 pattern: a coroutine on the pool that begins a search and drives it a slice at a time, giving the frame back first
+        struct CoroutineAnswer {
+            std::atomic<bool> done{false};
+            std::expected<Analysis, EngineError> answer = std::unexpected(EngineError{EngineErrorKind::Unsupported, "not answered"});
+            uint64_t slices = 0;
+        };
+
+        Task<void> DriveOnThePool(const OwnEngine& engine, SearchRequest request, CancellationToken token, eastl::shared_ptr<CoroutineAnswer> out) {
+            auto search = engine.BeginFindMove(request, token);
+            if (!search) {
+                out->answer = std::unexpected(std::move(search.error()));
+                out->done.store(true, std::memory_order_release);
+                co_return;
+            }
+            while (!search->IsDone()) {
+                co_await YieldIfNeeded();
+                (void)search->Advance();
+                ++out->slices;
+            }
+            out->answer = search->Result();
+            out->done.store(true, std::memory_order_release);
+            co_return;
+        }
+
+        bool WaitFor(const CoroutineAnswer& out) {
+            const Clock::time_point deadline = Clock::now() + kPoolWaitLimit;
+            while (!out.done.load(std::memory_order_acquire)) {
+                if (Clock::now() >= deadline) {
+                    return false;
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
+            return true;
+        }
+
+    }  // namespace
+
+    TEST(SearchSliceTest, FindMoveInSlicesGivesFindMovesAnswer) {
+        OwnEngine engine;
+        const NamedPolicy sizes[] = {{"1 node", Fixed(kSliceOfOneNode)}, {"7 nodes", Fixed(kSliceOfSevenNodes)}, {"256 nodes", Fixed(kSearchSliceNodes)}, {"varying", Varying}};
+
+        for (const int depth : kEngineDepths) {
+            std::vector<std::pair<std::string, SearchRequest>> requests;
+            for (const NamedFen& position : kPerftPositions) {
+                requests.emplace_back(position.name, RequestFor(position.fen, depth));
+            }
+            requests.emplace_back("history", RequestWithHistory(depth));
+
+            for (const auto& [name, request] : requests) {
+                const auto expected = engine.FindMove(request, CancellationToken::Create());
+                ASSERT_TRUE(expected.has_value()) << name << " d" << depth;
+
+                // The same search driven to its end in one call is the reference for the node count
+                auto whole = engine.BeginFindMove(request, CancellationToken::Create());
+                ASSERT_TRUE(whole.has_value());
+                EXPECT_EQ(whole->Advance(UINT64_MAX), SearchProgress::Done);
+                ASSERT_TRUE(whole->Result().has_value());
+                EXPECT_EQ(whole->Result()->Best().move, *expected) << name << " d" << depth;
+
+                for (size_t sizeIndex = 0; sizeIndex < std::size(sizes); ++sizeIndex) {
+                    const NamedPolicy& slices = sizes[sizeIndex];
+                    // The 1-node slice (the first size) of a depth-4 search is hundreds of thousands of calls: only the shallow depth gets it
+                    if (depth > kEngineShallowDepth && sizeIndex == 0) {
+                        continue;
+                    }
+                    auto search = engine.BeginFindMove(request, CancellationToken::Create());
+                    ASSERT_TRUE(search.has_value());
+                    (void)DriveToTheEnd(*search, slices.policy);
+
+                    ASSERT_TRUE(search->IsDone()) << name << " d" << depth << " in slices of " << slices.name;
+                    const auto answer = search->Result();
+                    ASSERT_TRUE(answer.has_value()) << name << " d" << depth << " in slices of " << slices.name;
+                    EXPECT_EQ(answer->LineCount(), 1u);
+                    EXPECT_EQ(answer->Best().move, *expected) << name << " d" << depth << " in slices of " << slices.name;
+                    EXPECT_TRUE(SameLines(*answer, *whole->Result()))
+                        << name << " d" << depth << " in slices of " << slices.name << ": " << Describe(*answer) << " against " << Describe(*whole->Result());
+                    EXPECT_EQ(search->GetNodes(), whole->GetNodes()) << name << " d" << depth << " in slices of " << slices.name;
+                }
+            }
+        }
+    }
+
+    TEST(SearchSliceTest, AnalyseInSlicesGivesAnalyses) {
+        OwnEngine engine;
+        const NamedPolicy sizes[] = {{"100 nodes", Fixed(kSliceOfAHundredNodes)}, {"256 nodes", Fixed(kSearchSliceNodes)}, {"varying", Varying}};
+
+        for (const NamedFen& position : {kPerftPositions[0], kPerftPositions[1], kPerftPositions[3]}) {
+            for (const int lines : kAnalysisLineCounts) {
+                const SearchRequest request = RequestFor(position.fen, kEngineShallowDepth, lines);
+                const auto expected = engine.Analyse(request, CancellationToken::Create());
+                ASSERT_TRUE(expected.has_value()) << position.name << " lines " << lines;
+                EXPECT_EQ(expected->LineCount(), eastl::min(static_cast<size_t>(lines), MoveGenerator::GenerateLegal(PositionFromFen(position.fen)).size()));
+
+                for (const NamedPolicy& slices : sizes) {
+                    auto search = engine.BeginAnalyse(request, CancellationToken::Create());
+                    ASSERT_TRUE(search.has_value());
+                    (void)DriveToTheEnd(*search, slices.policy);
+
+                    ASSERT_TRUE(search->IsDone());
+                    const auto answer = search->Result();
+                    ASSERT_TRUE(answer.has_value()) << position.name << " lines " << lines << " in slices of " << slices.name;
+                    EXPECT_TRUE(SameLines(*answer, *expected)) << position.name << " lines " << lines << " in slices of " << slices.name << ": " << Describe(*answer) << " against "
+                                                               << Describe(*expected);
+                }
+                // Asked again: the same lines
+                const auto again = engine.Analyse(request, CancellationToken::Create());
+                ASSERT_TRUE(again.has_value());
+                EXPECT_TRUE(SameLines(*again, *expected));
+            }
+        }
+    }
+
+    TEST(SearchSliceTest, AnalyseInSlicesWithAHistoryGivesAnalyses) {
+        OwnEngine engine;
+        const SearchRequest request = RequestWithHistory(kEngineShallowDepth, 3);
+        const auto expected = engine.Analyse(request, CancellationToken::Create());
+        ASSERT_TRUE(expected.has_value());
+
+        auto search = engine.BeginAnalyse(request, CancellationToken::Create());
+        ASSERT_TRUE(search.has_value());
+        (void)DriveToTheEnd(*search, Fixed(kSliceOfSevenNodes));
+
+        ASSERT_TRUE(search->Result().has_value());
+        EXPECT_TRUE(SameLines(*search->Result(), *expected));
+    }
+
+    TEST(SearchSliceTest, APositionWithOneLegalMoveGivesOneLineInSlices) {
+        OwnEngine engine;
+        ASSERT_EQ(MoveGenerator::GenerateLegal(PositionFromFen(kOneLegalMoveFen)).size(), 1u);
+
+        for (const int lines : kAnalysisLineCounts) {
+            auto search = engine.BeginAnalyse(RequestFor(kOneLegalMoveFen, kEngineShallowDepth, lines), CancellationToken::Create());
+            ASSERT_TRUE(search.has_value()) << lines;
+            (void)DriveToTheEnd(*search, Fixed(kSliceOfFiveNodes));
+
+            ASSERT_TRUE(search->Result().has_value()) << lines;
+            EXPECT_EQ(search->Result()->LineCount(), 1u) << lines;
+            EXPECT_EQ(search->Result()->Best().move.ToUci(), "a8a7") << lines;
+        }
+    }
+
+    TEST(SearchSliceTest, BeginReportsTheErrorsOfTheBlockingCalls) {
+        OwnEngine engine;
+        const CancellationToken token = CancellationToken::Create();
+
+        SearchRequest noLimits = RequestFor(Position::kStartFen, 1);
+        noLimits.limits = SearchLimits{0, 0};
+        SearchRequest brokenFen = RequestFor(Position::kStartFen, 1);
+        brokenFen.startFen = "this is not a fen";
+        SearchRequest illegalMove = RequestFor(Position::kStartFen, 1);
+        illegalMove.moves.push_back(Mv("e2e5"));
+        SearchRequest noLines = RequestFor(Position::kStartFen, 1, 0);
+        SearchRequest tooManyLines = RequestFor(Position::kStartFen, 1, kMaxAnalysisLines + 1);
+
+        for (const SearchRequest* request : {&noLimits, &brokenFen, &illegalMove, &noLines, &tooManyLines}) {
+            const auto find = engine.BeginFindMove(*request, token);
+            const auto analyse = engine.BeginAnalyse(*request, token);
+
+            EXPECT_EQ(KindOf(find), EngineErrorKind::BadRequest);
+            EXPECT_EQ(KindOf(analyse), EngineErrorKind::BadRequest);
+            // The same kind as the blocking calls
+            EXPECT_EQ(find.error().kind, engine.FindMove(*request, token).error().kind);
+            EXPECT_EQ(KindOf(analyse), KindOf(engine.Analyse(*request, token)));
+        }
+        for (const eastl::string_view fen : {kMatedFen, kStalematedFen}) {
+            EXPECT_EQ(KindOf(engine.BeginFindMove(RequestFor(fen, 1), token)), EngineErrorKind::NoMove) << fen.data();
+            EXPECT_EQ(KindOf(engine.BeginAnalyse(RequestFor(fen, 1), token)), EngineErrorKind::NoMove) << fen.data();
+        }
+        CancellationToken cancelled = CancellationToken::Create();
+        cancelled.Cancel();
+        EXPECT_EQ(KindOf(engine.BeginFindMove(RequestFor(Position::kStartFen, 1), cancelled)), EngineErrorKind::Cancelled);
+        EXPECT_EQ(KindOf(engine.BeginAnalyse(RequestFor(Position::kStartFen, 1), cancelled)), EngineErrorKind::Cancelled);
+        // The lines of a request for FindMove are only validated
+        EXPECT_TRUE(engine.BeginFindMove(RequestFor(Position::kStartFen, 1, kMaxAnalysisLines), token).has_value());
+    }
+
+    TEST(SearchSliceTest, ACancelBetweenSlicesIsCancelled) {
+        OwnEngine engine;
+
+        for (const int lines : {1, 3}) {
+            CancellationToken token = CancellationToken::Create();
+            const SearchRequest request = RequestFor(kKiwipeteFen, kGoldenForeverDepth, lines);
+            auto search = lines == 1 ? engine.BeginFindMove(request, token) : engine.BeginAnalyse(request, token);
+            ASSERT_TRUE(search.has_value()) << lines;
+
+            for (int slice = 0; slice < kSlicesBeforeCancel; ++slice) {
+                ASSERT_EQ(search->Advance(), SearchProgress::Paused) << lines;
+            }
+            const uint64_t nodes = search->GetNodes();
+            EXPECT_GT(nodes, 0u);
+            token.Cancel();
+
+            EXPECT_EQ(search->Advance(), SearchProgress::Done) << lines;
+
+            EXPECT_TRUE(search->IsDone());
+            ASSERT_FALSE(search->Result().has_value());
+            EXPECT_EQ(search->Result().error().kind, EngineErrorKind::Cancelled);
+            EXPECT_EQ(search->GetNodes(), nodes) << "the nodes do not grow after the cancel";
+            EXPECT_EQ(search->Advance(), SearchProgress::Done) << "a search that is over stays over";
+            EXPECT_EQ(search->GetNodes(), nodes);
+        }
+    }
+
+    TEST(SearchSliceTest, ADeadlineThatRanOutGivesTheFirstIteration) {
+        OwnEngine engine;
+        SearchRequest request = SearchRequest::FromPosition(PositionFromFen(kKiwipeteFen), SearchLimits{kTinyMoveTimeMs, 0});
+        auto search = engine.BeginFindMove(request, CancellationToken::Create());
+        ASSERT_TRUE(search.has_value());
+        std::this_thread::sleep_for(kPastTinyMoveTime);
+
+        // The deadline has passed before the first node: the retry at depth 1 answers, as the blocking call does
+        (void)DriveToTheEnd(*search, Fixed(kSearchSliceNodes));
+
+        ASSERT_TRUE(search->IsDone());
+        ASSERT_TRUE(search->Result().has_value());
+        EXPECT_EQ(search->Result()->LineCount(), 1u);
+        EXPECT_EQ(search->Result()->Best().depth, kGoldenEasyDepth);
+        Position position = PositionFromFen(kKiwipeteFen);
+        EXPECT_TRUE(IsLegalIn(position, search->Result()->Best().move));
+
+        // The same with a few lines: each line ran out of time and has its first iteration
+        request.lines = 3;
+        auto lines = engine.BeginAnalyse(request, CancellationToken::Create());
+        ASSERT_TRUE(lines.has_value());
+        std::this_thread::sleep_for(kPastTinyMoveTime);
+        (void)DriveToTheEnd(*lines, Fixed(kSearchSliceNodes));
+
+        ASSERT_TRUE(lines->Result().has_value());
+        ASSERT_EQ(lines->Result()->LineCount(), 3u);
+        for (const AnalysisLine& line : lines->Result()->lines) {
+            EXPECT_EQ(line.depth, kGoldenEasyDepth);
+            EXPECT_TRUE(IsLegalIn(position, line.move));
+        }
+    }
+
+    TEST(SearchSliceTest, ASearchOutlivesItsRequest) {
+        OwnEngine expectedEngine;
+        const auto expected = expectedEngine.Analyse(RequestFor(kKiwipeteFen, kEngineShallowDepth, 2), CancellationToken::Create());
+        ASSERT_TRUE(expected.has_value());
+
+        std::optional<OwnSearch> search;
+        {
+            // The engine, the request and the token are gone at the end of the block
+            OwnEngine engine;
+            const SearchRequest request = RequestFor(kKiwipeteFen, kEngineShallowDepth, 2);
+            auto begun = engine.BeginAnalyse(request, CancellationToken::Create());
+            ASSERT_TRUE(begun.has_value());
+            search.emplace(std::move(*begun));
+            (void)search->Advance(kSearchSliceNodes);
+        }
+        OwnSearch moved = std::move(*search);
+        search.reset();
+        (void)DriveToTheEnd(moved, Fixed(kSearchSliceNodes));
+
+        ASSERT_TRUE(moved.Result().has_value());
+        EXPECT_TRUE(SameLines(*moved.Result(), *expected));
+    }
+
+    TEST(SearchSliceTest, TwoSearchesOfOneEngineInterleave) {
+        OwnEngine engine;
+        const SearchRequest first = RequestFor(kKiwipeteFen, kGoldenDepth, 2);
+        const SearchRequest second = RequestFor(Position::kStartFen, kGoldenDeepDepth);
+        const auto expectedFirst = engine.Analyse(first, CancellationToken::Create());
+        const auto expectedSecond = engine.Analyse(second, CancellationToken::Create());
+        ASSERT_TRUE(expectedFirst.has_value());
+        ASSERT_TRUE(expectedSecond.has_value());
+
+        auto a = engine.BeginAnalyse(first, CancellationToken::Create());
+        auto b = engine.BeginAnalyse(second, CancellationToken::Create());
+        ASSERT_TRUE(a.has_value());
+        ASSERT_TRUE(b.has_value());
+        size_t rounds = 0;
+        while ((!a->IsDone() || !b->IsDone()) && ++rounds < 100000) {
+            (void)a->Advance(kSliceOfAHundredNodes);
+            (void)b->Advance(kSliceOfSevenNodes);
+        }
+
+        ASSERT_TRUE(a->Result().has_value());
+        ASSERT_TRUE(b->Result().has_value());
+        EXPECT_TRUE(SameLines(*a->Result(), *expectedFirst)) << Describe(*a->Result()) << " against " << Describe(*expectedFirst);
+        EXPECT_TRUE(SameLines(*b->Result(), *expectedSecond)) << Describe(*b->Result()) << " against " << Describe(*expectedSecond);
+    }
+
+    /// Slice 2's pattern in a test: a coroutine on the pool begins the search and drives it with the frame budget in mind. On a threaded build `YieldIfNeeded()` never suspends
+    class OwnSearchOnThePoolTest : public ::testing::Test {
+    protected:
+        static void SetUpTestSuite() {
+            ::BECore::Tests::EngineEnvironment::EnsureCoreServices();  // TaskManager
+        }
+    };
+
+    TEST_F(OwnSearchOnThePoolTest, ACoroutineCanDriveTheSearchOnThePool) {
+#if BE_SINGLE_THREAD
+        // A single-thread build runs the slices in TaskManager::Update, which only CoreManager may call, and a Wait() on a task that yielded would block for ever
+        GTEST_SKIP() << "needs worker threads (BE_SINGLE_THREAD)";
+#else
+        OwnEngine engine;
+        const SearchRequest request = RequestFor(kKiwipeteFen, kGoldenDepth);
+        const auto expected = engine.FindMove(request, CancellationToken::Create());
+        ASSERT_TRUE(expected.has_value());
+
+        auto out = eastl::make_shared<CoroutineAnswer>();
+        auto handle = TaskManager::GetInstance().Run(DriveOnThePool(engine, request, CancellationToken::Create(), out));
+
+        ASSERT_TRUE(WaitFor(*out)) << "the coroutine did not finish";
+        ASSERT_TRUE(out->answer.has_value());
+        EXPECT_EQ(out->answer->Best().move, *expected);
+        EXPECT_GT(out->slices, 1u) << "the search ran in more than one slice";
+#endif
+    }
+
+    TEST_F(OwnSearchOnThePoolTest, ACoroutineThatIsCancelledEndsWithCancelled) {
+#if BE_SINGLE_THREAD
+        GTEST_SKIP() << "needs worker threads (BE_SINGLE_THREAD)";
+#else
+        OwnEngine engine;
+        CancellationToken token = CancellationToken::Create();
+        auto out = eastl::make_shared<CoroutineAnswer>();
+        auto handle = TaskManager::GetInstance().Run(DriveOnThePool(engine, RequestFor(kKiwipeteFen, kGoldenForeverDepth), token, out));
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        token.Cancel();
+
+        ASSERT_TRUE(WaitFor(*out)) << "the coroutine did not finish";
+        ASSERT_FALSE(out->answer.has_value());
+        EXPECT_EQ(out->answer.error().kind, EngineErrorKind::Cancelled);
+#endif
+    }
+
     // -- the benchmark -------------------------------------------------------------------------------------------------------
 
     namespace {
@@ -824,12 +1242,33 @@ namespace BECore::Chess::Tests {
             return job.GetResult().nodes + polls;
         }
 
+        /// What OwnEngine::FindMove() does: begin the search of a request for the depth and run it to the end in one call (the nodes are read from the OwnSearch)
+        uint64_t OwnSearchToTheEnd(eastl::string_view fen, int depth) {
+            OwnEngine engine;
+            auto search = engine.BeginFindMove(RequestFor(fen, depth), CancellationToken::Create());
+            (void)search->Advance(UINT64_MAX);
+            return search->GetNodes();
+        }
+
+        /// The same driven in slices of kSearchSliceNodes, as a coroutine caller does it
+        uint64_t OwnSearchInSlices(eastl::string_view fen, int depth) {
+            OwnEngine engine;
+            auto search = engine.BeginFindMove(RequestFor(fen, depth), CancellationToken::Create());
+            while (search->Advance(kSearchSliceNodes) == SearchProgress::Paused) {
+            }
+            return search->GetNodes();
+        }
+
     }  // namespace
 
     // Run by hand, in a Release build, on a quiet machine: ChessTests --gtest_also_run_disabled_tests --gtest_filter='SearchSliceBenchmark.*'
     // ctest does not run it. The first column uses the public Search() only, so the same file measures the code before and after a change
     TEST(SearchSliceBenchmark, DISABLED_NodesPerSecond) {
-        RunBenchmark({{"Search() one call", SearchToTheEnd}, {"SearchJob in slices of kSearchSliceNodes", JobInSlices}, {"SearchJob in slices with a ShouldYield() poll", JobInSlicesWithAPoll}});
+        RunBenchmark({{"Search() one call", SearchToTheEnd},
+                      {"SearchJob in slices of kSearchSliceNodes", JobInSlices},
+                      {"SearchJob in slices with a ShouldYield() poll", JobInSlicesWithAPoll},
+                      {"OwnEngine search in one call (what FindMove() does)", OwnSearchToTheEnd},
+                      {"OwnEngine search in slices of kSearchSliceNodes", OwnSearchInSlices}});
     }
 
 }  // namespace BECore::Chess::Tests

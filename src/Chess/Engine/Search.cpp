@@ -180,7 +180,7 @@ namespace BECore::Chess {
         /// push a frame, and a finished frame hands its value to the frame below it (_returning). The order of every check, count and update is
         /// that of a plain recursive negamax, which the pinned node counts of the tests hold.
         /// Loop() keeps the window and the best of the frame it is in in locals and writes them to the frame only when it leaves it (to descend,
-        /// to pause or to finish): the registers do the work that the stack did in the recursive form, and the frame in memory is not read per move
+        /// to pause or to finish): the window and the best are not read from the frame per move
         class Searcher {
         public:
             Searcher(Position& position, const SearchSettings& settings, const SearchControl& control) : _position(position), _settings(settings), _control(control) {}
@@ -541,7 +541,7 @@ namespace BECore::Chess {
                     StartIteration();
                 }
                 Frame& frame = *_frames[static_cast<size_t>(_top)];
-                // The state of the frame lives in locals while its moves are tried (registers, as in the recursive form) and goes back to the
+                // The state of the frame lives in locals while its moves are tried (registers) and goes back to the
                 // frame when the loop leaves it: to descend into a child that has moves of its own, to pause, or to finish
                 const int ply = _top;
                 const FrameKind kind = frame.kind;
@@ -592,7 +592,7 @@ namespace BECore::Chess {
                     _returning = false;
                     over = absorb(-_value);
                 }
-                // The moves of the frame, as the loop of the recursive form had them; a child that is a leaf is taken back and scored right here
+                // The moves of the frame; a child that is a leaf is taken back and scored right here
                 bool descended = false;
                 while (!over && next < count) {
                     // The only place a slice ends: before a child is entered (and counted), so a pause changes no count

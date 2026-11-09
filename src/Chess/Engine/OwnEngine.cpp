@@ -16,110 +16,203 @@ namespace BECore::Chess {
             return limits.depth > 0 ? eastl::min(limits.depth, kMaxSearchDepth) : kMaxSearchDepth;
         }
 
-        /// What the request leads to, ready to be searched: the position, its legal moves and when the call began (the deadlines are counted from it)
-        struct Prepared {
-            Position position;
-            MoveList legal;
-            std::chrono::steady_clock::time_point start;
-        };
-
-        /// The part of FindMove() and Analyse() that they share, so the two cannot drift: validate, the final position, NoMove and an early Cancelled
-        std::expected<Prepared, EngineError> Prepare(const SearchRequest& request, const CancellationToken& token) {
-            const std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
-
-            if (auto valid = request.Validate(); !valid) {
-                return std::unexpected(std::move(valid.error()));
-            }
-            auto found = request.FinalPosition();
-            if (!found) {
-                return std::unexpected(std::move(found.error()));
-            }
-            Prepared prepared{std::move(*found), {}, start};
-            prepared.legal = MoveGenerator::GenerateLegal(prepared.position);
-            if (prepared.legal.empty()) {
-                return Fail(EngineErrorKind::NoMove, "the side to move has no legal move: the engine was not asked");
-            }
-            if (token.IsCancelled()) {
-                return Fail(EngineErrorKind::Cancelled, "cancelled before the search started");
-            }
-            return prepared;
-        }
-
-        /// One search of FindMove() and Analyse(), the same for every line: the settings, the search with @p deadline (nothing: no time limit) and without the root
-        /// moves @p excluded, Cancelled after it, the retry when no iteration finished, and the check of the move against the generator.
-        /// The result has a best move that is legal in the position
-        std::expected<SearchResult, EngineError> SearchOnce(Prepared& prepared, const SearchRequest& request, const CancellationToken& token,
-                                                            std::optional<std::chrono::steady_clock::time_point> deadline, const eastl::vector<Move>& excluded) {
-            SearchSettings settings;
-            settings.maxDepth = MaxDepthOf(request.limits);
-            settings.excludedRootMoves = excluded;
-            SearchControl control;
-            control.token = token;
-            control.deadline = deadline;
-
-            SearchResult result = Search(prepared.position, settings, control);
-            if (token.IsCancelled()) {
-                return Fail(EngineErrorKind::Cancelled, "the search was cancelled and its answer was dropped");
-            }
-            if (!result.complete) {
-                // The deadline had run out before the first node (a tiny move time on a busy machine): the answer is the first iteration, which has no limit
-                settings.maxDepth = 1;
-                result = Search(prepared.position, settings, SearchControl{});
-            }
-
-            if (result.best.IsNull() || eastl::find(prepared.legal.begin(), prepared.legal.end(), result.best) == prepared.legal.end()) {
-                return Fail(EngineErrorKind::IllegalMove, Format("the search answered '{}', which is not legal in {}", result.best.ToUci(), prepared.position.ToFen()));
-            }
-            return result;
-        }
-
         /// The time after which line @p line of @p lineCount (counted from 1) must be done: the move time is shared out, line k ends at k / lineCount of it. No move time: no deadline
-        std::optional<std::chrono::steady_clock::time_point> DeadlineOfLine(const Prepared& prepared, const SearchLimits& limits, size_t line, size_t lineCount) {
+        std::optional<std::chrono::steady_clock::time_point> DeadlineOfLine(std::chrono::steady_clock::time_point start, const SearchLimits& limits, size_t line, size_t lineCount) {
             if (limits.moveTimeMs <= 0) {
                 return std::nullopt;
             }
             const int64_t shareMs = static_cast<int64_t>(limits.moveTimeMs) * static_cast<int64_t>(line) / static_cast<int64_t>(lineCount);
-            return prepared.start + std::chrono::milliseconds(shareMs);
-        }
-
-        /// The search of FindMove(): the whole move time, no root move excluded (Analyse() prepares and searches by itself, line by line)
-        std::expected<SearchResult, EngineError> RunSearch(const SearchRequest& request, const CancellationToken& token) {
-            auto prepared = Prepare(request, token);
-            if (!prepared) {
-                return std::unexpected(std::move(prepared.error()));
-            }
-            return SearchOnce(*prepared, request, token, DeadlineOfLine(*prepared, request.limits, 1, 1), {});
+            return start + std::chrono::milliseconds(shareMs);
         }
 
     }  // namespace
 
-    std::expected<Move, EngineError> OwnEngine::FindMove(const SearchRequest& request, const CancellationToken& token) {
-        auto searched = RunSearch(request, token);
-        if (!searched) {
-            return std::unexpected(std::move(searched.error()));
+    /// The state of one FindMove() / Analyse(): the request's position and limits, the line being searched (a job) and the lines found. The one place for the
+    /// line loop, the deadlines, the retry and the checks of the answer: the one-call path is this object run to the end
+    struct OwnSearch::Impl {
+        /// The position the request leads to, with the history of the game; every line's job searches a copy of it
+        Position position;
+        MoveList legal;
+        SearchLimits limits;
+        /// When the call began: the deadlines are counted from it
+        std::chrono::steady_clock::time_point start;
+        CancellationToken token;
+        size_t lineCount;
+        /// The best moves of the lines found, which the next line leaves out at the root
+        eastl::vector<Move> excluded;
+        Analysis analysis;
+        /// The search of the line being worked on; none once the answer or the error is ready
+        std::optional<SearchJob> job;
+        /// Whether the job is the retry at depth 1 of a line whose first search was stopped before its first node
+        bool retrying = false;
+        /// The nodes of the jobs that are over
+        uint64_t finishedNodes = 0;
+        std::optional<std::expected<Analysis, EngineError>> result;
+
+        Impl(Position startPosition, MoveList legalMoves, const SearchLimits& searchLimits, std::chrono::steady_clock::time_point begun, const CancellationToken& cancelToken, size_t lines)
+            : position(std::move(startPosition)), legal(std::move(legalMoves)), limits(searchLimits), start(begun), token(cancelToken), lineCount(lines) {}
+
+        /// Starts the search of line `excluded.size() + 1`: with the limits and the deadline of the line, or (@p retry) the first iteration alone, which no limit can stop
+        void StartJob(bool retry) {
+            SearchSettings settings;
+            settings.maxDepth = retry ? 1 : MaxDepthOf(limits);
+            settings.excludedRootMoves = excluded;
+            SearchControl control;
+            if (!retry) {
+                control.token = token;
+                control.deadline = DeadlineOfLine(start, limits, excluded.size() + 1, lineCount);
+            }
+            job.reset();
+            job.emplace(position, eastl::move(settings), eastl::move(control));
         }
-        return searched->best;
+
+        void Finish(EngineErrorKind kind, eastl::string detail) {
+            if (job) {
+                finishedNodes += job->GetResult().nodes;
+                job.reset();
+            }
+            result = std::unexpected(EngineError{kind, std::move(detail)});
+        }
+
+        /// What the end of the job of a line does, the same for every line: Cancelled when the token is cancelled, the retry when no iteration finished, the check of the
+        /// move against the generator, then the line is kept and the next line's job starts, or the analysis is the answer
+        void OnJobDone() {
+            const SearchResult found = job->GetResult();
+            finishedNodes += found.nodes;
+            job.reset();
+
+            if (!retrying) {
+                if (token.IsCancelled()) {
+                    Finish(EngineErrorKind::Cancelled, "the search was cancelled and its answer was dropped");
+                    return;
+                }
+                if (!found.complete) {
+                    // The deadline had run out before the first node (a tiny move time on a busy machine): the answer is the first iteration, which has no limit
+                    retrying = true;
+                    StartJob(true);
+                    return;
+                }
+            }
+            retrying = false;
+
+            if (found.best.IsNull() || eastl::find(legal.begin(), legal.end(), found.best) == legal.end()) {
+                Finish(EngineErrorKind::IllegalMove, Format("the search answered '{}', which is not legal in {}", found.best.ToUci(), position.ToFen()));
+                return;
+            }
+            analysis.lines.push_back(AnalysisLine{found.best, ScoreFromSearch(found.score), found.depth});
+            excluded.push_back(found.best);
+            if (excluded.size() >= lineCount) {
+                result = eastl::move(analysis);
+                return;
+            }
+            StartJob(false);
+        }
+    };
+
+    OwnSearch::OwnSearch(eastl::unique_ptr<Impl> impl) noexcept : _impl(eastl::move(impl)) {}
+    OwnSearch::~OwnSearch() = default;
+    OwnSearch::OwnSearch(OwnSearch&&) noexcept = default;
+    OwnSearch& OwnSearch::operator=(OwnSearch&&) noexcept = default;
+
+    std::expected<OwnSearch, EngineError> OwnSearch::Begin(const SearchRequest& request, const CancellationToken& token, int lines) {
+        const std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+
+        if (auto valid = request.Validate(); !valid) {
+            return std::unexpected(std::move(valid.error()));
+        }
+        auto found = request.FinalPosition();
+        if (!found) {
+            return std::unexpected(std::move(found.error()));
+        }
+        MoveList legal = MoveGenerator::GenerateLegal(*found);
+        if (legal.empty()) {
+            return Fail(EngineErrorKind::NoMove, "the side to move has no legal move: the engine was not asked");
+        }
+        if (token.IsCancelled()) {
+            return Fail(EngineErrorKind::Cancelled, "cancelled before the search started");
+        }
+        // A position with fewer legal moves than lines asked for gives as many lines as it has moves
+        const size_t lineCount = eastl::min(static_cast<size_t>(lines), static_cast<size_t>(legal.size()));
+        auto impl = eastl::make_unique<Impl>(std::move(*found), std::move(legal), request.limits, start, token, lineCount);
+        impl->StartJob(false);
+        return OwnSearch(eastl::move(impl));
+    }
+
+    SearchProgress OwnSearch::Advance(uint64_t maxNodes) {
+        Impl& search = *_impl;
+        if (search.result) {
+            return SearchProgress::Done;
+        }
+        if (search.token.IsCancelled()) {
+            search.Finish(EngineErrorKind::Cancelled, "the search was cancelled and its answer was dropped");
+            return SearchProgress::Done;
+        }
+        // The nodes left of this call: a line that ends inside the slice hands the rest to the next line's job
+        uint64_t remaining = maxNodes;
+        for (;;) {
+            const uint64_t before = search.job->GetResult().nodes;
+            if (search.job->Advance(remaining) == SearchProgress::Paused) {
+                return SearchProgress::Paused;
+            }
+            const uint64_t ran = search.job->GetResult().nodes - before;
+            search.OnJobDone();
+            if (search.result) {
+                return SearchProgress::Done;
+            }
+            if (ran >= remaining) {
+                return SearchProgress::Paused;
+            }
+            if (remaining != UINT64_MAX) {
+                remaining -= ran;
+            }
+        }
+    }
+
+    bool OwnSearch::IsDone() const noexcept {
+        return _impl->result.has_value();
+    }
+
+    std::expected<Analysis, EngineError> OwnSearch::Result() const {
+        ASSERT(_impl->result.has_value(), "OwnSearch::Result: the search is not over");
+        if (!_impl->result) {
+            return Fail(EngineErrorKind::Cancelled, "the search is not over");
+        }
+        return *_impl->result;
+    }
+
+    uint64_t OwnSearch::GetNodes() const noexcept {
+        return _impl->finishedNodes + (_impl->job ? _impl->job->GetResult().nodes : 0);
+    }
+
+    std::expected<OwnSearch, EngineError> OwnEngine::BeginFindMove(const SearchRequest& request, const CancellationToken& token) const {
+        // FindMove() gives one move whatever request.lines says (the request is validated with it all the same)
+        return OwnSearch::Begin(request, token, 1);
+    }
+
+    std::expected<OwnSearch, EngineError> OwnEngine::BeginAnalyse(const SearchRequest& request, const CancellationToken& token) const {
+        return OwnSearch::Begin(request, token, request.lines);
+    }
+
+    std::expected<Move, EngineError> OwnEngine::FindMove(const SearchRequest& request, const CancellationToken& token) {
+        auto search = BeginFindMove(request, token);
+        if (!search) {
+            return std::unexpected(std::move(search.error()));
+        }
+        (void)search->Advance(UINT64_MAX);
+        auto answer = search->Result();
+        if (!answer) {
+            return std::unexpected(std::move(answer.error()));
+        }
+        return answer->Best().move;
     }
 
     std::expected<Analysis, EngineError> OwnEngine::Analyse(const SearchRequest& request, const CancellationToken& token) {
-        auto prepared = Prepare(request, token);
-        if (!prepared) {
-            return std::unexpected(std::move(prepared.error()));
+        auto search = BeginAnalyse(request, token);
+        if (!search) {
+            return std::unexpected(std::move(search.error()));
         }
-        // Line 1 is the search of a request for one line (for one line it is all there is, the call FindMove() makes); line k is a search of its own
-        // with the moves of the lines before it left out at the root. A position with fewer legal moves than lines asked for gives as many lines as it has moves
-        const size_t lineCount = eastl::min(static_cast<size_t>(request.lines), static_cast<size_t>(prepared->legal.size()));
-        Analysis analysis;
-        eastl::vector<Move> excluded;
-        for (size_t line = 1; line <= lineCount; ++line) {
-            auto searched = SearchOnce(*prepared, request, token, DeadlineOfLine(*prepared, request.limits, line, lineCount), excluded);
-            if (!searched) {
-                return std::unexpected(std::move(searched.error()));
-            }
-            analysis.lines.push_back(AnalysisLine{searched->best, ScoreFromSearch(searched->score), searched->depth});
-            excluded.push_back(searched->best);
-        }
-        return analysis;
+        (void)search->Advance(UINT64_MAX);
+        return search->Result();
     }
 
 }  // namespace BECore::Chess
