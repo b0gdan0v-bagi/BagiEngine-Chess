@@ -181,7 +181,7 @@ namespace BECore::Chess {
 
     namespace {
 
-        /// Why there is no process here, one sentence per case (the Windows one is the oldest)
+        /// Why there is no process here, one sentence per case
         constexpr const char* kNoProcessDetail =
 #if defined(_WIN32)
             "a UCI engine process is not implemented on Windows yet";

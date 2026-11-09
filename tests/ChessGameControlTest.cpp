@@ -2513,9 +2513,13 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(ErrorCodeOf(result.error()), "engine_unavailable");
         EXPECT_FALSE(std::string(result.error().message.c_str()).empty()) << "the sentence of the refusal";
         const Json computer = game.OpponentState();
-        EXPECT_TRUE(FindJsonMember(computer, "plays")->is_null());
+        const Json* plays = FindJsonMember(computer, "plays");
+        const Json* error = FindJsonMember(computer, "error");
+        ASSERT_NE(plays, nullptr);
+        ASSERT_NE(error, nullptr);
+        EXPECT_TRUE(plays->is_null());
         EXPECT_EQ(StringMember(computer, "engine"), "own") << "nothing is changed";
-        EXPECT_EQ(StringMember(*FindJsonMember(computer, "error"), "kind"), "unsupported");
+        EXPECT_EQ(StringMember(*error, "kind"), "unsupported");
         EXPECT_GT(game.control.GetStateVersion(), version) << "the error that appeared is a change a client can see";
     }
 
@@ -2532,7 +2536,9 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(state.has_value());
         EXPECT_EQ(StringMember(*state, "fen"), std::string(Position::kStartFen.data(), Position::kStartFen.size())) << "the position is not replaced";
         const Json computer = game.OpponentState();
-        EXPECT_TRUE(FindJsonMember(computer, "plays")->is_null());
+        const Json* plays = FindJsonMember(computer, "plays");
+        ASSERT_NE(plays, nullptr);
+        EXPECT_TRUE(plays->is_null());
         EXPECT_EQ(StringMember(computer, "engine"), "own");
 
         // The seat objects are asked in the same way, also the one nobody plays
@@ -2543,7 +2549,11 @@ namespace BECore::Chess::Tests {
         ASSERT_FALSE(seatResult.has_value());
         EXPECT_EQ(ErrorCodeOf(seatResult.error()), "engine_unavailable");
         const Json afterSeats = game.OpponentState();
-        EXPECT_EQ(StringMember(*FindJsonMember(*FindJsonMember(afterSeats, "seats"), "black"), "engine"), "own");
+        const Json* seatsState = FindJsonMember(afterSeats, "seats");
+        ASSERT_NE(seatsState, nullptr);
+        const Json* blackSeat = FindJsonMember(*seatsState, "black");
+        ASSERT_NE(blackSeat, nullptr);
+        EXPECT_EQ(StringMember(*blackSeat, "engine"), "own");
     }
 
     TEST_F(ChessGameControlTest, WithoutStockfishASideAloneWorksAndTheOwnEnginePlaysIt) {
@@ -2555,7 +2565,9 @@ namespace BECore::Chess::Tests {
         const Json computer = game.OpponentState();
         EXPECT_EQ(StringMember(computer, "plays"), "black");
         EXPECT_EQ(StringMember(computer, "engine"), "own");
-        EXPECT_TRUE(FindJsonMember(computer, "error")->is_null());
+        const Json* error = FindJsonMember(computer, "error");
+        ASSERT_NE(error, nullptr);
+        EXPECT_TRUE(error->is_null());
     }
 
 #endif  // CHESS_NO_STOCKFISH

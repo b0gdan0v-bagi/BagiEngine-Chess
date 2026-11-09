@@ -242,7 +242,7 @@ namespace BECore::Chess {
     }
 
     void OpponentController::FailPick(EngineError error, PieceColor computer, OpponentEngine engine, const OpponentLevel& level) {
-        LOG_WARNING("Opponent: no {} engine to play {} at level {}, the pick is refused and the opponent stays as it was, {}: {}"_format(
+        LOG_WARNING("Opponent: no {} engine for the {} seat at level {}, the pick is refused and the opponent stays as it was, {}: {}"_format(
             OpponentEngineId(engine), EnumUtils<PieceColor>::ToString(computer), level.id, EnumUtils<EngineErrorKind>::ToString(error.kind), error.detail));
         _pickError = std::move(error);
         _errorVersion = _model.GetVersion();

@@ -67,7 +67,8 @@ namespace BECore::Chess {
      *
      * The engine is part of the choice and nothing else picks it: there is no fallback from one engine to the other. A refused Stockfish pick keeps the old opponents and
      * puts the error in GetError(); the person picks the other engine (SetEngine()), which clears the error, and then a side. While nobody plays, SetEngine() only changes the
-     * choice: no factory call, nothing is looked up or started (so it cannot be refused).
+     * choice: no factory call, nothing is looked up or started (so it cannot be refused), except in a build with CHESS_NO_STOCKFISH and the default factory, where a pick of
+     * Stockfish is refused whoever plays (above).
      *
      * The error rule: an error belongs to the version of the game it came from (ChessGameModel::GetVersion()). When the version moves (a reset, a position set from
      * outside, a move of someone else) Update() clears the error, the opponents' too, and a new pick clears it as well: the person has acted, so they have seen it.
