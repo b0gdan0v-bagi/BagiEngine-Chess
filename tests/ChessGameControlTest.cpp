@@ -2,6 +2,7 @@
 #include "TestEngines.h"
 
 #include <Chess/ChessGameControl.h>
+#include <Chess/Engine/OwnEngine.h>
 #include <Chess/Game/MoveGenerator.h>
 #include <Common/EngineEnvironment.h>
 #include <EASTL/algorithm.h>
@@ -2228,6 +2229,27 @@ namespace BECore::Chess::Tests {
             return reasons;
         }
 
+        /// The real OwnEngine that counts its analyses (the default factory's engine, with a count), for a test that must know a search really ran
+        class CountingOwnEngine final : public IChessEngine {
+        public:
+            [[nodiscard]] std::expected<Move, EngineError> FindMove(const SearchRequest& request, const CancellationToken& token) override {
+                return _own.FindMove(request, token);
+            }
+
+            [[nodiscard]] std::expected<Analysis, EngineError> Analyse(const SearchRequest& request, const CancellationToken& token) override {
+                _analyses.fetch_add(1);
+                return _own.Analyse(request, token);
+            }
+
+            [[nodiscard]] int Analyses() const {
+                return _analyses.load();
+            }
+
+        private:
+            OwnEngine _own;
+            std::atomic<int> _analyses{0};
+        };
+
     }  // namespace
 
     TEST_F(ChessGameControlTest, TheRatingsAreOffAndNothingIsSearchedForThemUntilSwitchedOn) {
@@ -2321,8 +2343,33 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(ReasonsOfRatings(AnalysisMember("ratings")), (eastl::vector<std::string>{"brilliant"}));
     }
 
+    TEST_F(ChessGameControlTest, ARefusedHintDoesNotApplyTheRatingsSwitchOfTheSameCall) {
+        const auto engine = Analyser(kPawnUp, Mv("a1a8"));
+        CountingAnalysisFactory factory{engine};
+        analyst.SetEngineFactory(factory.AsFactory());
+        SetFen(kMateInOneFen);
+        Perform("a1a8");
+        ASSERT_EQ(StringMember(State(), "status"), "checkmate");
+        const std::string before = AnalysisSnapshot();
+
+        Json analysis = Json::object();
+        analysis["hint"] = true;
+        analysis["ratings"] = true;
+        Json request = Json::object();
+        request["analysis"] = analysis;
+        EXPECT_EQ(SetStateError(request), "game_over");
+
+        EXPECT_EQ(GetJsonBool(AnalysisOfState(), "ratingsOn"), false) << "the ratings switch of a refused call is not applied either";
+        EXPECT_EQ(AnalysisSnapshot(), before);
+        Frames();
+        EXPECT_EQ(factory.Calls(), 0);
+    }
+
     TEST_F(ChessGameControlTest, RatingsWithTheRealOwnEngineAreTheSameWhenTheGameIsPlayedTwice) {
-        // No factory: the default one, the OwnEngine at depth 5 (no process); pinned in MoveRaterTest: not_best, brilliant, not_best, brilliant
+        // The real OwnEngine at depth 5 (no process) behind a counting wrapper; pinned in MoveRaterTest: not_best, brilliant, not_best, brilliant
+        const auto engine = eastl::make_shared<CountingOwnEngine>();
+        CountingAnalysisFactory factory{engine};
+        analyst.SetEngineFactory(factory.AsFactory());
         ASSERT_TRUE(control.SetState(RatingsRequest(true)).has_value());
         const auto playTheGame = [&] {
             for (const char* uci : {"e2e4", "e7e5", "g1f3", "b8c6"}) {
@@ -2333,10 +2380,16 @@ namespace BECore::Chess::Tests {
         };
 
         const eastl::vector<std::string> first = playTheGame();
+        const int searchesOfTheFirstGame = engine->Analyses();
+        EXPECT_EQ(searchesOfTheFirstGame, 4) << "one search per move";
+
         ASSERT_TRUE(control.Reset(Json::object()).has_value());
+        Frames(1);  // the rater sees the empty game and lets go of the old ratings, so the second game is rated from nothing
+        ASSERT_TRUE(AnalysisMember("ratings").empty());
         const eastl::vector<std::string> second = playTheGame();
 
         EXPECT_EQ(first, (eastl::vector<std::string>{"not_best", "brilliant", "not_best", "brilliant"}));
+        EXPECT_EQ(engine->Analyses(), 2 * searchesOfTheFirstGame) << "the second game was really searched again, not read from the old ratings";
         EXPECT_EQ(second, first) << "a fixed depth: the same game, the same ratings";
         EXPECT_TRUE(AnalysisMember("error").is_null());
     }

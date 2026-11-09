@@ -65,7 +65,8 @@ namespace BECore::Chess {
      * best move of the own engine at depth 5 in the position it was played in (the engine's first line before the move) and it was a choice: "forced" is a position with one legal move,
      * "obvious" one where the second line is 200 centipawns or more behind (a forced recapture, a mate in one); "not_best" is any other move. Rated in the background, the oldest move first, with
      * an engine of its own that is always the own engine, whatever opponent.engine is, so the same game gets the same ratings twice; the ratings of earlier moves stay after a new move and go
-     * with a reset or a set_state of a fen. Independent of hintRequested and of the evaluation, and of the turn of the person.
+     * with a reset or a set_state of a fen. Independent of hintRequested and of the evaluation, and of the turn of the person. The rater's failure (an engine that cannot be made, a search
+     * that fails) is not in analysis.error: it is logged, and the move stays null.
      *
      * Actions: {"type": "move", "uci": "e2e4"}, every legal move once; none once the game is over. The list does not change with the opponent: the program's
      * side is listed and accepted like the other (a controller may play for it; a search that the move makes stale is dropped). Castling is the king's move
@@ -83,13 +84,14 @@ namespace BECore::Chess {
      * nothing; "evaluation" switches the evaluation on or off, "hint": true asks for a hint for the position now on the board and "hint": false drops it, "ratings" switches the rating of
      * the moves, also on a finished game); a wrong type or a member that is not one of the three is invalid_params. **analysis cannot be combined with fen or opponent in one call** (invalid_params:
      * the hint belongs to the position after them, two calls say it plainly). A hint on a side that the program plays (so on either turn while two programs play) is not_your_turn, on a finished game
-     * game_over; nothing is changed then, the evaluation switch of the same call included. list_actions is not changed by any of it. A pick that finds no engine (only Stockfish can fail) is
-     * engine_unavailable (with the sentence of the engine's error) and is refused as a whole, whichever seat has no engine: the position is not replaced and the opponent is unchanged (sides, seats
-     * and a running search stay as they were), the error is in the state, so a client can ask again with "engine": "own". A pick that changes nothing (the same sides and seats, no error standing)
-     * does nothing: a running Stockfish is not restarted. With an error standing, the same "plays" asks for an engine again, and plays null clears it.
+     * game_over; nothing is changed then, the evaluation and ratings switches of the same call included. list_actions is not changed by any of it. A pick that finds no engine (only Stockfish can
+     * fail) is engine_unavailable (with the sentence of the engine's error) and is refused as a whole, whichever seat has no engine: the position is not replaced and the opponent is unchanged (sides,
+     * seats and a running search stay as they were), the error is in the state, so a client can ask again with "engine": "own". A pick that changes nothing (the same sides and seats, no error
+     * standing) does nothing: a running Stockfish is not restarted. With an error standing, the same "plays" asks for an engine again, and plays null clears it.
      *
      * The state version is the version of the game plus the revision of the opponent (a pick, an error that appears or goes) plus the revision of the analyst (a switch,
-     * a hint asked or dropped, an answer that arrives, an error that appears or goes), so a push reports a change of the opponent and a hint that came as well; it never goes back.
+     * a hint asked or dropped, an answer that arrives, an error that appears or goes, a switch of the ratings, a rating that arrives or is dropped; an error of the rater that appears
+     * or goes moves it too, although it is not in get_state), so a push reports a change of the opponent and a hint or a rating that came as well; it never goes back.
      *
      * The model, the opponent and the analyst belong to ChessGame, which owns this adapter, so all three are always there. The analyst is told of a changed engine pick by SetState
      * at once, so a get_state right after never shows the old engine's answer.

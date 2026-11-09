@@ -11,7 +11,7 @@ it answers the same move to the same position (a fixed depth), which the scenari
 play each other (`set_state` with `"plays": "both"` and a seat each), reads the seats back, follows the game (the version only grows, the turns alternate), checks that a hint is refused,
 that a reset keeps both seats (and, on the manual clock, plays the same game again), that `"plays": "white"` is a takeover that leaves Black to the person, and that null ends it. The analysis ("analysis" scenarios, base ones too) switches the evaluation of the own engine on, reads it from White's view on a mate in one, asks for a hint and reads it, and
 leaves the game with the analyst running; it also switches the ratings of the moves on (the own engine, in the background), plays a short game, waits until every entry of
-`analysis.ratings` is set and checks its shape, and plays the same game again after a reset for the same ratings. The opponent panel ("opponent panel" scenarios, base
+`analysis.ratings` is set and checks its shape and the pinned reasons of the game, and, after a reset and a frame (so that the old ratings are dropped), plays the same game again for the same ratings. The opponent panel ("opponent panel" scenarios, base
 ones too) is driven only by `ui_click` on the buttons and segments found by name, as a person would: open it with the Menu button, pick the own engine,
 Computer, a level and a color, read the pick back from `get_state` and from `ui_tree`, play, close it with OK. The captured material ("captured material"
 scenarios, base ones too, no engine) reads `get_state.material` after a capture, after a position set from outside and after a reset, and, on the headless
@@ -515,6 +515,7 @@ def wait_for_the_analysis(client: BagiControlClient, accept, what: str) -> dict:
 
 
 RATING_REASONS = ("brilliant", "not_best", "forced", "obvious")
+PINNED_GAME_REASONS = ["not_best", "brilliant", "not_best", "brilliant"]  # e2e4 e7e5 g1f3 b8c6 by the own engine at depth 5 (MoveRaterTest pins the same)
 
 
 def check_the_ratings_are_complete(ratings: list, expected_count: int, when: str) -> None:
@@ -548,9 +549,12 @@ def check_the_ratings(client: BagiControlClient) -> None:
     check(switched["version"] > version and get_analysis(client)["ratingsOn"] is True, "switching the ratings on did not show")
     game = ["e2e4", "e7e5", "g1f3", "b8c6"]
     first = play_and_wait_for_the_ratings(client, game)
+    check([rating["reason"] for rating in first] == PINNED_GAME_REASONS, f"the own engine rated the game differently from the pinned list {PINNED_GAME_REASONS}: {first}")
 
-    # A reset drops the ratings and keeps the switch; the same game gets the same ratings (a fixed depth, no clock)
+    # A reset drops the ratings and keeps the switch; the same game gets the same ratings (a fixed depth, no clock). A frame passes before the moves are replayed: the rater
+    # drops the old ratings when it sees the empty game, and a replay before that frame would be taken for the same game going on and keep them
     client.call("reset")
+    let_frames_pass(client, 2)
     after_reset = get_analysis(client)
     check(after_reset["ratingsOn"] is True and after_reset["ratings"] == [], f"a reset did not drop the ratings and keep the switch: {after_reset}")
     check(play_and_wait_for_the_ratings(client, game) == first, "the same game was rated differently the second time")
