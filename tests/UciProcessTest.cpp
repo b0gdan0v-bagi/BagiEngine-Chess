@@ -4,7 +4,7 @@
 #include <Chess/Engine/UciProcess.h>
 #include <chrono>
 
-#if !defined(_WIN32)
+#if CHESS_HAS_UCI_PROCESS
 #include <cerrno>
 #include <csignal>
 #include <poll.h>
@@ -14,9 +14,9 @@
 /// The child process under a UCI engine, against the fake engine (tests/fake_uci_engine.py): no fixed sleeps, a test that must not time out waits long, one that must is short
 namespace BECore::Chess::Tests {
 
-#if defined(_WIN32)
+#if !CHESS_HAS_UCI_PROCESS
 
-    TEST(UciProcessTest, StartIsUnsupportedOnWindows) {
+    TEST(UciProcessTest, StartIsUnsupportedWithoutProcessCode) {
         ProcessLaunch launch;
         launch.path = "engine.exe";
 
@@ -24,6 +24,7 @@ namespace BECore::Chess::Tests {
 
         ASSERT_FALSE(started.has_value());
         EXPECT_EQ(started.error().kind, EngineErrorKind::Unsupported);
+        EXPECT_FALSE(started.error().detail.empty()) << "the sentence says why there is no process here";
     }
 
 #else
@@ -493,6 +494,6 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(ReadUntil(*second, "bestmove e2e4 ponder e7e5").size(), 2u);
     }
 
-#endif  // defined(_WIN32)
+#endif  // !CHESS_HAS_UCI_PROCESS
 
 }  // namespace BECore::Chess::Tests

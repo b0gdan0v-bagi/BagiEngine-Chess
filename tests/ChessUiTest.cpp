@@ -839,6 +839,14 @@ namespace BECore::Chess::Tests {
             InputEvents::ActionEvent::Emit(PoolString::Intern(action), PoolString::Intern(value));
         }
 
+        /// A game of a build without Stockfish starts with the own engine. The cases that walk from "stockfish" (a name that the doubles of a test factory answer) pick it first, through
+        /// the action of the panel; they must have given the controller a factory, or the default one refuses it. Where Stockfish is available it is the engine already and nothing is done
+        static void StartFromTheStockfishName() {
+            if constexpr (!kStockfishAvailable) {
+                PressWith("ChessSetEngine", "stockfish");
+            }
+        }
+
         /// The "opponent" object of get_state of the control API, the way a client reads it
         Json ControlOpponent() const {
             const auto state = ChessGame::GetActive()->AsControllable()->GetState();
@@ -3188,9 +3196,10 @@ namespace BECore::Chess::Tests {
         CountingFactory factory({eastl::make_shared<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
+        StartFromTheStockfishName();
         ASSERT_TRUE(OpenThePanel());
         EXPECT_EQ(Var("opponentEngine"), "stockfish");
-        EXPECT_TRUE(PanelControl<UIButton>("EngineStockfish").selected) << "the default";
+        EXPECT_TRUE(PanelControl<UIButton>("EngineStockfish").selected) << "the default (where Stockfish is available)";
         EXPECT_FALSE(PanelControl<UIButton>("EngineOwn").selected);
 
         ASSERT_TRUE(ClickPanel("EngineOwn").Both());
@@ -3356,6 +3365,7 @@ namespace BECore::Chess::Tests {
         CountingFactory factory({eastl::make_shared<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
+        StartFromTheStockfishName();
         ASSERT_TRUE(OpenThePanel());
         Draw();
         ASSERT_EQ(ShownText(PanelElement("EngineStockfish")), "Stockfish");
@@ -3490,10 +3500,10 @@ namespace BECore::Chess::Tests {
     // The segments of the panel emit ChessSetMode / ChessSetColor / ChessSetEngine / ChessSetLevel with the id as `value`; the board answers through OpponentChoice and
     // publishes the ids. These tests press the actions the segments will emit (the panel itself is in the scene from WP 3) and read the variables
 
-    TEST_F(ChessUiTest, TheIdsOfThePanelStartAsTwoWhiteStockfishMediumAndNoError) {
+    TEST_F(ChessUiTest, TheIdsOfThePanelStartAsTwoWhiteTheDefaultEngineMediumAndNoError) {
         EXPECT_EQ(Var("opponentMode"), "two");
         EXPECT_EQ(Var("opponentColor"), "white");
-        EXPECT_EQ(Var("opponentEngine"), "stockfish");
+        EXPECT_EQ(Var("opponentEngine"), kStockfishAvailable ? "stockfish" : "own");
         EXPECT_EQ(Var("opponentLevel"), "medium");
         EXPECT_EQ(Var("opponentError"), "");
     }
@@ -3596,6 +3606,7 @@ namespace BECore::Chess::Tests {
         CountingFactory factory({eastl::make_shared<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
+        StartFromTheStockfishName();
         PressWith("ChessSetMode", "computer");
         ASSERT_EQ(factory.Calls(), 1);
         const uint64_t revision = Opponent().GetRevision();
@@ -3632,6 +3643,7 @@ namespace BECore::Chess::Tests {
             return eastl::make_shared<InstantEngine>();
         });
         _manager->UpdateAll();
+        StartFromTheStockfishName();
 
         PressWith("ChessSetMode", "computer");
 
@@ -4093,6 +4105,7 @@ namespace BECore::Chess::Tests {
             return eastl::make_shared<InstantEngine>();
         });
         _manager->UpdateAll();
+        StartFromTheStockfishName();
         ASSERT_TRUE(OpenThePanel());
         EXPECT_EQ(PanelText("OpponentError"), "") << "no error line to start with";
 

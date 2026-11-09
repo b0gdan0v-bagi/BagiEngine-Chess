@@ -9,12 +9,26 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     include(${CMAKE_CURRENT_SOURCE_DIR}/engine/cmake/BagiEngine.cmake)
 endif()
 
+option(CHESS_NO_STOCKFISH "No Stockfish: the opponent is the engine of our own only, no child process (the web build; also for a web-like desktop check)" OFF)
+if(ENGINE_TARGET_WEB)
+    # A browser has no child process: the switch is not a choice there
+    set(CHESS_NO_STOCKFISH ON CACHE BOOL "No Stockfish: the opponent is the engine of our own only, no child process (forced ON for the web build)" FORCE)
+endif()
+
 be_add_module(Chess LINK
     BECoreModule
     EventsModule
     GamesModule
     SDLModule
 )
+# PUBLIC: ChessTests, BagiChess and BagiChessUci see the same value (UciProcess.h, OpponentEngines.h). Always 0 or 1, so `#if CHESS_NO_STOCKFISH` needs no `defined`
+if(CHESS_NO_STOCKFISH)
+    message(STATUS "Chess: no Stockfish (CHESS_NO_STOCKFISH=ON): the opponent is the own engine, no child process")
+    target_compile_definitions(ChessModule PUBLIC CHESS_NO_STOCKFISH=1)
+else()
+    message(STATUS "Chess: Stockfish is available as the opponent (CHESS_NO_STOCKFISH=OFF)")
+    target_compile_definitions(ChessModule PUBLIC CHESS_NO_STOCKFISH=0)
+endif()
 be_add_game_reflection(ChessModule)
 
 be_add_game_executable(BagiChess

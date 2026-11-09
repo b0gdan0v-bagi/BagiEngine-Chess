@@ -25,6 +25,9 @@ namespace BECore::Chess {
     std::expected<eastl::shared_ptr<IChessEngine>, EngineError> MakeAnalysisEngine(OpponentEngine engine, const OpponentSettings& settings) {
         switch (engine) {
             case OpponentEngine::Stockfish: {
+                if (!IsOpponentEngineAvailable(OpponentEngine::Stockfish)) {
+                    return std::unexpected(UnavailableEngineError(OpponentEngine::Stockfish));
+                }
                 const std::optional<eastl::string> program = FindStockfish(settings.stockfishPath);
                 if (!program) {
                     return std::unexpected(EngineError{EngineErrorKind::LaunchFailed, NoStockfishDetail(settings.stockfishPath)});

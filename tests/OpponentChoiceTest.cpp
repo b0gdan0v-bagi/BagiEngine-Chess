@@ -14,6 +14,7 @@ namespace BECore::Chess::Tests {
         constexpr eastl::string_view kMediumId = "medium";
         constexpr eastl::string_view kOwnId = "own";
         constexpr eastl::string_view kStockfishId = "stockfish";
+        constexpr eastl::string_view kDefaultEngineId = kStockfishAvailable ? kStockfishId : kOwnId;  // the engine a game starts with in this build
         constexpr std::optional<PieceColor> kNobody = std::nullopt;
 
         EngineError NoStockfish() {
@@ -60,14 +61,14 @@ namespace BECore::Chess::Tests {
         }
     };
 
-    TEST_F(OpponentChoiceTest, ANewChoiceIsTwoPlayersWhiteStockfishMediumAndAsksNoEngine) {
+    TEST_F(OpponentChoiceTest, ANewChoiceIsTwoPlayersWhiteTheDefaultEngineMediumAndAsksNoEngine) {
         Seat seat;
 
         EXPECT_EQ(seat.choice.Mode(), OpponentMode::Two);
         EXPECT_EQ(seat.choice.Color(), PieceColor::White);
         EXPECT_EQ(seat.choice.ModeId(), "two");
         EXPECT_EQ(seat.choice.ColorId(), "white");
-        EXPECT_EQ(seat.choice.EngineId(), kStockfishId);
+        EXPECT_EQ(seat.choice.EngineId(), kDefaultEngineId);
         EXPECT_EQ(seat.choice.LevelId(), kMediumId);
         EXPECT_EQ(seat.factory.Calls(), 0);
         EXPECT_EQ(seat.controller.GetRevision(), 0u);
@@ -84,7 +85,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(seat.choice.ModeId(), "computer");
         EXPECT_EQ(seat.choice.Color(), PieceColor::White);
         ASSERT_EQ(seat.factory.Calls(), 1);
-        EXPECT_EQ(seat.factory.Engines()[0], Text(kStockfishId));
+        EXPECT_EQ(seat.factory.Engines()[0], Text(kDefaultEngineId));
         EXPECT_EQ(seat.factory.Levels()[0], Text(kMediumId));
     }
 
@@ -207,7 +208,7 @@ namespace BECore::Chess::Tests {
             EXPECT_EQ(seat.controller.GetRevision(), revision);
             EXPECT_EQ(seat.choice.Mode(), programPlays ? OpponentMode::Computer : OpponentMode::Two);
             EXPECT_EQ(seat.choice.Color(), PieceColor::White);
-            EXPECT_EQ(seat.choice.EngineId(), kStockfishId);
+            EXPECT_EQ(seat.choice.EngineId(), kDefaultEngineId);
             EXPECT_EQ(seat.choice.LevelId(), kMediumId);
         }
     }
@@ -243,6 +244,7 @@ namespace BECore::Chess::Tests {
             }
             return eastl::make_shared<InstantEngine>();
         });
+        ASSERT_TRUE(choice.SetEngine("stockfish").has_value());  // already the engine of a new game where Stockfish is available; nobody plays: no factory call
 
         const auto failed = choice.SetMode("computer");
 
@@ -270,6 +272,32 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(asked[1], Text(kOwnId));
         EXPECT_EQ(controller.GetPlays(), std::optional<PieceColor>(PieceColor::Black));
     }
+
+#if CHESS_NO_STOCKFISH
+
+    TEST_F(OpponentChoiceTest, WithoutStockfishThePickOfStockfishIsAnEngineErrorUnderTheDefaultFactoryAlsoWhileNobodyPlays) {
+        ChessGameModel model;
+        OpponentController controller(model);  // the default factory
+        OpponentChoice choice(controller);
+        ASSERT_EQ(choice.EngineId(), kOwnId);
+
+        const auto refused = choice.SetEngine("stockfish");
+
+        ASSERT_FALSE(refused.has_value());
+        EXPECT_EQ(refused.error().kind, ChoiceErrorKind::Engine);
+        EXPECT_EQ(refused.error().engine.kind, EngineErrorKind::Unsupported);
+        EXPECT_FALSE(refused.error().detail.empty());
+        EXPECT_EQ(choice.EngineId(), kOwnId) << "nothing changed";
+        EXPECT_EQ(choice.Mode(), OpponentMode::Two);
+        EXPECT_TRUE(controller.GetError().has_value());
+
+        EXPECT_TRUE(choice.SetEngine("own").has_value()) << "the own engine is a pick that changes nothing, and clears the error";
+        EXPECT_FALSE(controller.GetError().has_value());
+        EXPECT_TRUE(choice.SetMode("computer").has_value());
+        EXPECT_EQ(controller.GetPlays(), std::optional<PieceColor>(PieceColor::Black));
+    }
+
+#endif
 
     TEST_F(OpponentChoiceTest, AFailedColorPickWhileTheProgramPlaysIsRefusedAndChangesNothing) {
         ChessGameModel model;

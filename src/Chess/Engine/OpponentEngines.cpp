@@ -32,13 +32,16 @@ namespace BECore::Chess {
     }
 
     OpponentEngine NextOpponentEngine(OpponentEngine engine) {
+        OpponentEngine next = kDefaultOpponentEngine;
         switch (engine) {
             case OpponentEngine::Stockfish:
-                return OpponentEngine::Own;
+                next = OpponentEngine::Own;
+                break;
             case OpponentEngine::Own:
-                return OpponentEngine::Stockfish;
+                next = OpponentEngine::Stockfish;
+                break;
         }
-        return kDefaultOpponentEngine;
+        return IsOpponentEngineAvailable(next) ? next : engine;
     }
 
 }  // namespace BECore::Chess

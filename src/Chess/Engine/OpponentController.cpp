@@ -17,10 +17,17 @@ namespace BECore::Chess {
                "there is no fallback), or put stockfish on PATH. The game does not ship Stockfish; install it yourself";
     }
 
+    EngineError UnavailableEngineError(OpponentEngine engine) {
+        return EngineError{EngineErrorKind::Unsupported, Format("{} cannot run in this build (CHESS_NO_STOCKFISH): the opponent is the own engine", OpponentEngineName(engine))};
+    }
+
     namespace {
 
         /// The default factory: a UciEngine over the Stockfish that FindStockfish() finds for the settings, with the Skill Level of the level, under the handicap of the level (WithHandicap)
         std::expected<eastl::shared_ptr<IChessEngine>, EngineError> MakeStockfishEngine(const OpponentSettings& settings, const OpponentLevel& level) {
+            if (!IsOpponentEngineAvailable(OpponentEngine::Stockfish)) {
+                return std::unexpected(UnavailableEngineError(OpponentEngine::Stockfish));
+            }
             const std::optional<eastl::string> program = FindStockfish(settings.stockfishPath);
             if (!program) {
                 return std::unexpected(EngineError{EngineErrorKind::LaunchFailed, NoStockfishDetail(settings.stockfishPath)});
@@ -139,6 +146,13 @@ namespace BECore::Chess {
             }
         }
 
+        // An engine this build cannot run is refused for every seat, the one nobody plays included (a pick of it would only fail at the first search)
+        if (const std::optional<PieceColor> refused = FindUnavailableSeat(picked)) {
+            const SeatChoice& choice = picked[SeatIndex(*refused)];
+            FailPick(UnavailableEngineError(choice.engine), *refused, choice.engine, levels[choice.level]);
+            return std::unexpected(*_pickError);
+        }
+
         bool unchanged = true;
         bool opponentFailed = false;
         for (const PieceColor color : EnumUtils<PieceColor>::Values()) {
@@ -213,6 +227,18 @@ namespace BECore::Chess {
                 return WithHandicap(eastl::make_shared<OwnEngine>(), level);
         }
         return std::unexpected(EngineError{EngineErrorKind::BadRequest, "unknown engine"});
+    }
+
+    std::optional<PieceColor> OpponentController::FindUnavailableSeat(const eastl::array<SeatChoice, kSeatCount>& picked) const {
+        if (_factory) {
+            return std::nullopt;
+        }
+        for (const PieceColor color : EnumUtils<PieceColor>::Values()) {
+            if (!IsOpponentEngineAvailable(picked[SeatIndex(color)].engine)) {
+                return color;
+            }
+        }
+        return std::nullopt;
     }
 
     void OpponentController::FailPick(EngineError error, PieceColor computer, OpponentEngine engine, const OpponentLevel& level) {

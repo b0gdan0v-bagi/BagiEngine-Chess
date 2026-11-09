@@ -73,13 +73,43 @@ namespace BECore::Chess::Tests {
         EXPECT_FALSE(FindOpponentEngine("stock").has_value());
     }
 
-    TEST(OpponentEnginesTest, TheCycleWalksStockfishOwnAndBack) {
-        EXPECT_EQ(NextOpponentEngine(OpponentEngine::Stockfish), OpponentEngine::Own);
-        EXPECT_EQ(NextOpponentEngine(OpponentEngine::Own), OpponentEngine::Stockfish);
+    TEST(OpponentEnginesTest, TheCycleWalksStockfishOwnAndBackWhereStockfishIsAvailable) {
+        if constexpr (!kStockfishAvailable) {
+            GTEST_SKIP() << "no Stockfish in this build (CHESS_NO_STOCKFISH)";
+        } else {
+            EXPECT_EQ(NextOpponentEngine(OpponentEngine::Stockfish), OpponentEngine::Own);
+            EXPECT_EQ(NextOpponentEngine(OpponentEngine::Own), OpponentEngine::Stockfish);
+        }
     }
 
-    TEST(OpponentEnginesTest, AGameStartsWithStockfish) {
-        EXPECT_EQ(kDefaultOpponentEngine, OpponentEngine::Stockfish);
+    TEST(OpponentEnginesTest, TheCycleSkipsAnEngineThatIsNotAvailable) {
+        if constexpr (kStockfishAvailable) {
+            GTEST_SKIP() << "Stockfish is available in this build";
+        } else {
+            EXPECT_EQ(NextOpponentEngine(OpponentEngine::Stockfish), OpponentEngine::Own);
+            EXPECT_EQ(NextOpponentEngine(OpponentEngine::Own), OpponentEngine::Own) << "the cycle stays on the one engine there is";
+        }
+    }
+
+    TEST(OpponentEnginesTest, TheCycleAlwaysEndsOnAnAvailableEngine) {
+        for (const OpponentEngine engine : EnumUtils<OpponentEngine>::Values()) {
+            EXPECT_TRUE(IsOpponentEngineAvailable(NextOpponentEngine(engine))) << Text(OpponentEngineId(engine));
+        }
+    }
+
+    TEST(OpponentEnginesTest, TheOwnEngineIsAlwaysAvailableAndStockfishOnlyWithoutTheSwitch) {
+        EXPECT_TRUE(IsOpponentEngineAvailable(OpponentEngine::Own));
+        EXPECT_EQ(IsOpponentEngineAvailable(OpponentEngine::Stockfish), kStockfishAvailable);
+#if CHESS_NO_STOCKFISH
+        EXPECT_FALSE(kStockfishAvailable);
+#else
+        EXPECT_TRUE(kStockfishAvailable);
+#endif
+    }
+
+    TEST(OpponentEnginesTest, AGameStartsWithStockfishAndWithTheOwnEngineWhereThereIsNone) {
+        EXPECT_EQ(kDefaultOpponentEngine, kStockfishAvailable ? OpponentEngine::Stockfish : OpponentEngine::Own);
+        EXPECT_TRUE(IsOpponentEngineAvailable(kDefaultOpponentEngine)) << "a default that cannot start would be an error at the first pick";
     }
 
 }  // namespace BECore::Chess::Tests

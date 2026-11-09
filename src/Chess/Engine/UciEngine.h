@@ -134,6 +134,7 @@ namespace BECore::Chess {
      * must name an existing file, and when it does not the answer is nothing, with no fallback to the next place (a typo is not hidden by
      * a Stockfish somewhere else). A PATH entry counts when `stockfish` there is a file someone may execute; an empty entry is skipped.
      * Only a lookup: nothing here knows where Stockfish is installed, and nothing of it is shipped with the game.
+     * With CHESS_NO_STOCKFISH (the web build) the answer is always nothing and nothing is looked at.
      */
     [[nodiscard]] std::optional<eastl::string> FindStockfish(eastl::string_view explicitPath);
 

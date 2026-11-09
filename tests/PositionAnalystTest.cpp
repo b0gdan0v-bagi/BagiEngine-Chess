@@ -811,6 +811,24 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(analysis->Best().move, Mv("a1a8"));
     }
 
+#if CHESS_NO_STOCKFISH
+
+    TEST_F(PositionAnalystTest, WithoutStockfishTheDefaultFactoryRefusesStockfishAsUnsupportedAndMakesTheOwnEngine) {
+        OpponentSettings settings;
+        settings.stockfishPath = "/no/such/file";
+
+        const std::expected<eastl::shared_ptr<IChessEngine>, EngineError> stockfish = MakeAnalysisEngine(OpponentEngine::Stockfish, settings);
+        const std::expected<eastl::shared_ptr<IChessEngine>, EngineError> own = MakeAnalysisEngine(OpponentEngine::Own, {});
+
+        ASSERT_FALSE(stockfish.has_value());
+        EXPECT_EQ(stockfish.error().kind, EngineErrorKind::Unsupported) << "the path is not even looked at, and nothing falls back to the other engine";
+        EXPECT_FALSE(stockfish.error().detail.empty());
+        ASSERT_TRUE(own.has_value());
+        EXPECT_NE(*own, nullptr);
+    }
+
+#else
+
     TEST_F(PositionAnalystTest, AMissingStockfishFileIsLaunchFailedNamingThePathAndNothingFallsBack) {
         OpponentSettings settings;
         settings.stockfishPath = "/no/such/file";
@@ -821,6 +839,8 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(engine.error().kind, EngineErrorKind::LaunchFailed);
         EXPECT_NE(engine.error().detail.find("/no/such/file"), eastl::string::npos) << engine.error().detail.c_str();
     }
+
+#endif  // CHESS_NO_STOCKFISH
 
     TEST_F(PositionAnalystTest, TheOwnEngineGivesTheMatingMoveAsTheHintAndMateInOne) {
         ChessGameModel model;

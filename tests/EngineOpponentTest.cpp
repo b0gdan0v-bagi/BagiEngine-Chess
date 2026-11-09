@@ -27,7 +27,7 @@ namespace BECore::Chess::Tests {
         constexpr const char* kThinksUntilStopped = "60000";  // the fake thinks for a minute unless it is sent `stop`
         constexpr eastl::string_view kGoCommand = "go movetime 50";
         constexpr eastl::string_view kMatedBlackFen = "7k/6Q1/6K1/8/8/8/8/8 b - - 0 1";
-#if defined(_WIN32)
+#if !CHESS_HAS_UCI_PROCESS
         constexpr EngineErrorKind kMissingProgramError = EngineErrorKind::Unsupported;
 #else
         constexpr EngineErrorKind kMissingProgramError = EngineErrorKind::LaunchFailed;

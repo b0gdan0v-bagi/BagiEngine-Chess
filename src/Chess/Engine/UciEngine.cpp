@@ -23,6 +23,7 @@ namespace BECore::Chess {
         constexpr eastl::string_view kBestMoveReply = "bestmove";
         constexpr eastl::string_view kMultiPvOption = "MultiPV";
 
+#if !CHESS_NO_STOCKFISH
         constexpr const char* kStockfishVariable = "STOCKFISH";
         constexpr const char* kPathVariable = "PATH";
 #if defined(_WIN32)
@@ -32,6 +33,7 @@ namespace BECore::Chess {
         constexpr const char* kStockfishFileName = "stockfish";
         constexpr char kPathSeparator = ':';
 #endif
+#endif  // !CHESS_NO_STOCKFISH
 
         std::unexpected<EngineError> Fail(EngineErrorKind kind, eastl::string detail) {
             return std::unexpected(EngineError{kind, std::move(detail)});
@@ -88,6 +90,7 @@ namespace BECore::Chess {
             return static_cast<int>(std::min<int64_t>(total, std::numeric_limits<int>::max()));
         }
 
+#if !CHESS_NO_STOCKFISH
         /// The first of the explicit path and $STOCKFISH that is set decides (see FindStockfish); nothing when it is not a file
         std::optional<eastl::string> ExistingFile(const std::string& path) {
             std::error_code error;
@@ -143,6 +146,7 @@ namespace BECore::Chess {
             }
             return std::nullopt;
         }
+#endif  // !CHESS_NO_STOCKFISH
 
     }  // namespace
 
@@ -339,7 +343,10 @@ namespace BECore::Chess {
         _multiPv = kSingleLine;
     }
 
-    std::optional<eastl::string> FindStockfish(eastl::string_view explicitPath) {
+    std::optional<eastl::string> FindStockfish([[maybe_unused]] eastl::string_view explicitPath) {
+#if CHESS_NO_STOCKFISH
+        return std::nullopt;  // nothing is looked for: no file system walk, no environment, and no process could be started from what was found
+#else
         if (!explicitPath.empty()) {
             return ExistingFile(std::string(explicitPath.data(), explicitPath.size()));
         }
@@ -348,6 +355,7 @@ namespace BECore::Chess {
             return ExistingFile(fromEnvironment);
         }
         return StockfishOnPath();
+#endif
     }
 
 }  // namespace BECore::Chess

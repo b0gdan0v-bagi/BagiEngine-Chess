@@ -3,6 +3,14 @@
 #include <Chess/Engine/ChessEngine.h>
 #include <chrono>
 
+// 1 where this file has process code (POSIX), 0 where Start() only answers Unsupported: on Windows, in a build with CHESS_NO_STOCKFISH (no engine program is ever started) and under
+// Emscripten (a browser has no child process, and no <spawn.h>)
+#if defined(_WIN32) || CHESS_NO_STOCKFISH || defined(__EMSCRIPTEN__)
+#define CHESS_HAS_UCI_PROCESS 0
+#else
+#define CHESS_HAS_UCI_PROCESS 1
+#endif
+
 namespace BECore::Chess {
 
     /// A program to start: the path of its executable (taken as it is, `PATH` is not searched) and the arguments after it
@@ -30,7 +38,8 @@ namespace BECore::Chess {
      * it after the last Start(), because UciEngine starts the process again after an error: a host that needs its own SIGPIPE handler off Apple
      * cannot share its process with this class. The child gets the default disposition back.
      *
-     * POSIX only (macOS, Linux). On Windows Start() answers Unsupported and no Windows header is included; the process code for it is a later step.
+     * POSIX only (macOS, Linux), and not on the web. Where CHESS_HAS_UCI_PROCESS is 0 (Windows, CHESS_NO_STOCKFISH, Emscripten) Start() answers Unsupported with a sentence for the case, the
+     * other calls answer it too, and no system header is included; the process code for Windows is a later step. (The Emscripten case has not been compiled yet: it needs emsdk.)
      */
     class UciProcess {
     public:
