@@ -545,6 +545,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessPieceAnimationTest, WithTheProgramAsWhiteAMoveSlidesBetweenTheTurnedCells) {
+        SKIP_WITHOUT_WORKER_THREADS();
         Settle();
         TurnTheBoard();
         EXPECT_EQ(PixelOf("a1"), (Origin{660.0f, 80.0f})) << "the board is turned: a1 at the top right";
@@ -641,6 +642,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessPieceAnimationTest, ADropInTheTurnedBoardStandsOnTheTargetAtOnceToo) {
+        SKIP_WITHOUT_WORKER_THREADS();
         TurnTheBoard();
         Settle();
         StartFrom("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1");

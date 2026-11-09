@@ -1215,6 +1215,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, AControllerMayMoveForTheProgramsSide) {
+        SKIP_WITHOUT_WORKER_THREADS();
         const auto engine = eastl::make_shared<GatedEngine>(true);
         CountingFactory factory({engine});
         opponent.SetEngineFactory(factory.AsFactory());
@@ -1234,6 +1235,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, ASetPositionWhileTheProgramThinksDropsTheAnswer) {
+        SKIP_WITHOUT_WORKER_THREADS();
         const auto engine = eastl::make_shared<GatedEngine>(false);
         CountingFactory factory({engine});
         opponent.SetEngineFactory(factory.AsFactory());

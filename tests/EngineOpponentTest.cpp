@@ -160,6 +160,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(EngineOpponentTest, PlaysItsSideAfterTheOtherSideHasMoved) {
         SKIP_WITHOUT_FAKE_ENGINE();
+        SKIP_WITHOUT_WORKER_THREADS();
         const TempDirectory directory;
         const eastl::string log = directory.FileText(kLogName);
         ChessGameModel model;
@@ -189,6 +190,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(EngineOpponentTest, UpdateDoesNotWaitForTheEngine) {
         SKIP_WITHOUT_FAKE_ENGINE();
+        SKIP_WITHOUT_WORKER_THREADS();
         const TempDirectory directory;
         const eastl::string log = directory.FileText(kLogName);
         ChessGameModel model;
@@ -248,6 +250,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(EngineOpponentTest, AResetWhileTheEngineThinksDropsItsAnswer) {
         SKIP_WITHOUT_FAKE_ENGINE();
+        SKIP_WITHOUT_WORKER_THREADS();
         const TempDirectory directory;
         const eastl::string log = directory.FileText(kLogName);
         // The first search thinks until it is stopped and then answers e7e5; the second answers d7d5 at once
@@ -271,6 +274,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(EngineOpponentTest, AnEngineThatIgnoresItsTokenHasItsStaleAnswerDropped) {
+        SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
         const auto engine = MakeScripted({"e7e5", "d7d5"}, true);
         EngineOpponent opponent(engine, PieceColor::Black, kLimits);
@@ -291,6 +295,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(EngineOpponentTest, AMoveOfSomeoneElseMakesTheSearchStale) {
+        SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
         const auto engine = MakeScripted({"e7e5"}, true);
         EngineOpponent opponent(engine, PieceColor::Black, kLimits);
@@ -312,6 +317,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(EngineOpponentTest, CancelDropsTheAnswerAndTheNextUpdateAsksAgain) {
+        SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
         const auto engine = MakeScripted({"e7e5", "d7d5"}, true);
         EngineOpponent opponent(engine, PieceColor::Black, kLimits);
@@ -414,6 +420,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(EngineOpponentTest, DestroyingTheOpponentWhileTheEngineThinksCancelsTheSearchAndEndsTheChild) {
         SKIP_WITHOUT_FAKE_ENGINE();
+        SKIP_WITHOUT_WORKER_THREADS();
         const TempDirectory directory;
         const eastl::string log = directory.FileText(kLogName);
         ChessGameModel model;

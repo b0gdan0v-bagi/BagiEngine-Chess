@@ -291,6 +291,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(OpponentSeatsTest, TheSamePickAgainDoesNothingAndAClearedErrorIsNotARemake) {
+        SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
         const auto white = eastl::make_shared<GatedEngine>(true, Mv("e2e4"));
         const auto black = eastl::make_shared<GatedEngine>(true);
@@ -353,6 +354,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(OpponentSeatsTest, IsThinkingIsTrueForEitherSeat) {
+        SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
         const auto white = eastl::make_shared<GatedEngine>(true);
         const auto black = eastl::make_shared<GatedEngine>(true);
@@ -570,6 +572,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(OpponentSeatsTest, PickingNobodyFromAWatchRemovesBothAndRemembersTheChoices) {
+        SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
         CountingFactory factory({eastl::make_shared<GatedEngine>(true), eastl::make_shared<GatedEngine>(true)});
         OpponentController controller(model);
@@ -603,6 +606,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(OpponentSeatsTest, ShutdownWithAnEngineThatIgnoresItsTokenInEachSeatReturnsAtOnce) {
+        SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
         const auto white = eastl::make_shared<GatedEngine>(false);
         const auto black = eastl::make_shared<GatedEngine>(false);

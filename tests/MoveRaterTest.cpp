@@ -675,6 +675,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(MoveRaterTest, ShutdownWithASearchInFlightReturnsAtOnceAndDropsItsAnswer) {
+        SKIP_WITHOUT_WORKER_THREADS();
         const auto engine = MakeEngine();
         engine->Gate(false);
         CountingAnalysisFactory factory{engine};
@@ -699,6 +700,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(MoveRaterTest, CancelStopsTheSearchAndTheNextUpdateAsksAgain) {
+        SKIP_WITHOUT_WORKER_THREADS();
         const auto engine = MakeEngine();
         engine->Gate(true);
         CountingAnalysisFactory factory{engine};
@@ -719,6 +721,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(MoveRaterTest, TheDestructorWithASearchInFlightReturnsAtOnce) {
+        SKIP_WITHOUT_WORKER_THREADS();
         const auto engine = MakeEngine();
         engine->Gate(false);
         CountingAnalysisFactory factory{engine};

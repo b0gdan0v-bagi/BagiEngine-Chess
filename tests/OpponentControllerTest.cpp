@@ -461,6 +461,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(OpponentControllerTest, AChangeOfLevelDropsTheRunningSearchAndItsStaleAnswer) {
+        SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
         // The first engine ignores its token and holds the answer h7h5 until the end of the test; the second answers at once
         const auto slow = eastl::make_shared<GatedEngine>(false, Mv("h7h5"));
@@ -807,6 +808,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(OpponentControllerTest, ChangingTheEngineWhileTheProgramPlaysRemakesTheOpponentAndDropsTheStaleAnswer) {
+        SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
         // The first (Stockfish) engine ignores its token and holds h7h5 until the end of the test; the second (Own) answers at once
         const auto slow = eastl::make_shared<GatedEngine>(false, Mv("h7h5"));

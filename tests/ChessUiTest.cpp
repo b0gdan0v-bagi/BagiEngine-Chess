@@ -1935,6 +1935,7 @@ namespace BECore::Chess::Tests {
     }  // namespace
 
     TEST_F(ChessUiTest, WithTheProgramAsWhiteTheBoardAndThePiecesAreTurnedBy180Degrees) {
+        SKIP_WITHOUT_WORKER_THREADS();
         CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -2013,6 +2014,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, APersonsMoveByClicksInTheTurnedBoardIsPlayed) {
+        SKIP_WITHOUT_WORKER_THREADS();
         CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         ControlPlays("white");
@@ -2129,6 +2131,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheBoardTurnsBackWhenNobodyOrBlackIsTheProgram) {
+        SKIP_WITHOUT_WORKER_THREADS();
         CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -2176,6 +2179,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, ABlackPickedWhileTwoPlayDoesNotTurnTheBoardUntilComputerIsPicked) {
+        SKIP_WITHOUT_WORKER_THREADS();
         CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -2196,6 +2200,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, ARefusedPickLeavesTheOrientationAsItWas) {
+        SKIP_WITHOUT_WORKER_THREADS();
         eastl::vector<eastl::string> asked;
         Opponent().SetEngineFactory([&asked](OpponentEngine engine, const OpponentLevel&) -> MadeEngine {
             const eastl::string_view id = OpponentEngineId(engine);
@@ -2230,6 +2235,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, ResetAndSetStateKeepTheTurnedBoardAndDealThePiecesToItsCells) {
+        SKIP_WITHOUT_WORKER_THREADS();
         CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         ControlPlays("white");
@@ -2261,6 +2267,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, WithTheProgramAsWhiteTheCoordinateVariablesReadFromBlacksSide) {
+        SKIP_WITHOUT_WORKER_THREADS();
         CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         ControlPlays("white");
@@ -2271,6 +2278,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheCoordinateVariablesTurnBackWithTwoPeopleAndWithTheProgramAsBlack) {
+        SKIP_WITHOUT_WORKER_THREADS();
         CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         ControlPlays("white");
@@ -2292,6 +2300,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheCoordinateVariablesFollowTheColorSegmentsAndTheModeOfThePanel) {
+        SKIP_WITHOUT_WORKER_THREADS();
         CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -2309,6 +2318,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, AResetAndASetStateKeepTheCoordinatesOfTheBoardThatIsTurned) {
+        SKIP_WITHOUT_WORKER_THREADS();
         CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         ControlPlays("white");
@@ -2424,6 +2434,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, NoCoordinateGlyphReachesAPieceInEitherOrientation) {
+        SKIP_WITHOUT_WORKER_THREADS();
         // The width the labels keep clear is the width of a piece that Contain fits into a cell: the real draw of a rook says so
         const auto whiteA1 = GiveAtlasCell("WhiteRook_a1");
         const auto whiteH1 = GiveAtlasCell("WhiteRook_h1");
@@ -2471,6 +2482,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheCoordinateColorsReadOnTheSquaresThatAreDrawnInBothOrientations) {
+        SKIP_WITHOUT_WORKER_THREADS();
         CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
 
@@ -2618,6 +2630,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheCoordinateLabelsTurnTheirTextAndKeepTheirPlaceOnTheScreen) {
+        SKIP_WITHOUT_WORKER_THREADS();
         CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         const auto read = [&](bool files) {
@@ -2661,6 +2674,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheCoordinateColorsAreTheSameWhenTheBoardIsTurned) {
+        SKIP_WITHOUT_WORKER_THREADS();
         // The turn by 180 degrees keeps the color of every cell, which is why the colors of the labels are fixed in the XML
         CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
@@ -2742,6 +2756,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheStateOfTheControlApiIsTheSameWhateverSideIsAtTheBottom) {
+        SKIP_WITHOUT_WORKER_THREADS();
         CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         ControlPlays("white");
@@ -2912,6 +2927,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, AResetWhileTheProgramThinksDropsItsAnswerAndANewSearchFollowsOnItsTurn) {
+        SKIP_WITHOUT_WORKER_THREADS();
         const auto engine = eastl::make_shared<GatedEngine>(false);  // ignores its token: its answer comes late and must still be thrown away
         CountingFactory factory({engine});
         Opponent().SetEngineFactory(factory.AsFactory());
@@ -4986,6 +5002,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, ThePanelTurnsTheDisplayWithTheBoard) {
+        SKIP_WITHOUT_WORKER_THREADS();
         CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -5593,6 +5610,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, AReadyHintFillsTheTurnedCellsWhenTheProgramPlaysWhite) {
+        SKIP_WITHOUT_WORKER_THREADS();
         CountingFactory opponentFactory({eastl::make_shared<GatedEngine>(true)});  // the program opens and holds its answer: the board stays as it is
         Opponent().SetEngineFactory(opponentFactory.AsFactory());
         CountingAnalysisFactory factory({eastl::make_shared<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"))});
@@ -5922,6 +5940,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheTurnedBoardMarksTheTurnedCells) {
+        SKIP_WITHOUT_WORKER_THREADS();
         CountingFactory opponentFactory({eastl::make_shared<GatedEngine>(true)});  // the program opens and holds its answer: the board stays as it is
         Opponent().SetEngineFactory(opponentFactory.AsFactory());
         _manager->UpdateAll();
@@ -6076,6 +6095,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, WatchNoClickStartsAPromotion) {
+        SKIP_WITHOUT_WORKER_THREADS();
         const auto white = eastl::make_shared<GatedEngine>(true);
         const auto black = eastl::make_shared<GatedEngine>(true);
         CountingFactory factory({white, black});
@@ -6097,6 +6117,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, WatchStartingDropsTheSelectionOfThePersonWhoseTurnItIs) {
+        SKIP_WITHOUT_WORKER_THREADS();
         const auto white = eastl::make_shared<GatedEngine>(true);
         const auto black = eastl::make_shared<GatedEngine>(true);
         CountingFactory factory({white, black});
@@ -6114,6 +6135,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, WatchWhiteStaysAtTheBottomAndTheMaterialGroupsAreNotSwapped) {
+        SKIP_WITHOUT_WORKER_THREADS();
         CountingFactory factory({eastl::make_shared<GatedEngine>(true), eastl::make_shared<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -6139,6 +6161,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, WatchAClickAfterTheEndStartsANewGameAndTheProgramsOpenIt) {
+        SKIP_WITHOUT_WORKER_THREADS();
         const auto white = eastl::make_shared<GatedEngine>(true);
         const auto black = eastl::make_shared<GatedEngine>(true);
         CountingFactory factory({white, black});
@@ -6166,6 +6189,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, WatchTheResetButtonStartsAgainAndTheBoardStaysLocked) {
+        SKIP_WITHOUT_WORKER_THREADS();
         const auto white = eastl::make_shared<GatedEngine>(true);
         const auto black = eastl::make_shared<GatedEngine>(true);
         CountingFactory factory({white, black});
@@ -6213,6 +6237,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, WatchNobodyThroughTheControlApiGivesTheBoardBackToClicks) {
+        SKIP_WITHOUT_WORKER_THREADS();
         CountingFactory factory({eastl::make_shared<GatedEngine>(true), eastl::make_shared<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -6428,6 +6453,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, WatchTheBoardTakesNoDragOnEitherTurn) {
+        SKIP_WITHOUT_WORKER_THREADS();
         const auto white = eastl::make_shared<GatedEngine>(true);
         const auto black = eastl::make_shared<GatedEngine>(true);
         CountingFactory factory({white, black});
@@ -6644,6 +6670,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, ADraggedPieceIsCenteredUnderThePointerOnTheDragLayerAndGoesBackOrLandsOnTheTargetOnLetGo) {
+        SKIP_WITHOUT_WORKER_THREADS();
         CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         for (const bool turned : {false, true}) {
