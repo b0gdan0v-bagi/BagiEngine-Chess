@@ -35,17 +35,14 @@ namespace BECore::Chess {
 
 namespace BECore::Chess::Tests {
 
-    /// One task frame, for a test that runs no CoreManager frame and waits for a search that may span frames: what TaskManager::Update does (it takes a PassKey, so a test
-    /// cannot call it) minus the game-time delays. Single-thread builds only resume a task that yielded here; a threaded build has nothing to resume, so it is a no-op.
-    /// Returns the number of slices resumed
-    inline size_t PumpTaskFrame() {
+    /// One task frame, for a test that runs no CoreManager frame and waits for a search that may span frames: the same three steps as TaskManager::Update (it takes a
+    /// PassKey, so a test cannot call it; keep the two in step by hand). Single-thread builds only resume a task that yielded here; a threaded build has nothing to resume
+    inline void PumpTaskFrame() {
 #if BE_SINGLE_THREAD
         TaskScheduler& scheduler = *TaskManager::GetInstance().GetScheduler();
         scheduler.ProcessDelayedTasks();
         scheduler.ProcessMainThreadTasks();
-        return scheduler.ProcessBackgroundSlices(TaskManager::GetInstance().GetFrameBudget());
-#else
-        return 0;
+        (void)scheduler.ProcessBackgroundSlices(TaskManager::GetInstance().GetFrameBudget());
 #endif
     }
 

@@ -1201,9 +1201,19 @@ namespace BECore::Chess::Tests {
                 return analysis;
             }
 
+            [[nodiscard]] int FindCalls() const {
+                return _findCalls;
+            }
+
+            [[nodiscard]] int AnalyseCalls() const {
+                return _analyseCalls;
+            }
+
+            static constexpr int kScriptedCentipawns = 17;
+
+        private:
             int _findCalls = 0;
             int _analyseCalls = 0;
-            static constexpr int kScriptedCentipawns = 17;
         };
 
     }  // namespace
@@ -1306,13 +1316,14 @@ namespace BECore::Chess::Tests {
         const auto moveOut = RunOnThePool<Move>(engine.FindMoveAsync(request, CancellationToken::Create()));
         ASSERT_TRUE(WaitForAnswer(*moveOut));
         ASSERT_TRUE(moveOut->answer.has_value());
+        EXPECT_EQ(engine.FindCalls(), 1) << "the default async call went through the blocking one";
         EXPECT_EQ(*moveOut->answer, *engine.FindMove(request, CancellationToken::Create()));
 
         const auto analyseOut = RunOnThePool<Analysis>(engine.AnalyseAsync(request, CancellationToken::Create()));
         ASSERT_TRUE(WaitForAnswer(*analyseOut));
         ASSERT_TRUE(analyseOut->answer.has_value());
         EXPECT_EQ(analyseOut->answer->Best().score.value, BlockingOnlyEngine::kScriptedCentipawns);
-        EXPECT_EQ(engine._analyseCalls, 1);
+        EXPECT_EQ(engine.AnalyseCalls(), 1);
     }
 
     TEST_F(OwnSearchOnThePoolTest, TheDefaultAsyncOfAnEngineThatDoesNotAnalyseIsUnsupported) {
@@ -1343,13 +1354,13 @@ namespace BECore::Chess::Tests {
         constexpr int kFramesBeforeCancel = 5;
 
         /// Runs the opponent over frames (a task frame, then Update) until the model has moved on or the time is up. Returns the frames it took
-        size_t PlayFrames(EngineOpponent& opponent, ChessGameModel& model, std::chrono::milliseconds* longestFrame) {
+        [[nodiscard]] size_t PlayFrames(EngineOpponent& opponent, ChessGameModel& model, std::chrono::milliseconds* longestFrame) {
             const uint64_t version = model.GetVersion();
             const Clock::time_point deadline = Clock::now() + kPoolWaitLimit;
             size_t frames = 0;
             while (model.GetVersion() == version && Clock::now() < deadline) {
                 const Clock::time_point start = Clock::now();
-                (void)PumpTaskFrame();
+                PumpTaskFrame();
                 opponent.Update(model);
                 *longestFrame = std::max(*longestFrame, std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - start));
                 ++frames;
@@ -1369,14 +1380,14 @@ namespace BECore::Chess::Tests {
             void SetUp() override {
                 _savedBudget = TaskManager::GetInstance().GetFrameBudget();
                 TaskManager::GetInstance().SetFrameBudget(kTinyFrameBudget);
-                (void)PumpTaskFrame();  // the first frame: from here a task started between frames yields at its first check
+                PumpTaskFrame();  // the first frame: from here a task started between frames yields at its first check
             }
 
             void TearDown() override {
-                // Let a search a failed test left parked run to its end (it is cancelled: the opponent is gone)
+                // Single-thread builds: let a search a failed test left parked run to its end (it is cancelled: the opponent is gone). On a threaded build nothing is parked
                 const Clock::time_point deadline = Clock::now() + kPoolWaitLimit;
                 while (TaskManager::GetInstance().GetPendingTaskCount() > 0 && Clock::now() < deadline) {
-                    (void)PumpTaskFrame();
+                    PumpTaskFrame();
                 }
                 TaskManager::GetInstance().SetFrameBudget(_savedBudget);
             }
@@ -1395,15 +1406,13 @@ namespace BECore::Chess::Tests {
 
         EngineOpponent opponent(eastl::make_shared<OwnEngine>(), PieceColor::White, limits);
         std::chrono::milliseconds longestFrame{0};
-        const size_t frames = PlayFrames(opponent, model, &longestFrame);
+        [[maybe_unused]] const size_t frames = PlayFrames(opponent, model, &longestFrame);
 
         ASSERT_EQ(model.GetMoves().size(), 1u) << "the opponent did not play within the time limit";
         EXPECT_EQ(model.GetMoves()[0], *expected);
         EXPECT_LT(longestFrame, kFrameLimit);
 #if BE_SINGLE_THREAD
         EXPECT_GT(frames, 2u) << "the search ran in one frame";
-#else
-        (void)frames;
 #endif
     }
 
@@ -1412,7 +1421,7 @@ namespace BECore::Chess::Tests {
         EngineOpponent opponent(eastl::make_shared<OwnEngine>(), PieceColor::White, SearchLimits{0, kGoldenForeverDepth});
 
         for (int frame = 0; frame < kFramesBeforeCancel; ++frame) {
-            (void)PumpTaskFrame();
+            PumpTaskFrame();
             opponent.Update(model);
         }
         EXPECT_TRUE(opponent.IsThinking());
@@ -1420,10 +1429,11 @@ namespace BECore::Chess::Tests {
         opponent.Cancel();
         EXPECT_FALSE(opponent.IsThinking());
 
-        // The search sees the token at its next slice and ends; the next Update drops the answer
+        // The search sees the token at its next slice and ends (single-thread: pumped here until no task is parked; threaded: the pending count does not include a running task,
+        // so the sleep below is the wait). The Update after it drops the answer, and being the White opponent's turn it starts a new search that the destructor cancels
         const Clock::time_point deadline = Clock::now() + kPoolWaitLimit;
         while (TaskManager::GetInstance().GetPendingTaskCount() > 0 && Clock::now() < deadline) {
-            (void)PumpTaskFrame();
+            PumpTaskFrame();
         }
         std::this_thread::sleep_for(kRunBeforeCancel);
         opponent.Update(model);
@@ -1434,7 +1444,7 @@ namespace BECore::Chess::Tests {
         ChessGameModel model;
         EngineOpponent opponent(eastl::make_shared<OwnEngine>(), PieceColor::White, SearchLimits{0, kGoldenForeverDepth});
         for (int frame = 0; frame < kFramesBeforeCancel; ++frame) {
-            (void)PumpTaskFrame();
+            PumpTaskFrame();
             opponent.Update(model);
         }
         ASSERT_TRUE(opponent.IsThinking());
@@ -1445,7 +1455,7 @@ namespace BECore::Chess::Tests {
 
         const Clock::time_point deadline = Clock::now() + kPoolWaitLimit;
         while (TaskManager::GetInstance().GetPendingTaskCount() > 0 && Clock::now() < deadline) {
-            (void)PumpTaskFrame();
+            PumpTaskFrame();
         }
         std::this_thread::sleep_for(kRunBeforeCancel);
         opponent.Update(model);

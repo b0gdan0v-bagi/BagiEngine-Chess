@@ -71,8 +71,9 @@ namespace BECore::Chess {
      * **Deterministic for a depth**: a request with a depth and no time gives the same move on every run and platform. A request
      * with a time is not: where the clock stops the search decides the depth reached, hence the move.
      *
-     * **Two ways to ask, one implementation.** FindMove() and Analyse() block until the answer. BeginFindMove() and BeginAnalyse() start the same search and hand back
-     * an OwnSearch that the caller drives with Advance(), a slice at a time; FindMove() and Analyse() are "begin, run to the end", so they give the answer of a driven
+     * **Three ways to ask, one implementation.** FindMove() and Analyse() block until the answer. BeginFindMove() and BeginAnalyse() start the same search and hand back
+     * an OwnSearch that the caller drives with Advance(), a slice at a time. FindMoveAsync() and AnalyseAsync() are coroutines that drive that search a slice at a time
+     * between frames (below), and the game's tasks await them; FindMove() and Analyse() are "begin, run to the end", so they give the answer of a driven
      * search for any size of the slices (the move, the score, the depth and the nodes), with the same errors. The errors of the request (BadRequest, NoMove, a token
      * already cancelled) come back from Begin...() and nothing is started.
      *
@@ -100,9 +101,10 @@ namespace BECore::Chess {
         [[nodiscard]] std::expected<OwnSearch, EngineError> BeginAnalyse(const SearchRequest& request, const CancellationToken& token) const;
 
         /// FindMove() as a coroutine: Begin, then `co_await YieldIfNeeded()` and Advance(kSearchSliceNodes) until done (the yield goes BEFORE each slice, so a task started
-        /// between two drains of the frame budget gives the frame back at once), then the same answer as FindMove() by the same code. On the single-thread build the search so
+        /// between two drains of the frame budget gives the frame back at once), then the same answer as FindMove() by the same code. On the single-thread build the search
         /// spans many frames; on a threaded build YieldIfNeeded() never suspends and the call is FindMove() with one pointer test per slice. The OwnSearch lives in the
-        /// coroutine frame and nothing reads the engine once the task runs, so a destroyed engine does not matter. Cancelled is seen at the start of every slice.
+        /// coroutine frame and the coroutine reads no member of the engine once it runs, but the caller keeps the engine alive until the task ends, as IChessEngine::FindMoveAsync() says.
+        /// Cancelled is seen at the start of every slice.
         [[nodiscard]] Task<std::expected<Move, EngineError>> FindMoveAsync(SearchRequest request, CancellationToken token) override;
 
         /// Analyse() as a coroutine, the loop of FindMoveAsync()
