@@ -1,6 +1,13 @@
 #include "UciProcess.h"
 
-#if CHESS_HAS_UCI_PROCESS
+// The POSIX process code; the Windows one is UciProcessWindows.cpp, the stub (no process code) is at the end of this file
+#if CHESS_HAS_UCI_PROCESS && !defined(_WIN32)
+#define CHESS_UCI_PROCESS_POSIX 1
+#else
+#define CHESS_UCI_PROCESS_POSIX 0
+#endif
+
+#if CHESS_UCI_PROCESS_POSIX
 #include <fcntl.h>
 #include <poll.h>
 #include <signal.h>
@@ -24,14 +31,15 @@ namespace BECore::Chess {
 
     namespace {
 
+#if !CHESS_HAS_UCI_PROCESS || CHESS_UCI_PROCESS_POSIX
         std::unexpected<EngineError> Fail(EngineErrorKind kind, eastl::string detail) {
             return std::unexpected(EngineError{kind, std::move(detail)});
         }
+#endif
 
-#if CHESS_HAS_UCI_PROCESS
+#if CHESS_UCI_PROCESS_POSIX
 
         constexpr size_t kReadChunkBytes = 4096;
-        constexpr size_t kCompactBytes = 64 * 1024;                // the consumed front of the line buffer is dropped once it is this big and half of the buffer
         constexpr std::chrono::milliseconds kTerminateGrace{500};  // how long a child gets after SIGTERM before SIGKILL
         constexpr std::chrono::milliseconds kExitPollInterval{2};  // waitpid has no timeout: the exit is looked for at this pace
         constexpr int kFirstFreeDescriptor = STDERR_FILENO + 1;    // the pipes live above the three the child gets
@@ -173,9 +181,42 @@ namespace BECore::Chess {
             posix_spawnattr_t _attributes;
         };
 
-#endif  // CHESS_HAS_UCI_PROCESS
+#endif  // CHESS_UCI_PROCESS_POSIX
 
     }  // namespace
+
+#if CHESS_HAS_UCI_PROCESS
+
+    // The line buffer, the same on every platform with process code
+    std::optional<eastl::string> UciProcess::TakeBufferedLine() {
+        constexpr char kLineEnd = '\n';
+        constexpr char kCarriageReturn = '\r';
+        constexpr size_t kCompactBytes = 64 * 1024;  // the consumed front of the line buffer is dropped once it is this big and half of the buffer
+
+        const size_t lineEnd = _buffer.find(kLineEnd, _head + _scanned);
+        if (lineEnd == eastl::string::npos) {
+            _scanned = _buffer.size() - _head;
+            return std::nullopt;
+        }
+
+        size_t textEnd = lineEnd;
+        if (textEnd > _head && _buffer[textEnd - 1] == kCarriageReturn) {
+            --textEnd;
+        }
+        eastl::string line(_buffer.data() + _head, textEnd - _head);
+        _head = lineEnd + 1;
+        _scanned = 0;
+        if (_head == _buffer.size()) {
+            _buffer.clear();
+            _head = 0;
+        } else if (_head >= kCompactBytes && _head * 2 >= _buffer.size()) {
+            _buffer.erase(0, _head);
+            _head = 0;
+        }
+        return line;
+    }
+
+#endif  // CHESS_HAS_UCI_PROCESS
 
 #if !CHESS_HAS_UCI_PROCESS
 
@@ -183,9 +224,7 @@ namespace BECore::Chess {
 
         /// Why there is no process here, one sentence per case
         constexpr const char* kNoProcessDetail =
-#if defined(_WIN32)
-            "a UCI engine process is not implemented on Windows yet";
-#elif defined(__EMSCRIPTEN__)
+#if defined(__EMSCRIPTEN__)
             "a UCI engine cannot run in a browser";
 #else
             "a UCI engine process is switched off in this build (CHESS_NO_STOCKFISH)";
@@ -215,7 +254,7 @@ namespace BECore::Chess {
         return false;
     }
 
-#else
+#elif CHESS_UCI_PROCESS_POSIX
 
     UciProcess::UciProcess(int processId, int inputDescriptor, int outputDescriptor) : _pid(processId), _inputDescriptor(inputDescriptor), _outputDescriptor(outputDescriptor) {}
 
@@ -290,33 +329,6 @@ namespace BECore::Chess {
             written += static_cast<size_t>(count);
         }
         return {};
-    }
-
-    std::optional<eastl::string> UciProcess::TakeBufferedLine() {
-        constexpr char kLineEnd = '\n';
-        constexpr char kCarriageReturn = '\r';
-
-        const size_t lineEnd = _buffer.find(kLineEnd, _head + _scanned);
-        if (lineEnd == eastl::string::npos) {
-            _scanned = _buffer.size() - _head;
-            return std::nullopt;
-        }
-
-        size_t textEnd = lineEnd;
-        if (textEnd > _head && _buffer[textEnd - 1] == kCarriageReturn) {
-            --textEnd;
-        }
-        eastl::string line(_buffer.data() + _head, textEnd - _head);
-        _head = lineEnd + 1;
-        _scanned = 0;
-        if (_head == _buffer.size()) {
-            _buffer.clear();
-            _head = 0;
-        } else if (_head >= kCompactBytes && _head * 2 >= _buffer.size()) {
-            _buffer.erase(0, _head);
-            _head = 0;
-        }
-        return line;
     }
 
     std::expected<eastl::string, EngineError> UciProcess::ReadLine(std::chrono::milliseconds timeout) {
@@ -439,6 +451,6 @@ namespace BECore::Chess {
         return true;
     }
 
-#endif  // !CHESS_HAS_UCI_PROCESS
+#endif  // !CHESS_HAS_UCI_PROCESS, CHESS_UCI_PROCESS_POSIX
 
 }  // namespace BECore::Chess

@@ -17,7 +17,7 @@ src/Chess/
 │   └── StatusText.*, BoardOrientation.h, BoardCoordinates.h, PromotionChoices.*, CapturedMaterial.*, MaterialLayout.h, MoveNotation.*, MoveList.*   pure helpers of the UI (`MoveNotation.*`: `SanOf`, the standard algebraic notation of a move; `MoveList.*`: `BuildMoveList`, the rows of a move list, not to be confused with the `MoveList` alias of `MoveGenerator.h`)
 ├── Engine/                   the computer opponent (src/Chess/Engine/CLAUDE.md)
 │   ├── ChessEngine.h, Analysis.*, SearchRequest.*     IChessEngine (FindMove, Analyse), the request and the analysis
-│   ├── UciProtocol.*, UciProcess.*, UciEngine.*       Stockfish over UCI in a child process (POSIX)
+│   ├── UciProtocol.*, UciProcess.*, UciEngine.*       Stockfish over UCI in a child process (POSIX and Windows)
 │   ├── Evaluation.*, Search.*, TranspositionTable.*, OwnEngine.*   the engine of our own
 │   ├── BlunderEngine.*, OpponentLevels.*, OpponentEngines.*, OpponentText.*, OpponentSettings.*   handicap, levels, engines, words, settings
 │   ├── EngineOpponent.*, OpponentController.*, OpponentChoice.*   the opponent in a game, its seat, the person's choice
