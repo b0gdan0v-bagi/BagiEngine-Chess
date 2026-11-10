@@ -18,7 +18,11 @@ namespace BECore::Chess::Tests {
         constexpr int kManyUpdates = 1000;
         constexpr std::chrono::milliseconds kShutdownBudget{3000};  // well under the 5 s a UciEngine gives a stubborn child by default (UciEngineSettings::kDefaultQuitGraceMs)
         constexpr const char* kLogName = "fake.log";
+#if defined(_WIN32)
+        constexpr const char* kWrapperName = "stockfish-wrapper.cmd";  // CreateProcess runs a .cmd through cmd.exe
+#else
         constexpr const char* kWrapperName = "stockfish-wrapper.sh";
+#endif
         constexpr eastl::string_view kMissingPath = "/no/such/file";
         constexpr eastl::string_view kTildePath = "~/bin/stockfish";
         constexpr std::filesystem::perms kScriptPermissions = std::filesystem::perms::owner_all | std::filesystem::perms::group_read | std::filesystem::perms::group_exec |
@@ -762,8 +766,13 @@ namespace BECore::Chess::Tests {
             const std::filesystem::path script = directory.File(kWrapperName);
             {
                 std::ofstream out(script);
+#if defined(_WIN32)
+                // No exec: cmd.exe stays the parent of the fake, and UciProcess's job ends both
+                out << "@\"" << CHESS_TEST_PYTHON << "\" \"" << FakeEngineScript().string() << "\" " << std::string(flags.data(), flags.size()) << "\r\n";
+#else
                 out << "#!/bin/sh\n";
                 out << "exec \"" << CHESS_TEST_PYTHON << "\" \"" << FakeEngineScript().string() << "\" " << std::string(flags.data(), flags.size()) << "\n";
+#endif
             }
             std::filesystem::permissions(script, kScriptPermissions, std::filesystem::perm_options::replace);
             return script;
