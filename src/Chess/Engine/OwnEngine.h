@@ -98,6 +98,15 @@ namespace BECore::Chess {
 
         /// The search of Analyse(), started
         [[nodiscard]] std::expected<OwnSearch, EngineError> BeginAnalyse(const SearchRequest& request, const CancellationToken& token) const;
+
+        /// FindMove() as a coroutine: Begin, then `co_await YieldIfNeeded()` and Advance(kSearchSliceNodes) until done (the yield goes BEFORE each slice, so a task started
+        /// between two drains of the frame budget gives the frame back at once), then the same answer as FindMove() by the same code. On the single-thread build the search so
+        /// spans many frames; on a threaded build YieldIfNeeded() never suspends and the call is FindMove() with one pointer test per slice. The OwnSearch lives in the
+        /// coroutine frame and nothing reads the engine once the task runs, so a destroyed engine does not matter. Cancelled is seen at the start of every slice.
+        [[nodiscard]] Task<std::expected<Move, EngineError>> FindMoveAsync(SearchRequest request, CancellationToken token) override;
+
+        /// Analyse() as a coroutine, the loop of FindMoveAsync()
+        [[nodiscard]] Task<std::expected<Analysis, EngineError>> AnalyseAsync(SearchRequest request, CancellationToken token) override;
     };
 
 }  // namespace BECore::Chess

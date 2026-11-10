@@ -32,9 +32,9 @@ namespace BECore::Chess {
         ASSERT(_inner, "BlunderEngine: no engine to wrap");
     }
 
-    std::expected<Move, EngineError> BlunderEngine::FindMove(const SearchRequest& request, const CancellationToken& token) {
+    std::expected<std::optional<Move>, EngineError> BlunderEngine::BlunderMove(const SearchRequest& request, const CancellationToken& token) const {
         if (_percent == 0) {
-            return _inner->FindMove(request, token);
+            return std::nullopt;
         }
 
         if (auto valid = request.Validate(); !valid) {
@@ -53,7 +53,7 @@ namespace BECore::Chess {
         const uint64_t seed = position.Key() ^ (static_cast<uint64_t>(request.moves.size()) * kPlyStep);
         const bool blunder = Mix(seed ^ kRollSalt) % kMaxPercent < static_cast<uint64_t>(_percent);
         if (!blunder) {
-            return _inner->FindMove(request, token);
+            return std::nullopt;
         }
         if (token.IsCancelled()) {
             return Fail(EngineErrorKind::Cancelled, "cancelled before the move was picked");
@@ -61,8 +61,35 @@ namespace BECore::Chess {
         return legal[Mix(seed ^ kMoveSalt) % legal.size()];
     }
 
+    std::expected<Move, EngineError> BlunderEngine::FindMove(const SearchRequest& request, const CancellationToken& token) {
+        auto blunder = BlunderMove(request, token);
+        if (!blunder) {
+            return std::unexpected(std::move(blunder.error()));
+        }
+        if (*blunder) {
+            return **blunder;
+        }
+        return _inner->FindMove(request, token);
+    }
+
     std::expected<Analysis, EngineError> BlunderEngine::Analyse(const SearchRequest& request, const CancellationToken& token) {
         return _inner->Analyse(request, token);
+    }
+
+    // The blunder path answers at once, without a suspension; the engine object must outlive the task, as the wrapped one does
+    Task<std::expected<Move, EngineError>> BlunderEngine::FindMoveAsync(SearchRequest request, CancellationToken token) {
+        auto blunder = BlunderMove(request, token);
+        if (!blunder) {
+            co_return std::unexpected(std::move(blunder.error()));
+        }
+        if (*blunder) {
+            co_return** blunder;
+        }
+        co_return AnswerOfTask(co_await _inner->FindMoveAsync(std::move(request), std::move(token)));
+    }
+
+    Task<std::expected<Analysis, EngineError>> BlunderEngine::AnalyseAsync(SearchRequest request, CancellationToken token) {
+        co_return AnswerOfTask(co_await _inner->AnalyseAsync(std::move(request), std::move(token)));
     }
 
 }  // namespace BECore::Chess

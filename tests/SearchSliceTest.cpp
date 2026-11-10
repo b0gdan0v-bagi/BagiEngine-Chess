@@ -1137,6 +1137,196 @@ namespace BECore::Chess::Tests {
 #endif
     }
 
+    // -- the async calls of IChessEngine -------------------------------------------------------------------------------------
+
+    namespace {
+
+        /// The answer of an async call that a task on the pool writes: the test polls `done`
+        template <typename T>
+        struct AsyncAnswer {
+            std::atomic<bool> done{false};
+            std::expected<T, EngineError> answer = std::unexpected(EngineError{EngineErrorKind::Unsupported, "not answered"});
+        };
+
+        /// Awaits @p call on the pool (the way EngineOpponent's task body does) and stores what it gave
+        template <typename T>
+        Task<void> AwaitOnThePool(Task<std::expected<T, EngineError>> call, eastl::shared_ptr<AsyncAnswer<T>> out) {
+            out->answer = AnswerOfTask(co_await std::move(call));
+            out->done.store(true, std::memory_order_release);
+            co_return;
+        }
+
+        template <typename T>
+        bool WaitForAnswer(const AsyncAnswer<T>& out) {
+            const Clock::time_point deadline = Clock::now() + kPoolWaitLimit;
+            while (!out.done.load(std::memory_order_acquire)) {
+                if (Clock::now() >= deadline) {
+                    return false;
+                }
+                std::this_thread::sleep_for(kPoolPollInterval);
+            }
+            return true;
+        }
+
+        /// Runs @p call as a task on the pool and waits for it by a poll with a time limit; the answer is in @p out
+        template <typename T>
+        eastl::shared_ptr<AsyncAnswer<T>> RunOnThePool(Task<std::expected<T, EngineError>> call) {
+            auto out = eastl::make_shared<AsyncAnswer<T>>();
+            TaskManager::GetInstance().Run(AwaitOnThePool<T>(std::move(call), out));
+            return out;
+        }
+
+        /// An engine with the blocking calls only: the async ones are the defaults of IChessEngine
+        class BlockingOnlyEngine final : public IChessEngine {
+        public:
+            std::expected<Move, EngineError> FindMove(const SearchRequest& request, const CancellationToken&) override {
+                ++_findCalls;
+                const auto found = request.FinalPosition();
+                if (!found) {
+                    return std::unexpected(found.error());
+                }
+                return MoveGenerator::GenerateLegal(*found)[0];
+            }
+
+            std::expected<Analysis, EngineError> Analyse(const SearchRequest& request, const CancellationToken& token) override {
+                ++_analyseCalls;
+                auto move = FindMove(request, token);
+                if (!move) {
+                    return std::unexpected(std::move(move.error()));
+                }
+                Analysis analysis;
+                analysis.lines.push_back(AnalysisLine{*move, AnalysisScore{AnalysisScoreKind::Centipawns, kScriptedCentipawns}, 1});
+                return analysis;
+            }
+
+            int _findCalls = 0;
+            int _analyseCalls = 0;
+            static constexpr int kScriptedCentipawns = 17;
+        };
+
+    }  // namespace
+
+    TEST_F(OwnSearchOnThePoolTest, OwnEngineAsyncGivesTheBlockingAnswer) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        OwnEngine engine;
+
+        for (const NamedFen& position : kPerftPositions) {
+            SCOPED_TRACE(position.name);
+            const SearchRequest request = RequestFor(position.fen, kEngineShallowDepth);
+            const auto expectedMove = engine.FindMove(request, CancellationToken::Create());
+            ASSERT_TRUE(expectedMove.has_value());
+
+            const auto moveOut = RunOnThePool<Move>(engine.FindMoveAsync(request, CancellationToken::Create()));
+            ASSERT_TRUE(WaitForAnswer(*moveOut)) << "FindMoveAsync did not finish";
+            ASSERT_TRUE(moveOut->answer.has_value());
+            EXPECT_EQ(*moveOut->answer, *expectedMove);
+
+            for (const int lines : kAnalysisLineCounts) {
+                if (lines > 3) {
+                    continue;
+                }
+                const SearchRequest linesRequest = RequestFor(position.fen, kEngineShallowDepth, lines);
+                const auto expected = engine.Analyse(linesRequest, CancellationToken::Create());
+                ASSERT_TRUE(expected.has_value());
+
+                const auto out = RunOnThePool<Analysis>(engine.AnalyseAsync(linesRequest, CancellationToken::Create()));
+                ASSERT_TRUE(WaitForAnswer(*out)) << "AnalyseAsync did not finish";
+                ASSERT_TRUE(out->answer.has_value()) << lines << " lines";
+                EXPECT_TRUE(SameLines(*out->answer, *expected)) << lines << " lines: " << Describe(*out->answer) << " against " << Describe(*expected);
+            }
+        }
+    }
+
+    TEST_F(OwnSearchOnThePoolTest, OwnEngineAsyncReportsTheErrorsOfTheBlockingCalls) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        OwnEngine engine;
+        SearchRequest noLimits = RequestFor(Position::kStartFen, 1);
+        noLimits.limits = SearchLimits{0, 0};
+        CancellationToken cancelled = CancellationToken::Create();
+        cancelled.Cancel();
+
+        struct Case {
+            const char* name;
+            SearchRequest request;
+            CancellationToken token;
+            EngineErrorKind kind;
+        };
+        const Case cases[] = {
+            {"bad request", noLimits, CancellationToken::Create(), EngineErrorKind::BadRequest},
+            {"no move", RequestFor(kMatedFen, 1), CancellationToken::Create(), EngineErrorKind::NoMove},
+            {"cancelled", RequestFor(Position::kStartFen, 1), cancelled, EngineErrorKind::Cancelled},
+        };
+
+        for (const Case& c : cases) {
+            SCOPED_TRACE(c.name);
+            const auto blocking = engine.FindMove(c.request, c.token);
+            ASSERT_FALSE(blocking.has_value());
+            EXPECT_EQ(blocking.error().kind, c.kind);
+
+            const auto moveOut = RunOnThePool<Move>(engine.FindMoveAsync(c.request, c.token));
+            ASSERT_TRUE(WaitForAnswer(*moveOut));
+            ASSERT_FALSE(moveOut->answer.has_value());
+            EXPECT_EQ(moveOut->answer.error().kind, c.kind);
+
+            const auto analyseOut = RunOnThePool<Analysis>(engine.AnalyseAsync(c.request, c.token));
+            ASSERT_TRUE(WaitForAnswer(*analyseOut));
+            ASSERT_FALSE(analyseOut->answer.has_value());
+            EXPECT_EQ(analyseOut->answer.error().kind, c.kind);
+        }
+    }
+
+    TEST_F(OwnSearchOnThePoolTest, OwnEngineAsyncCancelledWhileRunning) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        OwnEngine engine;
+        CancellationToken moveToken = CancellationToken::Create();
+        CancellationToken analyseToken = CancellationToken::Create();
+        const auto moveOut = RunOnThePool<Move>(engine.FindMoveAsync(RequestFor(kKiwipeteFen, kGoldenForeverDepth), moveToken));
+        const auto analyseOut = RunOnThePool<Analysis>(engine.AnalyseAsync(RequestFor(kKiwipeteFen, kGoldenForeverDepth, 2), analyseToken));
+
+        std::this_thread::sleep_for(kRunBeforeCancel);
+        EXPECT_FALSE(moveOut->done.load()) << "a depth-64 search is not over after a few milliseconds";
+        moveToken.Cancel();
+        analyseToken.Cancel();
+
+        ASSERT_TRUE(WaitForAnswer(*moveOut)) << "the task did not end";
+        ASSERT_TRUE(WaitForAnswer(*analyseOut)) << "the task did not end";
+        ASSERT_FALSE(moveOut->answer.has_value());
+        ASSERT_FALSE(analyseOut->answer.has_value());
+        EXPECT_EQ(moveOut->answer.error().kind, EngineErrorKind::Cancelled);
+        EXPECT_EQ(analyseOut->answer.error().kind, EngineErrorKind::Cancelled);
+    }
+
+    TEST_F(OwnSearchOnThePoolTest, TheDefaultAsyncCallsTheBlockingOne) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        BlockingOnlyEngine engine;
+        const SearchRequest request = RequestFor(Position::kStartFen, 1);
+
+        const auto moveOut = RunOnThePool<Move>(engine.FindMoveAsync(request, CancellationToken::Create()));
+        ASSERT_TRUE(WaitForAnswer(*moveOut));
+        ASSERT_TRUE(moveOut->answer.has_value());
+        EXPECT_EQ(*moveOut->answer, *engine.FindMove(request, CancellationToken::Create()));
+
+        const auto analyseOut = RunOnThePool<Analysis>(engine.AnalyseAsync(request, CancellationToken::Create()));
+        ASSERT_TRUE(WaitForAnswer(*analyseOut));
+        ASSERT_TRUE(analyseOut->answer.has_value());
+        EXPECT_EQ(analyseOut->answer->Best().score.value, BlockingOnlyEngine::kScriptedCentipawns);
+        EXPECT_EQ(engine._analyseCalls, 1);
+    }
+
+    TEST_F(OwnSearchOnThePoolTest, TheDefaultAsyncOfAnEngineThatDoesNotAnalyseIsUnsupported) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        struct PlayingOnly final : IChessEngine {
+            std::expected<Move, EngineError> FindMove(const SearchRequest&, const CancellationToken&) override {
+                return Move();
+            }
+        } engine;
+
+        const auto out = RunOnThePool<Analysis>(engine.AnalyseAsync(RequestFor(Position::kStartFen, 1), CancellationToken::Create()));
+        ASSERT_TRUE(WaitForAnswer(*out));
+        ASSERT_FALSE(out->answer.has_value());
+        EXPECT_EQ(out->answer.error().kind, EngineErrorKind::Unsupported);
+    }
+
     // -- the benchmark -------------------------------------------------------------------------------------------------------
 
     namespace {

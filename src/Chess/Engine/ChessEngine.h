@@ -3,6 +3,7 @@
 #include <Chess/Engine/Analysis.h>
 #include <Chess/Game/Move.h>
 #include <TaskSystem/CancellationToken.h>
+#include <TaskSystem/Task.h>
 
 namespace BECore::Chess {
 
@@ -26,11 +27,23 @@ namespace BECore::Chess {
         int depth = 0;
     };
 
+    /// What `co_await` of an async engine call gives: the engine's own answer inside the task's result. The task itself fails only when it was abandoned or threw,
+    /// which is a Cancelled answer to the caller
+    template <typename T>
+    [[nodiscard]] std::expected<T, EngineError> AnswerOfTask(std::expected<std::expected<T, EngineError>, TaskError> result) {
+        if (!result) {
+            return std::unexpected(EngineError{EngineErrorKind::Cancelled, "the engine task did not finish"});
+        }
+        return std::move(*result);
+    }
+
     /**
      * @brief An engine that picks a move and analyses a position: Stockfish over UCI, the engine of our own (OwnEngine), or a handicap over either.
      *
-     * The call is synchronous and blocking: it returns when the engine has answered, was cancelled or failed, so a caller that must not
-     * wait (the main thread) runs it on a worker. It takes a SearchRequest (the start FEN and the moves played), not a Position,
+     * FindMove() and Analyse() are synchronous and blocking: they return when the engine has answered, was cancelled or failed, so a caller that must not
+     * wait (the main thread) runs them on a worker. FindMoveAsync() and AnalyseAsync() are the same calls as coroutines: an engine with a resumable search
+     * (OwnEngine) gives the thread back between slices of its search, the others block for the whole call (the default). The game's tasks await the async form.
+     * It takes a SearchRequest (the start FEN and the moves played), not a Position,
      * because UCI engines see repetitions only through the moves. The request type is in Chess/Engine/SearchRequest.h, which includes this file.
      */
     class IChessEngine {
@@ -57,6 +70,18 @@ namespace BECore::Chess {
         [[nodiscard]] virtual std::expected<Analysis, EngineError> Analyse([[maybe_unused]] const SearchRequest& request, [[maybe_unused]] const CancellationToken& token) {
             return std::unexpected(EngineError{EngineErrorKind::Unsupported, "this engine does not analyse"});
         }
+
+        /**
+         * @brief FindMove() as a coroutine: the same answer and the same errors, but an engine with a resumable search may suspend between slices.
+         *
+         * The default body calls FindMove() and so blocks the thread for the whole call; an engine with a resumable search overrides it. The request and the
+         * token are taken by value, so the coroutine frame owns what it uses (a reference would dangle once the caller's frame is gone). The call suspends only
+         * through the frame budget (`co_await YieldIfNeeded()`): on a worker pool it behaves as the blocking call. The caller keeps the engine alive until the task ends.
+         */
+        [[nodiscard]] virtual Task<std::expected<Move, EngineError>> FindMoveAsync(SearchRequest request, CancellationToken token);
+
+        /// Analyse() as a coroutine, with the rules of FindMoveAsync(). The default body calls Analyse(), so an engine that does not analyse answers Unsupported
+        [[nodiscard]] virtual Task<std::expected<Analysis, EngineError>> AnalyseAsync(SearchRequest request, CancellationToken token);
     };
 
 }  // namespace BECore::Chess
