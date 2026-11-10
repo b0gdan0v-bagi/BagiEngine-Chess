@@ -6,6 +6,56 @@
 namespace BECore::Chess {
 
     /**
+     * @brief A search of the engine of our own that has been started and is driven a few nodes at a time: the state of one FindMove() or Analyse().
+     *
+     * Made by OwnEngine::BeginFindMove() / BeginAnalyse(). A caller that must stay responsive (a coroutine on the single-thread web build) calls Advance() with
+     * kSearchSliceNodes until IsDone(), giving the thread back between the calls, and then reads Result(); FindMove() and Analyse() are the same object run to the
+     * end in one call, so the sliced and the one-call path cannot give different answers. The object owns everything it needs (a copy of the position, the request's
+     * limits, the token, the jobs of the lines with their transposition tables: 4 MB each for a depth of 3 or more, one at a time, freed with the line and with the
+     * object), so it may outlive the request it was made from. It is moved, never copied; not thread safe: one thread drives it at a time, though not always the same one.
+     * The token may be cancelled from any thread.
+     */
+    class OwnSearch {
+    public:
+        ~OwnSearch();
+        OwnSearch(OwnSearch&&) noexcept;
+        OwnSearch& operator=(OwnSearch&&) noexcept;
+        OwnSearch(const OwnSearch&) = delete;
+        OwnSearch& operator=(const OwnSearch&) = delete;
+
+        /**
+         * @brief Runs the search for about @p maxNodes more nodes (SearchJob::Advance() says how exactly) and answers whether it is over.
+         *
+         * `Paused`: call again. `Done`: the answer or the error is ready in Result(); a call after that does nothing. UINT64_MAX runs to the end, 0 counts as 1.
+         * A cancelled token is looked at at the start of every call, so a cancel between two slices ends the search at once, with the error Cancelled and no node
+         * searched. A slice goes on from one line of an analysis to the next, and a line that ends the slice's budget exactly may leave the next one for the next call.
+         * **A move time is a wall-clock deadline counted from OwnEngine::BeginFindMove() / BeginAnalyse()**, so the time a caller spends elsewhere between two slices
+         * counts against it (a search with a depth only is not affected).
+         */
+        [[nodiscard]] SearchProgress Advance(uint64_t maxNodes = kSearchSliceNodes);
+
+        [[nodiscard]] bool IsDone() const noexcept;
+
+        /// The answer once IsDone(): `min(SearchRequest::lines, legal moves)` lines for BeginAnalyse(), one for BeginFindMove(), as OwnEngine::Analyse() gives them;
+        /// or the error that FindMove() / Analyse() would give (Cancelled, IllegalMove). Not meant to be called before IsDone()
+        [[nodiscard]] std::expected<Analysis, EngineError> Result() const;
+
+        /// The nodes searched so far by all the lines (the retry's included); for the tests
+        [[nodiscard]] uint64_t GetNodes() const noexcept;
+
+    private:
+        friend class OwnEngine;
+        struct Impl;
+
+        explicit OwnSearch(eastl::unique_ptr<Impl> impl) noexcept;
+
+        /// Validates, finds the position and its moves, and starts the search of the first line; @p lines is the number of lines wanted (before the legal moves limit it)
+        [[nodiscard]] static std::expected<OwnSearch, EngineError> Begin(const SearchRequest& request, const CancellationToken& token, int lines);
+
+        eastl::unique_ptr<Impl> _impl;
+    };
+
+    /**
      * @brief The engine of our own: IChessEngine over Search(), in the process of the game, on every platform.
      *
      * The same contract as UciEngine::FindMove(), minus the process. The request is checked first (BadRequest for wrong limits, a
@@ -21,10 +71,14 @@ namespace BECore::Chess {
      * **Deterministic for a depth**: a request with a depth and no time gives the same move on every run and platform. A request
      * with a time is not: where the clock stops the search decides the depth reached, hence the move.
      *
-     * The object has no state between calls and no process, so FindMove() may be called from several threads at once, each with its
-     * own request and token. It logs nothing (only EngineOpponent, OpponentController, PositionAnalyst and MoveRater log). The search runs on the thread that
-     * calls, which is a worker of the Background pool in the game: Search() keeps a few KB of move lists per ply (see Search.cpp,
-     * kMaxPly), which a worker's stack of 512 KB holds.
+     * **Two ways to ask, one implementation.** FindMove() and Analyse() block until the answer. BeginFindMove() and BeginAnalyse() start the same search and hand back
+     * an OwnSearch that the caller drives with Advance(), a slice at a time; FindMove() and Analyse() are "begin, run to the end", so they give the answer of a driven
+     * search for any size of the slices (the move, the score, the depth and the nodes), with the same errors. The errors of the request (BadRequest, NoMove, a token
+     * already cancelled) come back from Begin...() and nothing is started.
+     *
+     * The object has no state between calls and no process (the state of a call is the OwnSearch), so FindMove() may be called from several threads at once, each with its
+     * own request and token, and several OwnSearch of one engine may be driven side by side. It logs nothing (only EngineOpponent, OpponentController, PositionAnalyst and MoveRater log).
+     * The search runs on the thread that calls: the plies of a line are frames on the heap (see Search.h), so a worker needs no deep stack.
      */
     class OwnEngine final : public IChessEngine {
     public:
@@ -38,6 +92,12 @@ namespace BECore::Chess {
         /// and searches under both, so they give the same move for the same request, and the errors are the same), also deterministic for a depth, a deadline is not an error and the object may be
         /// asked from several threads at once.
         [[nodiscard]] std::expected<Analysis, EngineError> Analyse(const SearchRequest& request, const CancellationToken& token) override;
+
+        /// The search of FindMove(), started: one line (SearchRequest::lines is validated but otherwise ignored), the answer in OwnSearch::Result() as a one-line Analysis
+        [[nodiscard]] std::expected<OwnSearch, EngineError> BeginFindMove(const SearchRequest& request, const CancellationToken& token) const;
+
+        /// The search of Analyse(), started
+        [[nodiscard]] std::expected<OwnSearch, EngineError> BeginAnalyse(const SearchRequest& request, const CancellationToken& token) const;
     };
 
 }  // namespace BECore::Chess
