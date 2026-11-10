@@ -36,12 +36,23 @@ namespace BECore::Chess {
         /// analyse answers Unsupported through this class as well.
         [[nodiscard]] std::expected<Analysis, EngineError> Analyse(const SearchRequest& request, const CancellationToken& token) override;
 
+        /// FindMove() as a coroutine: the same decision (BlunderMove(), one place), a blunder is answered at once with no suspension, otherwise the wrapped engine's
+        /// FindMoveAsync() is awaited, so a wrapped OwnEngine still yields between slices. The object must outlive the task
+        [[nodiscard]] Task<std::expected<Move, EngineError>> FindMoveAsync(SearchRequest request, CancellationToken token) override;
+
+        /// Forwarded to the wrapped engine's AnalyseAsync() like Analyse()
+        [[nodiscard]] Task<std::expected<Analysis, EngineError>> AnalyseAsync(SearchRequest request, CancellationToken token) override;
+
         /// The share after clamping
         [[nodiscard]] int Percent() const {
             return _percent;
         }
 
     private:
+        /// The part of FindMove() that is the handicap's own: an error of the request (in the order of OwnEngine), the random legal move when this move is a blunder,
+        /// nothing when the wrapped engine is to answer (always at 0 percent, with no check of the request)
+        [[nodiscard]] std::expected<std::optional<Move>, EngineError> BlunderMove(const SearchRequest& request, const CancellationToken& token) const;
+
         eastl::shared_ptr<IChessEngine> _inner;
         int _percent;
     };

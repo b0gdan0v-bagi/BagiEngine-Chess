@@ -2,6 +2,7 @@
 #include "FakeEngineUtil.h"
 
 #include <Chess/Engine/EngineOpponent.h>
+#include <Chess/Engine/OwnEngine.h>
 #include <Chess/Engine/UciEngine.h>
 #include <Chess/Game/ChessGameModel.h>
 #include <Chess/Game/MoveGenerator.h>
@@ -456,6 +457,40 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(model.GetPosition().Key(), byHand.GetPosition().Key());
         EXPECT_EQ(model.GetVersion(), byHand.GetVersion());
         EXPECT_EQ(model.GetStatus(), byHand.GetStatus());
+        EXPECT_FALSE(opponent.GetLastError().has_value());
+    }
+
+    /// The real own engine over many slices (depth 4 is far more than one slice of nodes): the move is the blocking one, and a version that moves meanwhile drops the answer
+    TEST_F(EngineOpponentTest, TheOwnEngineOverManySlicesPlaysTheBlockingMove) {
+        constexpr SearchLimits kOwnLimits{0, 4};
+        ChessGameModel model;
+        const auto expected = OwnEngine().FindMove(SearchRequest::FromModel(model, kOwnLimits), CancellationToken::Create());
+        ASSERT_TRUE(expected.has_value());
+        EngineOpponent opponent(eastl::make_shared<OwnEngine>(), PieceColor::White, kOwnLimits);
+
+        opponent.Update(model);
+        EXPECT_TRUE(opponent.IsThinking());
+        ASSERT_TRUE(UpdateUntil(opponent, model, [&] { return model.GetMoves().size() == 1; })) << Describe(opponent.GetLastError()).c_str();
+
+        EXPECT_EQ(model.GetMoves()[0], *expected);
+        EXPECT_FALSE(opponent.IsThinking());
+        EXPECT_FALSE(opponent.GetLastError().has_value());
+    }
+
+    TEST_F(EngineOpponentTest, TheOwnEnginesAnswerIsDroppedWhenTheVersionMovesMeanwhile) {
+        constexpr SearchLimits kOwnLimits{0, 4};
+        ChessGameModel model;
+        EngineOpponent opponent(eastl::make_shared<OwnEngine>(), PieceColor::White, kOwnLimits);
+
+        opponent.Update(model);
+        EXPECT_TRUE(opponent.IsThinking());
+        ASSERT_TRUE(Play(model, "e2e4"));  // someone else moves for White
+
+        ASSERT_TRUE(UpdateUntil(opponent, model, [&] { return !opponent.IsThinking(); })) << Describe(opponent.GetLastError()).c_str();
+        for (int frame = 0; frame < kManyUpdates; ++frame) {
+            opponent.Update(model);
+        }
+        EXPECT_EQ(model.GetMoves().size(), 1u) << "the stale White move was not played, and Black's turn is not the opponent's";
         EXPECT_FALSE(opponent.GetLastError().has_value());
     }
 

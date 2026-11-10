@@ -1,5 +1,6 @@
 #include "ChessTestUtil.h"
 
+#include <Chess/Engine/EngineOpponent.h>
 #include <Chess/Engine/OwnEngine.h>
 #include <Chess/Engine/Search.h>
 #include <Chess/Game/ChessGameModel.h>
@@ -1101,7 +1102,8 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OwnSearchOnThePoolTest, ACoroutineCanDriveTheSearchOnThePool) {
 #if BE_SINGLE_THREAD
-        // A single-thread build resumes a task that yielded only in TaskManager::Update, which only CoreManager calls, so nothing here would ever finish the coroutine
+        // A single-thread build resumes a task that yielded only in TaskManager::Update, which only CoreManager calls, and this test waits with a poll and never pumps (OpponentOverFramesTest does,
+        // with PumpTaskFrame)
         GTEST_SKIP() << "needs worker threads (BE_SINGLE_THREAD)";
 #else
         OwnEngine engine;
@@ -1135,6 +1137,330 @@ namespace BECore::Chess::Tests {
         ASSERT_FALSE(out->answer.has_value());
         EXPECT_EQ(out->answer.error().kind, EngineErrorKind::Cancelled);
 #endif
+    }
+
+    // -- the async calls of IChessEngine -------------------------------------------------------------------------------------
+
+    namespace {
+
+        /// The answer of an async call that a task on the pool writes: the test polls `done`
+        template <typename T>
+        struct AsyncAnswer {
+            std::atomic<bool> done{false};
+            std::expected<T, EngineError> answer = std::unexpected(EngineError{EngineErrorKind::Unsupported, "not answered"});
+        };
+
+        /// Awaits @p call on the pool (the way EngineOpponent's task body does) and stores what it gave
+        template <typename T>
+        Task<void> AwaitOnThePool(Task<std::expected<T, EngineError>> call, eastl::shared_ptr<AsyncAnswer<T>> out) {
+            out->answer = AnswerOfTask(co_await std::move(call));
+            out->done.store(true, std::memory_order_release);
+            co_return;
+        }
+
+        template <typename T>
+        bool WaitForAnswer(const AsyncAnswer<T>& out) {
+            const Clock::time_point deadline = Clock::now() + kPoolWaitLimit;
+            while (!out.done.load(std::memory_order_acquire)) {
+                if (Clock::now() >= deadline) {
+                    return false;
+                }
+                std::this_thread::sleep_for(kPoolPollInterval);
+            }
+            return true;
+        }
+
+        /// Runs @p call as a task on the pool and waits for it by a poll with a time limit; the answer is in @p out
+        template <typename T>
+        eastl::shared_ptr<AsyncAnswer<T>> RunOnThePool(Task<std::expected<T, EngineError>> call) {
+            auto out = eastl::make_shared<AsyncAnswer<T>>();
+            TaskManager::GetInstance().Run(AwaitOnThePool<T>(std::move(call), out));
+            return out;
+        }
+
+        /// An engine with the blocking calls only: the async ones are the defaults of IChessEngine
+        class BlockingOnlyEngine final : public IChessEngine {
+        public:
+            std::expected<Move, EngineError> FindMove(const SearchRequest& request, const CancellationToken&) override {
+                ++_findCalls;
+                const auto found = request.FinalPosition();
+                if (!found) {
+                    return std::unexpected(found.error());
+                }
+                return MoveGenerator::GenerateLegal(*found)[0];
+            }
+
+            std::expected<Analysis, EngineError> Analyse(const SearchRequest& request, const CancellationToken& token) override {
+                ++_analyseCalls;
+                auto move = FindMove(request, token);
+                if (!move) {
+                    return std::unexpected(std::move(move.error()));
+                }
+                Analysis analysis;
+                analysis.lines.push_back(AnalysisLine{*move, AnalysisScore{AnalysisScoreKind::Centipawns, kScriptedCentipawns}, 1});
+                return analysis;
+            }
+
+            [[nodiscard]] int FindCalls() const {
+                return _findCalls;
+            }
+
+            [[nodiscard]] int AnalyseCalls() const {
+                return _analyseCalls;
+            }
+
+            static constexpr int kScriptedCentipawns = 17;
+
+        private:
+            int _findCalls = 0;
+            int _analyseCalls = 0;
+        };
+
+    }  // namespace
+
+    TEST_F(OwnSearchOnThePoolTest, OwnEngineAsyncGivesTheBlockingAnswer) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        OwnEngine engine;
+
+        for (const NamedFen& position : kPerftPositions) {
+            SCOPED_TRACE(position.name);
+            const SearchRequest request = RequestFor(position.fen, kEngineShallowDepth);
+            const auto expectedMove = engine.FindMove(request, CancellationToken::Create());
+            ASSERT_TRUE(expectedMove.has_value());
+
+            const auto moveOut = RunOnThePool<Move>(engine.FindMoveAsync(request, CancellationToken::Create()));
+            ASSERT_TRUE(WaitForAnswer(*moveOut)) << "FindMoveAsync did not finish";
+            ASSERT_TRUE(moveOut->answer.has_value());
+            EXPECT_EQ(*moveOut->answer, *expectedMove);
+
+            for (const int lines : kAnalysisLineCounts) {
+                if (lines > 3) {
+                    continue;
+                }
+                const SearchRequest linesRequest = RequestFor(position.fen, kEngineShallowDepth, lines);
+                const auto expected = engine.Analyse(linesRequest, CancellationToken::Create());
+                ASSERT_TRUE(expected.has_value());
+
+                const auto out = RunOnThePool<Analysis>(engine.AnalyseAsync(linesRequest, CancellationToken::Create()));
+                ASSERT_TRUE(WaitForAnswer(*out)) << "AnalyseAsync did not finish";
+                ASSERT_TRUE(out->answer.has_value()) << lines << " lines";
+                EXPECT_TRUE(SameLines(*out->answer, *expected)) << lines << " lines: " << Describe(*out->answer) << " against " << Describe(*expected);
+            }
+        }
+    }
+
+    TEST_F(OwnSearchOnThePoolTest, OwnEngineAsyncReportsTheErrorsOfTheBlockingCalls) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        OwnEngine engine;
+        SearchRequest noLimits = RequestFor(Position::kStartFen, 1);
+        noLimits.limits = SearchLimits{0, 0};
+        CancellationToken cancelled = CancellationToken::Create();
+        cancelled.Cancel();
+
+        struct Case {
+            const char* name;
+            SearchRequest request;
+            CancellationToken token;
+            EngineErrorKind kind;
+        };
+        const Case cases[] = {
+            {"bad request", noLimits, CancellationToken::Create(), EngineErrorKind::BadRequest},
+            {"no move", RequestFor(kMatedFen, 1), CancellationToken::Create(), EngineErrorKind::NoMove},
+            {"cancelled", RequestFor(Position::kStartFen, 1), cancelled, EngineErrorKind::Cancelled},
+        };
+
+        for (const Case& c : cases) {
+            SCOPED_TRACE(c.name);
+            const auto blocking = engine.FindMove(c.request, c.token);
+            ASSERT_FALSE(blocking.has_value());
+            EXPECT_EQ(blocking.error().kind, c.kind);
+
+            const auto moveOut = RunOnThePool<Move>(engine.FindMoveAsync(c.request, c.token));
+            ASSERT_TRUE(WaitForAnswer(*moveOut));
+            ASSERT_FALSE(moveOut->answer.has_value());
+            EXPECT_EQ(moveOut->answer.error().kind, c.kind);
+
+            const auto analyseOut = RunOnThePool<Analysis>(engine.AnalyseAsync(c.request, c.token));
+            ASSERT_TRUE(WaitForAnswer(*analyseOut));
+            ASSERT_FALSE(analyseOut->answer.has_value());
+            EXPECT_EQ(analyseOut->answer.error().kind, c.kind);
+        }
+    }
+
+    TEST_F(OwnSearchOnThePoolTest, OwnEngineAsyncCancelledWhileRunning) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        OwnEngine engine;
+        CancellationToken moveToken = CancellationToken::Create();
+        CancellationToken analyseToken = CancellationToken::Create();
+        const auto moveOut = RunOnThePool<Move>(engine.FindMoveAsync(RequestFor(kKiwipeteFen, kGoldenForeverDepth), moveToken));
+        const auto analyseOut = RunOnThePool<Analysis>(engine.AnalyseAsync(RequestFor(kKiwipeteFen, kGoldenForeverDepth, 2), analyseToken));
+
+        std::this_thread::sleep_for(kRunBeforeCancel);
+        EXPECT_FALSE(moveOut->done.load()) << "a depth-64 search is not over after a few milliseconds";
+        moveToken.Cancel();
+        analyseToken.Cancel();
+
+        ASSERT_TRUE(WaitForAnswer(*moveOut)) << "the task did not end";
+        ASSERT_TRUE(WaitForAnswer(*analyseOut)) << "the task did not end";
+        ASSERT_FALSE(moveOut->answer.has_value());
+        ASSERT_FALSE(analyseOut->answer.has_value());
+        EXPECT_EQ(moveOut->answer.error().kind, EngineErrorKind::Cancelled);
+        EXPECT_EQ(analyseOut->answer.error().kind, EngineErrorKind::Cancelled);
+    }
+
+    TEST_F(OwnSearchOnThePoolTest, TheDefaultAsyncCallsTheBlockingOne) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        BlockingOnlyEngine engine;
+        const SearchRequest request = RequestFor(Position::kStartFen, 1);
+
+        const auto moveOut = RunOnThePool<Move>(engine.FindMoveAsync(request, CancellationToken::Create()));
+        ASSERT_TRUE(WaitForAnswer(*moveOut));
+        ASSERT_TRUE(moveOut->answer.has_value());
+        EXPECT_EQ(engine.FindCalls(), 1) << "the default async call went through the blocking one";
+        EXPECT_EQ(*moveOut->answer, *engine.FindMove(request, CancellationToken::Create()));
+
+        const auto analyseOut = RunOnThePool<Analysis>(engine.AnalyseAsync(request, CancellationToken::Create()));
+        ASSERT_TRUE(WaitForAnswer(*analyseOut));
+        ASSERT_TRUE(analyseOut->answer.has_value());
+        EXPECT_EQ(analyseOut->answer->Best().score.value, BlockingOnlyEngine::kScriptedCentipawns);
+        EXPECT_EQ(engine.AnalyseCalls(), 1);
+    }
+
+    TEST_F(OwnSearchOnThePoolTest, TheDefaultAsyncOfAnEngineThatDoesNotAnalyseIsUnsupported) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        struct PlayingOnly final : IChessEngine {
+            std::expected<Move, EngineError> FindMove(const SearchRequest&, const CancellationToken&) override {
+                return Move();
+            }
+        } engine;
+
+        const auto out = RunOnThePool<Analysis>(engine.AnalyseAsync(RequestFor(Position::kStartFen, 1), CancellationToken::Create()));
+        ASSERT_TRUE(WaitForAnswer(*out));
+        ASSERT_FALSE(out->answer.has_value());
+        EXPECT_EQ(out->answer.error().kind, EngineErrorKind::Unsupported);
+    }
+
+    // -- the opponent over many frames ---------------------------------------------------------------------------------------
+
+    namespace {
+
+        /// A frame budget so small that one slice of the search spends it: every frame resumes about one slice
+        constexpr std::chrono::microseconds kTinyFrameBudget{5};
+        /// The depth of the opponent's search: far more than one slice of nodes, and quick in a Debug build
+        constexpr int kFramesDepth = 4;
+        /// A frame is one slice plus a poll: a generous multiple of the budget, since the machine is noisy and a Debug slice costs far more than 5 us
+        constexpr std::chrono::milliseconds kFrameLimit{250};
+        /// The frames of the interleaving tests run before they cancel
+        constexpr int kFramesBeforeCancel = 5;
+
+        /// Runs the opponent over frames (a task frame, then Update) until the model has moved on or the time is up. Returns the frames it took
+        [[nodiscard]] size_t PlayFrames(EngineOpponent& opponent, ChessGameModel& model, std::chrono::milliseconds* longestFrame) {
+            const uint64_t version = model.GetVersion();
+            const Clock::time_point deadline = Clock::now() + kPoolWaitLimit;
+            size_t frames = 0;
+            while (model.GetVersion() == version && Clock::now() < deadline) {
+                const Clock::time_point start = Clock::now();
+                PumpTaskFrame();
+                opponent.Update(model);
+                *longestFrame = std::max(*longestFrame, std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - start));
+                ++frames;
+#if !BE_SINGLE_THREAD
+                std::this_thread::sleep_for(kPoolPollInterval);
+#endif
+            }
+            return frames;
+        }
+
+        class OpponentOverFramesTest : public ::testing::Test {
+        protected:
+            static void SetUpTestSuite() {
+                ::BECore::Tests::EngineEnvironment::EnsureCoreServices();  // TaskManager
+            }
+
+            void SetUp() override {
+                _savedBudget = TaskManager::GetInstance().GetFrameBudget();
+                TaskManager::GetInstance().SetFrameBudget(kTinyFrameBudget);
+                PumpTaskFrame();  // the first frame: from here a task started between frames yields at its first check
+            }
+
+            void TearDown() override {
+                // Single-thread builds: let a search a failed test left parked run to its end (it is cancelled: the opponent is gone). On a threaded build nothing is parked
+                const Clock::time_point deadline = Clock::now() + kPoolWaitLimit;
+                while (TaskManager::GetInstance().GetPendingTaskCount() > 0 && Clock::now() < deadline) {
+                    PumpTaskFrame();
+                }
+                TaskManager::GetInstance().SetFrameBudget(_savedBudget);
+            }
+
+            TaskManager::Duration _savedBudget{};
+        };
+
+    }  // namespace
+
+    /// The single-thread build interleaves a search with frames (runs in the web-like build and is not skipped there); a threaded build only checks the answer
+    TEST_F(OpponentOverFramesTest, TheOwnEnginesSearchSpansFramesAndGivesTheBlockingMove) {
+        ChessGameModel model;
+        const SearchLimits limits{0, kFramesDepth};
+        const auto expected = OwnEngine().FindMove(SearchRequest::FromModel(model, limits), CancellationToken::Create());
+        ASSERT_TRUE(expected.has_value());
+
+        EngineOpponent opponent(eastl::make_shared<OwnEngine>(), PieceColor::White, limits);
+        std::chrono::milliseconds longestFrame{0};
+        [[maybe_unused]] const size_t frames = PlayFrames(opponent, model, &longestFrame);
+
+        ASSERT_EQ(model.GetMoves().size(), 1u) << "the opponent did not play within the time limit";
+        EXPECT_EQ(model.GetMoves()[0], *expected);
+        EXPECT_LT(longestFrame, kFrameLimit);
+#if BE_SINGLE_THREAD
+        EXPECT_GT(frames, 2u) << "the search ran in one frame";
+#endif
+    }
+
+    TEST_F(OpponentOverFramesTest, ACancelInTheMiddleOfAMultiFrameSearchPlaysNothing) {
+        ChessGameModel model;
+        EngineOpponent opponent(eastl::make_shared<OwnEngine>(), PieceColor::White, SearchLimits{0, kGoldenForeverDepth});
+
+        for (int frame = 0; frame < kFramesBeforeCancel; ++frame) {
+            PumpTaskFrame();
+            opponent.Update(model);
+        }
+        EXPECT_TRUE(opponent.IsThinking());
+        EXPECT_TRUE(model.GetMoves().empty());
+        opponent.Cancel();
+        EXPECT_FALSE(opponent.IsThinking());
+
+        // The search sees the token at its next slice and ends (single-thread: pumped here until no task is parked; threaded: the pending count does not include a running task,
+        // so the sleep below is the wait). The Update after it drops the answer, and being the White opponent's turn it starts a new search that the destructor cancels
+        const Clock::time_point deadline = Clock::now() + kPoolWaitLimit;
+        while (TaskManager::GetInstance().GetPendingTaskCount() > 0 && Clock::now() < deadline) {
+            PumpTaskFrame();
+        }
+        std::this_thread::sleep_for(kRunBeforeCancel);
+        opponent.Update(model);
+        EXPECT_TRUE(model.GetMoves().empty());
+    }
+
+    TEST_F(OpponentOverFramesTest, AMovedVersionInTheMiddleOfAMultiFrameSearchDropsTheAnswer) {
+        ChessGameModel model;
+        EngineOpponent opponent(eastl::make_shared<OwnEngine>(), PieceColor::White, SearchLimits{0, kGoldenForeverDepth});
+        for (int frame = 0; frame < kFramesBeforeCancel; ++frame) {
+            PumpTaskFrame();
+            opponent.Update(model);
+        }
+        ASSERT_TRUE(opponent.IsThinking());
+
+        model.Reset();  // the version moves: the next Update cancels the search
+        opponent.Update(model);
+        EXPECT_FALSE(opponent.IsThinking());
+
+        const Clock::time_point deadline = Clock::now() + kPoolWaitLimit;
+        while (TaskManager::GetInstance().GetPendingTaskCount() > 0 && Clock::now() < deadline) {
+            PumpTaskFrame();
+        }
+        std::this_thread::sleep_for(kRunBeforeCancel);
+        opponent.Update(model);
+        EXPECT_TRUE(model.GetMoves().empty());
+        EXPECT_FALSE(opponent.GetLastError().has_value());
     }
 
     // -- the benchmark -------------------------------------------------------------------------------------------------------

@@ -2,6 +2,7 @@
 
 #include <Chess/Engine/Analysis.h>
 #include <Chess/Game/MoveGenerator.h>
+#include <TaskSystem/Awaitables.h>
 
 namespace BECore::Chess {
 
@@ -193,17 +194,26 @@ namespace BECore::Chess {
         return OwnSearch::Begin(request, token, request.lines);
     }
 
+    namespace {
+
+        /// The answer of FindMove() from a finished search: the move of the first line, or the error of the search. The one place for the blocking and the async path
+        std::expected<Move, EngineError> MoveOf(const OwnSearch& search) {
+            auto answer = search.Result();
+            if (!answer) {
+                return std::unexpected(std::move(answer.error()));
+            }
+            return answer->Best().move;
+        }
+
+    }  // namespace
+
     std::expected<Move, EngineError> OwnEngine::FindMove(const SearchRequest& request, const CancellationToken& token) {
         auto search = BeginFindMove(request, token);
         if (!search) {
             return std::unexpected(std::move(search.error()));
         }
         (void)search->Advance(UINT64_MAX);
-        auto answer = search->Result();
-        if (!answer) {
-            return std::unexpected(std::move(answer.error()));
-        }
-        return answer->Best().move;
+        return MoveOf(*search);
     }
 
     std::expected<Analysis, EngineError> OwnEngine::Analyse(const SearchRequest& request, const CancellationToken& token) {
@@ -213,6 +223,32 @@ namespace BECore::Chess {
         }
         (void)search->Advance(UINT64_MAX);
         return search->Result();
+    }
+
+    // The coroutines start the search with OwnSearch::Begin() and not through the members, so nothing reads `this` once the task runs: the engine may be gone by then.
+    // The yield goes before the work: a task started between two drains of the frame budget is "spent" and must give the frame back at once.
+    Task<std::expected<Move, EngineError>> OwnEngine::FindMoveAsync(SearchRequest request, CancellationToken token) {
+        auto search = OwnSearch::Begin(request, token, 1);
+        if (!search) {
+            co_return std::unexpected(std::move(search.error()));
+        }
+        while (!search->IsDone()) {
+            co_await YieldIfNeeded();
+            (void)search->Advance(kSearchSliceNodes);
+        }
+        co_return MoveOf(*search);
+    }
+
+    Task<std::expected<Analysis, EngineError>> OwnEngine::AnalyseAsync(SearchRequest request, CancellationToken token) {
+        auto search = OwnSearch::Begin(request, token, request.lines);
+        if (!search) {
+            co_return std::unexpected(std::move(search.error()));
+        }
+        while (!search->IsDone()) {
+            co_await YieldIfNeeded();
+            (void)search->Advance(kSearchSliceNodes);
+        }
+        co_return search->Result();
     }
 
 }  // namespace BECore::Chess

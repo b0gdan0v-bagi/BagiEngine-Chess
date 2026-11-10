@@ -1,6 +1,7 @@
 #include "TestEngines.h"
 
 #include <Chess/Engine/MoveRater.h>
+#include <Chess/Engine/OwnEngine.h>
 #include <Chess/Engine/PositionAnalyst.h>
 #include <Chess/Game/ChessGameModel.h>
 #include <Chess/Game/MoveGenerator.h>
@@ -797,6 +798,25 @@ namespace BECore::Chess::Tests {
         using Reason = MoveRatingReason;
         EXPECT_EQ(ReasonsOf({}, {"e2e4", "e7e5", "g1f3", "b8c6", "f1c4", "g8f6"}),
                   (eastl::vector<Reason>{Reason::NotBest, Reason::Brilliant, Reason::NotBest, Reason::Brilliant, Reason::NotBest, Reason::Brilliant}));
+    }
+
+    /// The rater awaits the async search (many slices at depth 5); its rating is the one the blocking Analyse of the same request gives
+    TEST_F(MoveRaterTest, OwnEngineTheRatingEqualsTheRatingOfTheBlockingAnalysis) {
+        ChessGameModel model;
+        ASSERT_TRUE(PlayAll(model, {"e2e4", "e7e5"}));
+        SearchRequest request;
+        request.startFen = model.GetStartFen();
+        request.limits = SearchLimits{0, kRatingDepth};
+        request.lines = kRatingLines;
+        const MoveRatings ratings = RateWithTheOwnEngine(model);
+        ASSERT_EQ(ratings.size(), model.GetMoves().size());
+        for (size_t ply = 0; ply < model.GetMoves().size(); ++ply) {
+            const std::expected<Analysis, EngineError> analysis = OwnEngine().Analyse(request, CancellationToken::Create());
+            ASSERT_TRUE(analysis.has_value());
+            ASSERT_TRUE(ratings[ply].has_value());
+            EXPECT_EQ(ratings[ply]->reason, RateMove(*analysis, model.GetMoves()[ply]).reason) << "ply " << ply;
+            request.moves.push_back(model.GetMoves()[ply]);
+        }
     }
 
     TEST_F(MoveRaterTest, OwnEngineTheSameGameRatedTwiceGivesEqualRatings) {

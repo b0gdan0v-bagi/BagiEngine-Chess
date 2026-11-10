@@ -41,9 +41,10 @@ namespace BECore::Chess {
      * its score is the evaluation, so asking for both costs one search. The search asks for kAnalysisLines = 2 lines (MultiPV): the second line is kept next to the best one for GetLines() and
      * changes neither the evaluation nor the hint (the best line is the first one, as for one line; exact for the own engine at its fixed
      * depth, while Stockfish with MultiPV 2 in the same 2 s may search it a little shallower); a position with one legal move has one line. The owner of the model calls Update() once per frame on the
-     * main thread. When something is wanted and no answer is held for the position, Update() copies the game into a SearchRequest (SearchRequest::FromModel) and hands Analyse() to TaskManager
-     * (the Background pool, where a call that blocks for seconds belongs); a later Update() finds the answer. One search runs at a time. TaskManager must be running (CoreManager starts it). Nothing
-     * starts while nothing is switched on or asked, and never for a finished game.
+     * main thread. When something is wanted and no answer is held for the position, Update() copies the game into a SearchRequest (SearchRequest::FromModel) and hands a task that awaits
+     * IChessEngine::AnalyseAsync() to TaskManager (the Background pool, where a call that blocks for seconds belongs; in the single-thread build the own engine's search yields to the frame and spans
+     * many of them); a later Update() finds the answer. One search runs at a time. TaskManager must be running (CoreManager starts it). Nothing starts while nothing is switched on or asked, and never
+     * for a finished game.
      *
      * **The version rule** (the pattern of EngineOpponent). The model's GetVersion() at the time of the request is remembered, and the answer is kept only for that version. A search whose
      * version has moved (a move, a reset, a position set from outside) is cancelled and its answer thrown away, also when the engine ignores the token, and a new search starts for the

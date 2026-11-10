@@ -388,4 +388,73 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(inner->Calls(), 0) << "the double has no Analyse, so FindMove was not asked either";
     }
 
+    TEST(BlunderEngineTest, BlunderEngineAsyncKeepsTheBlunderRuleAndForwards) {
+        // The doubles never suspend, so a task driven on the test thread runs to its end
+        const eastl::vector<SearchRequest> requests = SeededRequests(60);
+        for (const int percent : {0, 40, 100}) {
+            const auto inner = eastl::make_shared<InstantEngine>();
+            BlunderEngine engine(inner, percent);
+            size_t blunders = 0;
+
+            for (size_t i = 0; i < requests.size(); ++i) {
+                const int before = inner->Calls();
+                const auto expected = Ask(engine, requests[i]);
+                const bool blundered = inner->Calls() == before;
+                blunders += blundered ? 1 : 0;
+                const int afterBlocking = inner->Calls();
+
+                auto task = engine.FindMoveAsync(requests[i], CancellationToken::Create());
+                const auto result = task.GetResult();
+
+                ASSERT_TRUE(result.has_value()) << percent << " " << i;
+                EXPECT_EQ(Found(*result), Found(expected)) << percent << " " << i;
+                EXPECT_EQ(inner->Calls() == afterBlocking, blundered) << percent << " " << i << ": a blunder does not ask the wrapped engine";
+            }
+            if (percent == 40) {
+                EXPECT_GT(blunders, 0u);
+                EXPECT_LT(blunders, requests.size());
+            }
+        }
+
+        // The errors of the blocking call, at 0 and at 100 percent
+        for (const int percent : {0, 100}) {
+            BlunderEngine engine(eastl::make_shared<InstantEngine>(), percent);
+            auto mated = engine.FindMoveAsync(SearchRequest::FromPosition(PositionFromFen(kMated), kLimits), CancellationToken::Create());
+            const auto mateResult = mated.GetResult();
+            ASSERT_TRUE(mateResult.has_value());
+            ASSERT_FALSE(mateResult->has_value()) << percent;
+            EXPECT_EQ(mateResult->error().kind, EngineErrorKind::NoMove) << percent;
+        }
+        {
+            BlunderEngine engine(eastl::make_shared<InstantEngine>(), 100);
+            CancellationToken cancelled = CancellationToken::Create();
+            cancelled.Cancel();
+            auto task = engine.FindMoveAsync(SearchRequest::FromPosition(Position::Start(), kLimits), cancelled);
+            const auto result = task.GetResult();
+            ASSERT_TRUE(result.has_value());
+            ASSERT_FALSE(result->has_value());
+            EXPECT_EQ(result->error().kind, EngineErrorKind::Cancelled);
+        }
+
+        // AnalyseAsync is the inner engine's, whatever the percent
+        SearchRequest request = SearchRequest::FromPosition(Position::Start(), kLimits);
+        request.lines = 3;
+        for (const int percent : {0, 50, 100}) {
+            const auto inner = eastl::make_shared<AnalysingEngine>();
+            BlunderEngine engine(inner, percent);
+            const auto direct = inner->Analyse(request, CancellationToken::Create());
+            ASSERT_TRUE(direct.has_value());
+
+            auto task = engine.AnalyseAsync(request, CancellationToken::Create());
+            const auto result = task.GetResult();
+
+            ASSERT_TRUE(result.has_value()) << percent;
+            ASSERT_TRUE(result->has_value()) << percent;
+            EXPECT_EQ((*result)->Best().move, direct->Best().move) << percent;
+            EXPECT_EQ((*result)->LineCount(), direct->LineCount()) << percent;
+            EXPECT_EQ(inner->LastRequest().lines, 3) << percent;
+            EXPECT_EQ(inner->Calls(), 2) << percent;
+        }
+    }
+
 }  // namespace BECore::Chess::Tests
