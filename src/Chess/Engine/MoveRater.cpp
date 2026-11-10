@@ -69,7 +69,7 @@ namespace BECore::Chess {
     }
 
     Task<void> MoveRater::RunSearch(eastl::shared_ptr<Search> search, SearchRequest request) {
-        std::expected<Analysis, EngineError> answer = search->engine->Analyse(request, search->token);
+        std::expected<Analysis, EngineError> answer = AnswerOfTask(co_await search->engine->AnalyseAsync(request, search->token));
         {
             const std::lock_guard lock(search->mutex);
             search->answer = std::move(answer);

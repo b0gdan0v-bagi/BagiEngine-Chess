@@ -1,5 +1,6 @@
 #include "ChessTestUtil.h"
 
+#include <Chess/Engine/EngineOpponent.h>
 #include <Chess/Engine/OwnEngine.h>
 #include <Chess/Engine/Search.h>
 #include <Chess/Game/ChessGameModel.h>
@@ -1101,7 +1102,8 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OwnSearchOnThePoolTest, ACoroutineCanDriveTheSearchOnThePool) {
 #if BE_SINGLE_THREAD
-        // A single-thread build resumes a task that yielded only in TaskManager::Update, which only CoreManager calls, so nothing here would ever finish the coroutine
+        // A single-thread build resumes a task that yielded only in TaskManager::Update, which only CoreManager calls, and this test waits with a poll and never pumps (OpponentOverFramesTest does,
+        // with PumpTaskFrame)
         GTEST_SKIP() << "needs worker threads (BE_SINGLE_THREAD)";
 #else
         OwnEngine engine;
@@ -1325,6 +1327,130 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(WaitForAnswer(*out));
         ASSERT_FALSE(out->answer.has_value());
         EXPECT_EQ(out->answer.error().kind, EngineErrorKind::Unsupported);
+    }
+
+    // -- the opponent over many frames ---------------------------------------------------------------------------------------
+
+    namespace {
+
+        /// A frame budget so small that one slice of the search spends it: every frame resumes about one slice
+        constexpr std::chrono::microseconds kTinyFrameBudget{5};
+        /// The depth of the opponent's search: far more than one slice of nodes, and quick in a Debug build
+        constexpr int kFramesDepth = 4;
+        /// A frame is one slice plus a poll: a generous multiple of the budget, since the machine is noisy and a Debug slice costs far more than 5 us
+        constexpr std::chrono::milliseconds kFrameLimit{250};
+        /// The frames of the interleaving tests run before they cancel
+        constexpr int kFramesBeforeCancel = 5;
+
+        /// Runs the opponent over frames (a task frame, then Update) until the model has moved on or the time is up. Returns the frames it took
+        size_t PlayFrames(EngineOpponent& opponent, ChessGameModel& model, std::chrono::milliseconds* longestFrame) {
+            const uint64_t version = model.GetVersion();
+            const Clock::time_point deadline = Clock::now() + kPoolWaitLimit;
+            size_t frames = 0;
+            while (model.GetVersion() == version && Clock::now() < deadline) {
+                const Clock::time_point start = Clock::now();
+                (void)PumpTaskFrame();
+                opponent.Update(model);
+                *longestFrame = std::max(*longestFrame, std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - start));
+                ++frames;
+#if !BE_SINGLE_THREAD
+                std::this_thread::sleep_for(kPoolPollInterval);
+#endif
+            }
+            return frames;
+        }
+
+        class OpponentOverFramesTest : public ::testing::Test {
+        protected:
+            static void SetUpTestSuite() {
+                ::BECore::Tests::EngineEnvironment::EnsureCoreServices();  // TaskManager
+            }
+
+            void SetUp() override {
+                _savedBudget = TaskManager::GetInstance().GetFrameBudget();
+                TaskManager::GetInstance().SetFrameBudget(kTinyFrameBudget);
+                (void)PumpTaskFrame();  // the first frame: from here a task started between frames yields at its first check
+            }
+
+            void TearDown() override {
+                // Let a search a failed test left parked run to its end (it is cancelled: the opponent is gone)
+                const Clock::time_point deadline = Clock::now() + kPoolWaitLimit;
+                while (TaskManager::GetInstance().GetPendingTaskCount() > 0 && Clock::now() < deadline) {
+                    (void)PumpTaskFrame();
+                }
+                TaskManager::GetInstance().SetFrameBudget(_savedBudget);
+            }
+
+            TaskManager::Duration _savedBudget{};
+        };
+
+    }  // namespace
+
+    /// The single-thread build interleaves a search with frames (runs in the web-like build and is not skipped there); a threaded build only checks the answer
+    TEST_F(OpponentOverFramesTest, TheOwnEnginesSearchSpansFramesAndGivesTheBlockingMove) {
+        ChessGameModel model;
+        const SearchLimits limits{0, kFramesDepth};
+        const auto expected = OwnEngine().FindMove(SearchRequest::FromModel(model, limits), CancellationToken::Create());
+        ASSERT_TRUE(expected.has_value());
+
+        EngineOpponent opponent(eastl::make_shared<OwnEngine>(), PieceColor::White, limits);
+        std::chrono::milliseconds longestFrame{0};
+        const size_t frames = PlayFrames(opponent, model, &longestFrame);
+
+        ASSERT_EQ(model.GetMoves().size(), 1u) << "the opponent did not play within the time limit";
+        EXPECT_EQ(model.GetMoves()[0], *expected);
+        EXPECT_LT(longestFrame, kFrameLimit);
+#if BE_SINGLE_THREAD
+        EXPECT_GT(frames, 2u) << "the search ran in one frame";
+#else
+        (void)frames;
+#endif
+    }
+
+    TEST_F(OpponentOverFramesTest, ACancelInTheMiddleOfAMultiFrameSearchPlaysNothing) {
+        ChessGameModel model;
+        EngineOpponent opponent(eastl::make_shared<OwnEngine>(), PieceColor::White, SearchLimits{0, kGoldenForeverDepth});
+
+        for (int frame = 0; frame < kFramesBeforeCancel; ++frame) {
+            (void)PumpTaskFrame();
+            opponent.Update(model);
+        }
+        EXPECT_TRUE(opponent.IsThinking());
+        EXPECT_TRUE(model.GetMoves().empty());
+        opponent.Cancel();
+        EXPECT_FALSE(opponent.IsThinking());
+
+        // The search sees the token at its next slice and ends; the next Update drops the answer
+        const Clock::time_point deadline = Clock::now() + kPoolWaitLimit;
+        while (TaskManager::GetInstance().GetPendingTaskCount() > 0 && Clock::now() < deadline) {
+            (void)PumpTaskFrame();
+        }
+        std::this_thread::sleep_for(kRunBeforeCancel);
+        opponent.Update(model);
+        EXPECT_TRUE(model.GetMoves().empty());
+    }
+
+    TEST_F(OpponentOverFramesTest, AMovedVersionInTheMiddleOfAMultiFrameSearchDropsTheAnswer) {
+        ChessGameModel model;
+        EngineOpponent opponent(eastl::make_shared<OwnEngine>(), PieceColor::White, SearchLimits{0, kGoldenForeverDepth});
+        for (int frame = 0; frame < kFramesBeforeCancel; ++frame) {
+            (void)PumpTaskFrame();
+            opponent.Update(model);
+        }
+        ASSERT_TRUE(opponent.IsThinking());
+
+        model.Reset();  // the version moves: the next Update cancels the search
+        opponent.Update(model);
+        EXPECT_FALSE(opponent.IsThinking());
+
+        const Clock::time_point deadline = Clock::now() + kPoolWaitLimit;
+        while (TaskManager::GetInstance().GetPendingTaskCount() > 0 && Clock::now() < deadline) {
+            (void)PumpTaskFrame();
+        }
+        std::this_thread::sleep_for(kRunBeforeCancel);
+        opponent.Update(model);
+        EXPECT_TRUE(model.GetMoves().empty());
+        EXPECT_FALSE(opponent.GetLastError().has_value());
     }
 
     // -- the benchmark -------------------------------------------------------------------------------------------------------

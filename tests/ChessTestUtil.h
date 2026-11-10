@@ -5,6 +5,8 @@
 #include <Chess/Game/Move.h>
 #include <Chess/Game/Position.h>
 #include <Common/Printers.h>
+#include <TaskSystem/TaskManager.h>
+#include <TaskSystem/TaskScheduler.h>
 
 // A test that needs a worker thread (a gate that a worker holds while the test thread opens it, a wait for IsThinking()
 // while a search blocks, an engine that only stands in as "never answers") begins with this: under ENGINE_SINGLE_THREAD
@@ -32,6 +34,20 @@ namespace BECore::Chess {
 }  // namespace BECore::Chess
 
 namespace BECore::Chess::Tests {
+
+    /// One task frame, for a test that runs no CoreManager frame and waits for a search that may span frames: what TaskManager::Update does (it takes a PassKey, so a test
+    /// cannot call it) minus the game-time delays. Single-thread builds only resume a task that yielded here; a threaded build has nothing to resume, so it is a no-op.
+    /// Returns the number of slices resumed
+    inline size_t PumpTaskFrame() {
+#if BE_SINGLE_THREAD
+        TaskScheduler& scheduler = *TaskManager::GetInstance().GetScheduler();
+        scheduler.ProcessDelayedTasks();
+        scheduler.ProcessMainThreadTasks();
+        return scheduler.ProcessBackgroundSlices(TaskManager::GetInstance().GetFrameBudget());
+#else
+        return 0;
+#endif
+    }
 
     /// Square from its algebraic name ("e4").
     inline Square Sq(eastl::string_view name) {

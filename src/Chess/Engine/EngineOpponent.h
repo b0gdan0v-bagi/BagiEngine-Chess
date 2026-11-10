@@ -9,7 +9,8 @@ namespace BECore::Chess {
      * @brief Plays one side of a ChessGameModel against an IChessEngine, without making the caller wait.
      *
      * The owner of the model calls Update() once per frame on the main thread. When it is the opponent's turn, Update() copies the game into a
-     * SearchRequest and hands IChessEngine::FindMove() to TaskManager (the Background pool, which is where a call that blocks for seconds belongs);
+     * SearchRequest and hands a task that awaits IChessEngine::FindMoveAsync() to TaskManager (the Background pool, which is where a call that blocks for seconds belongs; in the single-thread
+     * build the own engine's search yields to the frame and spans many of them, and nothing changes for the caller: it still polls Update());
      * a later Update() finds the answer and plays it with ChessGameModel::TryMove(). One search runs at a time. TaskManager must be running
      * (CoreManager starts it).
      *
@@ -22,7 +23,7 @@ namespace BECore::Chess {
      * Threads: the model is read and written in Update() only, on the thread that calls it; the worker sees a copy of the request and a state
      * of its own (the engine, a CancellationToken, the answer), which it shares with the opponent through a shared pointer, so nothing dangles when
      * either side ends first. The destructor and Cancel() cancel the token and return at once: they never wait for the worker. A search that
-     * ignores its token may outlive the opponent; it keeps the engine alive until it returns, and the answer is thrown away.
+     * ignores its token (or, in the single-thread build, one parked between frames) may outlive the opponent; it keeps the engine alive until it returns, and the answer is thrown away.
      *
      * A search is answered only if it is still wanted. The model's GetVersion() at the time of the request is remembered; when it has moved by the time
      * the answer comes (a reset, a position set from outside, a move made by someone else) the search is cancelled and the answer dropped. An opponent

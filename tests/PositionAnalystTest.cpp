@@ -2,6 +2,7 @@
 #include "TestEngines.h"
 
 #include <Chess/Engine/OpponentLevels.h>
+#include <Chess/Engine/OwnEngine.h>
 #include <Chess/Engine/PositionAnalyst.h>
 #include <Chess/Game/ChessGameModel.h>
 #include <Chess/Game/MoveGenerator.h>
@@ -855,6 +856,28 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(hint->move, Mv("a1a8"));
         EXPECT_EQ(hint->score, (AnalysisScore{AnalysisScoreKind::Mate, 1}));
         EXPECT_EQ(analyst.GetEvaluation(model)->score, hint->score);
+    }
+
+    /// A search of many slices (depth 5 from the start position, two lines) through the async call equals the blocking Analyse of the same request
+    TEST_F(PositionAnalystTest, TheOwnEngineOverManySlicesGivesTheBlockingAnalysis) {
+        ChessGameModel model;
+        SearchRequest request = SearchRequest::FromModel(model, LimitsOf(OpponentEngine::Own, GetOpponentLevels().back()));
+        request.lines = kAnalysisLines;
+        const std::expected<Analysis, EngineError> expected = OwnEngine().Analyse(request, CancellationToken::Create());
+        ASSERT_TRUE(expected.has_value());
+
+        PositionAnalyst analyst;  // the default factory
+        analyst.SetEvaluation(true);
+        ASSERT_TRUE(UpdateUntil(analyst, model, OpponentEngine::Own, [&] { return !analyst.GetLines(model).empty() || analyst.GetError().has_value(); })) << DescribeError(analyst.GetError()).c_str();
+
+        const eastl::vector<AnalysisLine> lines = analyst.GetLines(model);
+        ASSERT_EQ(lines.size(), expected->lines.size()) << DescribeError(analyst.GetError()).c_str();
+        for (size_t i = 0; i < lines.size(); ++i) {
+            EXPECT_EQ(lines[i].move, expected->lines[i].move) << "line " << i;
+            EXPECT_EQ(lines[i].score, expected->lines[i].score) << "line " << i;
+            EXPECT_EQ(lines[i].depth, expected->lines[i].depth) << "line " << i;
+        }
+        analyst.Shutdown();
     }
 
     TEST_F(PositionAnalystTest, ARealStockfishGivesTheMatingMoveAsTheHint) {
