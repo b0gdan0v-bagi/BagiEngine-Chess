@@ -6,7 +6,6 @@
 #include <Chess/Game/ChessGameModel.h>
 #include <Chess/Game/MoveGenerator.h>
 #include <Common/EngineEnvironment.h>
-#include <chrono>
 
 /// MoveRater with the real TaskManager and engines made in the test (no process), then the real OwnEngine at depth 5 on positions found by running it. Every wait polls a condition with a time
 /// limit; none is a fixed sleep
@@ -14,10 +13,6 @@ namespace BECore::Chess::Tests {
 
     namespace {
 
-        using std::chrono::milliseconds;
-        using Clock = std::chrono::steady_clock;
-
-        constexpr milliseconds kUpdateBudget{2000};  // an Update that waits for the gated engine would take 10 s (kGateGiveUp)
         constexpr int kManyUpdates = 1000;
         constexpr eastl::string_view kOneMoveFen = "k7/8/1K6/8/8/8/8/7R b - - 0 1";  // Black has one legal move, Kb8
 
@@ -455,11 +450,8 @@ namespace BECore::Chess::Tests {
         rater.SetEngineFactory(factory.AsFactory());
         rater.SetOn(true);
 
-        const Clock::time_point begin = Clock::now();
-        UpdateMany(rater, model, 200);
-        const Clock::duration took = Clock::now() - begin;
+        UpdateMany(rater, model, 200);  // the gate is opened only after this: an Update that waited for it would end in the give-up of the gate, not in the state below
 
-        EXPECT_LT(took, kUpdateBudget);
         EXPECT_TRUE(rater.IsThinking());
         EXPECT_FALSE(RatedAt(rater, model, 0));
         engine->Open();
@@ -675,7 +667,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(engine->Calls(), 3) << "and the game is rated from the start again";
     }
 
-    TEST_F(MoveRaterTest, ShutdownWithASearchInFlightReturnsAtOnceAndDropsItsAnswer) {
+    TEST_F(MoveRaterTest, ShutdownWithASearchInFlightJoinsNothingAndDropsItsAnswer) {
         SKIP_WITHOUT_WORKER_THREADS();
         const auto engine = MakeEngine();
         engine->Gate(false);
@@ -687,11 +679,9 @@ namespace BECore::Chess::Tests {
         rater.SetOn(true);
         ASSERT_TRUE(UpdateUntil(rater, model, [&] { return engine->Calls() == 1; }));
 
-        const Clock::time_point begin = Clock::now();
         rater.Shutdown();
-        const Clock::duration took = Clock::now() - begin;
 
-        EXPECT_LT(took, kUpdateBudget);
+        EXPECT_EQ(engine->Answered(), 0) << "the worker is still at its gate: nothing waited for it";
         EXPECT_FALSE(rater.IsThinking());
         engine->Open();
         ASSERT_TRUE(WaitUntil([&] { return engine->Answered() == 1; }));
@@ -721,7 +711,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(engine->Calls(), 2);
     }
 
-    TEST_F(MoveRaterTest, TheDestructorWithASearchInFlightReturnsAtOnce) {
+    TEST_F(MoveRaterTest, TheDestructorWithASearchInFlightJoinsNothing) {
         SKIP_WITHOUT_WORKER_THREADS();
         const auto engine = MakeEngine();
         engine->Gate(false);
@@ -733,11 +723,9 @@ namespace BECore::Chess::Tests {
         rater->SetOn(true);
         ASSERT_TRUE(UpdateUntil(*rater, model, [&] { return engine->Calls() == 1; }));
 
-        const Clock::time_point begin = Clock::now();
-        rater.reset();  // the worker is still at the gate
-        const Clock::duration took = Clock::now() - begin;
+        rater.reset();
 
-        EXPECT_LT(took, kUpdateBudget);
+        EXPECT_EQ(engine->Answered(), 0) << "the worker is still at its gate: nothing waited for it";
         engine->Open();
         ASSERT_TRUE(WaitUntil([&] { return engine->Answered() == 1; })) << "the worker frees itself";
     }

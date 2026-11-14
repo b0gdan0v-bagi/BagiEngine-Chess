@@ -8,7 +8,6 @@
 #include <Chess/Game/MoveGenerator.h>
 #include <Common/EngineEnvironment.h>
 #include <EASTL/algorithm.h>
-#include <chrono>
 
 /// PositionAnalyst with the real TaskManager and engines made in the test (TestEngines.h, no process), plus the OwnEngine for the mate in one and the default factory, and a
 /// real Stockfish when there is one. Every wait polls a condition with a time limit; none is a fixed sleep
@@ -16,10 +15,6 @@ namespace BECore::Chess::Tests {
 
     namespace {
 
-        using std::chrono::milliseconds;
-        using Clock = std::chrono::steady_clock;
-
-        constexpr milliseconds kUpdateBudget{2000};  // an Update that waits for the gated engine would take 10 s (kGateGiveUp)
         constexpr int kManyUpdates = 1000;
         constexpr AnalysisScore kScore{AnalysisScoreKind::Centipawns, 35};
         constexpr eastl::string_view kMateInOneFen = "6k1/5ppp/8/8/8/8/8/R3K3 w - - 0 1";  // Ra8#
@@ -186,11 +181,8 @@ namespace BECore::Chess::Tests {
         analyst.SetEngineFactory(factory.AsFactory());
         analyst.SetEvaluation(true);
 
-        const Clock::time_point begin = Clock::now();
-        UpdateMany(analyst, model, OpponentEngine::Stockfish, 200);
-        const Clock::duration took = Clock::now() - begin;
+        UpdateMany(analyst, model, OpponentEngine::Stockfish, 200);  // the gate is opened only after this: an Update that waited for it would end in the give-up of the gate, not in the state below
 
-        EXPECT_LT(took, kUpdateBudget);
         EXPECT_TRUE(analyst.IsThinking());
         EXPECT_FALSE(analyst.GetEvaluation(model).has_value());
         engine->Open();
@@ -485,7 +477,7 @@ namespace BECore::Chess::Tests {
         EXPECT_FALSE(analyst.GetError().has_value()) << "a search that was cancelled by the analyst is not an error";
     }
 
-    TEST_F(PositionAnalystTest, CancelAndTheDestructorReturnAtOnceWithASearchThatIgnoresItsToken) {
+    TEST_F(PositionAnalystTest, CancelAndTheDestructorJoinNothingWithASearchThatIgnoresItsToken) {
         SKIP_WITHOUT_WORKER_THREADS();
         const auto engine = MakeEngine();
         engine->Gate(false);
@@ -498,10 +490,9 @@ namespace BECore::Chess::Tests {
             analyst.Update(model, OpponentEngine::Stockfish);
             ASSERT_TRUE(WaitUntil([&] { return engine->Calls() == 1; }));
 
-            const Clock::time_point begin = Clock::now();
             analyst.Cancel();
+            EXPECT_EQ(engine->Answered(), 0) << "the worker is still at its gate: nothing waited for it";
             EXPECT_FALSE(analyst.IsThinking());
-            EXPECT_LT(Clock::now() - begin, kUpdateBudget);
             EXPECT_FALSE(analyst.GetEvaluation(model).has_value());
 
             // The switch stays: once the old worker has returned, the next Update asks again
@@ -514,7 +505,6 @@ namespace BECore::Chess::Tests {
         const auto second = MakeEngine();
         second->Gate(false);
         CountingAnalysisFactory secondFactory{second};
-        const Clock::time_point begin = Clock::now();
         {
             PositionAnalyst analyst;
             analyst.SetEngineFactory(secondFactory.AsFactory());
@@ -522,7 +512,7 @@ namespace BECore::Chess::Tests {
             analyst.Update(model, OpponentEngine::Stockfish);
             ASSERT_TRUE(WaitUntil([&] { return second->Calls() == 1; }));
         }
-        EXPECT_LT(Clock::now() - begin, kUpdateBudget);
+        EXPECT_EQ(second->Answered(), 0) << "the worker is still at its gate: nothing waited for it";
         second->Open();
         ASSERT_TRUE(WaitUntil([&] { return second->Answered() == 1; }));
     }

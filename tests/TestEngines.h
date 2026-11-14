@@ -16,9 +16,9 @@ namespace BECore::Chess::Tests {
 
     using MadeEngine = std::expected<eastl::shared_ptr<IChessEngine>, EngineError>;
 
-    inline constexpr std::chrono::milliseconds kEngineWaitLimit{15000};  ///< how long a test waits for something that must happen
+    inline constexpr std::chrono::milliseconds kEngineWaitLimit{30000};  ///< the give-up limit of a wait for something that must happen: it only ends a broken test, so it is generous under load
     inline constexpr std::chrono::milliseconds kEnginePollInterval{1};
-    inline constexpr std::chrono::milliseconds kGateGiveUp{10000};  ///< a gated engine that is never opened answers a Timeout after this, so a lost test frees its worker
+    inline constexpr std::chrono::milliseconds kGateGiveUp{30000};  ///< a gated engine that is never opened answers a Timeout after this, so a lost test frees its worker
 
     /// Polls @p done until it is true; false when it has not become true within @p timeout. No fixed sleep
     template <typename Condition>
