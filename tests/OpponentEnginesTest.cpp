@@ -7,11 +7,11 @@ namespace BECore::Chess::Tests {
     namespace {
 
         /// gtest cannot stream an EASTL string view
-        std::string Text(eastl::string_view text) {
-            return std::string(text.data(), text.size());
+        String Text(StringView text) {
+            return String(text.data(), text.size());
         }
 
-        bool IsWireName(eastl::string_view id) {
+        bool IsWireName(StringView id) {
             if (id.empty()) {
                 return false;
             }
@@ -59,8 +59,8 @@ namespace BECore::Chess::Tests {
             ASSERT_TRUE(found.has_value()) << Text(OpponentEngineId(engine));
             EXPECT_EQ(*found, engine);
         }
-        EXPECT_EQ(FindOpponentEngine("stockfish"), std::optional<OpponentEngine>(OpponentEngine::Stockfish));
-        EXPECT_EQ(FindOpponentEngine("own"), std::optional<OpponentEngine>(OpponentEngine::Own));
+        EXPECT_EQ(FindOpponentEngine("stockfish"), Optional<OpponentEngine>(OpponentEngine::Stockfish));
+        EXPECT_EQ(FindOpponentEngine("own"), Optional<OpponentEngine>(OpponentEngine::Own));
     }
 
     TEST(OpponentEnginesTest, FindOpponentEngineMissesWhatIsNotAnId) {

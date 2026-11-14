@@ -46,7 +46,7 @@ namespace BECore::Chess::Tests {
             return Search(position, settings);
         }
 
-        SearchResult SearchFen(eastl::string_view fen, int depth) {
+        SearchResult SearchFen(StringView fen, int depth) {
             Position position = PositionFromFen(fen);
             return SearchDepth(position, depth);
         }
@@ -63,7 +63,7 @@ namespace BECore::Chess::Tests {
         /// What a position is, as far as a search could change it: the key and the FEN
         struct Snapshot {
             ZobristKey key = 0;
-            eastl::string fen;
+            String fen;
             bool operator==(const Snapshot&) const = default;
         };
 
@@ -71,7 +71,7 @@ namespace BECore::Chess::Tests {
             return Snapshot{position.Key(), position.ToFen()};
         }
 
-        const eastl::string_view kPerftFens[] = {Position::kStartFen, kKiwipeteFen, kPosition3Fen, kPosition4Fen, kPosition5Fen, kPosition6Fen};
+        const StringView kPerftFens[] = {Position::kStartFen, kKiwipeteFen, kPosition3Fen, kPosition4Fen, kPosition5Fen, kPosition6Fen};
 
         /// Whether the side to move can mate at once
         bool HasMateInOne(Position& position) {
@@ -104,8 +104,8 @@ namespace BECore::Chess::Tests {
             return forced;
         }
 
-        eastl::vector<Move> MateInTwoKeys(Position& position) {
-            eastl::vector<Move> keys;
+        Vector<Move> MateInTwoKeys(Position& position) {
+            Vector<Move> keys;
             for (const Move move : MoveGenerator::GenerateLegal(position)) {
                 if (ForcesMateInTwo(position, move)) {
                     keys.push_back(move);
@@ -257,7 +257,7 @@ namespace BECore::Chess::Tests {
     TEST(SearchTest, ADefendedPawnIsNotTakenWithTheQueen) {
         // Qxd5 wins a pawn and loses the queen to Qxd5. At the horizon of one ply the capture looks like a pawn up; the quiescence
         // search lets Black recapture. Without it the same search takes the pawn: the test fails if the quiescence stops mattering
-        const eastl::string_view fen = "3qk3/8/8/3p4/8/8/8/3QK3 w - - 0 1";
+        const StringView fen = "3qk3/8/8/3p4/8/8/8/3QK3 w - - 0 1";
         Position position = PositionFromFen(fen);
         SearchSettings settings;
         settings.maxDepth = 1;
@@ -367,11 +367,11 @@ namespace BECore::Chess::Tests {
         // table is on (the default size, and a table of four entries): at depth 3 a position is reached at the plies 1 and 3 only (the side
         // to move is in its key), and the ply 3 is the horizon, so an entry is never deeper than the node that reads it and the table
         // changes no score
-        const eastl::string_view fens[] = {
+        const StringView fens[] = {
             Position::kStartFen, kKiwipeteFen, kPosition3Fen, kPosition4Fen, kPosition5Fen, kPosition6Fen, "kbK5/pp6/1P6/8/8/8/8/R7 w - - 0 1", "K1k5/8/8/2b5/2pQ4/8/8/8 b - - 0 1",
         };
         for (const size_t tableEntries : {kDefaultTableEntries, kTinyTables[1]}) {
-            for (const eastl::string_view fen : fens) {
+            for (const StringView fen : fens) {
                 Position position = PositionFromFen(fen);
                 SearchSettings settings;
                 settings.maxDepth = kMinimaxDepth;
@@ -398,7 +398,7 @@ namespace BECore::Chess::Tests {
         uint64_t orderedTotal = 0;
         uint64_t plainTotal = 0;
         int better = 0;
-        for (const eastl::string_view fen : kPerftFens) {
+        for (const StringView fen : kPerftFens) {
             Position position = PositionFromFen(fen);
             SearchSettings settings;
             settings.maxDepth = kOrderingDepth;
@@ -419,7 +419,7 @@ namespace BECore::Chess::Tests {
     TEST(SearchTest, QuietOrderingKeepsTheScoreOfPlainAlphaBeta) {
         // Without the quiescence search and the extension every score is exact whatever the order of the moves, so the two
         // orders must agree on it (the best move may differ between equal moves)
-        for (const eastl::string_view fen : kPerftFens) {
+        for (const StringView fen : kPerftFens) {
             Position position = PositionFromFen(fen);
             SearchSettings settings;
             settings.maxDepth = kOrderingDepth;
@@ -443,7 +443,7 @@ namespace BECore::Chess::Tests {
         // at depth 4: 4833 / 4228), so the cases are the ones that were measured. In these the score is the same too (not a guarantee of
         // the table: a deeper entry can answer a shallower node of another ply, so a score can differ; it is what these positions show)
         struct Case {
-            eastl::string_view fen;
+            StringView fen;
             int depth;
         };
         const Case cases[] = {
@@ -480,8 +480,8 @@ namespace BECore::Chess::Tests {
         // the mate score of the table is counted from the node (ScoreToTable / ScoreFromTable, tested alone in TranspositionTableTest):
         // with the table, with none and with a tiny one the score is exactly the mate in five plies, never a ply more or less. The
         // search does not make the read at another ply often (a wrong ply on the read does not change these answers, tried)
-        const eastl::string_view fens[] = {"k7/8/8/3K4/8/8/8/7R w - - 0 1", "k7/8/3K3R/8/8/8/8/8 w - - 0 1", "k7/8/8/2K5/8/8/8/1R6 w - - 0 1"};
-        for (const eastl::string_view fen : fens) {
+        const StringView fens[] = {"k7/8/8/3K4/8/8/8/7R w - - 0 1", "k7/8/3K3R/8/8/8/8/8 w - - 0 1", "k7/8/8/2K5/8/8/8/1R6 w - - 0 1"};
+        for (const StringView fen : fens) {
             for (const int depth : {kMateInThreeDepth, kMateInThreeDepth + 2}) {
                 for (const size_t tableEntries : {size_t{0}, kDefaultTableEntries, kTinyTables[0], kTinyTables[1]}) {
                     Position position = PositionFromFen(fen);
@@ -499,7 +499,7 @@ namespace BECore::Chess::Tests {
         // A table of one or four entries is overwritten all the time. The mates of the tests above still come out with the same
         // score and, where the position has one key move, the same move
         struct Case {
-            eastl::string_view fen;
+            StringView fen;
             const char* key;
             int score;
         };
@@ -584,7 +584,7 @@ namespace BECore::Chess::Tests {
     TEST(SearchTest, NoStateCrossesTwoCalls) {
         // Rule: the table is owned by one call. The position with its shuffle behind it (a draw by the repetition) and the same position
         // from the bare FEN (lost) are searched one after the other, in both orders, on fresh objects: each answer is its own, whatever the call before it stored
-        const eastl::string_view fen = "k7/8/8/8/8/8/8/3QK3 b - - 0 1";
+        const StringView fen = "k7/8/8/8/8/8/8/3QK3 b - - 0 1";
         for (const bool historyFirst : {true, false}) {
             int drawn = 0;
             int lost = 0;
@@ -638,8 +638,8 @@ namespace BECore::Chess::Tests {
         // draw. A search of the same position at the clock of 0 in a new call then finds it won: the draw of the first call is not in the second.
         // The clock is not part of the key, so this is the case the bound is for; the position cannot show it being broken (without
         // the bound these answers do not change, tried: the draws are also counted and block the stores), the sweep below is the guard
-        const eastl::string_view tired = "4k3/8/8/8/8/8/8/R3K3 w - - 96 80";
-        const eastl::string_view fresh = "4k3/8/8/8/8/8/8/R3K3 w - - 0 1";
+        const StringView tired = "4k3/8/8/8/8/8/8/R3K3 w - - 96 80";
+        const StringView fresh = "4k3/8/8/8/8/8/8/R3K3 w - - 0 1";
         for (const size_t tableEntries : {size_t{0}, kDefaultTableEntries}) {
             Position drawn = PositionFromFen(tired);
             const SearchResult tiredResult = SearchWithTable(drawn, kDeeperTableDepth, tableEntries);
@@ -656,7 +656,7 @@ namespace BECore::Chess::Tests {
         // where the bound lets the table in (a node with the clock c and d plies left is allowed when c + d + 32 is under 100), so the sweep
         // crosses the bound in the middle of the tree. Measured equal at each of these clocks; a guard on one position, not a proof
         for (const int clock : {0, 40, 60, 64, 68, 72, 80, 90, 96, 99}) {
-            const eastl::string fen = Format("4k3/8/8/8/8/8/8/R3K3 w - - {} 80", clock);
+            const String fen = Format("4k3/8/8/8/8/8/8/R3K3 w - - {} 80", clock);
             Position withTable = PositionFromFen(fen.c_str());
             Position withoutTable = PositionFromFen(fen.c_str());
 
@@ -671,7 +671,7 @@ namespace BECore::Chess::Tests {
     // -- determinism and hand-back -------------------------------------------------------------------------------------------
 
     TEST(SearchTest, TheSameSearchGivesTheSameResult) {
-        for (const eastl::string_view fen : kPerftFens) {
+        for (const StringView fen : kPerftFens) {
             Position first = PositionFromFen(fen);
             Position second = PositionFromFen(fen);
 
@@ -742,7 +742,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(SearchTest, ExcludingTheBestMoveGivesAnotherLegalMove) {
-        for (const eastl::string_view fen : kPerftFens) {
+        for (const StringView fen : kPerftFens) {
             Position position = PositionFromFen(fen);
             const SearchResult first = SearchDepth(position, kMinimaxDepth);
             SearchSettings settings;
@@ -774,7 +774,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(SearchTest, ExcludingEveryMoveButOneGivesThatMove) {
-        for (const eastl::string_view fen : {eastl::string_view(Position::kStartFen), eastl::string_view(kKiwipeteFen)}) {
+        for (const StringView fen : {StringView(Position::kStartFen), StringView(kKiwipeteFen)}) {
             Position position = PositionFromFen(fen);
             const MoveList legal = MoveGenerator::GenerateLegal(position);
             for (size_t keep : {size_t{0}, legal.size() / 2, legal.size() - 1}) {
@@ -811,7 +811,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(SearchTest, ThePositionComesBackEqual) {
-        for (const eastl::string_view fen : kPerftFens) {
+        for (const StringView fen : kPerftFens) {
             Position position = PositionFromFen(fen);
             const Snapshot before = SnapshotOf(position);
 
@@ -1053,7 +1053,7 @@ namespace BECore::Chess::Tests {
     // -- legality ------------------------------------------------------------------------------------------------------------
 
     TEST(SearchTest, TheMoveIsLegalInThePerftPositions) {
-        for (const eastl::string_view fen : kPerftFens) {
+        for (const StringView fen : kPerftFens) {
             Position position = PositionFromFen(fen);
 
             const SearchResult result = SearchDepth(position, 2);
@@ -1066,12 +1066,12 @@ namespace BECore::Chess::Tests {
 
     TEST(SearchTest, TheMoveIsLegalWithCastlingEnPassantAndPromotionInReach) {
         // Positions with a castling, an en passant capture and a promotion among the moves
-        const eastl::string_view fens[] = {
+        const StringView fens[] = {
             "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1",
             "rnbqkbnr/ppp1pppp/8/3pP3/8/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 3",
             "8/P6k/8/8/8/8/p6K/8 w - - 0 1",
         };
-        for (const eastl::string_view fen : fens) {
+        for (const StringView fen : fens) {
             Position position = PositionFromFen(fen);
 
             const SearchResult result = SearchDepth(position, 3);

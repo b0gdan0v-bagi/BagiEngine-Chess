@@ -98,7 +98,7 @@ namespace BECore::Tests {
         }
 
         /// The `<elements>` of the canvas on the Hud node of the shipped scene, as the content of a screen
-        std::string ShippedHudXml() {
+        String ShippedHudXml() {
             pugi::xml_document document;
             if (!document.load_file(ShippedSceneConfig().string().c_str())) {
                 return {};
@@ -112,14 +112,14 @@ namespace BECore::Tests {
             out << "<ui>";
             elements.print(out, "", pugi::format_raw);
             out << "</ui>";
-            return out.str();
+            return FromStdString(out.str());
         }
 
         /// The plate of the canvas on the OpponentPanel node of the shipped scene (without the dim), as the content of a screen, with ONE difference from the file: every
         /// UISegmented gets `blocksInput="true"`. The HTML front-end writes it on every element with a background (a filled box takes clicks in a web page), so the compiled
         /// group has it; the shipped file does without, because the plate behind the group blocks input already and the only place the group would take a click is the 4-unit
         /// gap between two segments, where the result is the same (the modal canvas takes it). The engine's own UIWebTest makes the same step for its panel (kPanelXml).
-        std::string ShippedPanelXml() {
+        String ShippedPanelXml() {
             pugi::xml_document document;
             if (!document.load_file(ShippedSceneConfig().string().c_str())) {
                 return {};
@@ -136,11 +136,11 @@ namespace BECore::Tests {
             out << "<ui><elements>";
             plate.print(out, "", pugi::format_raw);
             out << "</elements></ui>";
-            return out.str();
+            return FromStdString(out.str());
         }
 
         struct Compiled {
-            eastl::string xml;
+            String xml;
             UIWebReport report;
             UIScreenContent content;
             pugi::xml_document document;  ///< the compiled XML, for the comparison of attributes
@@ -156,10 +156,10 @@ namespace BECore::Tests {
             }
         };
 
-        std::unique_ptr<Compiled> Compile(const std::string& html, const std::string& css) {
-            auto compiled = std::make_unique<Compiled>();
-            const std::string source = "<style>" + css + "</style>" + html;
-            compiled->xml = UIWebCompiler::Compile(eastl::string_view(source.data(), source.size()), {}, compiled->report);
+        UniquePtr<Compiled> Compile(const String& html, const String& css) {
+            auto compiled = MakeUnique<Compiled>();
+            const String source = "<style>" + css + "</style>" + html;
+            compiled->xml = UIWebCompiler::Compile(StringView(source), {}, compiled->report);
             compiled->document.load_string(compiled->xml.c_str());
             XmlDeserializer deserializer;
             if (deserializer.LoadFromString(compiled->xml)) {
@@ -169,10 +169,10 @@ namespace BECore::Tests {
             return compiled;
         }
 
-        UIScreenContent ReadXml(const std::string& xml) {
+        UIScreenContent ReadXml(const String& xml) {
             UIScreenContent content;
             XmlDeserializer deserializer;
-            EXPECT_TRUE(deserializer.LoadFromString(eastl::string_view(xml.data(), xml.size())));
+            EXPECT_TRUE(deserializer.LoadFromString(StringView(xml)));
             content.Deserialize(deserializer);
             EXPECT_FALSE(deserializer.HasErrors());
             return content;
@@ -221,20 +221,20 @@ namespace BECore::Tests {
         /// A `UIStack` is a `UIElement` with `layout="Stack"` (the compile writes the second) and a `Vertical` direction is the default and is not written; neither is compared.
         /// Same as the helper of the engine's UIWebTest, which is in an anonymous namespace of that file.
         void ExpectSameAttributes(pugi::xml_node expected, pugi::xml_node actual) {
-            ASSERT_EQ(std::string(expected.attribute("name").as_string()), std::string(actual.attribute("name").as_string()));
-            const std::string name = expected.attribute("name").as_string();
+            ASSERT_EQ(String(expected.attribute("name").as_string()), String(actual.attribute("name").as_string()));
+            const String name = expected.attribute("name").as_string();
             const auto skipped = [](const pugi::xml_attribute& attribute, const pugi::xml_node& owner) {
-                const std::string key = attribute.name();
-                return key == "layout" || (key == "type" && std::string(attribute.as_string()) == "UIStack" && !owner.attribute("bind")) ||
-                       (key == "direction" && std::string(attribute.as_string()) == "Vertical");
+                const String key = attribute.name();
+                return key == "layout" || (key == "type" && String(attribute.as_string()) == "UIStack" && !owner.attribute("bind")) ||
+                       (key == "direction" && String(attribute.as_string()) == "Vertical");
             };
             for (pugi::xml_attribute attribute : expected.attributes()) {
                 if (!skipped(attribute, expected)) {
-                    EXPECT_EQ(std::string(attribute.as_string()), std::string(actual.attribute(attribute.name()).as_string())) << name << "." << attribute.name();
+                    EXPECT_EQ(String(attribute.as_string()), String(actual.attribute(attribute.name()).as_string())) << name << "." << attribute.name();
                 }
             }
             for (pugi::xml_attribute attribute : actual.attributes()) {
-                if (!skipped(attribute, actual) && std::string(attribute.name()) != "type") {
+                if (!skipped(attribute, actual) && String(attribute.name()) != "type") {
                     EXPECT_FALSE(expected.attribute(attribute.name()).empty()) << name << " has the extra attribute " << attribute.name();
                 }
             }
@@ -266,12 +266,12 @@ namespace BECore::Tests {
         ASSERT_FALSE(compiled->deserializeErrors) << compiled->xml.c_str();
         EXPECT_FALSE(compiled->report.HasIssues()) << compiled->report.issues[0].message.c_str() << " / " << compiled->xml.c_str();
 
-        const std::string shippedXml = ShippedHudXml();
+        const String shippedXml = ShippedHudXml();
         ASSERT_FALSE(shippedXml.empty()) << ShippedSceneConfig().string();
         const UIScreenContent shipped = ReadXml(shippedXml);
         LaidOut web(compiled->content);
         LaidOut xml(shipped);
-        for (const auto& [width, height] : {std::pair{1280.0f, 720.0f}, {480.0f, 480.0f}, {720.0f, 1280.0f}, {2560.0f, 1080.0f}}) {
+        for (const auto& [width, height] : {Pair<float, float>{1280.0f, 720.0f}, {480.0f, 480.0f}, {720.0f, 1280.0f}, {2560.0f, 1080.0f}}) {
             web.At(width, height);
             xml.At(width, height);
             for (const char* name : {"Turn", "Menu", "Reset", "Status"}) {
@@ -305,7 +305,7 @@ namespace BECore::Tests {
         ASSERT_FALSE(compiled->deserializeErrors) << compiled->xml.c_str();
         EXPECT_FALSE(compiled->report.HasIssues()) << compiled->report.issues[0].message.c_str() << " / " << compiled->xml.c_str();
 
-        const std::string shippedXml = ShippedPanelXml();
+        const String shippedXml = ShippedPanelXml();
         ASSERT_FALSE(shippedXml.empty()) << ShippedSceneConfig().string();
         pugi::xml_document reference;
         ASSERT_TRUE(reference.load_string(shippedXml.c_str()));
@@ -319,7 +319,7 @@ namespace BECore::Tests {
             const char* group;
             const char* bind;
             const char* action;
-            std::vector<std::pair<const char*, const char*>> segments;
+            Vector<Pair<const char*, const char*>> segments;
         } groups[] = {{"ModeGroup", "opponentMode", "ChessSetMode", {{"ModeTwo", "two"}, {"ModeComputer", "computer"}}},
                       {"ColorGroup", "opponentColor", "ChessSetColor", {{"ColorWhite", "white"}, {"ColorBlack", "black"}}},
                       {"EngineGroup", "opponentEngine", "ChessSetEngine", {{"EngineStockfish", "stockfish"}, {"EngineOwn", "own"}}},
@@ -343,12 +343,12 @@ namespace BECore::Tests {
     TEST_F(ChessHudWebTest, ThePanelInHtmlLaysOutLikeTheShippedXml) {
         const auto compiled = Compile(kChessPanelHtml, kChessPanelCss);
         ASSERT_FALSE(compiled->deserializeErrors) << compiled->xml.c_str();
-        const std::string shippedXml = ShippedPanelXml();
+        const String shippedXml = ShippedPanelXml();
         ASSERT_FALSE(shippedXml.empty()) << ShippedSceneConfig().string();
         const UIScreenContent shipped = ReadXml(shippedXml);
         LaidOut web(compiled->content);
         LaidOut xml(shipped);
-        for (const auto& [width, height] : {std::pair{1280.0f, 720.0f}, {640.0f, 360.0f}, {480.0f, 480.0f}, {720.0f, 1280.0f}, {2560.0f, 1080.0f}}) {
+        for (const auto& [width, height] : {Pair<float, float>{1280.0f, 720.0f}, {640.0f, 360.0f}, {480.0f, 480.0f}, {720.0f, 1280.0f}, {2560.0f, 1080.0f}}) {
             web.At(width, height);
             xml.At(width, height);
             for (const char* name : kPanelNames) {

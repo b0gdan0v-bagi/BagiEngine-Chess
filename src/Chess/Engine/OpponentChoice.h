@@ -8,16 +8,16 @@ namespace BECore::Chess {
     CORE_ENUM(OpponentMode, uint8_t, Two, Computer)
 
     /// The name on the wire of a color, as the control API spells it: "white", "black"
-    [[nodiscard]] eastl::string_view PieceColorId(PieceColor color);
+    [[nodiscard]] StringView PieceColorId(PieceColor color);
 
     /// The id of a mode: "two", "computer"
-    [[nodiscard]] eastl::string_view OpponentModeId(OpponentMode mode);
+    [[nodiscard]] StringView OpponentModeId(OpponentMode mode);
 
     /// The mode with this id (exactly as written: ids are lower case), or nothing
-    [[nodiscard]] std::optional<OpponentMode> ParseMode(eastl::string_view id);
+    [[nodiscard]] Optional<OpponentMode> ParseMode(StringView id);
 
     /// The color with this id ("white" or "black", exactly as written), or nothing
-    [[nodiscard]] std::optional<PieceColor> ParseColor(eastl::string_view id);
+    [[nodiscard]] Optional<PieceColor> ParseColor(StringView id);
 
     /// BadId: the id is not one of the table; nothing was changed and no engine was asked. Engine: the controller refused the pick, see ChoiceError::engine
     CORE_ENUM(ChoiceErrorKind, uint8_t, BadId, Engine)
@@ -25,8 +25,8 @@ namespace BECore::Chess {
     /// Why a pick of OpponentChoice did not happen as asked
     struct ChoiceError {
         ChoiceErrorKind kind = ChoiceErrorKind::BadId;
-        eastl::string detail;  ///< a sentence for the log: for BadId what was wrong, for Engine the detail of the engine error
-        EngineError engine;    ///< what OpponentController said; meaningful for the kind Engine only
+        String detail;       ///< a sentence for the log: for BadId what was wrong, for Engine the detail of the engine error
+        EngineError engine;  ///< what OpponentController said; meaningful for the kind Engine only
     };
 
     /**
@@ -64,16 +64,16 @@ namespace BECore::Chess {
         }
 
         /// "two" or "computer"
-        std::expected<void, ChoiceError> SetMode(eastl::string_view id);
+        std::expected<void, ChoiceError> SetMode(StringView id);
 
         /// The color the person plays, "white" or "black"
-        std::expected<void, ChoiceError> SetColor(eastl::string_view id);
+        std::expected<void, ChoiceError> SetColor(StringView id);
 
         /// An engine id of the control API, "stockfish" or "own"
-        std::expected<void, ChoiceError> SetEngine(eastl::string_view id);
+        std::expected<void, ChoiceError> SetEngine(StringView id);
 
         /// A level id of the control API, "easy", "medium", "hard" or "max"
-        std::expected<void, ChoiceError> SetLevel(eastl::string_view id);
+        std::expected<void, ChoiceError> SetLevel(StringView id);
 
         /// Computer while the program plays, else Two (also while an error stands that the program's side did not leave)
         [[nodiscard]] OpponentMode Mode() const noexcept;
@@ -82,16 +82,16 @@ namespace BECore::Chess {
         [[nodiscard]] PieceColor Color() const noexcept;
 
         /// The id of Mode()
-        [[nodiscard]] eastl::string_view ModeId() const noexcept;
+        [[nodiscard]] StringView ModeId() const noexcept;
 
         /// The id of Color()
-        [[nodiscard]] eastl::string_view ColorId() const noexcept;
+        [[nodiscard]] StringView ColorId() const noexcept;
 
         /// The id of the picked engine, as in the control API
-        [[nodiscard]] eastl::string_view EngineId() const noexcept;
+        [[nodiscard]] StringView EngineId() const noexcept;
 
         /// The id of the picked level, as in the control API
-        [[nodiscard]] eastl::string_view LevelId() const noexcept;
+        [[nodiscard]] StringView LevelId() const noexcept;
 
     private:
         OpponentController& _opponent;

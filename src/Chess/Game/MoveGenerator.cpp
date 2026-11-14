@@ -7,7 +7,7 @@ namespace BECore::Chess {
         constexpr int kRankStep = 8;
 
         // Promotion pieces, strongest first, so the queen promotion is the first of the four moves.
-        constexpr eastl::array<PieceType, 4> kPromotionOrder{PieceType::Queen, PieceType::Rook, PieceType::Bishop, PieceType::Knight};
+        constexpr Array<PieceType, 4> kPromotionOrder{PieceType::Queen, PieceType::Rook, PieceType::Bishop, PieceType::Knight};
 
         struct CastlingSpec {
             int right;
@@ -16,7 +16,7 @@ namespace BECore::Chess {
             Bitboard mustBeEmpty;  ///< Squares between the king and the rook.
         };
 
-        constexpr eastl::array<CastlingSpec, 4> kCastlingSpecs{
+        constexpr Array<CastlingSpec, 4> kCastlingSpecs{
             CastlingSpec{kWhiteKingSide, 4, 6, SquareBB(5) | SquareBB(6)},
             CastlingSpec{kWhiteQueenSide, 4, 2, SquareBB(1) | SquareBB(2) | SquareBB(3)},
             CastlingSpec{kBlackKingSide, 60, 62, SquareBB(61) | SquareBB(62)},
@@ -157,9 +157,9 @@ namespace BECore::Chess {
         return moves;
     }
 
-    std::optional<Move> MoveGenerator::ParseUci(const Position& position, eastl::string_view text) {
+    Optional<Move> MoveGenerator::ParseUci(const Position& position, StringView text) {
         for (const Move move : GenerateLegal(position)) {
-            if (eastl::string_view(move.ToUci().c_str()) == text) {
+            if (StringView(move.ToUci().c_str()) == text) {
                 return move;
             }
         }

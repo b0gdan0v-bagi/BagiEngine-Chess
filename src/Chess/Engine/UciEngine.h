@@ -15,7 +15,7 @@ namespace BECore::Chess {
         static constexpr int kDefaultQuitGraceMs = 5000;          ///< how long a closed engine gets to leave after `quit` before it is sent a signal
 
         ProcessLaunch launch;
-        eastl::vector<eastl::pair<eastl::string, eastl::string>> options;  ///< `setoption name <first> value <second>`, in this order, after `uciok`
+        Vector<Pair<String, String>> options;  ///< `setoption name <first> value <second>`, in this order, after `uciok`
         int startupTimeoutMs = kDefaultStartupTimeoutMs;
         int answerSlackMs = kDefaultAnswerSlackMs;
         int depthOnlyTimeoutMs = kDefaultDepthOnlyTimeoutMs;
@@ -100,7 +100,7 @@ namespace BECore::Chess {
         struct Searched {
             Move move;
             Position position;
-            eastl::vector<UciProtocol::Info> infos;
+            Vector<UciProtocol::Info> infos;
         };
 
         /// The whole of FindMove() and Analyse(), with the mutex already held: validation, NoMove, Cancelled, Begin(), the wait for `bestmove` (StopSearch(), CloseAndFail()), the move checked.
@@ -111,7 +111,7 @@ namespace BECore::Chess {
         [[nodiscard]] std::expected<void, EngineError> Begin(const SearchRequest& request, int lineCount, const CancellationToken& token);
         [[nodiscard]] std::expected<void, EngineError> Handshake(const CancellationToken& token);
         [[nodiscard]] std::expected<void, EngineError> WaitUntilReady(const CancellationToken& token);
-        [[nodiscard]] std::expected<void, EngineError> Send(eastl::string_view command);
+        [[nodiscard]] std::expected<void, EngineError> Send(StringView command);
 
         /// The token was cancelled during the search: `stop`, and the `bestmove` that answers it is read and dropped. The process is closed when it does not answer
         [[nodiscard]] std::unexpected<EngineError> StopSearch();
@@ -120,10 +120,10 @@ namespace BECore::Chess {
         void CloseProcess();
 
         UciEngineSettings _settings;
-        std::mutex _mutex;                       ///< held for the whole of FindMove() and Analyse(): everything below is touched under it only
-        eastl::unique_ptr<UciProcess> _process;  ///< null until the first search and after an error closed it
-        std::optional<SearchRequest> _previous;  ///< the request the running process was last given; none for a process that has had no search
-        int _multiPv = kSingleLine;              ///< the `MultiPV` the running process has been told (1 for a new one, and again once it is closed)
+        Mutex _mutex{BE_LOCK_SITE("UciEngine")};  ///< held for the whole of FindMove() and Analyse(): everything below is touched under it only
+        UniquePtr<UciProcess> _process;           ///< null until the first search and after an error closed it
+        Optional<SearchRequest> _previous;        ///< the request the running process was last given; none for a process that has had no search
+        int _multiPv = kSingleLine;               ///< the `MultiPV` the running process has been told (1 for a new one, and again once it is closed)
     };
 
     /**
@@ -136,6 +136,6 @@ namespace BECore::Chess {
      * Only a lookup: nothing here knows where Stockfish is installed, and nothing of it is shipped with the game.
      * With CHESS_NO_STOCKFISH (the web build) the answer is always nothing and nothing is looked at.
      */
-    [[nodiscard]] std::optional<eastl::string> FindStockfish(eastl::string_view explicitPath);
+    [[nodiscard]] Optional<String> FindStockfish(StringView explicitPath);
 
 }  // namespace BECore::Chess

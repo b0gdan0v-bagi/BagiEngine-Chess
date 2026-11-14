@@ -7,7 +7,7 @@ namespace BECore::Chess {
     /// One move of the list: its text and where it is in the game. A place with no move (White's in a game that began with Black to move, Black's in
     /// the last row) has an empty text and a ply of -1.
     struct MoveListEntry {
-        eastl::string san;
+        String san;
         int ply = -1;  ///< The index of the move in ChessGameModel::GetMoves()
     };
 
@@ -28,6 +28,6 @@ namespace BECore::Chess {
      * A start FEN that does not parse gives no rows. A move that is not legal in its turn (the model never produces one) ends the list there: the
      * rows before it stay.
      */
-    [[nodiscard]] eastl::vector<MoveListRow> BuildMoveList(eastl::string_view startFen, const eastl::vector<Move>& moves);
+    [[nodiscard]] Vector<MoveListRow> BuildMoveList(StringView startFen, const Vector<Move>& moves);
 
 }  // namespace BECore::Chess

@@ -8,7 +8,7 @@ namespace BECore::Chess {
 
     namespace {
 
-        std::unexpected<EngineError> Fail(EngineErrorKind kind, eastl::string detail) {
+        std::unexpected<EngineError> Fail(EngineErrorKind kind, String detail) {
             return std::unexpected(EngineError{kind, std::move(detail)});
         }
 
@@ -18,7 +18,7 @@ namespace BECore::Chess {
         }
 
         /// The time after which line @p line of @p lineCount (counted from 1) must be done: the move time is shared out, line k ends at k / lineCount of it. No move time: no deadline
-        std::optional<std::chrono::steady_clock::time_point> DeadlineOfLine(std::chrono::steady_clock::time_point start, const SearchLimits& limits, size_t line, size_t lineCount) {
+        Optional<std::chrono::steady_clock::time_point> DeadlineOfLine(std::chrono::steady_clock::time_point start, const SearchLimits& limits, size_t line, size_t lineCount) {
             if (limits.moveTimeMs <= 0) {
                 return std::nullopt;
             }
@@ -40,15 +40,15 @@ namespace BECore::Chess {
         CancellationToken token;
         size_t lineCount;
         /// The best moves of the lines found, which the next line leaves out at the root
-        eastl::vector<Move> excluded;
+        Vector<Move> excluded;
         Analysis analysis;
         /// The search of the line being worked on; none once the answer or the error is ready
-        std::optional<SearchJob> job;
+        Optional<SearchJob> job;
         /// Whether the job is the retry at depth 1 of a line whose first search was stopped before its first node
         bool retrying = false;
         /// The nodes of the jobs that are over
         uint64_t finishedNodes = 0;
-        std::optional<std::expected<Analysis, EngineError>> result;
+        Optional<std::expected<Analysis, EngineError>> result;
 
         Impl(Position startPosition, MoveList legalMoves, const SearchLimits& searchLimits, std::chrono::steady_clock::time_point begun, const CancellationToken& cancelToken, size_t lines)
             : position(std::move(startPosition)), legal(std::move(legalMoves)), limits(searchLimits), start(begun), token(cancelToken), lineCount(lines) {}
@@ -67,7 +67,7 @@ namespace BECore::Chess {
             job.emplace(position, std::move(settings), std::move(control));
         }
 
-        void Finish(EngineErrorKind kind, eastl::string detail) {
+        void Finish(EngineErrorKind kind, String detail) {
             if (job) {
                 finishedNodes += job->GetResult().nodes;
                 job.reset();
@@ -110,7 +110,7 @@ namespace BECore::Chess {
         }
     };
 
-    OwnSearch::OwnSearch(eastl::unique_ptr<Impl> impl) noexcept : _impl(std::move(impl)) {}
+    OwnSearch::OwnSearch(UniquePtr<Impl> impl) noexcept : _impl(std::move(impl)) {}
     OwnSearch::~OwnSearch() = default;
     OwnSearch::OwnSearch(OwnSearch&&) noexcept = default;
     OwnSearch& OwnSearch::operator=(OwnSearch&&) noexcept = default;
@@ -134,7 +134,7 @@ namespace BECore::Chess {
         }
         // A position with fewer legal moves than lines asked for gives as many lines as it has moves
         const size_t lineCount = eastl::min(static_cast<size_t>(lines), static_cast<size_t>(legal.size()));
-        auto impl = eastl::make_unique<Impl>(std::move(*found), std::move(legal), request.limits, start, token, lineCount);
+        auto impl = MakeUnique<Impl>(std::move(*found), std::move(legal), request.limits, start, token, lineCount);
         impl->StartJob(false);
         return OwnSearch(std::move(impl));
     }

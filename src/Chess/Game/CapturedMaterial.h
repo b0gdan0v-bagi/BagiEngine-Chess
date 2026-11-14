@@ -10,13 +10,13 @@ namespace BECore::Chess {
     [[nodiscard]] int MaterialPoints(PieceType type);
 
     /// The pieces that can be taken, in the order of the rows of the material display: queen, rook, bishop, knight, pawn
-    [[nodiscard]] eastl::span<const PieceType> CapturableTypes();
+    [[nodiscard]] Span<const PieceType> CapturableTypes();
 
     /// The name of a capturable piece in the scene and in the control API: "queen", "rook", "bishop", "knight", "pawn" (lower case); empty for any other piece
-    [[nodiscard]] eastl::string_view CapturedId(PieceType type);
+    [[nodiscard]] StringView CapturedId(PieceType type);
 
     /// The capturable piece with this id (exactly as written: ids are lower case), or nothing
-    [[nodiscard]] std::optional<PieceType> FindCaptured(eastl::string_view id);
+    [[nodiscard]] Optional<PieceType> FindCaptured(StringView id);
 
     /**
      * @brief What a position says about the material: which pieces of each color are gone and how many points each side has on the board.
@@ -40,14 +40,14 @@ namespace BECore::Chess {
     private:
         friend MaterialSummary SummarizeMaterial(const Position& position);
 
-        eastl::array<eastl::array<int, 7>, 2> _missing{};
-        eastl::array<int, 2> _points{};
+        Array<Array<int, 7>, 2> _missing{};
+        Array<int, 2> _points{};
     };
 
     /// The material of @p position: the pieces each side started with minus those on the board, promotions counted right
     [[nodiscard]] MaterialSummary SummarizeMaterial(const Position& position);
 
     /// The text of the lead of one side: "+N" for 1..99, "+99" for more, "" for no lead (zero or a deficit). The caller passes the lead of the side whose box this is
-    [[nodiscard]] eastl::string BalanceText(int pointsAhead);
+    [[nodiscard]] String BalanceText(int pointsAhead);
 
 }  // namespace BECore::Chess

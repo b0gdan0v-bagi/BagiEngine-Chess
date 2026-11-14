@@ -58,12 +58,12 @@ namespace BECore::Chess::Tests {
             return std::filesystem::path(__FILE__).parent_path().parent_path() / "config" / "SceneConfig.xml";
         }
 
-        bool Play(ChessGameModel& model, eastl::string_view uci) {
+        bool Play(ChessGameModel& model, StringView uci) {
             const auto move = MoveGenerator::ParseUci(model.GetPosition(), uci);
             return move.has_value() && model.TryMove(*move).has_value();
         }
 
-        using Origin = std::pair<float, float>;
+        using Origin = Pair<float, float>;
 
     }  // namespace
 
@@ -131,8 +131,8 @@ namespace BECore::Chess::Tests {
         }
 
         /// Every piece node the scene has
-        eastl::vector<IntrusivePtr<SceneNode>> PieceNodes() const {
-            eastl::vector<IntrusivePtr<SceneNode>> nodes;
+        Vector<IntrusivePtr<SceneNode>> PieceNodes() const {
+            Vector<IntrusivePtr<SceneNode>> nodes;
             for (const auto& node : GetScene().GetRootNode().GetChildren()) {
                 if (node->GetComponent<ChessPieceComponent>()) {
                     nodes.push_back(node);
@@ -228,8 +228,8 @@ namespace BECore::Chess::Tests {
         }
 
         /// Where every piece node is now, by node name
-        eastl::vector<std::pair<PoolString, Origin>> Origins() const {
-            eastl::vector<std::pair<PoolString, Origin>> origins;
+        Vector<Pair<PoolString, Origin>> Origins() const {
+            Vector<Pair<PoolString, Origin>> origins;
             for (const auto& node : PieceNodes()) {
                 origins.emplace_back(node->GetName(), OriginOf(node));
             }
@@ -237,7 +237,7 @@ namespace BECore::Chess::Tests {
         }
 
         /// The pieces other than @p moving have not left the origins in @p before
-        void ExpectOthersStill(const eastl::vector<std::pair<PoolString, Origin>>& before, const IntrusivePtr<SceneNode>& moving) const {
+        void ExpectOthersStill(const Vector<Pair<PoolString, Origin>>& before, const IntrusivePtr<SceneNode>& moving) const {
             const auto now = Origins();
             ASSERT_EQ(now.size(), before.size());
             for (size_t i = 0; i < now.size(); ++i) {
@@ -328,7 +328,7 @@ namespace BECore::Chess::Tests {
 
         IntrusivePtr<RecordingRenderer> _renderer;
         IntrusivePtrAtomic<SceneManager> _manager;
-        CountingFactory _factory{eastl::make_shared<GatedEngine>(true)};
+        CountingFactory _factory{MakeShared<GatedEngine>(true)};
     };
 
     TEST_F(ChessPieceAnimationTest, TheShippedSlideTimeIsTheDefaultOfTheCode) {
@@ -609,11 +609,11 @@ namespace BECore::Chess::Tests {
             ExpectEveryPieceOnItsSquare();
             ExpectOn(pawn, "d5");
 
-            std::string moves;
+            String moves;
             for (const Move move : Model().GetMoves()) {
-                moves += std::string(move.ToUci().c_str()) + " ";
+                moves += String(move.ToUci().c_str()) + " ";
             }
-            return std::tuple{Model().GetVersion() - version, moves, std::string(Model().GetPosition().ToFen().c_str())};
+            return Tuple<uint64_t, String, String>{Model().GetVersion() - version, moves, String(Model().GetPosition().ToFen().c_str())};
         };
 
         const auto animated = play(kDuration);

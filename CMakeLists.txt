@@ -49,7 +49,8 @@ endif()
 
 # The own engine as a UCI program (uci/main.cpp): a console executable with no window and no engine services. Not on the web: a
 # browser has no stdin / stdout to speak UCI on (and nothing there to start it). Its main is outside src/ because ChessModule globs
-# src/*.cpp. Linked as the tests are, minus gtest
+# src/*.cpp. Linked as the tests are, minus gtest. In a desktop ENGINE_SINGLE_THREAD build it is still built, but its `go` needs a
+# worker Thread and asserts there (the smokes below start it); only the browser build, where it is not built, is meant to run single-thread
 if(NOT ENGINE_TARGET_WEB)
     add_executable(BagiChessUci uci/main.cpp)
     target_precompile_headers(BagiChessUci REUSE_FROM BECoreModule)

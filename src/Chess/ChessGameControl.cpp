@@ -13,12 +13,12 @@ namespace BECore::Chess {
         constexpr char kBlackLetters[] = ".pnbrqk";
         static_assert(sizeof(kWhiteLetters) - 1 == static_cast<size_t>(PieceType::King) + 1, "one letter per piece type and one for None");
 
-        constexpr eastl::string_view kPromotionLetters = "nbrq";
-        constexpr eastl::string_view kMoveType = "move";
+        constexpr StringView kPromotionLetters = "nbrq";
+        constexpr StringView kMoveType = "move";
         constexpr size_t kUciMoveLength = 4;  // "e2e4"; a promotion has one letter more
         constexpr size_t kUciPromotionLength = 5;
 
-        eastl::string_view StatusName(GameStatus status) {
+        StringView StatusName(GameStatus status) {
             switch (status) {
                 case GameStatus::Ongoing:
                     return "ongoing";
@@ -37,7 +37,7 @@ namespace BECore::Chess {
         }
 
         /// The kind of an engine error as it goes on the wire
-        eastl::string_view ErrorKindName(EngineErrorKind kind) {
+        StringView ErrorKindName(EngineErrorKind kind) {
             switch (kind) {
                 case EngineErrorKind::BadRequest:
                     return "bad_request";
@@ -61,12 +61,12 @@ namespace BECore::Chess {
             return "bad_request";
         }
 
-        Json TextJson(const eastl::string& text) {
-            return MakeJsonString(eastl::string_view(text.data(), text.size()));
+        Json TextJson(const String& text) {
+            return MakeJsonString(StringView(text));
         }
 
         /// Whether @p text is spelled like a UCI move: two squares and, for a promotion, the piece in lower case
-        bool IsUciSyntax(eastl::string_view text) {
+        bool IsUciSyntax(StringView text) {
             if (text.size() != kUciMoveLength && text.size() != kUciPromotionLength) {
                 return false;
             }
@@ -74,14 +74,14 @@ namespace BECore::Chess {
             if (!isSquare(0) || !isSquare(2)) {
                 return false;
             }
-            return text.size() == kUciMoveLength || kPromotionLetters.find(text[kUciMoveLength]) != eastl::string_view::npos;
+            return text.size() == kUciMoveLength || kPromotionLetters.find(text[kUciMoveLength]) != StringView::npos;
         }
 
         /// Whether the legal moves have a promotion between the squares of @p uci (a four letter spelling)
-        bool NeedsPromotionPiece(const Position& position, eastl::string_view uci) {
+        bool NeedsPromotionPiece(const Position& position, StringView uci) {
             for (const Move move : MoveGenerator::GenerateLegal(position)) {
-                const eastl::string spelled = move.ToUci();
-                if (move.IsPromotion() && eastl::string_view(spelled.data(), kUciMoveLength) == uci) {
+                const String spelled = move.ToUci();
+                if (move.IsPromotion() && StringView(spelled.data(), kUciMoveLength) == uci) {
                     return true;
                 }
             }
@@ -103,8 +103,8 @@ namespace BECore::Chess {
             const auto captured = [&](PieceColor gone) {
                 Json counts = Json::object();
                 for (const PieceType type : CapturableTypes()) {
-                    const eastl::string_view id = CapturedId(type);
-                    counts[std::string(id.data(), id.size())] = summary.GetMissing(gone, type);
+                    const StringView id = CapturedId(type);
+                    counts[ToStdString(id)] = summary.GetMissing(gone, type);
                 }
                 return counts;
             };
@@ -117,8 +117,8 @@ namespace BECore::Chess {
         }
 
         /// "easy, medium, hard, max" for a message
-        eastl::string LevelIds() {
-            eastl::string ids;
+        String LevelIds() {
+            String ids;
             for (const OpponentLevel& level : GetOpponentLevels()) {
                 ids += Format("{}{}", ids.empty() ? "" : ", ", level.id);
             }
@@ -132,11 +132,11 @@ namespace BECore::Chess {
             SeatChoice black;
         };
 
-        constexpr eastl::string_view kBothId = "both";
+        constexpr StringView kBothId = "both";
 
         /// "stockfish, own" for a message
-        eastl::string EngineIds() {
-            eastl::string ids;
+        String EngineIds() {
+            String ids;
             for (const OpponentEngine engine : EnumUtils<OpponentEngine>::Values()) {
                 ids += Format("{}{}", ids.empty() ? "" : ", ", OpponentEngineId(engine));
             }
@@ -144,7 +144,7 @@ namespace BECore::Chess {
         }
 
         /// {"kind", "detail"} of an engine error, or null
-        Json ErrorJson(const std::optional<EngineError>& error) {
+        Json ErrorJson(const Optional<EngineError>& error) {
             if (!error) {
                 return Json();
             }
@@ -164,9 +164,9 @@ namespace BECore::Chess {
 
         /// What set_state asks of the analyst, checked; a member that is missing is nothing
         struct AnalysisPick {
-            std::optional<bool> evaluation;
-            std::optional<bool> hint;
-            std::optional<bool> ratings;
+            Optional<bool> evaluation;
+            Optional<bool> hint;
+            Optional<bool> ratings;
         };
 
         constexpr const char* kAnalysisUsage = "'analysis' has to be an object like {\"evaluation\": true, \"hint\": true, \"ratings\": true} (the members are optional booleans)";
@@ -178,7 +178,7 @@ namespace BECore::Chess {
             }
             AnalysisPick pick;
             for (const auto& [key, value] : analysis.items()) {
-                std::optional<bool>* target = key == "evaluation" ? &pick.evaluation : key == "hint" ? &pick.hint : key == "ratings" ? &pick.ratings : nullptr;
+                Optional<bool>* target = key == "evaluation" ? &pick.evaluation : key == "hint" ? &pick.hint : key == "ratings" ? &pick.ratings : nullptr;
                 if (!target || !value.is_boolean()) {
                     return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, kAnalysisUsage));
                 }
@@ -187,15 +187,15 @@ namespace BECore::Chess {
             return pick;
         }
 
-        ControlError BadOpponent(eastl::string message) {
+        ControlError BadOpponent(String message) {
             return MakeControlError(ControlErrors::kInvalidParams, message);
         }
 
         /// Reads "level" and "engine" of @p object (the opponent, or one of its seat objects, named @p where in a message) into @p choice; a member that is missing keeps what it was
-        std::expected<void, ControlError> ReadChoice(const Json& object, eastl::string_view where, SeatChoice& choice) {
+        std::expected<void, ControlError> ReadChoice(const Json& object, StringView where, SeatChoice& choice) {
             if (FindJsonMember(object, "level")) {
                 const auto id = GetJsonString(object, "level");
-                const std::optional<size_t> level = id ? FindOpponentLevel(eastl::string_view(id->data(), id->size())) : std::nullopt;
+                const Optional<size_t> level = id ? FindOpponentLevel(StringView(id->data(), id->size())) : std::nullopt;
                 if (!level) {
                     return std::unexpected(BadOpponent(Format("{} 'level' has to be the id of a level: {}", where, LevelIds())));
                 }
@@ -203,7 +203,7 @@ namespace BECore::Chess {
             }
             if (FindJsonMember(object, "engine")) {
                 const auto id = GetJsonString(object, "engine");
-                const std::optional<OpponentEngine> engine = id ? FindOpponentEngine(eastl::string_view(id->data(), id->size())) : std::nullopt;
+                const Optional<OpponentEngine> engine = id ? FindOpponentEngine(StringView(id->data(), id->size())) : std::nullopt;
                 if (!engine) {
                     return std::unexpected(BadOpponent(Format("{} 'engine' has to be the id of an engine: {}", where, EngineIds())));
                 }
@@ -213,8 +213,8 @@ namespace BECore::Chess {
         }
 
         /// Reads the seat object {"engine", "level"} of one color into @p choice; nothing else is a member of it
-        std::expected<void, ControlError> ReadSeat(const Json& seat, eastl::string_view color, SeatChoice& choice) {
-            const eastl::string where = Format("opponent '{}'", color);
+        std::expected<void, ControlError> ReadSeat(const Json& seat, StringView color, SeatChoice& choice) {
+            const String where = Format("opponent '{}'", color);
             if (!seat.is_object()) {
                 return std::unexpected(BadOpponent(Format("{} has to be an object like {{\"engine\": \"own\", \"level\": \"easy\"}}", where)));
             }
@@ -223,7 +223,7 @@ namespace BECore::Chess {
                     return std::unexpected(BadOpponent(Format("{} has no member '{}': only 'engine' and 'level'", where, key)));
                 }
             }
-            return ReadChoice(seat, eastl::string_view(where.data(), where.size()), choice);
+            return ReadChoice(seat, StringView(where), choice);
         }
 
         /// Reads {"plays", "level", "engine", "white", "black"}; a member that is missing keeps what @p current says, per seat. "level" and "engine" are for both seats, then the seat objects
@@ -252,8 +252,8 @@ namespace BECore::Chess {
                     current.plays = ProgramSides{};
                 } else {
                     const auto side = GetJsonString(opponent, "plays");
-                    const eastl::string_view id = side ? eastl::string_view(side->data(), side->size()) : eastl::string_view();
-                    const std::optional<PieceColor> color = side ? ParseColor(id) : std::nullopt;
+                    const StringView id = side ? StringView(side->data(), side->size()) : StringView();
+                    const Optional<PieceColor> color = side ? ParseColor(id) : std::nullopt;
                     if (side && id == kBothId) {
                         current.plays = ProgramSides{true, true};
                     } else if (color) {
@@ -277,13 +277,13 @@ namespace BECore::Chess {
     std::expected<Json, ControlError> ChessGameControl::GetState() const {
         Json board = Json::array();
         for (int8_t rank = 7; rank >= 0; --rank) {
-            std::string line;
+            String line;
             for (int8_t file = 0; file < 8; ++file) {
                 const Piece piece = _model.GetPieceAt(Square{file, rank});
                 const char* letters = piece.color == PieceColor::Black ? kBlackLetters : kWhiteLetters;
                 line.push_back(letters[static_cast<size_t>(piece.type)]);
             }
-            board.push_back(std::move(line));
+            board.push_back(MakeJsonString(line));
         }
 
         Json moves = Json::array();
@@ -305,8 +305,8 @@ namespace BECore::Chess {
     }
 
     Json ChessGameControl::OpponentJson() const {
-        const std::optional<PieceColor> plays = _opponent.GetPlays();
-        const std::optional<EngineError>& error = _opponent.GetError();
+        const Optional<PieceColor> plays = _opponent.GetPlays();
+        const Optional<EngineError>& error = _opponent.GetError();
 
         Json seats = Json::object();
         for (const PieceColor color : {PieceColor::White, PieceColor::Black}) {
@@ -314,8 +314,8 @@ namespace BECore::Chess {
             Json seat = Json::object();
             seat["engine"] = MakeJsonString(OpponentEngineId(choice.engine));
             seat["level"] = MakeJsonString(GetOpponentLevels()[choice.level].id);
-            const eastl::string_view id = PieceColorId(color);
-            seats[std::string(id.data(), id.size())] = std::move(seat);
+            const StringView id = PieceColorId(color);
+            seats[ToStdString(id)] = std::move(seat);
         }
 
         Json opponent = Json::object();
@@ -338,7 +338,7 @@ namespace BECore::Chess {
         analysis["hintRequested"] = _analyst.IsHintRequested(_model);
         analysis["thinking"] = _analyst.IsThinking();
 
-        const std::optional<AnalysisLine> evaluation = _analyst.GetEvaluation(_model);
+        const Optional<AnalysisLine> evaluation = _analyst.GetEvaluation(_model);
         if (evaluation) {
             const AnalysisScore white = ScoreForWhite(evaluation->score, _model.GetTurn());  // a bar needs one fixed side
             Json line = Json::object();
@@ -350,7 +350,7 @@ namespace BECore::Chess {
             analysis["evaluation"] = Json();
         }
 
-        const std::optional<AnalysisLine> hint = _analyst.GetHint(_model);
+        const Optional<AnalysisLine> hint = _analyst.GetHint(_model);
         if (hint) {
             Json line = Json::object();
             line["move"] = TextJson(hint->move.ToUci());
@@ -376,7 +376,7 @@ namespace BECore::Chess {
         // One entry per move of "moves", in the same order: null while the move is not rated
         analysis["ratingsOn"] = _analyst.AreRatingsOn();
         Json ratings = Json::array();
-        for (const std::optional<MoveRating>& rating : _analyst.GetRatings(_model)) {
+        for (const Optional<MoveRating>& rating : _analyst.GetRatings(_model)) {
             if (rating) {
                 Json described = Json::object();
                 described["brilliant"] = rating->IsBrilliant();
@@ -408,10 +408,10 @@ namespace BECore::Chess {
             return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, "'type' has to be \"move\""));
         }
         const auto uci = GetJsonString(action, "uci");
-        if (!uci || !IsUciSyntax(eastl::string_view(uci->data(), uci->size()))) {
+        if (!uci || !IsUciSyntax(StringView(uci->data(), uci->size()))) {
             return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, "'uci' has to be a move like \"e2e4\" or, for a promotion, \"e7e8q\" (the piece is n, b, r or q)"));
         }
-        const eastl::string_view spelling(uci->data(), uci->size());
+        const StringView spelling(uci->data(), uci->size());
 
         if (_model.IsGameOver()) {
             return std::unexpected(MakeControlError(ChessControlErrors::kGameOver, Format("the game is over ({}); reset it or set a position", StatusName(_model.GetStatus()))));
@@ -454,19 +454,19 @@ namespace BECore::Chess {
         }
 
         // Check everything first: a refused call changes nothing
-        std::optional<Position> position;
+        Optional<Position> position;
         if (fenMember) {
             const auto fen = GetJsonString(state, "fen");
             if (!fen) {
                 return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, "'fen' has to be a FEN string"));
             }
-            const auto parsed = Position::FromFen(eastl::string_view(fen->data(), fen->size()));
+            const auto parsed = Position::FromFen(StringView(fen->data(), fen->size()));
             if (!parsed) {
                 return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, Format("not a position this game can play: {}", EnumUtils<FenError>::ToString(parsed.error()))));
             }
             position = *parsed;
         }
-        std::optional<OpponentPick> pick;
+        Optional<OpponentPick> pick;
         if (opponentMember) {
             auto parsed = ParseOpponent(*opponentMember, OpponentPick{_opponent.GetSides(), _opponent.GetSeatChoice(PieceColor::White), _opponent.GetSeatChoice(PieceColor::Black)});
             if (!parsed) {
@@ -501,7 +501,7 @@ namespace BECore::Chess {
             return std::unexpected(pick.error());
         }
         if (pick->hint.value_or(false)) {
-            if (const std::optional<HintRefusal> refusal = HintRefusalFor(_model, _opponent.GetSides())) {
+            if (const Optional<HintRefusal> refusal = HintRefusalFor(_model, _opponent.GetSides())) {
                 if (*refusal == HintRefusal::GameOver) {
                     return std::unexpected(MakeControlError(ChessControlErrors::kGameOver, Format("the game is over ({}): there is nothing to hint", StatusName(_model.GetStatus()))));
                 }

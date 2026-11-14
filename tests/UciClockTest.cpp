@@ -61,7 +61,7 @@ namespace BECore::Chess::Tests {
 
     TEST(UciClockTest, MoreTimeNeverGivesASmallerAnswer) {
         for (const int increment : {0, 100, 5000}) {
-            for (const std::optional<int> movesToGo : {std::optional<int>{}, std::optional<int>{1}, std::optional<int>{7}, std::optional<int>{40}}) {
+            for (const Optional<int> movesToGo : {Optional<int>{}, Optional<int>{1}, Optional<int>{7}, Optional<int>{40}}) {
                 int previous = 0;
                 for (int remaining = -10; remaining <= 200000; remaining += 37) {
                     const int time = MoveTimeFor(remaining, increment, movesToGo);

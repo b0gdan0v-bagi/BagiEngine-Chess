@@ -104,8 +104,8 @@ namespace BECore::Chess::Tests {
 
     TEST(OpponentSettingsTest, TheTwoConfigsHaveTheNamesTheirFilesGive) {
         // ConfigManager keys a file by its stem: config/ChessSettings.xml and config/ChessSettings.local.xml
-        EXPECT_EQ(std::filesystem::path("ChessSettings.xml").stem().string(), std::string(OpponentSettings::kSharedConfigName.data(), OpponentSettings::kSharedConfigName.size()));
-        EXPECT_EQ(std::filesystem::path("ChessSettings.local.xml").stem().string(), std::string(OpponentSettings::kLocalConfigName.data(), OpponentSettings::kLocalConfigName.size()));
+        EXPECT_EQ(FromStdString(std::filesystem::path("ChessSettings.xml").stem().string()), String(OpponentSettings::kSharedConfigName.data(), OpponentSettings::kSharedConfigName.size()));
+        EXPECT_EQ(FromStdString(std::filesystem::path("ChessSettings.local.xml").stem().string()), String(OpponentSettings::kLocalConfigName.data(), OpponentSettings::kLocalConfigName.size()));
     }
 
     TEST(OpponentSettingsTest, TheShippedFileCarriesNoPath) {

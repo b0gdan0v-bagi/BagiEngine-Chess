@@ -8,7 +8,7 @@
 
 namespace BECore::Chess {
 
-    std::optional<HintRefusal> HintRefusalFor(const ChessGameModel& model, ProgramSides programPlays) {
+    Optional<HintRefusal> HintRefusalFor(const ChessGameModel& model, ProgramSides programPlays) {
         if (model.IsGameOver()) {
             return HintRefusal::GameOver;
         }
@@ -18,27 +18,27 @@ namespace BECore::Chess {
         return std::nullopt;
     }
 
-    std::optional<HintRefusal> HintRefusalFor(const ChessGameModel& model, std::optional<PieceColor> programPlays) {
+    Optional<HintRefusal> HintRefusalFor(const ChessGameModel& model, Optional<PieceColor> programPlays) {
         return HintRefusalFor(model, ProgramSides::Of(programPlays));
     }
 
-    std::expected<eastl::shared_ptr<IChessEngine>, EngineError> MakeAnalysisEngine(OpponentEngine engine, const OpponentSettings& settings) {
+    std::expected<SharedPtr<IChessEngine>, EngineError> MakeAnalysisEngine(OpponentEngine engine, const OpponentSettings& settings) {
         switch (engine) {
             case OpponentEngine::Stockfish: {
                 if (!IsOpponentEngineAvailable(OpponentEngine::Stockfish)) {
                     return std::unexpected(UnavailableEngineError(OpponentEngine::Stockfish));
                 }
-                const std::optional<eastl::string> program = FindStockfish(settings.stockfishPath);
+                const Optional<String> program = FindStockfish(settings.stockfishPath);
                 if (!program) {
                     return std::unexpected(EngineError{EngineErrorKind::LaunchFailed, NoStockfishDetail(settings.stockfishPath)});
                 }
                 UciEngineSettings uci;
                 uci.launch.path = *program;
                 uci.quitGraceMs = OpponentController::kQuitGraceMs;
-                return eastl::make_shared<UciEngine>(std::move(uci));
+                return MakeShared<UciEngine>(std::move(uci));
             }
             case OpponentEngine::Own:
-                return eastl::make_shared<OwnEngine>();
+                return MakeShared<OwnEngine>();
         }
         return std::unexpected(EngineError{EngineErrorKind::BadRequest, "unknown engine"});
     }
@@ -149,22 +149,22 @@ namespace BECore::Chess {
         return _search && !_search->token.IsCancelled();
     }
 
-    std::optional<AnalysisLine> PositionAnalyst::GetEvaluation(const ChessGameModel& model) const {
+    Optional<AnalysisLine> PositionAnalyst::GetEvaluation(const ChessGameModel& model) const {
         if (!_evaluationOn || !_result || _resultVersion != model.GetVersion()) {
             return std::nullopt;
         }
         return _result;
     }
 
-    std::optional<AnalysisLine> PositionAnalyst::GetHint(const ChessGameModel& model) const {
+    Optional<AnalysisLine> PositionAnalyst::GetHint(const ChessGameModel& model) const {
         if (!IsHintRequested(model) || !_result || _resultVersion != model.GetVersion()) {
             return std::nullopt;
         }
         return _result;
     }
 
-    eastl::vector<AnalysisLine> PositionAnalyst::GetLines(const ChessGameModel& model) const {
-        eastl::vector<AnalysisLine> lines;
+    Vector<AnalysisLine> PositionAnalyst::GetLines(const ChessGameModel& model) const {
+        Vector<AnalysisLine> lines;
         if ((!_evaluationOn && !IsHintRequested(model)) || !_result || _resultVersion != model.GetVersion()) {
             return lines;
         }
@@ -175,10 +175,10 @@ namespace BECore::Chess {
         return lines;
     }
 
-    Task<void> PositionAnalyst::RunSearch(eastl::shared_ptr<Search> search, SearchRequest request) {
+    Task<void> PositionAnalyst::RunSearch(SharedPtr<Search> search, SearchRequest request) {
         std::expected<Analysis, EngineError> answer = AnswerOfTask(co_await search->engine->AnalyseAsync(request, search->token));
         {
-            const std::lock_guard lock(search->mutex);
+            const LockGuard lock(search->mutex);
             search->answer = std::move(answer);
         }
         search->done.store(true, std::memory_order_release);
@@ -192,7 +192,7 @@ namespace BECore::Chess {
     void PositionAnalyst::TakeAnswer(const ChessGameModel& model, OpponentEngine picked) {
         std::expected<Analysis, EngineError> answer = std::unexpected(EngineError{});
         {
-            const std::lock_guard lock(_search->mutex);
+            const LockGuard lock(_search->mutex);
             answer = std::move(_search->answer);
         }
         const bool wanted = !_search->token.IsCancelled() && _searchVersion == model.GetVersion() && _searchEngine == picked;
@@ -213,7 +213,7 @@ namespace BECore::Chess {
             return;
         }
         _result = answer->Best();
-        _second = answer->Second() ? std::optional<AnalysisLine>(*answer->Second()) : std::nullopt;
+        _second = answer->Second() ? Optional<AnalysisLine>(*answer->Second()) : std::nullopt;
         _resultVersion = version;
         _resultEngine = engine;
         ++_revision;
@@ -248,7 +248,7 @@ namespace BECore::Chess {
     void PositionAnalyst::StartSearch(const ChessGameModel& model, OpponentEngine picked) {
         const uint64_t version = model.GetVersion();
         if (!_engine) {
-            std::expected<eastl::shared_ptr<IChessEngine>, EngineError> made = _factory ? _factory(picked) : MakeAnalysisEngine(picked, OpponentSettings{});
+            std::expected<SharedPtr<IChessEngine>, EngineError> made = _factory ? _factory(picked) : MakeAnalysisEngine(picked, OpponentSettings{});
             if (!made) {
                 Fail(version, picked, std::move(made.error()));
                 return;
@@ -256,7 +256,7 @@ namespace BECore::Chess {
             _engine = std::move(*made);
             _engineKind = picked;
         }
-        _search = eastl::make_shared<Search>(_engine);
+        _search = MakeShared<Search>(_engine);
         _searchVersion = version;
         _searchEngine = picked;
         const SearchLimits limits = LimitsOf(picked, GetOpponentLevels().back());

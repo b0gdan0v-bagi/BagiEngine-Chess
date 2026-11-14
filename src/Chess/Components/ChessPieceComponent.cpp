@@ -60,7 +60,7 @@ namespace BECore::Chess {
         Observe(*model, cur, event.deltaTime);
 
         // The piece the person holds is under the pointer, over the others, and nothing slides it
-        const std::optional<ChessBoardComponent::LiftedPiece> lifted = board->GetLiftedPiece();
+        const Optional<ChessBoardComponent::LiftedPiece> lifted = board->GetLiftedPiece();
         if (lifted && cur.IsInside() && lifted->from == cur) {
             if (!_lifted) {
                 _lifted = true;

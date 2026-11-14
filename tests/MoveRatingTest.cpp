@@ -174,14 +174,14 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(MoveRatingTest, TheIdsAreLowerCaseSnakeCaseAndUnique) {
-        eastl::vector<eastl::string> seen;
+        Vector<String> seen;
         for (const MoveRatingReason reason : EnumUtils<MoveRatingReason>::Values()) {
-            const eastl::string id(MoveRatingReasonId(reason));
+            const String id(MoveRatingReasonId(reason));
             EXPECT_FALSE(id.empty());
             for (const char c : id) {
                 EXPECT_TRUE((c >= 'a' && c <= 'z') || c == '_') << id.c_str();
             }
-            for (const eastl::string& other : seen) {
+            for (const String& other : seen) {
                 EXPECT_NE(id, other);
             }
             seen.push_back(id);

@@ -22,17 +22,17 @@ namespace BECore::Chess {
             return value;
         }
 
-        std::unexpected<EngineError> Fail(EngineErrorKind kind, eastl::string detail) {
+        std::unexpected<EngineError> Fail(EngineErrorKind kind, String detail) {
             return std::unexpected(EngineError{kind, std::move(detail)});
         }
 
     }  // namespace
 
-    BlunderEngine::BlunderEngine(eastl::shared_ptr<IChessEngine> inner, int percent) : _inner(std::move(inner)), _percent(eastl::clamp(percent, 0, kMaxPercent)) {
+    BlunderEngine::BlunderEngine(SharedPtr<IChessEngine> inner, int percent) : _inner(std::move(inner)), _percent(eastl::clamp(percent, 0, kMaxPercent)) {
         ASSERT(_inner, "BlunderEngine: no engine to wrap");
     }
 
-    std::expected<std::optional<Move>, EngineError> BlunderEngine::BlunderMove(const SearchRequest& request, const CancellationToken& token) const {
+    std::expected<Optional<Move>, EngineError> BlunderEngine::BlunderMove(const SearchRequest& request, const CancellationToken& token) const {
         if (_percent == 0) {
             return std::nullopt;
         }

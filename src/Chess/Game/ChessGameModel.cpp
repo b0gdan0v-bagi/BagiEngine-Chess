@@ -42,7 +42,7 @@ namespace BECore::Chess {
     void ChessGameModel::DealPieces(const Position& position) {
         for (const PieceColor color : {PieceColor::White, PieceColor::Black}) {
             // The map has no order of its own; the order of the start squares makes the deal the same on every run.
-            eastl::vector<PieceTrack*> tracks;
+            Vector<PieceTrack*> tracks;
             for (auto& [handle, track] : _pieces) {
                 if (track.startPiece.color == color) {
                     tracks.push_back(&track);
@@ -78,15 +78,15 @@ namespace BECore::Chess {
         ++_version;
     }
 
-    std::optional<PieceColor> ChessGameModel::GetWinner() const noexcept {
+    Optional<PieceColor> ChessGameModel::GetWinner() const noexcept {
         if (_status == GameStatus::Checkmate) {
             return Opposite(_position.SideToMove());
         }
         return std::nullopt;
     }
 
-    eastl::vector<Square> ChessGameModel::GetLegalMovesFor(Square from) const {
-        eastl::vector<Square> targets;
+    Vector<Square> ChessGameModel::GetLegalMovesFor(Square from) const {
+        Vector<Square> targets;
         if (!from.IsInside()) {
             return targets;
         }

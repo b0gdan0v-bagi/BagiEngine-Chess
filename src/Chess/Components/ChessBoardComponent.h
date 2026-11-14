@@ -124,7 +124,7 @@ namespace BECore::Chess {
         };
 
         /// The piece the person is dragging, engaged only while a drag is armed, still valid (see IsDragValid()) and lifted past kDragThreshold; the piece component asks it on every update
-        [[nodiscard]] std::optional<LiftedPiece> GetLiftedPiece() const;
+        [[nodiscard]] Optional<LiftedPiece> GetLiftedPiece() const;
 
     private:
         /// A press that left a piece selected: where, for which game, at which version, and where the pointer is now (scene units)
@@ -144,7 +144,7 @@ namespace BECore::Chess {
         void OnMouseMotion(const SDLEvents::MouseMotionEvent&);
 
         /// The square drawn under a point of the screen (scene units through Scene::ScreenToSceneX/Y, the orientation of GetBottomColor()), none off the board
-        [[nodiscard]] std::optional<Square> SquareUnder(float screenX, float screenY) const;
+        [[nodiscard]] Optional<Square> SquareUnder(float screenX, float screenY) const;
 
         /// Whether the drag still holds: the same game at the same version, not over, the dragged square still selected, no promotion pending and the program not to move
         [[nodiscard]] static bool IsDragValid(const Drag& drag, const ChessGameModel* model);
@@ -175,7 +175,7 @@ namespace BECore::Chess {
         /// changed since the last time, since the labels sit at fixed cells of the screen and only their text turns with the board
         void PublishCoordinates(PieceColor bottom);
 
-        std::optional<PieceColor> _publishedBottom;  // the bottom color the board coordinates were published for, none before the first draw
+        Optional<PieceColor> _publishedBottom;  // the bottom color the board coordinates were published for, none before the first draw
 
         uint64_t _publishedVersion = 0;                  // the model version PublishUiVars() last published, 0 for none
         const void* _publishedModel = nullptr;           // the model it was published for: another game starts the count again
@@ -189,7 +189,7 @@ namespace BECore::Chess {
         bool _promotionPanelShown = false;  // what SyncPromotionPanel() last set: the canvas starts hidden
         bool _enginesChecked = false;       // HideUnavailableEngines() has run
 
-        std::optional<Drag> _drag;  // armed by a press that left a piece selected, cleared by every release, a motion without the button, the next press and a failed IsDragValid()
+        Optional<Drag> _drag;  // armed by a press that left a piece selected, cleared by every release, a motion without the button, the next press and a failed IsDragValid()
 
         static ChessBoardComponent* s_active;
     };

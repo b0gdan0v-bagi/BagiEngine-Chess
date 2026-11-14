@@ -8,7 +8,7 @@ namespace BECore::Chess::Tests {
 
     namespace {
 
-        GameStatus StatusOf(eastl::string_view fen) {
+        GameStatus StatusOf(StringView fen) {
             return EvaluateStatus(PositionFromFen(fen));
         }
 

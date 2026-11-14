@@ -12,22 +12,22 @@ namespace BECore::Chess::Tests {
     namespace {
 
         /// Plays a line of UCI moves, separated by spaces, through the model's own TryMove
-        void PlayLine(ChessGameModel& model, eastl::string_view line) {
+        void PlayLine(ChessGameModel& model, StringView line) {
             size_t begin = 0;
             while (begin < line.size()) {
                 size_t end = line.find(' ', begin);
-                if (end == eastl::string_view::npos) {
+                if (end == StringView::npos) {
                     end = line.size();
                 }
-                const std::optional<Move> move = MoveGenerator::ParseUci(model.GetPosition(), line.substr(begin, end - begin));
-                ASSERT_TRUE(move.has_value()) << "not a legal move: " << std::string(line.substr(begin, end - begin).data(), end - begin);
+                const Optional<Move> move = MoveGenerator::ParseUci(model.GetPosition(), line.substr(begin, end - begin));
+                ASSERT_TRUE(move.has_value()) << "not a legal move: " << String(line.substr(begin, end - begin).data(), end - begin);
                 ASSERT_TRUE(model.TryMove(*move).has_value());
                 begin = end + 1;
             }
         }
 
-        std::string MovesText(const ChessGameModel& model) {
-            std::string text;
+        String MovesText(const ChessGameModel& model) {
+            String text;
             for (const Move move : model.GetMoves()) {
                 text += text.empty() ? "" : " ";
                 text += move.ToUci().c_str();
@@ -35,27 +35,27 @@ namespace BECore::Chess::Tests {
             return text;
         }
 
-        SeatChoice Seat(OpponentEngine engine, eastl::string_view level) {
-            const std::optional<size_t> index = FindOpponentLevel(level);
+        SeatChoice Seat(OpponentEngine engine, StringView level) {
+            const Optional<size_t> index = FindOpponentLevel(level);
             EXPECT_TRUE(index.has_value());
             return SeatChoice{engine, index.value_or(kDefaultOpponentLevel)};
         }
 
         /// The fields of a state as one comparable text
-        std::string Describe(const ChessSaveState& state) {
-            std::string text;
+        String Describe(const ChessSaveState& state) {
+            String text;
             for (const String* field : {&state.startFen, &state.moves, &state.plays, &state.whiteEngine, &state.whiteLevel, &state.blackEngine, &state.blackLevel, &state.personColor}) {
-                text += std::string(field->c_str(), field->size()) + "|";
+                text += String(field->c_str(), field->size()) + "|";
             }
             return text;
         }
 
-        std::vector<uint8_t> BytesOf(const Vector<uint8_t>& bytes) {
-            return std::vector<uint8_t>(bytes.begin(), bytes.end());
+        Vector<uint8_t> BytesOf(const Vector<uint8_t>& bytes) {
+            return Vector<uint8_t>(bytes.begin(), bytes.end());
         }
 
-        constexpr eastl::string_view kFoolsMate = "f2f3 e7e5 g2g4 d8h4";
-        constexpr eastl::string_view kGameInProgress = "e2e4 e7e5 g1f3 b8c6";
+        constexpr StringView kFoolsMate = "f2f3 e7e5 g2g4 d8h4";
+        constexpr StringView kGameInProgress = "e2e4 e7e5 g1f3 b8c6";
 
     }  // namespace
 
@@ -66,7 +66,7 @@ namespace BECore::Chess::Tests {
         OpponentChoice choice;
         CountingFactory factory;
 
-        SavedGame() : controller(model), choice(controller), factory({eastl::make_shared<InstantEngine>()}) {
+        SavedGame() : controller(model), choice(controller), factory({MakeShared<InstantEngine>()}) {
             controller.SetEngineFactory(factory.AsFactory());
         }
 
@@ -112,14 +112,14 @@ namespace BECore::Chess::Tests {
             ASSERT_TRUE(saved.has_value()) << saved.error().detail.c_str();
         }
 
-        std::vector<uint8_t> FileBytes() const {
+        Vector<uint8_t> FileBytes() const {
             const std::expected<Vector<uint8_t>, SaveError> bytes = _service.ReadSlot(kChessSaveSlot);
-            return bytes ? BytesOf(*bytes) : std::vector<uint8_t>();
+            return bytes ? BytesOf(*bytes) : Vector<uint8_t>();
         }
 
         /// Everything that must not move when a file is refused
         struct Snapshot {
-            std::string state;
+            String state;
             uint64_t modelVersion = 0;
             uint64_t revision = 0;
             bool hasError = false;
@@ -143,7 +143,7 @@ namespace BECore::Chess::Tests {
             PlayLine(game.model, kGameInProgress);
             ASSERT_TRUE(game.controller.ChooseSeats(ProgramSides::Of(PieceColor::Black), Seat(OpponentEngine::Own, "hard"), Seat(OpponentEngine::Own, "hard")).has_value());
             const Snapshot before = Snap(game);
-            const std::vector<uint8_t> fileBefore = FileBytes();
+            const Vector<uint8_t> fileBefore = FileBytes();
 
             const std::expected<SaveInfo, SaveError> restored = LoadAndRestore(game);
 
@@ -297,7 +297,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(target.model.GetVersion(), versionBefore);
         EXPECT_EQ(target.model.GetStatus(), GameStatus::Ongoing);
         EXPECT_TRUE(target.model.GetMoves().empty());
-        EXPECT_EQ(target.model.GetPosition().ToFen(), eastl::string(Position::kStartFen.data(), Position::kStartFen.size()));
+        EXPECT_EQ(target.model.GetPosition().ToFen(), String(Position::kStartFen.data(), Position::kStartFen.size()));
         EXPECT_EQ(target.controller.GetPlays(), PieceColor::Black);
         EXPECT_EQ(target.controller.GetSeatChoice(PieceColor::Black), Seat(OpponentEngine::Own, "hard"));
     }

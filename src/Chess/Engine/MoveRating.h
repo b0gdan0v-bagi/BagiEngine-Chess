@@ -51,7 +51,7 @@ namespace BECore::Chess {
     [[nodiscard]] int ScoreToCentipawns(const AnalysisScore& score) noexcept;
 
     /// The id of @p reason on the control API: "brilliant", "not_best", "forced", "obvious" (snake_case, unique)
-    [[nodiscard]] eastl::string_view MoveRatingReasonId(MoveRatingReason reason);
+    [[nodiscard]] StringView MoveRatingReasonId(MoveRatingReason reason);
 
     /**
      * @brief Rates @p played, a move made in the position that @p before analyses (an analysis of the position BEFORE the move, two lines asked for).

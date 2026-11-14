@@ -15,10 +15,10 @@ namespace BECore::Chess {
 
     /// The rule of who may ask for a hint, one pure function for every caller (the control API, the HUD button): refused on a finished game, and on the turn of any side the program
     /// plays (@p programPlays; nobody for two people, where either side may ask; both for two programs, where a hint is refused on either turn). Nothing: the hint may be asked
-    [[nodiscard]] std::optional<HintRefusal> HintRefusalFor(const ChessGameModel& model, ProgramSides programPlays);
+    [[nodiscard]] Optional<HintRefusal> HintRefusalFor(const ChessGameModel& model, ProgramSides programPlays);
 
     /// The same for a program that plays one color or none
-    [[nodiscard]] std::optional<HintRefusal> HintRefusalFor(const ChessGameModel& model, std::optional<PieceColor> programPlays);
+    [[nodiscard]] Optional<HintRefusal> HintRefusalFor(const ChessGameModel& model, Optional<PieceColor> programPlays);
 
     /// How many lines the analyst asks of the engine: the best one (the evaluation and the hint) and the second best, for whoever compares them (GetLines())
     inline constexpr int kAnalysisLines = 2;
@@ -31,7 +31,7 @@ namespace BECore::Chess {
      * object each time, so it is a second process, never the opponent's. Without Stockfish in the build (CHESS_NO_STOCKFISH) Stockfish is `Unsupported` (UnavailableEngineError) and the picked engine,
      * which a game starts with, is Own.
      */
-    [[nodiscard]] std::expected<eastl::shared_ptr<IChessEngine>, EngineError> MakeAnalysisEngine(OpponentEngine engine, const OpponentSettings& settings);
+    [[nodiscard]] std::expected<SharedPtr<IChessEngine>, EngineError> MakeAnalysisEngine(OpponentEngine engine, const OpponentSettings& settings);
 
     /**
      * @brief Analyses the position of a ChessGameModel in the background and keeps the answer for exactly that version of the game: the evaluation and the hint.
@@ -151,7 +151,7 @@ namespace BECore::Chess {
         }
 
         /// Why the rating of a move failed, when it did (MoveRater::GetError()); kept apart from GetError(), which is the analysis's
-        [[nodiscard]] const std::optional<EngineError>& GetRatingError() const noexcept {
+        [[nodiscard]] const Optional<EngineError>& GetRatingError() const noexcept {
             return _rater.GetError();
         }
 
@@ -164,18 +164,18 @@ namespace BECore::Chess {
         [[nodiscard]] bool IsThinking() const;
 
         /// The line for the position of @p model as the engine gave it (the view of the side to move), when the evaluation is on and the answer for this very version has come
-        [[nodiscard]] std::optional<AnalysisLine> GetEvaluation(const ChessGameModel& model) const;
+        [[nodiscard]] Optional<AnalysisLine> GetEvaluation(const ChessGameModel& model) const;
 
         /// The line for the position of @p model when a hint was asked at this version and the answer for it has come; its move is the hint
-        [[nodiscard]] std::optional<AnalysisLine> GetHint(const ChessGameModel& model) const;
+        [[nodiscard]] Optional<AnalysisLine> GetHint(const ChessGameModel& model) const;
 
         /// The lines of the answer for the position of @p model, best first (the best one is what GetEvaluation() and GetHint() give, then the second best when the position has a second legal move),
         /// as the engine gave them (the side to move's view). Empty unless the evaluation is on or a hint was asked at this version, and the answer for this very version has come: no line is
         /// shown for another position, another engine pick or a search nobody wants, with the same drop rules as the hint
-        [[nodiscard]] eastl::vector<AnalysisLine> GetLines(const ChessGameModel& model) const;
+        [[nodiscard]] Vector<AnalysisLine> GetLines(const ChessGameModel& model) const;
 
         /// Why the last search failed (any EngineError, an engine that could not be made included); empty when none did or after it went with a new version, pick or request
-        [[nodiscard]] const std::optional<EngineError>& GetError() const noexcept {
+        [[nodiscard]] const Optional<EngineError>& GetError() const noexcept {
             return _error;
         }
 
@@ -187,17 +187,17 @@ namespace BECore::Chess {
     private:
         /// What the worker and the analyst share. The worker writes the answer and then raises `done`; the analyst reads the answer after it sees `done`
         struct Search {
-            explicit Search(eastl::shared_ptr<IChessEngine> engineToAsk) : engine(std::move(engineToAsk)) {}
+            explicit Search(SharedPtr<IChessEngine> engineToAsk) : engine(std::move(engineToAsk)) {}
 
-            eastl::shared_ptr<IChessEngine> engine;
+            SharedPtr<IChessEngine> engine;
             CancellationToken token = CancellationToken::Create();
-            std::mutex mutex;  ///< guards `answer`
+            Mutex mutex{BE_LOCK_SITE("PositionAnalyst")};  ///< guards `answer`
             std::expected<Analysis, EngineError> answer = std::unexpected(EngineError{EngineErrorKind::NoMove, "the search has not finished"});
             std::atomic<bool> done{false};
         };
 
         /// Runs on the pool: asks the engine and leaves the answer in @p search. Takes its arguments by value, so the frame owns everything it uses
-        static Task<void> RunSearch(eastl::shared_ptr<Search> search, SearchRequest request);
+        static Task<void> RunSearch(SharedPtr<Search> search, SearchRequest request);
 
         /// Update() without the rater: the analysis search of the evaluation and the hint
         void UpdateSearch(const ChessGameModel& model, OpponentEngine picked);
@@ -211,22 +211,22 @@ namespace BECore::Chess {
         void ClearError();
 
         AnalysisEngineFactory _factory;  ///< empty: MakeAnalysisEngine over empty settings
-        eastl::shared_ptr<IChessEngine> _engine;
+        SharedPtr<IChessEngine> _engine;
         OpponentEngine _engineKind = kDefaultOpponentEngine;  ///< what _engine was made for; meaningless while it is null
 
         bool _evaluationOn = false;
-        std::optional<uint64_t> _hintVersion;  ///< the version of the model a hint was asked at
+        Optional<uint64_t> _hintVersion;  ///< the version of the model a hint was asked at
 
-        eastl::shared_ptr<Search> _search;  ///< the search under way, null when none; main thread only
-        uint64_t _searchVersion = 0;        ///< the version of the model when _search was asked
+        SharedPtr<Search> _search;    ///< the search under way, null when none; main thread only
+        uint64_t _searchVersion = 0;  ///< the version of the model when _search was asked
         OpponentEngine _searchEngine = kDefaultOpponentEngine;
 
-        std::optional<AnalysisLine> _result;  ///< the answer, for _resultVersion and _resultEngine
-        std::optional<AnalysisLine> _second;  ///< its second line, when the engine gave one; goes with _result
+        Optional<AnalysisLine> _result;  ///< the answer, for _resultVersion and _resultEngine
+        Optional<AnalysisLine> _second;  ///< its second line, when the engine gave one; goes with _result
         uint64_t _resultVersion = 0;
         OpponentEngine _resultEngine = kDefaultOpponentEngine;
 
-        std::optional<EngineError> _error;
+        Optional<EngineError> _error;
         uint64_t _errorVersion = 0;
         OpponentEngine _errorEngine = kDefaultOpponentEngine;
 

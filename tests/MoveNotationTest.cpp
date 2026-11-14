@@ -13,27 +13,27 @@ namespace BECore::Chess::Tests {
     namespace {
 
         /// The SAN of the legal move @p uci in @p position; a spelling that is no legal move fails the test
-        eastl::string San(const Position& position, eastl::string_view uci) {
-            const std::optional<Move> move = MoveGenerator::ParseUci(position, uci);
+        String San(const Position& position, StringView uci) {
+            const Optional<Move> move = MoveGenerator::ParseUci(position, uci);
             if (!move) {
-                ADD_FAILURE() << "Not a legal move: " << eastl::string(uci).c_str() << " in " << position.ToFen().c_str();
+                ADD_FAILURE() << "Not a legal move: " << String(uci).c_str() << " in " << position.ToFen().c_str();
                 return {};
             }
             return SanOf(position, *move);
         }
 
-        eastl::string San(eastl::string_view fen, eastl::string_view uci) {
+        String San(StringView fen, StringView uci) {
             return San(PositionFromFen(fen), uci);
         }
 
         /// The SANs of a game played from @p fen, joined by spaces
-        eastl::string SanLine(eastl::string_view fen, eastl::vector<eastl::string_view> moves) {
+        String SanLine(StringView fen, Vector<StringView> moves) {
             Position position = PositionFromFen(fen);
-            eastl::string line;
-            for (const eastl::string_view uci : moves) {
-                const std::optional<Move> move = MoveGenerator::ParseUci(position, uci);
+            String line;
+            for (const StringView uci : moves) {
+                const Optional<Move> move = MoveGenerator::ParseUci(position, uci);
                 if (!move) {
-                    ADD_FAILURE() << "Not a legal move: " << eastl::string(uci).c_str() << " in " << position.ToFen().c_str();
+                    ADD_FAILURE() << "Not a legal move: " << String(uci).c_str() << " in " << position.ToFen().c_str();
                     break;
                 }
                 if (!line.empty()) {
@@ -45,19 +45,19 @@ namespace BECore::Chess::Tests {
             return line;
         }
 
-        constexpr eastl::string_view kStartFen = Position::kStartFen;
-        constexpr eastl::string_view kAllowedCharacters = "KQRBNabcdefgh12345678xO-=+#";
+        constexpr StringView kStartFen = Position::kStartFen;
+        constexpr StringView kAllowedCharacters = "KQRBNabcdefgh12345678xO-=+#";
 
         /// The checks of the property for one position: every legal move has a SAN that is not empty, made of the allowed characters, different from the
         /// others of the position, and its suffix says what the position after the move says
         void ExpectSansAreSound(const Position& position) {
-            const std::string fen = position.ToFen().c_str();
-            eastl::vector<eastl::string> seen;
+            const String fen = position.ToFen().c_str();
+            Vector<String> seen;
             for (const Move move : MoveGenerator::GenerateLegal(position)) {
-                const eastl::string san = SanOf(position, move);
+                const String san = SanOf(position, move);
                 ASSERT_FALSE(san.empty()) << fen << " " << move.ToUci().c_str();
                 for (const char c : san) {
-                    EXPECT_NE(kAllowedCharacters.find(c), eastl::string_view::npos) << fen << " " << san.c_str();
+                    EXPECT_NE(kAllowedCharacters.find(c), StringView::npos) << fen << " " << san.c_str();
                 }
                 EXPECT_EQ(eastl::find(seen.begin(), seen.end(), san), seen.end()) << fen << " twice " << san.c_str();
                 seen.push_back(san);
@@ -69,7 +69,7 @@ namespace BECore::Chess::Tests {
                 EXPECT_EQ(last == '+' || last == '#', after.IsInCheck()) << fen << " " << san.c_str();
                 EXPECT_EQ(last == '#', mate) << fen << " " << san.c_str();
             }
-            EXPECT_EQ(std::string(position.ToFen().c_str()), fen) << "SanOf must not change the position";
+            EXPECT_EQ(String(position.ToFen().c_str()), fen) << "SanOf must not change the position";
         }
 
     }  // namespace
@@ -159,7 +159,7 @@ namespace BECore::Chess::Tests {
 
     TEST(MoveNotationTest, StalemateHasNoSuffix) {
         const Position position = PositionFromFen("7k/8/6K1/8/8/8/8/5Q2 w - - 0 1");
-        const std::optional<Move> move = MoveGenerator::ParseUci(position, "f1f7");
+        const Optional<Move> move = MoveGenerator::ParseUci(position, "f1f7");
         ASSERT_TRUE(move.has_value());
         Position after = position;
         after.DoMove(*move);
@@ -211,7 +211,7 @@ namespace BECore::Chess::Tests {
 
     TEST(MoveNotationTest, TheInputPositionIsUnchanged) {
         const Position position = PositionFromFen(kKiwipeteFen);
-        const eastl::string fen = position.ToFen();
+        const String fen = position.ToFen();
         const ZobristKey key = position.Key();
         for (const Move move : MoveGenerator::GenerateLegal(position)) {
             (void)SanOf(position, move);
@@ -224,15 +224,15 @@ namespace BECore::Chess::Tests {
     // ---- Property over the perft positions ----
 
     TEST(MoveNotationTest, EveryMoveOfThePerftPositionsHasASoundSan) {
-        for (const eastl::string_view fen : {kStartFen, kKiwipeteFen, kPosition3Fen, kPosition4Fen, kPosition5Fen, kPosition6Fen}) {
-            SCOPED_TRACE(eastl::string(fen).c_str());
+        for (const StringView fen : {kStartFen, kKiwipeteFen, kPosition3Fen, kPosition4Fen, kPosition5Fen, kPosition6Fen}) {
+            SCOPED_TRACE(String(fen).c_str());
             ExpectSansAreSound(PositionFromFen(fen));
         }
     }
 
     TEST(MoveNotationTest, EveryReplyInThePerftPositionsHasASoundSan) {
-        for (const eastl::string_view fen : {kStartFen, kKiwipeteFen, kPosition3Fen, kPosition4Fen, kPosition5Fen, kPosition6Fen}) {
-            SCOPED_TRACE(eastl::string(fen).c_str());
+        for (const StringView fen : {kStartFen, kKiwipeteFen, kPosition3Fen, kPosition4Fen, kPosition5Fen, kPosition6Fen}) {
+            SCOPED_TRACE(String(fen).c_str());
             const Position position = PositionFromFen(fen);
             for (const Move move : MoveGenerator::GenerateLegal(position)) {
                 Position after = position;

@@ -12,10 +12,10 @@ namespace BECore::Chess::Uci {
 
     namespace {
 
-        constexpr eastl::string_view kInfoStringPrefix = "info string ";
-        constexpr eastl::string_view kBestMovePrefix = "bestmove ";
-        constexpr eastl::string_view kNoMoveText = "(none)";
-        constexpr eastl::string_view kBusyText = "a search is running: the command was ignored";
+        constexpr StringView kInfoStringPrefix = "info string ";
+        constexpr StringView kBestMovePrefix = "bestmove ";
+        constexpr StringView kNoMoveText = "(none)";
+        constexpr StringView kBusyText = "a search is running: the command was ignored";
 
         /// The depth of the search that answers a `stop` when no depth has finished (and of the bounded `go` that was stopped)
         constexpr int kStopFallbackDepth = 1;
@@ -24,7 +24,7 @@ namespace BECore::Chess::Uci {
             return c >= 'A' && c <= 'Z' ? static_cast<char>(c - 'A' + 'a') : c;
         }
 
-        bool EqualsIgnoreCase(eastl::string_view a, eastl::string_view b) {
+        bool EqualsIgnoreCase(StringView a, StringView b) {
             if (a.size() != b.size()) {
                 return false;
             }
@@ -36,8 +36,8 @@ namespace BECore::Chess::Uci {
             return true;
         }
 
-        eastl::string Lowered(eastl::string_view text) {
-            eastl::string result;
+        String Lowered(StringView text) {
+            String result;
             for (const char c : text) {
                 result.push_back(Lower(c));
             }
@@ -45,8 +45,8 @@ namespace BECore::Chess::Uci {
         }
 
         /// The game of a `position`: the start FEN and the moves as Move values. The text of the reason when the FEN or a move is refused
-        std::expected<SearchRequest, eastl::string> BuildGame(const PositionParams& params) {
-            const auto start = Position::FromFen(eastl::string_view(params.startFen.data(), params.startFen.size()));
+        std::expected<SearchRequest, String> BuildGame(const PositionParams& params) {
+            const auto start = Position::FromFen(StringView(params.startFen));
             if (!start) {
                 return std::unexpected(Format("position refused: '{}' is not a position this game can play ({})", params.startFen, EnumUtils<FenError>::ToString(start.error())));
             }
@@ -54,8 +54,8 @@ namespace BECore::Chess::Uci {
             game.startFen = params.startFen;
             Position position = *start;
             for (size_t index = 0; index < params.moves.size(); ++index) {
-                const eastl::string& text = params.moves[index];
-                const std::optional<Move> move = MoveGenerator::ParseUci(position, eastl::string_view(text.data(), text.size()));
+                const String& text = params.moves[index];
+                const Optional<Move> move = MoveGenerator::ParseUci(position, StringView(text));
                 if (!move) {
                     return std::unexpected(Format("position refused: move {} ({}) is not legal", index + 1, text));
                 }
@@ -66,7 +66,7 @@ namespace BECore::Chess::Uci {
         }
 
         /// The first legal move of the game @p request leads to, for the `bestmove` after a failure: a GUI must get a move when there is one
-        std::optional<Move> FirstLegalMove(const SearchRequest& request) {
+        Optional<Move> FirstLegalMove(const SearchRequest& request) {
             const auto position = request.FinalPosition();
             if (!position) {
                 return std::nullopt;
@@ -80,7 +80,7 @@ namespace BECore::Chess::Uci {
 
     }  // namespace
 
-    UciServer::UciServer(eastl::shared_ptr<IChessEngine> engine, Sink sink) : _engine(std::move(engine)), _sink(std::move(sink)) {
+    UciServer::UciServer(SharedPtr<IChessEngine> engine, Sink sink) : _engine(std::move(engine)), _sink(std::move(sink)) {
         ASSERT(_engine != nullptr, "UciServer needs an engine");
         _game.startFen.assign(Position::kStartFen.data(), Position::kStartFen.size());
     }
@@ -92,12 +92,12 @@ namespace BECore::Chess::Uci {
         }
     }
 
-    void UciServer::Say(eastl::string_view line) {
-        const std::lock_guard lock(_sinkMutex);
+    void UciServer::Say(StringView line) {
+        const LockGuard lock(_sinkMutex);
         _sink(line);
     }
 
-    void UciServer::SayInfo(eastl::string_view text) {
+    void UciServer::SayInfo(StringView text) {
         Say(Format("{}{}", kInfoStringPrefix, text));
     }
 
@@ -119,7 +119,7 @@ namespace BECore::Chess::Uci {
         _token.Cancel();
     }
 
-    void UciServer::HandleLine(eastl::string_view line) {
+    void UciServer::HandleLine(StringView line) {
         const UciCommand command = ParseCommand(line);
         switch (command.kind) {
             case UciCommandKind::Uci:
@@ -128,7 +128,7 @@ namespace BECore::Chess::Uci {
                 Say(Format("option name {} type spin default 0 min 0 max {}", kDepthOption, kMaxDepthOption));
                 Say(Format("option name {} type spin default 0 min 0 max {}", kBlunderPercentOption, kMaxBlunderPercentOption));
                 {
-                    eastl::string levels = Format("option name {} type combo default {} var {}", kLevelOption, kCustomLevel, kCustomLevel);
+                    String levels = Format("option name {} type combo default {} var {}", kLevelOption, kCustomLevel, kCustomLevel);
                     for (const OpponentLevel& level : GetOpponentLevels()) {
                         levels.append(" var ");
                         levels.append(level.id.data(), level.id.size());
@@ -178,13 +178,13 @@ namespace BECore::Chess::Uci {
             SayInfo(kBusyText);
             return;
         }
-        const eastl::string_view name(params.name.data(), params.name.size());
-        const eastl::string_view value(params.value.data(), params.value.size());
+        const StringView name(params.name.data(), params.name.size());
+        const StringView value(params.value.data(), params.value.size());
         if (EqualsIgnoreCase(name, kLevelOption)) {
             if (EqualsIgnoreCase(value, kCustomLevel)) {
                 return;
             }
-            const std::optional<size_t> found = FindOpponentLevel(Lowered(value));
+            const Optional<size_t> found = FindOpponentLevel(Lowered(value));
             if (!found) {
                 SayInfo(Format("option refused: '{}' is not a level", value));
                 return;
@@ -200,7 +200,7 @@ namespace BECore::Chess::Uci {
             return;
         }
         const int top = isDepth ? kMaxDepthOption : kMaxBlunderPercentOption;
-        const std::optional<int> number = ParseInt(value);
+        const Optional<int> number = ParseInt(value);
         if (!number || *number < 0 || *number > top) {
             SayInfo(Format("option refused: '{}' is not a number from 0 to {}", value, top));
             return;
@@ -233,8 +233,8 @@ namespace BECore::Chess::Uci {
         }
         if (params.moveTime && *params.moveTime > 0) {
             limits.moveTimeMs = *params.moveTime;
-        } else if (const std::optional<int>& clock = whiteToMove ? params.wTime : params.bTime; clock) {
-            const std::optional<int>& increment = whiteToMove ? params.wInc : params.bInc;
+        } else if (const Optional<int>& clock = whiteToMove ? params.wTime : params.bTime; clock) {
+            const Optional<int>& increment = whiteToMove ? params.wInc : params.bInc;
             limits.moveTimeMs = MoveTimeFor(*clock, increment.value_or(0), params.movesToGo);
         }
         return limits;
@@ -249,7 +249,7 @@ namespace BECore::Chess::Uci {
 
         SearchJob job;
         job.request = _game;
-        job.engine = eastl::make_shared<BlunderEngine>(_engine, _blunderPercent);
+        job.engine = MakeShared<BlunderEngine>(_engine, _blunderPercent);
         job.token = CancellationToken::Create();
 
         const auto position = _game.FinalPosition();
@@ -259,12 +259,12 @@ namespace BECore::Chess::Uci {
 
         _token = job.token;
         _searching.store(true);
-        _worker = std::thread([this, job = std::move(job)]() { RunSearch(job); });
+        _worker = Thread("UciServer search", [this, job = std::move(job)]() { RunSearch(job); });
     }
 
     void UciServer::RunSearch(const SearchJob& job) {
-        std::optional<Move> best;
-        std::optional<EngineError> failure;
+        Optional<Move> best;
+        Optional<EngineError> failure;
 
         if (job.deepen) {
             // The answer of a search that nobody stops is the move of the deepest finished iteration

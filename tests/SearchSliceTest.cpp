@@ -33,18 +33,18 @@ namespace BECore::Chess::Tests {
         constexpr int kGoldenMediumDepth = 2;
         constexpr int kGoldenChecksDepth = 6;
         /// The word that ends the name of a default row, which the rows with no table replace
-        constexpr eastl::string_view kDefaultWord = "default";
+        constexpr StringView kDefaultWord = "default";
         /// The nodes after which the node-limited rows stop: a node limit is a clock that does not tick, so the result is deterministic
         constexpr uint64_t kGoldenNodeLimits[] = {1, 3000, 4000, 20000};
 
         /// The six perft positions, named for the rows of the table
         struct NamedFen {
             const char* name;
-            eastl::string_view fen;
+            StringView fen;
         };
 
         /// Both queens can give check again and again (the fixture of SearchTest.ChecksThatCanGoOnForeverEndTheSearch)
-        constexpr eastl::string_view kChecksFen = "7k/6q1/8/8/8/8/1Q6/K7 w - - 0 1";
+        constexpr StringView kChecksFen = "7k/6q1/8/8/8/8/1Q6/K7 w - - 0 1";
 
         const NamedFen kPerftPositions[] = {
             {"start", Position::kStartFen}, {"kiwipete", kKiwipeteFen}, {"pos3", kPosition3Fen}, {"pos4", kPosition4Fen}, {"pos5", kPosition5Fen}, {"pos6", kPosition6Fen},
@@ -52,9 +52,9 @@ namespace BECore::Chess::Tests {
 
         /// One search to run and to compare: a position (with the moves behind it), the depth and the settings that differ from the defaults
         struct GoldenCase {
-            eastl::string name;
-            eastl::string_view fen;
-            eastl::vector<const char*> moves;
+            String name;
+            StringView fen;
+            Vector<const char*> moves;
             int depth = 1;
             bool table = true;
             bool quietOrdering = true;
@@ -78,7 +78,7 @@ namespace BECore::Chess::Tests {
             bool complete;
         };
 
-        GoldenCase Case(eastl::string name, eastl::string_view fen, int depth) {
+        GoldenCase Case(String name, StringView fen, int depth) {
             GoldenCase c;
             c.name = eastl::move(name);
             c.fen = fen;
@@ -87,8 +87,8 @@ namespace BECore::Chess::Tests {
         }
 
         /// The cases of the golden table, in the order of its rows. The names are the key: a row of the table is found by name
-        std::vector<GoldenCase> BuildGoldenCases() {
-            std::vector<GoldenCase> cases;
+        Vector<GoldenCase> BuildGoldenCases() {
+            Vector<GoldenCase> cases;
             // The six positions at depth 3 and 4 with the defaults, with no table, with the old quiet order, and (depth 3) with neither
             // quiescence nor extension: plain depth-limited alpha-beta
             for (const NamedFen& position : kPerftPositions) {
@@ -328,22 +328,22 @@ namespace BECore::Chess::Tests {
         };
         // clang-format on
 
-        std::string Describe(const GoldenRow& row) {
-            return std::string(row.best) + " score " + std::to_string(row.score) + " depth " + std::to_string(row.depth) + " nodes " + std::to_string(row.nodes) + (row.stopped ? " stopped" : "") +
+        String Describe(const GoldenRow& row) {
+            return String(row.best) + " score " + ToString(row.score) + " depth " + ToString(row.depth) + " nodes " + ToString(row.nodes) + (row.stopped ? " stopped" : "") +
                    (row.complete ? " complete" : " incomplete");
         }
 
-        std::string Describe(const SearchResult& result) {
-            return std::string(result.best.IsNull() ? "(none)" : result.best.ToUci().c_str()) + " score " + std::to_string(result.score) + " depth " + std::to_string(result.depth) + " nodes " +
-                   std::to_string(result.nodes) + (result.stopped ? " stopped" : "") + (result.complete ? " complete" : " incomplete");
+        String Describe(const SearchResult& result) {
+            return String(result.best.IsNull() ? "(none)" : result.best.ToUci().c_str()) + " score " + ToString(result.score) + " depth " + ToString(result.depth) + " nodes " +
+                   ToString(result.nodes) + (result.stopped ? " stopped" : "") + (result.complete ? " complete" : " incomplete");
         }
 
-        std::string Describe(const GoldenRow& row, const SearchResult& result) {
+        String Describe(const GoldenRow& row, const SearchResult& result) {
             return "expected " + Describe(row) + ", got " + Describe(result);
         }
 
         bool Matches(const GoldenRow& row, const SearchResult& result) {
-            const std::string best = result.best.IsNull() ? "(none)" : std::string(result.best.ToUci().c_str());
+            const String best = result.best.IsNull() ? "(none)" : String(result.best.ToUci().c_str());
             return best == row.best && result.score == row.score && result.depth == row.depth && result.nodes == row.nodes && result.stopped == row.stopped && result.complete == row.complete;
         }
 
@@ -352,7 +352,7 @@ namespace BECore::Chess::Tests {
     // -- the golden results --------------------------------------------------------------------------------------------------
 
     TEST(SearchSliceTest, TheGoldenTableHasARowPerCase) {
-        const std::vector<GoldenCase> cases = BuildGoldenCases();
+        const Vector<GoldenCase> cases = BuildGoldenCases();
 
         ASSERT_EQ(std::size(kGoldenRows), cases.size());
         for (size_t i = 0; i < cases.size(); ++i) {
@@ -362,7 +362,7 @@ namespace BECore::Chess::Tests {
 
     TEST(SearchSliceTest, TheSearchGivesTheGoldenResults) {
         // Every row was taken from the recursive search before it was rewritten. A row that moves means the search gives another answer
-        const std::vector<GoldenCase> cases = BuildGoldenCases();
+        const Vector<GoldenCase> cases = BuildGoldenCases();
         ASSERT_EQ(std::size(kGoldenRows), cases.size());
 
         for (size_t i = 0; i < cases.size(); ++i) {
@@ -376,7 +376,7 @@ namespace BECore::Chess::Tests {
     TEST(SearchSliceGolden, DISABLED_PrintTheGoldenTable) {
         for (const GoldenCase& c : BuildGoldenCases()) {
             const SearchResult result = RunGoldenCase(c);
-            const std::string best = result.best.IsNull() ? "(none)" : std::string(result.best.ToUci().c_str());
+            const String best = result.best.IsNull() ? "(none)" : String(result.best.ToUci().c_str());
             std::cout << "            {\"" << c.name.c_str() << "\", \"" << best << "\", " << result.score << ", " << result.depth << ", " << result.nodes << ", "
                       << (result.stopped ? "true" : "false") << ", " << (result.complete ? "true" : "false") << "},\n";
         }
@@ -399,7 +399,7 @@ namespace BECore::Chess::Tests {
             SlicePolicy policy;
         };
 
-        size_t IndexOfCase(const std::vector<GoldenCase>& cases, const char* name) {
+        size_t IndexOfCase(const Vector<GoldenCase>& cases, const char* name) {
             for (size_t i = 0; i < cases.size(); ++i) {
                 if (cases[i].name == name) {
                     return i;
@@ -428,7 +428,7 @@ namespace BECore::Chess::Tests {
     TEST(SearchSliceTest, TheSlicedSearchGivesTheOneCallResult) {
         // Every row of the golden table (the six perft positions with and without the table, the old quiet order and an excluded root move, the
         // positions with a history, the mates, the node limits) driven in slices gives the numbers of the one call
-        const std::vector<GoldenCase> cases = BuildGoldenCases();
+        const Vector<GoldenCase> cases = BuildGoldenCases();
         ASSERT_EQ(std::size(kGoldenRows), cases.size());
 
         const NamedPolicy everySize[] = {
@@ -510,7 +510,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(SearchSliceTest, TheNodeLimitIsTheSameInSlices) {
-        const std::vector<GoldenCase> cases = BuildGoldenCases();
+        const Vector<GoldenCase> cases = BuildGoldenCases();
         const NamedPolicy sizes[] = {
             {"1 node", Fixed(kSliceOfOneNode)}, {"7 nodes", Fixed(kSliceOfSevenNodes)}, {"256 nodes", Fixed(kSearchSliceNodes)}, {"1000 nodes", Fixed(kSliceOfManyNodes)}, {"varying", Varying},
         };
@@ -639,7 +639,7 @@ namespace BECore::Chess::Tests {
         // The job works on a copy: the caller's position is the same after a job that ran to the end, and a stopped Search() hands it back equal
         Position position = PositionFromFen(kKiwipeteFen);
         position.DoMove(Mv("e2a6"));
-        const eastl::string fenBefore = position.ToFen();
+        const String fenBefore = position.ToFen();
         const ZobristKey keyBefore = position.Key();
         SearchSettings settings;
         settings.maxDepth = kGoldenShallowDepth;
@@ -670,7 +670,7 @@ namespace BECore::Chess::Tests {
         const SearchResult expected = Search(referencePosition, reference);
         ASSERT_NE(expected.best, excluded);
 
-        std::optional<SearchJob> job;
+        Optional<SearchJob> job;
         {
             // Everything the job was made from is gone at the end of the block
             Position position = PositionFromFen(kKiwipeteFen);
@@ -727,9 +727,9 @@ namespace BECore::Chess::Tests {
         constexpr int kEngineDepths[] = {3, 4};
         constexpr int kAnalysisLineCounts[] = {1, 2, 3, 8};
         /// A position where Black has the king move a7 and nothing else, a mate and a stalemate
-        constexpr eastl::string_view kOneLegalMoveFen = "k7/8/2K5/8/8/8/8/1R6 b - - 0 1";
-        constexpr eastl::string_view kMatedFen = "R5k1/5ppp/8/8/8/8/8/4K3 b - - 0 1";
-        constexpr eastl::string_view kStalematedFen = "7k/5Q2/6K1/8/8/8/8/8 b - - 0 1";
+        constexpr StringView kOneLegalMoveFen = "k7/8/2K5/8/8/8/8/1R6 b - - 0 1";
+        constexpr StringView kMatedFen = "R5k1/5ppp/8/8/8/8/8/4K3 b - - 0 1";
+        constexpr StringView kStalematedFen = "7k/5Q2/6K1/8/8/8/8/8 b - - 0 1";
         /// The game behind a request that has a history (the Italian opening)
         constexpr const char* kHistoryMoves[] = {"e2e4", "e7e5", "g1f3", "b8c6", "f1c4"};
         /// The move time of the deadline test, and the pause that lets it run out before the first slice
@@ -746,7 +746,7 @@ namespace BECore::Chess::Tests {
         /// The most rounds of the interleaving test: a search that makes no progress ends the test
         constexpr size_t kInterleaveRoundLimit = 100000;
 
-        SearchRequest RequestFor(eastl::string_view fen, int depth, int lines = 1) {
+        SearchRequest RequestFor(StringView fen, int depth, int lines = 1) {
             SearchRequest request = SearchRequest::FromPosition(PositionFromFen(fen), SearchLimits{0, depth});
             request.lines = lines;
             return request;
@@ -775,17 +775,16 @@ namespace BECore::Chess::Tests {
         }
 
         /// The kind of an error, or nothing for a value: a form that EXPECT_EQ can compare and print
-        std::optional<EngineErrorKind> KindOf(const std::expected<OwnSearch, EngineError>& begun) {
-            return begun ? std::nullopt : std::optional<EngineErrorKind>(begun.error().kind);
+        Optional<EngineErrorKind> KindOf(const std::expected<OwnSearch, EngineError>& begun) {
+            return begun ? std::nullopt : Optional<EngineErrorKind>(begun.error().kind);
         }
 
-        std::optional<EngineErrorKind> KindOf(const std::expected<Analysis, EngineError>& answer) {
-            return answer ? std::nullopt : std::optional<EngineErrorKind>(answer.error().kind);
+        Optional<EngineErrorKind> KindOf(const std::expected<Analysis, EngineError>& answer) {
+            return answer ? std::nullopt : Optional<EngineErrorKind>(answer.error().kind);
         }
 
-        std::string Describe(const AnalysisLine& line) {
-            return std::string(line.move.ToUci().c_str()) + " " + (line.score.kind == AnalysisScoreKind::Mate ? "mate " : "cp ") + std::to_string(line.score.value) + " depth " +
-                   std::to_string(line.depth);
+        String Describe(const AnalysisLine& line) {
+            return String(line.move.ToUci().c_str()) + " " + (line.score.kind == AnalysisScoreKind::Mate ? "mate " : "cp ") + ToString(line.score.value) + " depth " + ToString(line.depth);
         }
 
         /// Whether two analyses have the same lines: move, score (kind and value) and depth
@@ -801,8 +800,8 @@ namespace BECore::Chess::Tests {
             return true;
         }
 
-        std::string Describe(const Analysis& analysis) {
-            std::string text;
+        String Describe(const Analysis& analysis) {
+            String text;
             for (const AnalysisLine& line : analysis.lines) {
                 text += "[" + Describe(line) + "] ";
             }
@@ -816,7 +815,7 @@ namespace BECore::Chess::Tests {
             uint64_t slices = 0;
         };
 
-        Task<void> DriveOnThePool(OwnEngine engine, SearchRequest request, CancellationToken token, eastl::shared_ptr<CoroutineAnswer> out) {
+        Task<void> DriveOnThePool(OwnEngine engine, SearchRequest request, CancellationToken token, SharedPtr<CoroutineAnswer> out) {
             auto search = engine.BeginFindMove(request, token);
             if (!search) {
                 out->answer = std::unexpected(std::move(search.error()));
@@ -851,7 +850,7 @@ namespace BECore::Chess::Tests {
         const NamedPolicy sizes[] = {{"1 node", Fixed(kSliceOfOneNode)}, {"7 nodes", Fixed(kSliceOfSevenNodes)}, {"256 nodes", Fixed(kSearchSliceNodes)}, {"varying", Varying}};
 
         for (const int depth : kEngineDepths) {
-            std::vector<std::pair<std::string, SearchRequest>> requests;
+            Vector<Pair<String, SearchRequest>> requests;
             for (const NamedFen& position : kPerftPositions) {
                 requests.emplace_back(position.name, RequestFor(position.fen, depth));
             }
@@ -973,7 +972,7 @@ namespace BECore::Chess::Tests {
             EXPECT_EQ(find.error().kind, engine.FindMove(*request, token).error().kind);
             EXPECT_EQ(KindOf(analyse), KindOf(engine.Analyse(*request, token)));
         }
-        for (const eastl::string_view fen : {kMatedFen, kStalematedFen}) {
+        for (const StringView fen : {kMatedFen, kStalematedFen}) {
             EXPECT_EQ(KindOf(engine.BeginFindMove(RequestFor(fen, 1), token)), EngineErrorKind::NoMove) << fen.data();
             EXPECT_EQ(KindOf(engine.BeginAnalyse(RequestFor(fen, 1), token)), EngineErrorKind::NoMove) << fen.data();
         }
@@ -1049,7 +1048,7 @@ namespace BECore::Chess::Tests {
         const auto expected = expectedEngine.Analyse(RequestFor(kKiwipeteFen, kEngineShallowDepth, 2), CancellationToken::Create());
         ASSERT_TRUE(expected.has_value());
 
-        std::optional<OwnSearch> search;
+        Optional<OwnSearch> search;
         {
             // The engine, the request and the token are gone at the end of the block
             OwnEngine engine;
@@ -1111,7 +1110,7 @@ namespace BECore::Chess::Tests {
         const auto expected = engine.FindMove(request, CancellationToken::Create());
         ASSERT_TRUE(expected.has_value());
 
-        auto out = eastl::make_shared<CoroutineAnswer>();
+        auto out = MakeShared<CoroutineAnswer>();
         TaskManager::GetInstance().Run(DriveOnThePool(engine, request, CancellationToken::Create(), out));
 
         ASSERT_TRUE(WaitFor(*out)) << "the coroutine did not finish";
@@ -1127,7 +1126,7 @@ namespace BECore::Chess::Tests {
 #else
         OwnEngine engine;
         CancellationToken token = CancellationToken::Create();
-        auto out = eastl::make_shared<CoroutineAnswer>();
+        auto out = MakeShared<CoroutineAnswer>();
         TaskManager::GetInstance().Run(DriveOnThePool(engine, RequestFor(kKiwipeteFen, kGoldenForeverDepth), token, out));
 
         std::this_thread::sleep_for(kRunBeforeCancel);
@@ -1152,7 +1151,7 @@ namespace BECore::Chess::Tests {
 
         /// Awaits @p call on the pool (the way EngineOpponent's task body does) and stores what it gave
         template <typename T>
-        Task<void> AwaitOnThePool(Task<std::expected<T, EngineError>> call, eastl::shared_ptr<AsyncAnswer<T>> out) {
+        Task<void> AwaitOnThePool(Task<std::expected<T, EngineError>> call, SharedPtr<AsyncAnswer<T>> out) {
             out->answer = AnswerOfTask(co_await std::move(call));
             out->done.store(true, std::memory_order_release);
             co_return;
@@ -1172,8 +1171,8 @@ namespace BECore::Chess::Tests {
 
         /// Runs @p call as a task on the pool and waits for it by a poll with a time limit; the answer is in @p out
         template <typename T>
-        eastl::shared_ptr<AsyncAnswer<T>> RunOnThePool(Task<std::expected<T, EngineError>> call) {
-            auto out = eastl::make_shared<AsyncAnswer<T>>();
+        SharedPtr<AsyncAnswer<T>> RunOnThePool(Task<std::expected<T, EngineError>> call) {
+            auto out = MakeShared<AsyncAnswer<T>>();
             TaskManager::GetInstance().Run(AwaitOnThePool<T>(std::move(call), out));
             return out;
         }
@@ -1407,7 +1406,7 @@ namespace BECore::Chess::Tests {
         const auto expected = OwnEngine().FindMove(SearchRequest::FromModel(model, limits), CancellationToken::Create());
         ASSERT_TRUE(expected.has_value());
 
-        EngineOpponent opponent(eastl::make_shared<OwnEngine>(), PieceColor::White, limits);
+        EngineOpponent opponent(MakeShared<OwnEngine>(), PieceColor::White, limits);
         [[maybe_unused]] const size_t frames = PlayFrames(opponent, model);
 
         ASSERT_EQ(model.GetMoves().size(), 1u) << "the opponent did not play within the time limit";
@@ -1421,7 +1420,7 @@ namespace BECore::Chess::Tests {
     /// ChessTests --gtest_also_run_disabled_tests --gtest_filter=OpponentOverFramesTest.DISABLED_FrameLengthYardstick
     TEST_F(OpponentOverFramesTest, DISABLED_FrameLengthYardstick) {
         ChessGameModel model;
-        EngineOpponent opponent(eastl::make_shared<OwnEngine>(), PieceColor::White, SearchLimits{0, kFramesDepth});
+        EngineOpponent opponent(MakeShared<OwnEngine>(), PieceColor::White, SearchLimits{0, kFramesDepth});
         std::chrono::milliseconds longestFrame{0};
         [[maybe_unused]] const size_t frames = PlayFrames(opponent, model, &longestFrame);
 
@@ -1431,7 +1430,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OpponentOverFramesTest, ACancelInTheMiddleOfAMultiFrameSearchPlaysNothing) {
         ChessGameModel model;
-        EngineOpponent opponent(eastl::make_shared<OwnEngine>(), PieceColor::White, SearchLimits{0, kGoldenForeverDepth});
+        EngineOpponent opponent(MakeShared<OwnEngine>(), PieceColor::White, SearchLimits{0, kGoldenForeverDepth});
 
         for (int frame = 0; frame < kFramesBeforeCancel; ++frame) {
             PumpTaskFrame();
@@ -1455,7 +1454,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OpponentOverFramesTest, AMovedVersionInTheMiddleOfAMultiFrameSearchDropsTheAnswer) {
         ChessGameModel model;
-        EngineOpponent opponent(eastl::make_shared<OwnEngine>(), PieceColor::White, SearchLimits{0, kGoldenForeverDepth});
+        EngineOpponent opponent(MakeShared<OwnEngine>(), PieceColor::White, SearchLimits{0, kGoldenForeverDepth});
         for (int frame = 0; frame < kFramesBeforeCancel; ++frame) {
             PumpTaskFrame();
             opponent.Update(model);
@@ -1484,13 +1483,13 @@ namespace BECore::Chess::Tests {
 
         struct BenchmarkPosition {
             const char* name;
-            eastl::string_view fen;
+            StringView fen;
             int depth;
         };
 
         /// Depth 4 on the six positions, depth 5 on the start position and Kiwipete: about 70 ms of work in Release (one pass over the rows)
-        std::vector<BenchmarkPosition> BenchmarkPositions() {
-            std::vector<BenchmarkPosition> positions;
+        Vector<BenchmarkPosition> BenchmarkPositions() {
+            Vector<BenchmarkPosition> positions;
             for (const NamedFen& position : kPerftPositions) {
                 positions.push_back({position.name, position.fen, kGoldenDepth});
             }
@@ -1503,7 +1502,7 @@ namespace BECore::Chess::Tests {
         /// add a column by adding one of these
         struct BenchmarkColumn {
             const char* title;
-            std::function<uint64_t(eastl::string_view fen, int depth)> run;
+            std::function<uint64_t(StringView fen, int depth)> run;
         };
 
         struct Measured {
@@ -1532,8 +1531,8 @@ namespace BECore::Chess::Tests {
 
         /// Runs every column over every position and prints `name depth nodes ms Mnodes/s` per row and a total per column
         /// (the sum of the nodes over the sum of the fastest times)
-        void RunBenchmark(const std::vector<BenchmarkColumn>& columns) {
-            const std::vector<BenchmarkPosition> positions = BenchmarkPositions();
+        void RunBenchmark(const Vector<BenchmarkColumn>& columns) {
+            const Vector<BenchmarkPosition> positions = BenchmarkPositions();
             for (const BenchmarkColumn& column : columns) {
                 std::cout << "\n" << column.title << "\n";
                 std::cout << std::left << std::setw(10) << "name" << std::right << std::setw(6) << "depth" << std::setw(12) << "nodes" << std::setw(12) << "ms" << std::setw(12) << "Mnodes/s" << "\n";
@@ -1554,7 +1553,7 @@ namespace BECore::Chess::Tests {
         }
 
         /// The one-call Search() on the caller's position
-        uint64_t SearchToTheEnd(eastl::string_view fen, int depth) {
+        uint64_t SearchToTheEnd(StringView fen, int depth) {
             Position position = PositionFromFen(fen);
             SearchSettings settings;
             settings.maxDepth = depth;
@@ -1562,7 +1561,7 @@ namespace BECore::Chess::Tests {
         }
 
         /// A SearchJob driven to the end in slices of kSearchSliceNodes, as a coroutine caller does it
-        uint64_t JobInSlices(eastl::string_view fen, int depth) {
+        uint64_t JobInSlices(StringView fen, int depth) {
             SearchSettings settings;
             settings.maxDepth = depth;
             SearchJob job(PositionFromFen(fen), settings);
@@ -1574,7 +1573,7 @@ namespace BECore::Chess::Tests {
         /// The same, with the cheap look that a coroutine caller takes between slices: whether the frame budget is spent (it never is here,
         /// no task runs, so this is the cost of the call and of the pointer test). The result is the nodes plus the polls that said yes (none),
         /// so it is comparable with the other two and the poll cannot be optimized away
-        uint64_t JobInSlicesWithAPoll(eastl::string_view fen, int depth) {
+        uint64_t JobInSlicesWithAPoll(StringView fen, int depth) {
             SearchSettings settings;
             settings.maxDepth = depth;
             SearchJob job(PositionFromFen(fen), settings);
@@ -1587,7 +1586,7 @@ namespace BECore::Chess::Tests {
         }
 
         /// What OwnEngine::FindMove() does: begin the search of a request for the depth and run it to the end in one call (the nodes are read from the OwnSearch)
-        uint64_t OwnSearchToTheEnd(eastl::string_view fen, int depth) {
+        uint64_t OwnSearchToTheEnd(StringView fen, int depth) {
             OwnEngine engine;
             auto search = engine.BeginFindMove(RequestFor(fen, depth), CancellationToken::Create());
             (void)search->Advance(UINT64_MAX);
@@ -1595,7 +1594,7 @@ namespace BECore::Chess::Tests {
         }
 
         /// The same driven in slices of kSearchSliceNodes, as a coroutine caller does it
-        uint64_t OwnSearchInSlices(eastl::string_view fen, int depth) {
+        uint64_t OwnSearchInSlices(StringView fen, int depth) {
             OwnEngine engine;
             auto search = engine.BeginFindMove(RequestFor(fen, depth), CancellationToken::Create());
             while (search->Advance(kSearchSliceNodes) == SearchProgress::Paused) {

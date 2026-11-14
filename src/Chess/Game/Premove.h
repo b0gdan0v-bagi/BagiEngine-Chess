@@ -45,7 +45,7 @@ namespace BECore::Chess {
         [[nodiscard]] bool IsOwnPiece(Square square, PieceColor color) const noexcept;
 
         /// The squares the piece on @p from can be premoved to, each once, by ascending index; empty for an empty cell and for a piece that is not of @p color
-        [[nodiscard]] eastl::vector<Square> Targets(Square from, PieceColor color) const;
+        [[nodiscard]] Vector<Square> Targets(Square from, PieceColor color) const;
 
         /// Lifts the piece from `from` to `to`: what stood on `to` is gone, the cell of `from` is empty, a pawn that reaches the last rank becomes a queen. Does nothing for an empty `from` or a
         /// square outside the board
@@ -54,8 +54,8 @@ namespace BECore::Chess {
     private:
         static constexpr size_t kColorCount = 2;
 
-        eastl::array<Piece, kSquareCount> _cells{};
-        eastl::array<Bitboard, kColorCount> _byColor{};
+        Array<Piece, kSquareCount> _cells{};
+        Array<Bitboard, kColorCount> _byColor{};
     };
 
 }  // namespace BECore::Chess

@@ -14,7 +14,7 @@
 /// so the tests do not depend on a machine that has one on PATH. A test that needs a child process uses the fake UCI engine (FakeEngineUtil.h)
 namespace BECore::Chess::Tests {
 
-    using MadeEngine = std::expected<eastl::shared_ptr<IChessEngine>, EngineError>;
+    using MadeEngine = std::expected<SharedPtr<IChessEngine>, EngineError>;
 
     inline constexpr std::chrono::milliseconds kEngineWaitLimit{30000};  ///< the give-up limit of a wait for something that must happen: it only ends a broken test, so it is generous under load
     inline constexpr std::chrono::milliseconds kEnginePollInterval{1};
@@ -34,8 +34,8 @@ namespace BECore::Chess::Tests {
     }
 
     /// An error as a sentence for a failed test ("no error" when there is none)
-    inline eastl::string DescribeError(const std::optional<EngineError>& error) {
-        return error ? Format("{}: {}", EnumUtils<EngineErrorKind>::ToString(error->kind), error->detail) : eastl::string("no error");
+    inline String DescribeError(const Optional<EngineError>& error) {
+        return error ? Format("{}: {}", EnumUtils<EngineErrorKind>::ToString(error->kind), error->detail) : String("no error");
     }
 
     /// The first legal move of the position a request leads to; NoMove when the game is over there
@@ -134,7 +134,7 @@ namespace BECore::Chess::Tests {
      */
     class GatedEngine final : public RecordingEngine {
     public:
-        explicit GatedEngine(bool honorsToken = false, std::optional<Move> answer = std::nullopt) : _honorsToken(honorsToken), _answer(answer) {}
+        explicit GatedEngine(bool honorsToken = false, Optional<Move> answer = std::nullopt) : _honorsToken(honorsToken), _answer(answer) {}
 
         void Open() {
             _open.store(true);
@@ -160,7 +160,7 @@ namespace BECore::Chess::Tests {
 
     private:
         bool _honorsToken;
-        std::optional<Move> _answer;
+        Optional<Move> _answer;
         std::atomic<bool> _open{false};
         std::atomic<bool> _cancelled{false};
     };
@@ -190,7 +190,7 @@ namespace BECore::Chess::Tests {
      */
     class AnalysingEngine final : public IChessEngine {
     public:
-        explicit AnalysingEngine(AnalysisScore score = {AnalysisScoreKind::Centipawns, 35}, std::optional<Move> move = std::nullopt, int depth = 7) : _score(score), _move(move), _depth(depth) {}
+        explicit AnalysingEngine(AnalysisScore score = {AnalysisScoreKind::Centipawns, 35}, Optional<Move> move = std::nullopt, int depth = 7) : _score(score), _move(move), _depth(depth) {}
 
         /// From now on Analyse() waits for Open() before it answers; @p honorsToken: a cancelled token ends the wait with Cancelled
         void Gate(bool honorsToken) {
@@ -291,13 +291,13 @@ namespace BECore::Chess::Tests {
         }
 
         AnalysisScore _score;
-        std::optional<Move> _move;
+        Optional<Move> _move;
         int _depth;
         AnalysisScore _secondScore{AnalysisScoreKind::Centipawns, 10};
         int _secondDepth = 6;
         bool _gated = false;
         bool _honorsToken = false;
-        std::optional<EngineError> _error;
+        Optional<EngineError> _error;
         mutable std::mutex _mutex;  ///< guards _lastRequest
         SearchRequest _lastRequest;
         std::atomic<bool> _open{false};
@@ -314,7 +314,7 @@ namespace BECore::Chess::Tests {
      */
     class CountingAnalysisFactory {
     public:
-        CountingAnalysisFactory(std::initializer_list<eastl::shared_ptr<IChessEngine>> engines) : _engines(engines) {}
+        CountingAnalysisFactory(std::initializer_list<SharedPtr<IChessEngine>> engines) : _engines(engines) {}
         explicit CountingAnalysisFactory(EngineError error) : _error(std::move(error)) {}
         CountingAnalysisFactory(const CountingAnalysisFactory&) = delete;
         CountingAnalysisFactory& operator=(const CountingAnalysisFactory&) = delete;
@@ -329,14 +329,14 @@ namespace BECore::Chess::Tests {
         }
 
         /// The id of the engine ("stockfish", "own") of each call, in order
-        [[nodiscard]] const eastl::vector<eastl::string>& Engines() const {
+        [[nodiscard]] const Vector<String>& Engines() const {
             return _engineIds;
         }
 
     private:
         MadeEngine Make(OpponentEngine engine) {
             const size_t call = _engineIds.size();
-            const eastl::string_view engineId = OpponentEngineId(engine);
+            const StringView engineId = OpponentEngineId(engine);
             _engineIds.emplace_back(engineId.data(), engineId.size());
             if (_error) {
                 return std::unexpected(*_error);
@@ -344,9 +344,9 @@ namespace BECore::Chess::Tests {
             return _engines[eastl::min(call, _engines.size() - 1)];
         }
 
-        eastl::vector<eastl::shared_ptr<IChessEngine>> _engines;
-        std::optional<EngineError> _error;
-        eastl::vector<eastl::string> _engineIds;
+        Vector<SharedPtr<IChessEngine>> _engines;
+        Optional<EngineError> _error;
+        Vector<String> _engineIds;
     };
 
     /**
@@ -358,7 +358,7 @@ namespace BECore::Chess::Tests {
      */
     class CountingFactory {
     public:
-        explicit CountingFactory(std::initializer_list<eastl::shared_ptr<IChessEngine>> engines) : _engines(engines) {}
+        explicit CountingFactory(std::initializer_list<SharedPtr<IChessEngine>> engines) : _engines(engines) {}
         explicit CountingFactory(EngineError error) : _error(std::move(error)) {}
         CountingFactory(const CountingFactory&) = delete;
         CountingFactory& operator=(const CountingFactory&) = delete;
@@ -373,19 +373,19 @@ namespace BECore::Chess::Tests {
         }
 
         /// The id of the level of each call, in order
-        [[nodiscard]] const eastl::vector<eastl::string>& Levels() const {
+        [[nodiscard]] const Vector<String>& Levels() const {
             return _levels;
         }
 
         /// The id of the engine ("stockfish", "own") of each call, in order
-        [[nodiscard]] const eastl::vector<eastl::string>& Engines() const {
+        [[nodiscard]] const Vector<String>& Engines() const {
             return _engineIds;
         }
 
     private:
         MadeEngine Make(OpponentEngine engine, const OpponentLevel& level) {
             const size_t call = _levels.size();
-            const eastl::string_view engineId = OpponentEngineId(engine);
+            const StringView engineId = OpponentEngineId(engine);
             _engineIds.emplace_back(engineId.data(), engineId.size());
             _levels.emplace_back(level.id.data(), level.id.size());
             if (_error) {
@@ -394,10 +394,10 @@ namespace BECore::Chess::Tests {
             return _engines[eastl::min(call, _engines.size() - 1)];
         }
 
-        eastl::vector<eastl::shared_ptr<IChessEngine>> _engines;
-        std::optional<EngineError> _error;
-        eastl::vector<eastl::string> _levels;
-        eastl::vector<eastl::string> _engineIds;
+        Vector<SharedPtr<IChessEngine>> _engines;
+        Optional<EngineError> _error;
+        Vector<String> _levels;
+        Vector<String> _engineIds;
     };
 
 }  // namespace BECore::Chess::Tests

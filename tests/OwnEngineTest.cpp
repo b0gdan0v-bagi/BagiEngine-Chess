@@ -50,7 +50,7 @@ namespace BECore::Chess::Tests {
             return engine.FindMove(request, token);
         }
 
-        std::expected<Move, EngineError> AskFen(IChessEngine& engine, eastl::string_view fen, SearchLimits limits) {
+        std::expected<Move, EngineError> AskFen(IChessEngine& engine, StringView fen, SearchLimits limits) {
             return Ask(engine, SearchRequest::FromPosition(PositionFromFen(fen), limits));
         }
 
@@ -58,18 +58,18 @@ namespace BECore::Chess::Tests {
             return engine.Analyse(request, token);
         }
 
-        std::expected<Analysis, EngineError> AnalyseFen(IChessEngine& engine, eastl::string_view fen, SearchLimits limits) {
+        std::expected<Analysis, EngineError> AnalyseFen(IChessEngine& engine, StringView fen, SearchLimits limits) {
             return Analyse(engine, SearchRequest::FromPosition(PositionFromFen(fen), limits));
         }
 
         /// The kind of an error, or nothing for a value: a form that EXPECT_EQ can compare and print
-        std::optional<EngineErrorKind> KindOf(const std::expected<Analysis, EngineError>& answer) {
-            return answer ? std::nullopt : std::optional<EngineErrorKind>(answer.error().kind);
+        Optional<EngineErrorKind> KindOf(const std::expected<Analysis, EngineError>& answer) {
+            return answer ? std::nullopt : Optional<EngineErrorKind>(answer.error().kind);
         }
 
         /// The move of an answer, or nothing for an error: a form that EXPECT_EQ can compare and print
-        std::optional<Move> Found(const std::expected<Move, EngineError>& answer) {
-            return answer ? std::optional<Move>(*answer) : std::nullopt;
+        Optional<Move> Found(const std::expected<Move, EngineError>& answer) {
+            return answer ? Optional<Move>(*answer) : std::nullopt;
         }
 
         /// @p request asking for @p lines lines
@@ -78,7 +78,7 @@ namespace BECore::Chess::Tests {
             return request;
         }
 
-        bool Play(ChessGameModel& model, eastl::string_view uci) {
+        bool Play(ChessGameModel& model, StringView uci) {
             const auto move = MoveGenerator::ParseUci(model.GetPosition(), uci);
             return move.has_value() && model.TryMove(*move).has_value();
         }
@@ -106,7 +106,7 @@ namespace BECore::Chess::Tests {
         /// An engine that asks another with limits of its own and counts the searches that have ended: the levels of the game give a move time, and these tests want a depth
         class LimitedEngine final : public IChessEngine {
         public:
-            LimitedEngine(eastl::shared_ptr<IChessEngine> inner, SearchLimits limits) : _inner(std::move(inner)), _limits(limits) {}
+            LimitedEngine(SharedPtr<IChessEngine> inner, SearchLimits limits) : _inner(std::move(inner)), _limits(limits) {}
 
             std::expected<Move, EngineError> FindMove(const SearchRequest& request, const CancellationToken& token) override {
                 SearchRequest limited = request;
@@ -126,7 +126,7 @@ namespace BECore::Chess::Tests {
             }
 
         private:
-            eastl::shared_ptr<IChessEngine> _inner;
+            SharedPtr<IChessEngine> _inner;
             SearchLimits _limits;
             std::atomic<int> _calls{0};
             std::atomic<int> _answered{0};
@@ -229,7 +229,7 @@ namespace BECore::Chess::Tests {
         const auto answer = Ask(_engine, request);
         const auto took = std::chrono::steady_clock::now() - started;
 
-        ASSERT_TRUE(answer.has_value()) << DescribeError(answer ? std::nullopt : std::optional<EngineError>(answer.error())).c_str();
+        ASSERT_TRUE(answer.has_value()) << DescribeError(answer ? std::nullopt : Optional<EngineError>(answer.error())).c_str();
         EXPECT_TRUE(IsLegalIn(*request.FinalPosition(), *answer));
         EXPECT_GE(took, std::chrono::milliseconds(kMoveTimeMs) / 2) << "a search that has the time uses it";
     }
@@ -278,13 +278,13 @@ namespace BECore::Chess::Tests {
         const auto play = [&](OwnEngine& engine) {
             ChessGameModel model;
             const Player player = EnginePlayer(engine, Depth(kSelfPlayDepth));
-            eastl::vector<eastl::string> moves = PlayGame(model, player, player);
+            Vector<String> moves = PlayGame(model, player, player);
             EXPECT_TRUE(model.IsGameOver() || model.GetMoves().size() == kPlyCap) << "the game ended or reached the cap, no move was refused";
             return moves;
         };
 
-        const eastl::vector<eastl::string> first = play(_engine);
-        const eastl::vector<eastl::string> again = play(second);
+        const Vector<String> first = play(_engine);
+        const Vector<String> again = play(second);
 
         EXPECT_GT(first.size(), 20u) << "a game, not a stop at the first move";
         EXPECT_EQ(first, again);
@@ -302,7 +302,7 @@ namespace BECore::Chess::Tests {
             const Player mover = RandomPlayer(random);
             PlayGame(model, engineIsWhite ? engine : mover, engineIsWhite ? mover : engine);
 
-            const std::optional<PieceColor> winner = model.GetWinner();
+            const Optional<PieceColor> winner = model.GetWinner();
             const PieceColor engineColor = engineIsWhite ? PieceColor::White : PieceColor::Black;
             EXPECT_TRUE(winner.has_value() && *winner == engineColor) << "game " << game << " ended " << EnumUtils<GameStatus>::ToString(model.GetStatus()).data();
             won += winner.has_value() && *winner == engineColor ? 1 : 0;
@@ -312,7 +312,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OwnEngineTest, AControllerWithItPlaysALegalAnswer) {
         ChessGameModel model;
-        const auto engine = eastl::make_shared<LimitedEngine>(eastl::make_shared<OwnEngine>(), Depth(kFloorDepth));
+        const auto engine = MakeShared<LimitedEngine>(MakeShared<OwnEngine>(), Depth(kFloorDepth));
         OpponentController controller(model);
         controller.SetEngineFactory([engine](OpponentEngine, const OpponentLevel&) -> MadeEngine { return engine; });
         ASSERT_TRUE(controller.SetSide(PieceColor::Black).has_value());
@@ -334,7 +334,7 @@ namespace BECore::Chess::Tests {
         SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
         ASSERT_TRUE(Play(model, "e2e4"));
-        const auto engine = eastl::make_shared<LimitedEngine>(eastl::make_shared<OwnEngine>(), Depth(kDepthThatNeverEnds));
+        const auto engine = MakeShared<LimitedEngine>(MakeShared<OwnEngine>(), Depth(kDepthThatNeverEnds));
         OpponentController controller(model);
         controller.SetEngineFactory([engine](OpponentEngine, const OpponentLevel&) -> MadeEngine { return engine; });
         ASSERT_TRUE(controller.SetSide(PieceColor::Black).has_value());
@@ -739,7 +739,7 @@ namespace BECore::Chess::Tests {
         SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
         ASSERT_TRUE(Play(model, "e2e4"));
-        const auto engine = eastl::make_shared<LimitedEngine>(eastl::make_shared<OwnEngine>(), Depth(kDepthThatNeverEnds));
+        const auto engine = MakeShared<LimitedEngine>(MakeShared<OwnEngine>(), Depth(kDepthThatNeverEnds));
         OpponentController controller(model);
         controller.SetEngineFactory([engine](OpponentEngine, const OpponentLevel&) -> MadeEngine { return engine; });
         ASSERT_TRUE(controller.SetSide(PieceColor::Black).has_value());

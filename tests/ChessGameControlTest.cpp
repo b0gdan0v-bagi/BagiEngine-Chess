@@ -17,11 +17,11 @@ namespace BECore::Chess::Tests {
 
     namespace {
 
-        constexpr eastl::string_view kMateInOneFen = "6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1";
-        constexpr eastl::string_view kPromotionFen = "8/P6k/8/8/8/8/8/K7 w - - 0 1";
+        constexpr StringView kMateInOneFen = "6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1";
+        constexpr StringView kPromotionFen = "8/P6k/8/8/8/8/8/K7 w - - 0 1";
 
-        std::string ErrorCodeOf(const ControlError& error) {
-            return std::string(error.code.c_str(), error.code.size());
+        String ErrorCodeOf(const ControlError& error) {
+            return String(error.code.c_str(), error.code.size());
         }
 
         Json MoveAction(const char* uci) {
@@ -31,15 +31,15 @@ namespace BECore::Chess::Tests {
             return action;
         }
 
-        Json FenState(eastl::string_view fen) {
+        Json FenState(StringView fen) {
             Json state = Json::object();
             state["fen"] = MakeJsonString(fen);
             return state;
         }
 
-        std::string StringMember(const Json& json, eastl::string_view key) {
+        String StringMember(const Json& json, StringView key) {
             const auto value = GetJsonString(json, key);
-            return value ? std::string(value->c_str(), value->size()) : std::string("<missing>");
+            return value ? String(value->c_str(), value->size()) : String("<missing>");
         }
 
         Json OpponentState(const Json& opponent) {
@@ -79,7 +79,7 @@ namespace BECore::Chess::Tests {
                 // The cases below are a world of doubles in which "stockfish" is only a name that a test factory answers (the opponent starts with it, as it does on the desktop). A build without
                 // Stockfish starts with the own engine, so the fixture picks the name first, through a factory that makes any double. What a real game of that
                 // build does is the cases that say `WithoutStockfish`
-                opponent.SetEngineFactory([](OpponentEngine, const OpponentLevel&) -> MadeEngine { return eastl::make_shared<InstantEngine>(); });
+                opponent.SetEngineFactory([](OpponentEngine, const OpponentLevel&) -> MadeEngine { return MakeShared<InstantEngine>(); });
                 [[maybe_unused]] const auto picked = opponent.SetEngine(OpponentEngine::Stockfish);
                 // The factory stays: the default one would refuse the name Stockfish at every pick that names it, also one that changes nothing. A case that needs another sets its own
 #endif
@@ -105,17 +105,17 @@ namespace BECore::Chess::Tests {
                 return outcome ? *outcome : Json();
             }
 
-            void SetFen(eastl::string_view fen) {
+            void SetFen(StringView fen) {
                 const auto result = control.SetState(FenState(fen));
                 ASSERT_TRUE(result.has_value()) << result.error().message.c_str();
             }
 
             /// The UCI spellings of the actions, in the order they were listed
-            eastl::vector<eastl::string> ActionMoves() {
-                eastl::vector<eastl::string> moves;
+            Vector<String> ActionMoves() {
+                Vector<String> moves;
                 const Json actions = Actions();
                 for (size_t index = 0; index < actions.size(); ++index) {
-                    moves.push_back(GetJsonString(actions[index], "uci").value_or(eastl::string()));
+                    moves.push_back(GetJsonString(actions[index], "uci").value_or(String()));
                 }
                 return moves;
             }
@@ -157,10 +157,10 @@ namespace BECore::Chess::Tests {
             }
 
             /// The code of the error that set_state answers with; the test fails when it is accepted
-            std::string SetStateError(const Json& request) {
+            String SetStateError(const Json& request) {
                 const auto result = control.SetState(request);
                 EXPECT_FALSE(result.has_value()) << DumpJson(request).c_str();
-                return result ? std::string("<accepted>") : ErrorCodeOf(result.error());
+                return result ? String("<accepted>") : ErrorCodeOf(result.error());
             }
 
             /// What a game loop does with the analysis too: the frame of ChessBoardComponent, until @p done
@@ -197,7 +197,7 @@ namespace BECore::Chess::Tests {
             }
 
             /// {"analysis": {..}}; an empty @p evaluation or @p hint leaves the member out
-            static Json AnalysisRequest(std::optional<bool> evaluation, std::optional<bool> hint) {
+            static Json AnalysisRequest(Optional<bool> evaluation, Optional<bool> hint) {
                 Json analysis = Json::object();
                 if (evaluation) {
                     analysis["evaluation"] = *evaluation;
@@ -211,14 +211,14 @@ namespace BECore::Chess::Tests {
             }
 
             /// set_state with the analysis; the test fails when it is refused
-            void AnalyseWith(std::optional<bool> evaluation, std::optional<bool> hint = std::nullopt) {
+            void AnalyseWith(Optional<bool> evaluation, Optional<bool> hint = std::nullopt) {
                 const auto result = control.SetState(AnalysisRequest(evaluation, hint));
                 ASSERT_TRUE(result.has_value()) << result.error().message.c_str();
             }
 
             /// The state of the analysis as one string, to see that a refused call changed nothing
-            std::string AnalysisSnapshot() {
-                return AnalysisOfState().dump() + " v" + std::to_string(control.GetStateVersion());
+            String AnalysisSnapshot() {
+                return FromStdString(AnalysisOfState().dump()) + " v" + ToString(control.GetStateVersion());
             }
 
             ChessGameModel model;
@@ -234,7 +234,7 @@ namespace BECore::Chess::Tests {
     TEST_F(ChessGameControlTest, StateDescribesTheStartPosition) {
         const Json state = State();
 
-        EXPECT_EQ(StringMember(state, "fen"), std::string(Position::kStartFen.data(), Position::kStartFen.size()));
+        EXPECT_EQ(StringMember(state, "fen"), String(Position::kStartFen.data(), Position::kStartFen.size()));
         EXPECT_EQ(StringMember(state, "startFen"), StringMember(state, "fen"));
         EXPECT_EQ(StringMember(state, "turn"), "white");
         EXPECT_EQ(StringMember(state, "status"), "ongoing");
@@ -358,7 +358,7 @@ namespace BECore::Chess::Tests {
         const char* const expected[] = {"rnbqkbnr", "pppppppp", "........", "........", "........", "........", "PPPPPPPP", "RNBQKBNR"};
         for (size_t row = 0; row < board->size(); ++row) {
             ASSERT_TRUE((*board)[row].is_string());
-            EXPECT_EQ((*board)[row].get_ref<const std::string&>(), expected[row]) << "row " << row;
+            EXPECT_EQ((*board)[row].get_ref<const std::string&>(), expected[row]) << "row " << row;  //-NoStd: nlohmann string
         }
     }
 
@@ -369,10 +369,10 @@ namespace BECore::Chess::Tests {
         const Json state = State();
         const Json* board = FindJsonMember(state, "board");
         ASSERT_NE(board, nullptr);
-        EXPECT_EQ((*board)[1].get_ref<const std::string&>(), "pp.ppppp") << "rank 7, the c pawn left";
-        EXPECT_EQ((*board)[3].get_ref<const std::string&>(), "..p.....") << "rank 5";
-        EXPECT_EQ((*board)[4].get_ref<const std::string&>(), "....P...") << "rank 4";
-        EXPECT_EQ((*board)[6].get_ref<const std::string&>(), "PPPP.PPP") << "rank 2, the e pawn left";
+        EXPECT_EQ((*board)[1].get_ref<const std::string&>(), "pp.ppppp") << "rank 7, the c pawn left";  //-NoStd: nlohmann string
+        EXPECT_EQ((*board)[3].get_ref<const std::string&>(), "..p.....") << "rank 5";                   //-NoStd: nlohmann string
+        EXPECT_EQ((*board)[4].get_ref<const std::string&>(), "....P...") << "rank 4";                   //-NoStd: nlohmann string
+        EXPECT_EQ((*board)[6].get_ref<const std::string&>(), "PPPP.PPP") << "rank 2, the e pawn left";  //-NoStd: nlohmann string
         EXPECT_EQ(StringMember(state, "turn"), "white");
     }
 
@@ -385,9 +385,9 @@ namespace BECore::Chess::Tests {
         const Json* moves = FindJsonMember(state, "moves");
         ASSERT_NE(moves, nullptr);
         ASSERT_EQ(moves->size(), 3u);
-        EXPECT_EQ((*moves)[0].get_ref<const std::string&>(), "e2e4");
-        EXPECT_EQ((*moves)[2].get_ref<const std::string&>(), "g1f3");
-        EXPECT_EQ(StringMember(state, "startFen"), std::string(Position::kStartFen.data(), Position::kStartFen.size()));
+        EXPECT_EQ((*moves)[0].get_ref<const std::string&>(), "e2e4");  //-NoStd: nlohmann string
+        EXPECT_EQ((*moves)[2].get_ref<const std::string&>(), "g1f3");  //-NoStd: nlohmann string
+        EXPECT_EQ(StringMember(state, "startFen"), String(Position::kStartFen.data(), Position::kStartFen.size()));
     }
 
     TEST_F(ChessGameControlTest, StartFenAndMovesRebuildTheGame) {
@@ -396,17 +396,17 @@ namespace BECore::Chess::Tests {
         }
         const Json state = State();
 
-        auto replayed = Position::FromFen(eastl::string_view(StringMember(state, "startFen").c_str()));
+        auto replayed = Position::FromFen(StringView(StringMember(state, "startFen").c_str()));
         ASSERT_TRUE(replayed.has_value());
         const Json* moves = FindJsonMember(state, "moves");
         ASSERT_NE(moves, nullptr);
         for (size_t index = 0; index < moves->size(); ++index) {
-            const std::string& uci = (*moves)[index].get_ref<const std::string&>();
-            const auto move = MoveGenerator::ParseUci(*replayed, eastl::string_view(uci.c_str(), uci.size()));
+            const std::string& uci = (*moves)[index].get_ref<const std::string&>();  //-NoStd: nlohmann string
+            const auto move = MoveGenerator::ParseUci(*replayed, StringView(uci.c_str(), uci.size()));
             ASSERT_TRUE(move.has_value()) << uci;
             replayed->DoMove(*move);
         }
-        EXPECT_EQ(StringMember(state, "fen"), std::string(replayed->ToFen().c_str()));
+        EXPECT_EQ(StringMember(state, "fen"), String(replayed->ToFen().c_str()));
     }
 
     TEST_F(ChessGameControlTest, StateReportsCheck) {
@@ -430,7 +430,7 @@ namespace BECore::Chess::Tests {
         ASSERT_EQ(actions.size(), legal.size());
         for (size_t index = 0; index < legal.size(); ++index) {
             EXPECT_EQ(StringMember(actions[index], "type"), "move");
-            EXPECT_EQ(StringMember(actions[index], "uci"), std::string(legal[index].ToUci().c_str()));
+            EXPECT_EQ(StringMember(actions[index], "uci"), String(legal[index].ToUci().c_str()));
         }
     }
 
@@ -440,7 +440,7 @@ namespace BECore::Chess::Tests {
 
         // Five king moves, four promotions on a8 and four promoting captures of the rook on b8
         SetFen("1r2k3/P7/8/8/8/8/8/4K3 w - - 0 1");
-        const eastl::vector<eastl::string> moves = ActionMoves();
+        const Vector<String> moves = ActionMoves();
         EXPECT_EQ(moves.size(), 13u);
         for (const char* promotion : {"a7b8q", "a7b8r", "a7b8b", "a7b8n", "a7a8q", "a7a8n"}) {
             EXPECT_NE(eastl::find(moves.begin(), moves.end(), promotion), moves.end()) << promotion;
@@ -559,13 +559,13 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessGameControlTest, APromotionWithoutAPieceNeedsOne) {
         SetFen(kPromotionFen);
-        const std::string fen = StringMember(State(), "fen");
+        const String fen = StringMember(State(), "fen");
         const uint64_t version = control.GetStateVersion();
 
         const auto outcome = control.PerformAction(MoveAction("a7a8"));
         ASSERT_FALSE(outcome.has_value());
         EXPECT_EQ(ErrorCodeOf(outcome.error()), "promotion_required");
-        EXPECT_NE(std::string(outcome.error().message.c_str()).find("a7a8q"), std::string::npos) << "the message says what to send";
+        EXPECT_NE(String(outcome.error().message.c_str()).find("a7a8q"), String::npos) << "the message says what to send";
         EXPECT_EQ(StringMember(State(), "fen"), fen);
         EXPECT_EQ(control.GetStateVersion(), version);
 
@@ -621,7 +621,7 @@ namespace BECore::Chess::Tests {
 
         ASSERT_TRUE(control.Reset(Json::object()).has_value());
         EXPECT_GT(control.GetStateVersion(), version);
-        EXPECT_EQ(StringMember(State(), "fen"), std::string(Position::kStartFen.data(), Position::kStartFen.size()));
+        EXPECT_EQ(StringMember(State(), "fen"), String(Position::kStartFen.data(), Position::kStartFen.size()));
         EXPECT_TRUE(FindJsonMember(State(), "moves")->empty());
     }
 
@@ -641,8 +641,8 @@ namespace BECore::Chess::Tests {
         EXPECT_GT(control.GetStateVersion(), version);
 
         const Json state = State();
-        EXPECT_EQ(StringMember(state, "fen"), std::string(kKiwipeteFen.data(), kKiwipeteFen.size()));
-        EXPECT_EQ(StringMember(state, "startFen"), std::string(kKiwipeteFen.data(), kKiwipeteFen.size()));
+        EXPECT_EQ(StringMember(state, "fen"), String(kKiwipeteFen.data(), kKiwipeteFen.size()));
+        EXPECT_EQ(StringMember(state, "startFen"), String(kKiwipeteFen.data(), kKiwipeteFen.size()));
         EXPECT_TRUE(FindJsonMember(state, "moves")->empty()) << "the moves before it belong to another game";
     }
 
@@ -737,7 +737,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, ASideAndALevelAreSetAndReadBack) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(factory.AsFactory());
 
         SetOpponent(OpponentRequest("black", "easy"));
@@ -752,7 +752,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, AnEngineAloneIsReadBackAsksNoFactoryAndMovesTheVersion) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(factory.AsFactory());
         const uint64_t version = control.GetStateVersion();
 
@@ -767,7 +767,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, ASideAndTheOwnEngineMakeOneEngineForTheOwnEngine) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(factory.AsFactory());
 
         SetOpponent(OpponentRequest("black", "easy", "own"));
@@ -782,7 +782,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, ALevelOrASideKeepsTheEngine) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(factory.AsFactory());
         SetOpponent(EngineRequest(Json("own")));
 
@@ -805,7 +805,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, ABadEngineIsRefusedAndChangesNothing) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(factory.AsFactory());
         SetOpponent(OpponentRequest("black", "easy", "own"));
         Perform("e2e4");
@@ -819,7 +819,7 @@ namespace BECore::Chess::Tests {
             const auto result = control.SetState(request);
             ASSERT_FALSE(result.has_value()) << DumpJson(request).c_str();
             EXPECT_EQ(ErrorCodeOf(result.error()), "invalid_params") << DumpJson(request).c_str();
-            EXPECT_NE(std::string(result.error().message.c_str()).find("stockfish, own"), std::string::npos) << "the message names the ids: " << result.error().message.c_str();
+            EXPECT_NE(String(result.error().message.c_str()).find("stockfish, own"), String::npos) << "the message names the ids: " << result.error().message.c_str();
         }
 
         // A valid position next to a bad engine: neither half is applied
@@ -834,17 +834,17 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessGameControlTest, AClientThatGetsEngineUnavailableForStockfishCanSwitchToTheOwnEngine) {
         // Stockfish is missing, the own engine is not: the factory fails only for the first
-        eastl::vector<eastl::string> asked;
+        Vector<String> asked;
         opponent.SetEngineFactory([&asked](OpponentEngine engine, const OpponentLevel&) -> MadeEngine {
-            const eastl::string_view id = OpponentEngineId(engine);
+            const StringView id = OpponentEngineId(engine);
             asked.emplace_back(id.data(), id.size());
             if (engine == OpponentEngine::Stockfish) {
                 return std::unexpected(EngineError{EngineErrorKind::LaunchFailed, "no Stockfish in the test"});
             }
-            return eastl::make_shared<InstantEngine>();
+            return MakeShared<InstantEngine>();
         });
         Perform("e2e4");
-        const std::string fenBefore = StringMember(State(), "fen");
+        const String fenBefore = StringMember(State(), "fen");
 
         Json request = OpponentRequest("black", nullptr, "stockfish");
         request["fen"] = MakeJsonString(kMateInOneFen);
@@ -860,7 +860,7 @@ namespace BECore::Chess::Tests {
         request = OpponentRequest("black", nullptr, "own");
         request["fen"] = MakeJsonString(kMateInOneFen);
         SetOpponent(request);
-        EXPECT_EQ(StringMember(State(), "fen"), std::string(kMateInOneFen.data(), kMateInOneFen.size()));
+        EXPECT_EQ(StringMember(State(), "fen"), String(kMateInOneFen.data(), kMateInOneFen.size()));
         const Json computer = OpponentOfState();
         EXPECT_EQ(StringMember(computer, "plays"), "black");
         EXPECT_EQ(StringMember(computer, "engine"), "own");
@@ -870,19 +870,19 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, AFailedSwitchFromTheOwnEngineToStockfishIsRefusedAndTheOpponentStaysAsItWas) {
-        eastl::vector<eastl::string> asked;
+        Vector<String> asked;
         opponent.SetEngineFactory([&asked](OpponentEngine engine, const OpponentLevel&) -> MadeEngine {
-            const eastl::string_view id = OpponentEngineId(engine);
+            const StringView id = OpponentEngineId(engine);
             asked.emplace_back(id.data(), id.size());
             if (engine == OpponentEngine::Stockfish) {
                 return std::unexpected(EngineError{EngineErrorKind::LaunchFailed, "no Stockfish in the test"});
             }
-            return eastl::make_shared<InstantEngine>();
+            return MakeShared<InstantEngine>();
         });
         SetOpponent(OpponentRequest("black", "easy", "own"));
         ASSERT_EQ(StringMember(OpponentOfState(), "plays"), "black");
         Perform("e2e4");
-        const std::string fenBefore = StringMember(State(), "fen");
+        const String fenBefore = StringMember(State(), "fen");
 
         Json request = OpponentRequest("black", nullptr, "stockfish");
         request["fen"] = MakeJsonString(kMateInOneFen);
@@ -899,7 +899,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, TheSameEnginePickAgainDoesNothing) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(factory.AsFactory());
         SetOpponent(OpponentRequest("black", "easy", "own"));
         const uint64_t version = control.GetStateVersion();
@@ -921,7 +921,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, ResetKeepsTheEngine) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(factory.AsFactory());
         SetOpponent(OpponentRequest("white", "hard", "own"));
         Perform("e2e4");
@@ -933,7 +933,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, NullPutsTwoPeopleBack) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(factory.AsFactory());
         SetOpponent(OpponentRequest("white", "hard"));
         ASSERT_EQ(StringMember(OpponentOfState(), "plays"), "white");
@@ -947,7 +947,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, OnlyALevelKeepsTheSide) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(factory.AsFactory());
 
         Json onlyLevel = Json::object();
@@ -978,7 +978,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, AFenAndAnOpponentTogether) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(factory.AsFactory());
         Perform("e2e4");
 
@@ -987,7 +987,7 @@ namespace BECore::Chess::Tests {
         SetOpponent(both);
 
         const Json state = State();
-        EXPECT_EQ(StringMember(state, "fen"), std::string(kMateInOneFen.data(), kMateInOneFen.size()));
+        EXPECT_EQ(StringMember(state, "fen"), String(kMateInOneFen.data(), kMateInOneFen.size()));
         EXPECT_TRUE(FindJsonMember(state, "moves")->empty());
         EXPECT_EQ(StringMember(*FindJsonMember(state, "opponent"), "plays"), "black");
         EXPECT_EQ(StringMember(*FindJsonMember(state, "opponent"), "level"), "hard");
@@ -995,7 +995,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, SetStateNeedsAFenOrAnOpponent) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(factory.AsFactory());
         const Json before = State();
         const uint64_t version = control.GetStateVersion();
@@ -1012,7 +1012,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, ABadOpponentIsRefusedAndChangesNothing) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(factory.AsFactory());
         SetOpponent(OpponentRequest("black", "easy"));
         Perform("e2e4");
@@ -1074,7 +1074,7 @@ namespace BECore::Chess::Tests {
         CountingFactory factory(EngineError{EngineErrorKind::LaunchFailed, "no Stockfish in the test"});
         opponent.SetEngineFactory(factory.AsFactory());
         Perform("e2e4");
-        const std::string fenBefore = StringMember(State(), "fen");
+        const String fenBefore = StringMember(State(), "fen");
         const uint64_t version = control.GetStateVersion();
 
         Json request = OpponentRequest("black", "hard");
@@ -1083,7 +1083,7 @@ namespace BECore::Chess::Tests {
 
         ASSERT_FALSE(result.has_value());
         EXPECT_EQ(ErrorCodeOf(result.error()), "engine_unavailable");
-        EXPECT_NE(std::string(result.error().message.c_str()).find("no Stockfish in the test"), std::string::npos) << "the sentence of the engine's error is in the message";
+        EXPECT_NE(String(result.error().message.c_str()).find("no Stockfish in the test"), String::npos) << "the sentence of the engine's error is in the message";
         EXPECT_EQ(StringMember(State(), "fen"), fenBefore) << "the position is not replaced";
         EXPECT_EQ(MoveCount(), 1u);
         EXPECT_GT(control.GetStateVersion(), version) << "the error that appeared is a change a client can see";
@@ -1113,7 +1113,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, AnUnchangedOpponentDoesNothing) {
-        const auto engine = eastl::make_shared<InstantEngine>();
+        const auto engine = MakeShared<InstantEngine>();
         CountingFactory factory({engine});
         opponent.SetEngineFactory(factory.AsFactory());
         SetOpponent(OpponentRequest("black", "easy"));
@@ -1131,7 +1131,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessGameControlTest, ThinkingIsTrueWhileTheEngineSearches) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto engine = eastl::make_shared<GatedEngine>(true);
+        const auto engine = MakeShared<GatedEngine>(true);
         CountingFactory factory({engine});
         opponent.SetEngineFactory(factory.AsFactory());
         SetOpponent(OpponentRequest("black"));
@@ -1149,7 +1149,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, ASearchThatFailsShowsInTheStateAndMovesTheVersion) {
-        CountingFactory factory({eastl::make_shared<FailingEngine>(EngineError{EngineErrorKind::Timeout, "no answer in the test"})});
+        CountingFactory factory({MakeShared<FailingEngine>(EngineError{EngineErrorKind::Timeout, "no answer in the test"})});
         opponent.SetEngineFactory(factory.AsFactory());
         SetOpponent(OpponentRequest("black"));
         Perform("e2e4");
@@ -1171,7 +1171,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, TheErrorNamesAreOnTheWireInSnakeCase) {
-        const std::pair<EngineErrorKind, const char*> kinds[] = {
+        const Pair<EngineErrorKind, const char*> kinds[] = {
             {EngineErrorKind::BadRequest, "bad_request"},   {EngineErrorKind::LaunchFailed, "launch_failed"},   {EngineErrorKind::Timeout, "timeout"},
             {EngineErrorKind::ProcessDied, "process_died"}, {EngineErrorKind::ProtocolError, "protocol_error"}, {EngineErrorKind::NoMove, "no_move"},
             {EngineErrorKind::IllegalMove, "illegal_move"}, {EngineErrorKind::Cancelled, "cancelled"},          {EngineErrorKind::Unsupported, "unsupported"}};
@@ -1185,7 +1185,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, TheVersionGrowsWithAPickAndNeverGoesBack) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(factory.AsFactory());
         uint64_t version = control.GetStateVersion();
 
@@ -1220,7 +1220,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, ResetKeepsTheOpponent) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(factory.AsFactory());
         SetOpponent(OpponentRequest("white", "hard"));
         Perform("e2e4");
@@ -1235,7 +1235,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessGameControlTest, AControllerMayMoveForTheProgramsSide) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto engine = eastl::make_shared<GatedEngine>(true);
+        const auto engine = MakeShared<GatedEngine>(true);
         CountingFactory factory({engine});
         opponent.SetEngineFactory(factory.AsFactory());
         SetOpponent(OpponentRequest("black"));
@@ -1255,7 +1255,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessGameControlTest, ASetPositionWhileTheProgramThinksDropsTheAnswer) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto engine = eastl::make_shared<GatedEngine>(false);
+        const auto engine = MakeShared<GatedEngine>(false);
         CountingFactory factory({engine});
         opponent.SetEngineFactory(factory.AsFactory());
         SetOpponent(OpponentRequest("black"));
@@ -1277,8 +1277,8 @@ namespace BECore::Chess::Tests {
 
         constexpr AnalysisScore kPawnUp{AnalysisScoreKind::Centipawns, 35};
 
-        eastl::shared_ptr<AnalysingEngine> Analyser(AnalysisScore score = kPawnUp, std::optional<Move> move = std::nullopt) {
-            return eastl::make_shared<AnalysingEngine>(score, move);
+        SharedPtr<AnalysingEngine> Analyser(AnalysisScore score = kPawnUp, Optional<Move> move = std::nullopt) {
+            return MakeShared<AnalysingEngine>(score, move);
         }
 
     }  // namespace
@@ -1480,7 +1480,7 @@ namespace BECore::Chess::Tests {
         EXPECT_TRUE(AnalysisMember("evaluation").is_null()) << "the evaluation is off: the search had a score, but it is not shown";
         EXPECT_EQ(GetJsonBool(AnalysisOfState(), "evaluationOn"), false);
 
-        const eastl::vector<eastl::string> moves = ActionMoves();
+        const Vector<String> moves = ActionMoves();
         EXPECT_NE(eastl::find(moves.begin(), moves.end(), "d2d4"), moves.end()) << "the hint is one of the listed actions";
     }
 
@@ -1548,16 +1548,16 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, AHintOnTheProgramsTurnIsNotYourTurnAndChangesNothing) {
-        CountingFactory opponents({eastl::make_shared<InstantEngine>()});
+        CountingFactory opponents({MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(opponents.AsFactory());
         const auto engine = Analyser();
         CountingAnalysisFactory factory{engine};
         analyst.SetEngineFactory(factory.AsFactory());
 
         SetOpponent(OpponentRequest("black"));  // the person has White
-        const std::string before = AnalysisSnapshot();
+        const String before = AnalysisSnapshot();
         Perform("e2e4");  // Black, the program's, is to move
-        const std::string moved = AnalysisSnapshot();
+        const String moved = AnalysisSnapshot();
 
         // evaluation: true next to the refused hint is not applied either
         EXPECT_EQ(SetStateError(AnalysisRequest(true, true)), "not_your_turn");
@@ -1582,7 +1582,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, AHintForThePersonsTurnIsAnsweredWhileTheProgramPlaysTheOtherSide) {
-        CountingFactory opponents({eastl::make_shared<InstantEngine>()});
+        CountingFactory opponents({MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(opponents.AsFactory());
         const auto engine = Analyser(kPawnUp, Mv("d2d4"));
         CountingAnalysisFactory factory{engine};
@@ -1602,7 +1602,7 @@ namespace BECore::Chess::Tests {
         Perform("a1a8");
         ASSERT_TRUE(model.IsGameOver());
 
-        const std::string before = AnalysisSnapshot();
+        const String before = AnalysisSnapshot();
         EXPECT_EQ(SetStateError(AnalysisRequest(true, true)), "game_over");
         EXPECT_EQ(AnalysisSnapshot(), before) << "nothing changed, the evaluation switch of the same call included";
         Frames();
@@ -1619,8 +1619,8 @@ namespace BECore::Chess::Tests {
         const auto engine = Analyser();
         CountingAnalysisFactory factory{engine};
         analyst.SetEngineFactory(factory.AsFactory());
-        const std::string before = AnalysisSnapshot();
-        const std::string fenBefore = StringMember(State(), "fen");
+        const String before = AnalysisSnapshot();
+        const String fenBefore = StringMember(State(), "fen");
 
         Json withFen = AnalysisRequest(true, true);
         withFen["fen"] = MakeJsonString(kMateInOneFen);
@@ -1638,7 +1638,7 @@ namespace BECore::Chess::Tests {
         const auto engine = Analyser();
         CountingAnalysisFactory factory{engine};
         analyst.SetEngineFactory(factory.AsFactory());
-        const std::string before = AnalysisSnapshot();
+        const String before = AnalysisSnapshot();
 
         const auto request = [](const Json& analysis) {
             Json state = Json::object();
@@ -1674,7 +1674,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, AnEmptyAnalysisObjectChangesNothing) {
-        const std::string before = AnalysisSnapshot();
+        const String before = AnalysisSnapshot();
         const auto result = control.SetState(AnalysisRequest(std::nullopt, std::nullopt));
         EXPECT_TRUE(result.has_value());
         EXPECT_EQ(AnalysisSnapshot(), before);
@@ -1682,7 +1682,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessGameControlTest, TheAnalysisIsThinkingWhileItsEngineSearches) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto engine = eastl::make_shared<AnalysingEngine>(kPawnUp, std::nullopt, 7);
+        const auto engine = MakeShared<AnalysingEngine>(kPawnUp, std::nullopt, 7);
         engine->Gate(true);
         CountingAnalysisFactory factory{engine};
         analyst.SetEngineFactory(factory.AsFactory());
@@ -1766,7 +1766,7 @@ namespace BECore::Chess::Tests {
         const auto engine = Analyser(kPawnUp, Mv("d2d4"));
         CountingAnalysisFactory factory{engine};
         analyst.SetEngineFactory(factory.AsFactory());
-        const eastl::vector<eastl::string> before = ActionMoves();
+        const Vector<String> before = ActionMoves();
 
         AnalyseWith(true, true);
         ASSERT_TRUE(FrameUntil([&] { return !AnalysisMember("hint").is_null(); }));
@@ -1803,7 +1803,7 @@ namespace BECore::Chess::Tests {
         const auto result = control.SetState(Json::object());
         ASSERT_FALSE(result.has_value());
         EXPECT_EQ(ErrorCodeOf(result.error()), "invalid_params");
-        EXPECT_NE(std::string(result.error().message.c_str()).find("analysis"), std::string::npos);
+        EXPECT_NE(String(result.error().message.c_str()).find("analysis"), String::npos);
     }
 
     // ---- Two programs (plays "both", the seats) ----
@@ -1837,12 +1837,12 @@ namespace BECore::Chess::Tests {
 
         /// A factory that makes @p engine for the own engine and cannot make Stockfish (as a machine with none)
         struct OwnOnlyFactory {
-            eastl::shared_ptr<IChessEngine> engine;
-            eastl::vector<eastl::string> asked;  ///< "engine/level" of each call
+            SharedPtr<IChessEngine> engine;
+            Vector<String> asked;  ///< "engine/level" of each call
 
             EngineFactory AsFactory() {
                 return [this](OpponentEngine kind, const OpponentLevel& level) -> MadeEngine {
-                    const eastl::string_view id = OpponentEngineId(kind);
+                    const StringView id = OpponentEngineId(kind);
                     asked.push_back(Format("{}/{}", id, level.id));
                     if (kind == OpponentEngine::Stockfish) {
                         return std::unexpected(EngineError{EngineErrorKind::LaunchFailed, "no Stockfish in the test"});
@@ -1855,7 +1855,7 @@ namespace BECore::Chess::Tests {
     }  // namespace
 
     TEST_F(ChessGameControlTest, BothSeatsAreSetAndReadBackWithAnEngineAndALevelEach) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>(), eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>(), MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(factory.AsFactory());
         const uint64_t version = control.GetStateVersion();
 
@@ -1901,7 +1901,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, TheOldShapesKeepTheirMeaningWithSeats) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(factory.AsFactory());
 
         SetOpponent(OpponentRequest(nullptr, "hard"));  // a level alone while nobody plays: both seats
@@ -1945,7 +1945,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, AMissingMemberIsUnchangedPerSeat) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>(), eastl::make_shared<InstantEngine>(), eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>(), MakeShared<InstantEngine>(), MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(factory.AsFactory());
         SetOpponent(SeatsRequest(Json("both"), SeatObject("own", "easy"), SeatObject("own", "medium")));
         ASSERT_EQ(factory.Calls(), 2);
@@ -1966,7 +1966,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, ABothPickThenOneSideIsATakeoverAndNullEndsIt) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>(), eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>(), MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(factory.AsFactory());
         SetOpponent(OpponentRequest("both"));
         ASSERT_EQ(factory.Calls(), 2);
@@ -1989,7 +1989,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, ABadSeatPickIsInvalidParamsAndChangesNothing) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>(), eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>(), MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(factory.AsFactory());
         SetOpponent(SeatsRequest(Json("both"), SeatObject("own", "easy"), SeatObject("own", "hard")));
         const Json before = State();
@@ -2040,10 +2040,10 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, ASeatWhoseEngineIsMissingRefusesTheWholePickEvenWhenTheOtherSeatIsFine) {
-        OwnOnlyFactory factory{eastl::make_shared<InstantEngine>(), {}};
+        OwnOnlyFactory factory{MakeShared<InstantEngine>(), {}};
         opponent.SetEngineFactory(factory.AsFactory());
         Perform("e2e4");
-        const std::string fenBefore = StringMember(State(), "fen");
+        const String fenBefore = StringMember(State(), "fen");
 
         Json request = SeatsRequest(Json("both"), SeatObject("own"), SeatObject("stockfish"));
         request["fen"] = MakeJsonString(kMateInOneFen);
@@ -2051,7 +2051,7 @@ namespace BECore::Chess::Tests {
 
         ASSERT_FALSE(result.has_value());
         EXPECT_EQ(ErrorCodeOf(result.error()), "engine_unavailable");
-        EXPECT_NE(std::string(result.error().message.c_str()).find("no Stockfish in the test"), std::string::npos);
+        EXPECT_NE(String(result.error().message.c_str()).find("no Stockfish in the test"), String::npos);
         EXPECT_EQ(StringMember(State(), "fen"), fenBefore) << "the position is not replaced";
         const Json computer = OpponentOfState();
         EXPECT_TRUE(FindJsonMember(computer, "plays")->is_null()) << "the new choice of White's seat was fine and is not applied either";
@@ -2065,7 +2065,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessGameControlTest, ARefusedSeatKeepsTheRunningSearchAndTheSides) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto gate = eastl::make_shared<GatedEngine>(true);
+        const auto gate = MakeShared<GatedEngine>(true);
         OwnOnlyFactory factory{gate, {}};
         opponent.SetEngineFactory(factory.AsFactory());
         SetOpponent(OpponentRequest("black", nullptr, "own"));
@@ -2076,7 +2076,7 @@ namespace BECore::Chess::Tests {
         // Black's seat is unchanged and keeps its search; White's new seat asks for Stockfish and fails
         Json request = SeatsRequest(Json("both"), SeatObject("stockfish"), SeatObject("own"));
         request["opponent"]["black"]["level"] = "medium";
-        const std::string fenBefore = StringMember(State(), "fen");
+        const String fenBefore = StringMember(State(), "fen");
         request["fen"] = MakeJsonString(kMateInOneFen);
 
         EXPECT_EQ(SetStateError(request), "engine_unavailable");
@@ -2093,20 +2093,20 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, AFenAndBothInOneCallApplyTheOpponentFirst) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>(), eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>(), MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(factory.AsFactory());
 
         Json request = SeatsRequest(Json("both"));
         request["fen"] = MakeJsonString(kMateInOneFen);
         SetOpponent(request);
 
-        EXPECT_EQ(StringMember(State(), "fen"), std::string(kMateInOneFen.data(), kMateInOneFen.size()));
+        EXPECT_EQ(StringMember(State(), "fen"), String(kMateInOneFen.data(), kMateInOneFen.size()));
         EXPECT_EQ(StringMember(OpponentOfState(), "plays"), "both");
         EXPECT_EQ(factory.Calls(), 2);
     }
 
     TEST_F(ChessGameControlTest, ResetKeepsBothSeats) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>(), eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>(), MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(factory.AsFactory());
         SetOpponent(SeatsRequest(Json("both"), SeatObject("own", "easy"), SeatObject("stockfish", "max")));
         const Json seatsBefore = *FindJsonMember(OpponentOfState(), "seats");
@@ -2119,7 +2119,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, TwoProgramsPlayEachOtherAndTheMovesAlternate) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>(), eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>(), MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(factory.AsFactory());
         SetOpponent(OpponentRequest("both"));
 
@@ -2127,7 +2127,7 @@ namespace BECore::Chess::Tests {
 
         const Json state = State();
         EXPECT_TRUE(FindJsonMember(OpponentOfState(), "error")->is_null());
-        EXPECT_EQ(model.GetMoves().size() % 2, GetJsonString(state, "turn") == eastl::string("white") ? 0u : 1u) << "the turn follows the number of moves";
+        EXPECT_EQ(model.GetMoves().size() % 2, GetJsonString(state, "turn") == String("white") ? 0u : 1u) << "the turn follows the number of moves";
 
         // The pieces that moved are White's, Black's, White's...: the moves replayed on a model of our own
         ChessGameModel replay;
@@ -2139,8 +2139,8 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessGameControlTest, ThinkingIsTrueWhileEitherSeatSearches) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto whiteGate = eastl::make_shared<GatedEngine>(true);
-        const auto blackGate = eastl::make_shared<GatedEngine>(true);
+        const auto whiteGate = MakeShared<GatedEngine>(true);
+        const auto blackGate = MakeShared<GatedEngine>(true);
         CountingFactory factory({whiteGate, blackGate});
         opponent.SetEngineFactory(factory.AsFactory());
         SetOpponent(OpponentRequest("both"));
@@ -2155,8 +2155,8 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessGameControlTest, PerformActionIsNotBlockedWhileTwoProgramsPlay) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto whiteGate = eastl::make_shared<GatedEngine>(false);  // ignores its token: only the version tells that its answer is stale
-        const auto blackGate = eastl::make_shared<GatedEngine>(true);
+        const auto whiteGate = MakeShared<GatedEngine>(false);  // ignores its token: only the version tells that its answer is stale
+        const auto blackGate = MakeShared<GatedEngine>(true);
         CountingFactory factory({whiteGate, blackGate});
         opponent.SetEngineFactory(factory.AsFactory());
         SetOpponent(OpponentRequest("both"));
@@ -2179,7 +2179,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, AHintWhileTwoProgramsPlayIsNotYourTurnOnEitherTurnAndChangesNothing) {
-        CountingFactory opponents({eastl::make_shared<InstantEngine>(), eastl::make_shared<InstantEngine>()});
+        CountingFactory opponents({MakeShared<InstantEngine>(), MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(opponents.AsFactory());
         const auto engine = Analyser();
         CountingAnalysisFactory factory{engine};
@@ -2190,7 +2190,7 @@ namespace BECore::Chess::Tests {
             if (move) {
                 Perform(move);
             }
-            const std::string before = AnalysisSnapshot();
+            const String before = AnalysisSnapshot();
             EXPECT_EQ(SetStateError(AnalysisRequest(true, true)), "not_your_turn") << "turn " << StringMember(State(), "turn");
             EXPECT_EQ(AnalysisSnapshot(), before);
             EXPECT_EQ(GetJsonBool(AnalysisOfState(), "evaluationOn"), false) << "the evaluation switch of that call is not applied either";
@@ -2206,7 +2206,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, ATakeoverGivesTheHintBackOnThePersonsTurn) {
-        CountingFactory opponents({eastl::make_shared<InstantEngine>(), eastl::make_shared<InstantEngine>()});
+        CountingFactory opponents({MakeShared<InstantEngine>(), MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(opponents.AsFactory());
         const auto engine = Analyser(kPawnUp, Mv("e7e5"));
         CountingAnalysisFactory factory{engine};
@@ -2247,10 +2247,10 @@ namespace BECore::Chess::Tests {
         }
 
         /// The reasons of the ratings, in order ("<null>" for a move not rated)
-        eastl::vector<std::string> ReasonsOfRatings(const Json& ratings) {
-            eastl::vector<std::string> reasons;
+        Vector<String> ReasonsOfRatings(const Json& ratings) {
+            Vector<String> reasons;
             for (size_t index = 0; index < ratings.size(); ++index) {
-                reasons.push_back(ratings[index].is_null() ? std::string("<null>") : StringMember(ratings[index], "reason"));
+                reasons.push_back(ratings[index].is_null() ? String("<null>") : StringMember(ratings[index], "reason"));
             }
             return reasons;
         }
@@ -2307,7 +2307,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(FrameUntil([&] { return AllRated(AnalysisMember("ratings"), 2); })) << AnalysisOfState().dump().c_str();
 
         const Json ratings = AnalysisMember("ratings");
-        EXPECT_EQ(ReasonsOfRatings(ratings), (eastl::vector<std::string>{"brilliant", "not_best"}));
+        EXPECT_EQ(ReasonsOfRatings(ratings), (Vector<String>{"brilliant", "not_best"}));
         EXPECT_EQ(GetJsonBool(ratings[0], "brilliant"), true);
         EXPECT_EQ(GetJsonBool(ratings[1], "brilliant"), false);
         EXPECT_EQ(ratings[0].size(), 2u) << "brilliant and reason";
@@ -2335,7 +2335,7 @@ namespace BECore::Chess::Tests {
         Perform("e2e4");
         EXPECT_TRUE(AnalysisMember("ratings")[0].is_null()) << "not rated until the new game's own search has answered";
         ASSERT_TRUE(FrameUntil([&] { return AllRated(AnalysisMember("ratings"), 1); })) << "the next game is rated from its first move";
-        EXPECT_EQ(ReasonsOfRatings(AnalysisMember("ratings")), (eastl::vector<std::string>{"brilliant"}));
+        EXPECT_EQ(ReasonsOfRatings(AnalysisMember("ratings")), (Vector<String>{"brilliant"}));
     }
 
     TEST_F(ChessGameControlTest, AFenDropsTheRatingsAndSwitchingOffKeepsThem) {
@@ -2366,7 +2366,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(control.SetState(RatingsRequest(true)).has_value()) << "no refusal: the moves of a finished game are rated like any";
 
         ASSERT_TRUE(FrameUntil([&] { return AllRated(AnalysisMember("ratings"), 1); }));
-        EXPECT_EQ(ReasonsOfRatings(AnalysisMember("ratings")), (eastl::vector<std::string>{"brilliant"}));
+        EXPECT_EQ(ReasonsOfRatings(AnalysisMember("ratings")), (Vector<String>{"brilliant"}));
     }
 
     TEST_F(ChessGameControlTest, ARefusedHintDoesNotApplyTheRatingsSwitchOfTheSameCall) {
@@ -2376,7 +2376,7 @@ namespace BECore::Chess::Tests {
         SetFen(kMateInOneFen);
         Perform("a1a8");
         ASSERT_EQ(StringMember(State(), "status"), "checkmate");
-        const std::string before = AnalysisSnapshot();
+        const String before = AnalysisSnapshot();
 
         Json analysis = Json::object();
         analysis["hint"] = true;
@@ -2393,7 +2393,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessGameControlTest, RatingsWithTheRealOwnEngineAreTheSameWhenTheGameIsPlayedTwice) {
         // The real OwnEngine at depth 5 (no process) behind a counting wrapper; pinned in MoveRaterTest: not_best, brilliant, not_best, brilliant
-        const auto engine = eastl::make_shared<CountingOwnEngine>();
+        const auto engine = MakeShared<CountingOwnEngine>();
         CountingAnalysisFactory factory{engine};
         analyst.SetEngineFactory(factory.AsFactory());
         ASSERT_TRUE(control.SetState(RatingsRequest(true)).has_value());
@@ -2405,16 +2405,16 @@ namespace BECore::Chess::Tests {
             return ReasonsOfRatings(AnalysisMember("ratings"));
         };
 
-        const eastl::vector<std::string> first = playTheGame();
+        const Vector<String> first = playTheGame();
         const int searchesOfTheFirstGame = engine->Analyses();
         EXPECT_EQ(searchesOfTheFirstGame, 4) << "one search per move";
 
         ASSERT_TRUE(control.Reset(Json::object()).has_value());
         Frames(1);  // the rater sees the empty game and lets go of the old ratings, so the second game is rated from nothing
         ASSERT_TRUE(AnalysisMember("ratings").empty());
-        const eastl::vector<std::string> second = playTheGame();
+        const Vector<String> second = playTheGame();
 
-        EXPECT_EQ(first, (eastl::vector<std::string>{"not_best", "brilliant", "not_best", "brilliant"}));
+        EXPECT_EQ(first, (Vector<String>{"not_best", "brilliant", "not_best", "brilliant"}));
         EXPECT_EQ(engine->Analyses(), 2 * searchesOfTheFirstGame) << "the second game was really searched again, not read from the old ratings";
         EXPECT_EQ(second, first) << "a fixed depth: the same game, the same ratings";
         EXPECT_TRUE(AnalysisMember("error").is_null());
@@ -2425,8 +2425,8 @@ namespace BECore::Chess::Tests {
         CountingAnalysisFactory factory{engine};
         analyst.SetEngineFactory(factory.AsFactory());
         Perform("e2e4");
-        const std::string before = AnalysisSnapshot();
-        const std::string fenBefore = StringMember(State(), "fen");
+        const String before = AnalysisSnapshot();
+        const String fenBefore = StringMember(State(), "fen");
 
         Json one = Json::object();
         one["ratings"] = 1;
@@ -2512,7 +2512,7 @@ namespace BECore::Chess::Tests {
 
         ASSERT_FALSE(result.has_value());
         EXPECT_EQ(ErrorCodeOf(result.error()), "engine_unavailable");
-        EXPECT_FALSE(std::string(result.error().message.c_str()).empty()) << "the sentence of the refusal";
+        EXPECT_FALSE(String(result.error().message.c_str()).empty()) << "the sentence of the refusal";
         const Json computer = game.OpponentState();
         const Json* plays = FindJsonMember(computer, "plays");
         const Json* error = FindJsonMember(computer, "error");
@@ -2535,7 +2535,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(ErrorCodeOf(result.error()), "engine_unavailable");
         const auto state = game.control.GetState();
         ASSERT_TRUE(state.has_value());
-        EXPECT_EQ(StringMember(*state, "fen"), std::string(Position::kStartFen.data(), Position::kStartFen.size())) << "the position is not replaced";
+        EXPECT_EQ(StringMember(*state, "fen"), String(Position::kStartFen.data(), Position::kStartFen.size())) << "the position is not replaced";
         const Json computer = game.OpponentState();
         const Json* plays = FindJsonMember(computer, "plays");
         ASSERT_NE(plays, nullptr);

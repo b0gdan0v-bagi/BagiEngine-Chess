@@ -9,15 +9,15 @@ namespace BECore::Chess::Tests {
 
         constexpr int kScoreSlack = 150;
 
-        int EvaluateFen(eastl::string_view fen) {
+        int EvaluateFen(StringView fen) {
             return Evaluate(PositionFromFen(fen));
         }
 
         // A position of the middlegame and one of the endgame in which a king moves to the same two squares
-        constexpr eastl::string_view kMiddlegameKingHome = "r2qk2r/pppppppp/8/8/8/8/PPPPPPPP/R2QK2R w - - 0 1";
-        constexpr eastl::string_view kMiddlegameKingCenter = "r2qk2r/pppppppp/8/8/4K3/8/PPPPPPPP/R2Q3R w - - 0 1";
-        constexpr eastl::string_view kEndgameKingHome = "4k3/8/8/8/8/8/P7/4K3 w - - 0 1";
-        constexpr eastl::string_view kEndgameKingCenter = "4k3/8/8/8/4K3/8/P7/8 w - - 0 1";
+        constexpr StringView kMiddlegameKingHome = "r2qk2r/pppppppp/8/8/8/8/PPPPPPPP/R2QK2R w - - 0 1";
+        constexpr StringView kMiddlegameKingCenter = "r2qk2r/pppppppp/8/8/4K3/8/PPPPPPPP/R2Q3R w - - 0 1";
+        constexpr StringView kEndgameKingHome = "4k3/8/8/8/8/8/P7/4K3 w - - 0 1";
+        constexpr StringView kEndgameKingCenter = "4k3/8/8/8/4K3/8/P7/8 w - - 0 1";
 
     }  // namespace
 
@@ -54,7 +54,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(EvaluationTest, TheEvaluationDoesNotChangeWithTheColors) {
-        const eastl::string_view fens[] = {
+        const StringView fens[] = {
             Position::kStartFen,
             kKiwipeteFen,
             kPosition3Fen,
@@ -69,19 +69,19 @@ namespace BECore::Chess::Tests {
         };
         ASSERT_GE(sizeof(fens) / sizeof(fens[0]), 8U);
 
-        for (const eastl::string_view fen : fens) {
-            const std::string mirrored = MirrorFen(fen);
-            const std::string text(fen.data(), fen.size());
-            EXPECT_EQ(EvaluateFen(fen), EvaluateFen(eastl::string_view(mirrored.data(), mirrored.size()))) << text << " <-> " << mirrored;
+        for (const StringView fen : fens) {
+            const String mirrored = MirrorFen(fen);
+            const String text(fen.data(), fen.size());
+            EXPECT_EQ(EvaluateFen(fen), EvaluateFen(StringView(mirrored))) << text << " <-> " << mirrored;
         }
     }
 
     TEST(EvaluationTest, TheMirrorHelperIsItsOwnInverse) {
         // A check on the test's own tool: a symmetry test with a broken mirror would pass for the wrong reason
-        const std::string once = MirrorFen(kKiwipeteFen);
-        const std::string twice = MirrorFen(eastl::string_view(once.data(), once.size()));
+        const String once = MirrorFen(kKiwipeteFen);
+        const String twice = MirrorFen(StringView(once));
 
-        EXPECT_EQ(twice, std::string(kKiwipeteFen.data(), kKiwipeteFen.size()));
+        EXPECT_EQ(twice, String(kKiwipeteFen.data(), kKiwipeteFen.size()));
         EXPECT_EQ(MirrorFen("rnbqkbnr/ppp1pppp/8/3pP3/8/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 3"), "rnbqkbnr/pppp1ppp/8/8/3Pp3/8/PPP1PPPP/RNBQKBNR b KQkq d3 0 3");
     }
 

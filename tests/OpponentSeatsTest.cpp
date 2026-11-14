@@ -16,7 +16,7 @@ namespace BECore::Chess::Tests {
         constexpr ProgramSides kBoth{true, true};
         constexpr ProgramSides kNobody{};
 
-        bool Play(ChessGameModel& model, eastl::string_view uci) {
+        bool Play(ChessGameModel& model, StringView uci) {
             const auto move = MoveGenerator::ParseUci(model.GetPosition(), uci);
             return move.has_value() && model.TryMove(*move).has_value();
         }
@@ -34,13 +34,13 @@ namespace BECore::Chess::Tests {
             return EngineError{EngineErrorKind::LaunchFailed, "no Stockfish in the test"};
         }
 
-        size_t LevelIndex(eastl::string_view id) {
-            const std::optional<size_t> index = FindOpponentLevel(id);
+        size_t LevelIndex(StringView id) {
+            const Optional<size_t> index = FindOpponentLevel(id);
             EXPECT_TRUE(index.has_value()) << id.data();
             return index.value_or(kDefaultOpponentLevel);
         }
 
-        SeatChoice Choice(OpponentEngine engine, eastl::string_view level) {
+        SeatChoice Choice(OpponentEngine engine, StringView level) {
             return SeatChoice{engine, LevelIndex(level)};
         }
 
@@ -56,8 +56,8 @@ namespace BECore::Chess::Tests {
     TEST_F(OpponentSeatsTest, BothSeatsPlayAndTakeTurns) {
         SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
-        const auto white = eastl::make_shared<GatedEngine>(true, Mv("e2e4"));
-        const auto black = eastl::make_shared<GatedEngine>(true, Mv("e7e5"));
+        const auto white = MakeShared<GatedEngine>(true, Mv("e2e4"));
+        const auto black = MakeShared<GatedEngine>(true, Mv("e7e5"));
         CountingFactory factory({white, black});
         OpponentController controller(model);
         controller.SetEngineFactory(factory.AsFactory());
@@ -93,8 +93,8 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OpponentSeatsTest, EachSeatGetsItsOwnEngineAndTheFactorySeesTheChoiceOfEachSeat) {
         ChessGameModel model;
-        const auto white = eastl::make_shared<InstantEngine>();
-        const auto black = eastl::make_shared<InstantEngine>();
+        const auto white = MakeShared<InstantEngine>();
+        const auto black = MakeShared<InstantEngine>();
         CountingFactory factory({white, black});
         OpponentController controller(model);
         controller.SetEngineFactory(factory.AsFactory());
@@ -120,10 +120,10 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OpponentSeatsTest, TwoSeatsOfOnePickAreTwoEngineObjects) {
         ChessGameModel model;
-        eastl::vector<eastl::shared_ptr<InstantEngine>> made;
+        Vector<SharedPtr<InstantEngine>> made;
         OpponentController controller(model);
         controller.SetEngineFactory([&](OpponentEngine, const OpponentLevel&) -> MadeEngine {
-            made.push_back(eastl::make_shared<InstantEngine>());
+            made.push_back(MakeShared<InstantEngine>());
             return made.back();
         });
 
@@ -139,9 +139,9 @@ namespace BECore::Chess::Tests {
     TEST_F(OpponentSeatsTest, ASeatChangedWhileTheOtherThinksKeepsTheOthersSearch) {
         SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
-        const auto white = eastl::make_shared<GatedEngine>(true, Mv("e2e4"));
-        const auto black = eastl::make_shared<InstantEngine>();
-        const auto newBlack = eastl::make_shared<InstantEngine>();
+        const auto white = MakeShared<GatedEngine>(true, Mv("e2e4"));
+        const auto black = MakeShared<InstantEngine>();
+        const auto newBlack = MakeShared<InstantEngine>();
         CountingFactory factory({white, black, newBlack});
         OpponentController controller(model);
         controller.SetEngineFactory(factory.AsFactory());
@@ -176,9 +176,9 @@ namespace BECore::Chess::Tests {
     TEST_F(OpponentSeatsTest, ChangingTheSeatThatThinksCancelsItsSearch) {
         SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
-        const auto white = eastl::make_shared<GatedEngine>(true, Mv("e2e4"));
-        const auto newWhite = eastl::make_shared<GatedEngine>(true, Mv("d2d4"));
-        const auto black = eastl::make_shared<GatedEngine>(true);
+        const auto white = MakeShared<GatedEngine>(true, Mv("e2e4"));
+        const auto newWhite = MakeShared<GatedEngine>(true, Mv("d2d4"));
+        const auto black = MakeShared<GatedEngine>(true);
         CountingFactory factory({white, black, newWhite});
         OpponentController controller(model);
         controller.SetEngineFactory(factory.AsFactory());
@@ -200,8 +200,8 @@ namespace BECore::Chess::Tests {
     TEST_F(OpponentSeatsTest, ARefusedSeatRefusesTheWholePick) {
         SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
-        const auto white = eastl::make_shared<GatedEngine>(true, Mv("e2e4"));
-        const auto black = eastl::make_shared<InstantEngine>();
+        const auto white = MakeShared<GatedEngine>(true, Mv("e2e4"));
+        const auto black = MakeShared<InstantEngine>();
         int calls = 0;
         OpponentController controller(model);
         controller.SetEngineFactory([&](OpponentEngine engine, const OpponentLevel&) -> MadeEngine {
@@ -215,7 +215,7 @@ namespace BECore::Chess::Tests {
             if (calls == 2) {
                 return black;
             }
-            return eastl::make_shared<InstantEngine>();
+            return MakeShared<InstantEngine>();
         });
         const SeatChoice easy = Choice(OpponentEngine::Own, "easy");
         ASSERT_TRUE(controller.ChooseSeats(kBoth, easy, easy).has_value());
@@ -271,7 +271,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OpponentSeatsTest, ALevelOutsideTheTableIsBadRequestForEitherSeatAndChangesNothing) {
         ChessGameModel model;
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         OpponentController controller(model);
         controller.SetEngineFactory(factory.AsFactory());
         const size_t outside = GetOpponentLevels().size();
@@ -292,8 +292,8 @@ namespace BECore::Chess::Tests {
     TEST_F(OpponentSeatsTest, TheSamePickAgainDoesNothingAndAClearedErrorIsNotARemake) {
         SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
-        const auto white = eastl::make_shared<GatedEngine>(true, Mv("e2e4"));
-        const auto black = eastl::make_shared<GatedEngine>(true);
+        const auto white = MakeShared<GatedEngine>(true, Mv("e2e4"));
+        const auto black = MakeShared<GatedEngine>(true);
         int calls = 0;
         OpponentController controller(model);
         controller.SetEngineFactory([&](OpponentEngine engine, const OpponentLevel&) -> MadeEngine {
@@ -329,7 +329,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OpponentSeatsTest, PlaysForCoversBothColorsGetPlaysIsNothingAndTheProgramIsWatching) {
         ChessGameModel model;
-        CountingFactory factory({eastl::make_shared<GatedEngine>(true), eastl::make_shared<GatedEngine>(true)});
+        CountingFactory factory({MakeShared<GatedEngine>(true), MakeShared<GatedEngine>(true)});
         OpponentController controller(model);
         controller.SetEngineFactory(factory.AsFactory());
         EXPECT_FALSE(controller.IsWatching());
@@ -344,19 +344,19 @@ namespace BECore::Chess::Tests {
 
         ASSERT_TRUE(controller.SetSide(PieceColor::Black).has_value());
         EXPECT_FALSE(controller.IsWatching());
-        EXPECT_EQ(controller.GetPlays(), std::optional<PieceColor>(PieceColor::Black));
+        EXPECT_EQ(controller.GetPlays(), Optional<PieceColor>(PieceColor::Black));
         EXPECT_FALSE(controller.PlaysFor(PieceColor::White));
 
         ASSERT_TRUE(controller.ChooseSeats(ProgramSides{true, false}, {}, {}).has_value());
-        EXPECT_EQ(controller.GetPlays(), std::optional<PieceColor>(PieceColor::White));
+        EXPECT_EQ(controller.GetPlays(), Optional<PieceColor>(PieceColor::White));
         EXPECT_FALSE(controller.IsWatching());
     }
 
     TEST_F(OpponentSeatsTest, IsThinkingIsTrueForEitherSeat) {
         SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
-        const auto white = eastl::make_shared<GatedEngine>(true);
-        const auto black = eastl::make_shared<GatedEngine>(true);
+        const auto white = MakeShared<GatedEngine>(true);
+        const auto black = MakeShared<GatedEngine>(true);
         CountingFactory factory({white, black});
         OpponentController controller(model);
         controller.SetEngineFactory(factory.AsFactory());
@@ -373,8 +373,8 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OpponentSeatsTest, AnErrorOfBlacksSeatStallsTheGameAndGoesWithTheNextVersion) {
         ChessGameModel model;
-        const auto white = eastl::make_shared<InstantEngine>();
-        const auto black = eastl::make_shared<FailingEngine>(EngineError{EngineErrorKind::Timeout, "no answer in the test"});
+        const auto white = MakeShared<InstantEngine>();
+        const auto black = MakeShared<FailingEngine>(EngineError{EngineErrorKind::Timeout, "no answer in the test"});
         CountingFactory factory({white, black});
         OpponentController controller(model);
         controller.SetEngineFactory(factory.AsFactory());
@@ -407,8 +407,8 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OpponentSeatsTest, AnErrorOfWhitesSeatStallsTheGame) {
         ChessGameModel model;
-        const auto white = eastl::make_shared<FailingEngine>(EngineError{EngineErrorKind::ProcessDied, "gone in the test"});
-        const auto black = eastl::make_shared<InstantEngine>();
+        const auto white = MakeShared<FailingEngine>(EngineError{EngineErrorKind::ProcessDied, "gone in the test"});
+        const auto black = MakeShared<InstantEngine>();
         CountingFactory factory({white, black});
         OpponentController controller(model);
         controller.SetEngineFactory(factory.AsFactory());
@@ -433,8 +433,8 @@ namespace BECore::Chess::Tests {
         SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
         // White's engine ignores its token and holds e2e4 until it is opened; Black's seat never answers, so a dropped answer leaves the game as the position was set
-        const auto white = eastl::make_shared<GatedEngine>(false, Mv("e2e4"));
-        const auto black = eastl::make_shared<GatedEngine>(true);
+        const auto white = MakeShared<GatedEngine>(false, Mv("e2e4"));
+        const auto black = MakeShared<GatedEngine>(true);
         CountingFactory factory({white, black});
         OpponentController controller(model);
         controller.SetEngineFactory(factory.AsFactory());
@@ -458,8 +458,8 @@ namespace BECore::Chess::Tests {
     TEST_F(OpponentSeatsTest, AStaleAnswerOfBlacksSeatIsDroppedAfterAReset) {
         SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
-        const auto white = eastl::make_shared<GatedEngine>(true);
-        const auto black = eastl::make_shared<GatedEngine>(false, Mv("e7e5"));
+        const auto white = MakeShared<GatedEngine>(true);
+        const auto black = MakeShared<GatedEngine>(false, Mv("e7e5"));
         CountingFactory factory({white, black});
         OpponentController controller(model);
         controller.SetEngineFactory(factory.AsFactory());
@@ -483,8 +483,8 @@ namespace BECore::Chess::Tests {
     TEST_F(OpponentSeatsTest, ASideTakesTheChoiceOfItsSeatFromAWatchAndKeepsItsOpponent) {
         SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
-        const auto white = eastl::make_shared<GatedEngine>(true, Mv("e2e4"));
-        const auto black = eastl::make_shared<InstantEngine>();
+        const auto white = MakeShared<GatedEngine>(true, Mv("e2e4"));
+        const auto black = MakeShared<InstantEngine>();
         CountingFactory factory({white, black});
         OpponentController controller(model);
         controller.SetEngineFactory(factory.AsFactory());
@@ -496,7 +496,7 @@ namespace BECore::Chess::Tests {
 
         ASSERT_TRUE(controller.SetSide(PieceColor::White).has_value());
 
-        EXPECT_EQ(controller.GetPlays(), std::optional<PieceColor>(PieceColor::White));
+        EXPECT_EQ(controller.GetPlays(), Optional<PieceColor>(PieceColor::White));
         EXPECT_EQ(controller.GetSeatChoice(PieceColor::White), whiteChoice);
         EXPECT_EQ(controller.GetSeatChoice(PieceColor::Black), whiteChoice) << "the single-seat API writes the choice of the seat into both";
         EXPECT_EQ(controller.GetEngine(), OpponentEngine::Own);
@@ -518,7 +518,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OpponentSeatsTest, TheSingleSeatCallsWriteTheirValueIntoBothSeats) {
         ChessGameModel model;
-        CountingFactory factory({eastl::make_shared<InstantEngine>(), eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>(), MakeShared<InstantEngine>()});
         OpponentController controller(model);
         controller.SetEngineFactory(factory.AsFactory());
         const size_t hard = LevelIndex("hard");
@@ -539,7 +539,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(controller.Choose(PieceColor::White, hard, OpponentEngine::Stockfish).has_value());
         EXPECT_EQ(controller.GetSeatChoice(PieceColor::White), Choice(OpponentEngine::Stockfish, "hard"));
         EXPECT_EQ(controller.GetSeatChoice(PieceColor::Black), Choice(OpponentEngine::Stockfish, "hard"));
-        EXPECT_EQ(controller.GetPlays(), std::optional<PieceColor>(PieceColor::White));
+        EXPECT_EQ(controller.GetPlays(), Optional<PieceColor>(PieceColor::White));
         EXPECT_EQ(factory.Calls(), 2);
 
         ASSERT_TRUE(controller.SetSide(std::nullopt).has_value());
@@ -549,7 +549,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OpponentSeatsTest, TheSingleSeatCallsAgreeInAWatchByTheirValueAndKeepTheRest) {
         ChessGameModel model;
-        CountingFactory factory({eastl::make_shared<GatedEngine>(true), eastl::make_shared<GatedEngine>(true)});
+        CountingFactory factory({MakeShared<GatedEngine>(true), MakeShared<GatedEngine>(true)});
         OpponentController controller(model);
         controller.SetEngineFactory(factory.AsFactory());
         ASSERT_TRUE(controller.ChooseSeats(kBoth, Choice(OpponentEngine::Own, "easy"), Choice(OpponentEngine::Stockfish, "max")).has_value());
@@ -573,7 +573,7 @@ namespace BECore::Chess::Tests {
     TEST_F(OpponentSeatsTest, PickingNobodyFromAWatchRemovesBothAndRemembersTheChoices) {
         SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
-        CountingFactory factory({eastl::make_shared<GatedEngine>(true), eastl::make_shared<GatedEngine>(true)});
+        CountingFactory factory({MakeShared<GatedEngine>(true), MakeShared<GatedEngine>(true)});
         OpponentController controller(model);
         controller.SetEngineFactory(factory.AsFactory());
         ASSERT_TRUE(controller.ChooseSeats(kBoth, Choice(OpponentEngine::Own, "easy"), Choice(OpponentEngine::Stockfish, "max")).has_value());
@@ -592,7 +592,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OpponentSeatsTest, StartingAWatchDropsAHalfMadeMoveOfThePersonWhoseTurnItIs) {
         ChessGameModel model;
-        CountingFactory factory({eastl::make_shared<GatedEngine>(true), eastl::make_shared<GatedEngine>(true)});
+        CountingFactory factory({MakeShared<GatedEngine>(true), MakeShared<GatedEngine>(true)});
         OpponentController controller(model);
         controller.SetEngineFactory(factory.AsFactory());
         model.OnSquareClicked(Sq("g1"));
@@ -607,8 +607,8 @@ namespace BECore::Chess::Tests {
     TEST_F(OpponentSeatsTest, ShutdownWithAnEngineThatIgnoresItsTokenInEachSeatJoinsNothing) {
         SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
-        const auto white = eastl::make_shared<GatedEngine>(false);
-        const auto black = eastl::make_shared<GatedEngine>(false);
+        const auto white = MakeShared<GatedEngine>(false);
+        const auto black = MakeShared<GatedEngine>(false);
         CountingFactory factory({white, black});
         OpponentController controller(model);
         controller.SetEngineFactory(factory.AsFactory());
@@ -654,7 +654,7 @@ namespace BECore::Chess::Tests {
                 kGameBudget);
             EXPECT_TRUE(done) << "moves so far: " << model.GetMoves().size() << ", " << DescribeError(controller.GetError()).c_str();
             EXPECT_FALSE(controller.GetError().has_value()) << DescribeError(controller.GetError()).c_str();
-            eastl::vector<eastl::string> moves;
+            Vector<String> moves;
             for (const Move& played : model.GetMoves()) {
                 if (moves.size() == kPlyCap) {
                     break;  // a search that was already running when the cap was reached may have played one more
@@ -664,7 +664,7 @@ namespace BECore::Chess::Tests {
             return moves;
         };
 
-        const eastl::vector<eastl::string> first = playedTheGame();
+        const Vector<String> first = playedTheGame();
         ASSERT_FALSE(first.empty());
 
         // Every move is legal in its position (so the turns alternate): the moves replayed on a model of our own
@@ -675,13 +675,13 @@ namespace BECore::Chess::Tests {
 
         // A reset starts the game again, with the same two programs, and it goes the same way
         model.Reset();
-        const eastl::vector<eastl::string> second = playedTheGame();
+        const Vector<String> second = playedTheGame();
         EXPECT_EQ(first, second);
     }
 
     TEST_F(OpponentSeatsTest, TheChoiceOfThePersonOverTwoProgramsKeepsWorking) {
         ChessGameModel model;
-        CountingFactory factory({eastl::make_shared<GatedEngine>(true), eastl::make_shared<GatedEngine>(true)});
+        CountingFactory factory({MakeShared<GatedEngine>(true), MakeShared<GatedEngine>(true)});
         OpponentController controller(model);
         controller.SetEngineFactory(factory.AsFactory());
         OpponentChoice choice(controller);
@@ -691,8 +691,8 @@ namespace BECore::Chess::Tests {
         // The known gap: the mode enum has no Watch yet, so two programs read as Two; the color is the remembered one (White) and nothing crashes
         EXPECT_EQ(choice.Mode(), OpponentMode::Two);
         EXPECT_EQ(choice.Color(), PieceColor::White);
-        EXPECT_EQ(choice.ModeId(), eastl::string_view("two"));
-        EXPECT_EQ(choice.ColorId(), eastl::string_view("white"));
+        EXPECT_EQ(choice.ModeId(), StringView("two"));
+        EXPECT_EQ(choice.ColorId(), StringView("white"));
 
         ASSERT_TRUE(choice.SetColor("black").has_value());
         EXPECT_TRUE(controller.IsWatching()) << "a color picked while no one program plays is only remembered";
@@ -701,7 +701,7 @@ namespace BECore::Chess::Tests {
 
         ASSERT_TRUE(choice.SetMode("computer").has_value());
         EXPECT_FALSE(controller.IsWatching());
-        EXPECT_EQ(controller.GetPlays(), std::optional<PieceColor>(PieceColor::White)) << "the person has Black, the program plays White";
+        EXPECT_EQ(controller.GetPlays(), Optional<PieceColor>(PieceColor::White)) << "the person has Black, the program plays White";
         EXPECT_EQ(choice.Mode(), OpponentMode::Computer);
 
         ASSERT_TRUE(controller.ChooseSeats(kBoth, {}, {}).has_value());

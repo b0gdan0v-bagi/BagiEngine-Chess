@@ -14,16 +14,16 @@ namespace BECore::Chess::Tests {
     namespace {
 
         constexpr int kManyUpdates = 1000;
-        constexpr eastl::string_view kOneMoveFen = "k7/8/1K6/8/8/8/8/7R b - - 0 1";  // Black has one legal move, Kb8
+        constexpr StringView kOneMoveFen = "k7/8/1K6/8/8/8/8/7R b - - 0 1";  // Black has one legal move, Kb8
 
-        bool Play(ChessGameModel& model, eastl::string_view uci) {
+        bool Play(ChessGameModel& model, StringView uci) {
             const auto move = MoveGenerator::ParseUci(model.GetPosition(), uci);
             return move.has_value() && model.TryMove(*move).has_value();
         }
 
         /// A game from the opening: the moves of @p ucis in order
-        bool PlayAll(ChessGameModel& model, std::initializer_list<eastl::string_view> ucis) {
-            for (const eastl::string_view uci : ucis) {
+        bool PlayAll(ChessGameModel& model, std::initializer_list<StringView> ucis) {
+            for (const StringView uci : ucis) {
                 if (!Play(model, uci)) {
                     return false;
                 }
@@ -49,7 +49,7 @@ namespace BECore::Chess::Tests {
         /// Every move of the model is rated
         bool AllRated(const MoveRater& rater, const ChessGameModel& model) {
             const MoveRatings ratings = rater.GetRatings(model);
-            return ratings.size() == model.GetMoves().size() && eastl::all_of(ratings.begin(), ratings.end(), [](const std::optional<MoveRating>& rating) { return rating.has_value(); });
+            return ratings.size() == model.GetMoves().size() && eastl::all_of(ratings.begin(), ratings.end(), [](const Optional<MoveRating>& rating) { return rating.has_value(); });
         }
 
         bool RatedAt(const MoveRater& rater, const ChessGameModel& model, size_t ply) {
@@ -70,7 +70,7 @@ namespace BECore::Chess::Tests {
          */
         class PlyEngine final : public IChessEngine {
         public:
-            explicit PlyEngine(eastl::vector<Move> best = {}, int gap = 25) : _best(std::move(best)), _gap(gap) {}
+            explicit PlyEngine(Vector<Move> best = {}, int gap = 25) : _best(std::move(best)), _gap(gap) {}
 
             void Gate(bool honorsToken) {
                 _gated = true;
@@ -82,7 +82,7 @@ namespace BECore::Chess::Tests {
             }
 
             /// Every search fails with @p error, or only the one for the request of @p ply moves
-            void FailWith(EngineError error, std::optional<size_t> ply = std::nullopt) {
+            void FailWith(EngineError error, Optional<size_t> ply = std::nullopt) {
                 _error = std::move(error);
                 _failPly = ply;
             }
@@ -110,7 +110,7 @@ namespace BECore::Chess::Tests {
                 return _answered.load();
             }
 
-            [[nodiscard]] eastl::vector<SearchRequest> Requests() const {
+            [[nodiscard]] Vector<SearchRequest> Requests() const {
                 const std::lock_guard lock(_mutex);
                 return _requests;
             }
@@ -156,22 +156,22 @@ namespace BECore::Chess::Tests {
                 return analysis;
             }
 
-            eastl::vector<Move> _best;
+            Vector<Move> _best;
             int _gap;
             bool _gated = false;
             bool _honorsToken = false;
-            std::optional<EngineError> _error;
-            std::optional<size_t> _failPly;
+            Optional<EngineError> _error;
+            Optional<size_t> _failPly;
             mutable std::mutex _mutex;  ///< guards _requests
-            eastl::vector<SearchRequest> _requests;
+            Vector<SearchRequest> _requests;
             std::atomic<bool> _open{false};
             std::atomic<bool> _cancelled{false};
             std::atomic<int> _calls{0};
             std::atomic<int> _answered{0};
         };
 
-        eastl::shared_ptr<PlyEngine> MakeEngine(eastl::vector<Move> best = {}, int gap = 25) {
-            return eastl::make_shared<PlyEngine>(std::move(best), gap);
+        SharedPtr<PlyEngine> MakeEngine(Vector<Move> best = {}, int gap = 25) {
+            return MakeShared<PlyEngine>(std::move(best), gap);
         }
 
         const EngineError kBroken{EngineErrorKind::ProcessDied, "the engine fell over"};
@@ -236,7 +236,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(ReasonAt(rater, model, 0), MoveRatingReason::Brilliant) << "e2e4 is the engine's move";
         EXPECT_EQ(ReasonAt(rater, model, 1), MoveRatingReason::NotBest) << "e7e5, the engine wanted d7d5";
         EXPECT_EQ(ReasonAt(rater, model, 2), MoveRatingReason::Brilliant);
-        const eastl::vector<SearchRequest> requests = engine->Requests();
+        const Vector<SearchRequest> requests = engine->Requests();
         ASSERT_EQ(requests.size(), 3u) << "one search per move";
         for (size_t ply = 0; ply < requests.size(); ++ply) {
             EXPECT_EQ(requests[ply].startFen, model.GetStartFen()) << ply;
@@ -287,7 +287,8 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(MoveRaterTest, AWideGapMakesTheBestMoveObviousAndTheMarginDecidesIt) {
-        for (const auto& [gap, expected] : {std::pair{199, MoveRatingReason::Brilliant}, std::pair{200, MoveRatingReason::Obvious}, std::pair{900, MoveRatingReason::Obvious}}) {
+        for (const auto& [gap, expected] : {Pair<int, MoveRatingReason>{199, MoveRatingReason::Brilliant}, Pair<int, MoveRatingReason>{200, MoveRatingReason::Obvious},
+                                            Pair<int, MoveRatingReason>{900, MoveRatingReason::Obvious}}) {
             const auto engine = MakeEngine({Mv("e2e4")}, gap);
             CountingAnalysisFactory factory{engine};
             ChessGameModel model;
@@ -628,7 +629,7 @@ namespace BECore::Chess::Tests {
                 return FirstLegalMove(request);
             }
         };
-        const eastl::shared_ptr<IChessEngine> engine = eastl::make_shared<PlayingEngine>();
+        const SharedPtr<IChessEngine> engine = MakeShared<PlayingEngine>();
         CountingAnalysisFactory factory{engine};
         ChessGameModel model;
         ASSERT_TRUE(Play(model, "e2e4"));
@@ -718,7 +719,7 @@ namespace BECore::Chess::Tests {
         CountingAnalysisFactory factory{engine};
         ChessGameModel model;
         ASSERT_TRUE(Play(model, "e2e4"));
-        auto rater = std::make_unique<MoveRater>();
+        auto rater = MakeUnique<MoveRater>();
         rater->SetEngineFactory(factory.AsFactory());
         rater->SetOn(true);
         ASSERT_TRUE(UpdateUntil(*rater, model, [&] { return engine->Calls() == 1; }));
@@ -744,14 +745,14 @@ namespace BECore::Chess::Tests {
         }
 
         /// A game from @p fen: the moves of @p ucis rated, as the reasons in order
-        eastl::vector<MoveRatingReason> ReasonsOf(eastl::string_view fen, std::initializer_list<eastl::string_view> ucis) {
+        Vector<MoveRatingReason> ReasonsOf(StringView fen, std::initializer_list<StringView> ucis) {
             ChessGameModel model;
             if (!fen.empty()) {
                 model.SetPosition(PositionFromFen(fen));
             }
             EXPECT_TRUE(PlayAll(model, ucis));
-            eastl::vector<MoveRatingReason> reasons;
-            for (const std::optional<MoveRating>& rating : RateWithTheOwnEngine(model)) {
+            Vector<MoveRatingReason> reasons;
+            for (const Optional<MoveRating>& rating : RateWithTheOwnEngine(model)) {
                 EXPECT_TRUE(rating.has_value());
                 reasons.push_back(rating ? rating->reason : MoveRatingReason::NotBest);
             }
@@ -762,21 +763,21 @@ namespace BECore::Chess::Tests {
 
     TEST_F(MoveRaterTest, OwnEngineAMateInOneThatIsPlayedIsObvious) {
         // 6k1/5ppp/8/8/8/8/8/R3K3 w: Ra8# is Mate 1, line 2 (Kd2) is +2.40: a gap of 99660, "the only reasonable move"
-        EXPECT_EQ(ReasonsOf("6k1/5ppp/8/8/8/8/8/R3K3 w - - 0 1", {"a1a8"}), (eastl::vector<MoveRatingReason>{MoveRatingReason::Obvious}));
+        EXPECT_EQ(ReasonsOf("6k1/5ppp/8/8/8/8/8/R3K3 w - - 0 1", {"a1a8"}), (Vector<MoveRatingReason>{MoveRatingReason::Obvious}));
     }
 
     TEST_F(MoveRaterTest, OwnEngineAnotherMoveThanTheMateInOneIsNotBest) {
-        EXPECT_EQ(ReasonsOf("6k1/5ppp/8/8/8/8/8/R3K3 w - - 0 1", {"e1d2"}), (eastl::vector<MoveRatingReason>{MoveRatingReason::NotBest}));
+        EXPECT_EQ(ReasonsOf("6k1/5ppp/8/8/8/8/8/R3K3 w - - 0 1", {"e1d2"}), (Vector<MoveRatingReason>{MoveRatingReason::NotBest}));
     }
 
     TEST_F(MoveRaterTest, OwnEngineTakingAHangingQueenIsObvious) {
         // 4k3/8/8/3q4/8/8/8/3RK3 w: Rxd5 is +4.75, the best other move (Rd2) -4.05: a gap of 880
-        EXPECT_EQ(ReasonsOf("4k3/8/8/3q4/8/8/8/3RK3 w - - 0 1", {"d1d5"}), (eastl::vector<MoveRatingReason>{MoveRatingReason::Obvious}));
-        EXPECT_EQ(ReasonsOf("4k3/8/8/3q4/8/8/8/3RK3 w - - 0 1", {"d1d2"}), (eastl::vector<MoveRatingReason>{MoveRatingReason::NotBest}));
+        EXPECT_EQ(ReasonsOf("4k3/8/8/3q4/8/8/8/3RK3 w - - 0 1", {"d1d5"}), (Vector<MoveRatingReason>{MoveRatingReason::Obvious}));
+        EXPECT_EQ(ReasonsOf("4k3/8/8/3q4/8/8/8/3RK3 w - - 0 1", {"d1d2"}), (Vector<MoveRatingReason>{MoveRatingReason::NotBest}));
     }
 
     TEST_F(MoveRaterTest, OwnEngineTheOnlyLegalMoveIsForced) {
-        EXPECT_EQ(ReasonsOf(kOneMoveFen, {"a8b8"}), (eastl::vector<MoveRatingReason>{MoveRatingReason::Forced}));
+        EXPECT_EQ(ReasonsOf(kOneMoveFen, {"a8b8"}), (Vector<MoveRatingReason>{MoveRatingReason::Forced}));
     }
 
     TEST_F(MoveRaterTest, OwnEngineABestMoveWithACloseSecondIsBrilliantAndALegalOtherMoveIsNotBest) {
@@ -785,7 +786,7 @@ namespace BECore::Chess::Tests {
         // engine's pick, and e5, Nc6 and Nf6 are its pick with a second line within the margin (gaps 0, 20 and 15): brilliant
         using Reason = MoveRatingReason;
         EXPECT_EQ(ReasonsOf({}, {"e2e4", "e7e5", "g1f3", "b8c6", "f1c4", "g8f6"}),
-                  (eastl::vector<Reason>{Reason::NotBest, Reason::Brilliant, Reason::NotBest, Reason::Brilliant, Reason::NotBest, Reason::Brilliant}));
+                  (Vector<Reason>{Reason::NotBest, Reason::Brilliant, Reason::NotBest, Reason::Brilliant, Reason::NotBest, Reason::Brilliant}));
     }
 
     /// The rater awaits the async search (many slices at depth 5); its rating is the one the blocking Analyse of the same request gives
@@ -816,7 +817,7 @@ namespace BECore::Chess::Tests {
 
         ASSERT_EQ(first.size(), 6u);
         EXPECT_TRUE(first == second) << "a fixed depth and no clock: the same game, the same ratings";
-        for (const std::optional<MoveRating>& rating : first) {
+        for (const Optional<MoveRating>& rating : first) {
             EXPECT_TRUE(rating.has_value());
         }
     }
@@ -826,7 +827,7 @@ namespace BECore::Chess::Tests {
         ChessGameModel grown;
         MoveRater rater;
         rater.SetOn(true);
-        for (const eastl::string_view uci : {"e2e4", "e7e5", "g1f3", "b8c6"}) {
+        for (const StringView uci : {"e2e4", "e7e5", "g1f3", "b8c6"}) {
             ASSERT_TRUE(Play(grown, uci));
             ASSERT_TRUE(UpdateUntil(rater, grown, [&] { return AllRated(rater, grown); })) << DescribeError(rater.GetError()).c_str();
         }

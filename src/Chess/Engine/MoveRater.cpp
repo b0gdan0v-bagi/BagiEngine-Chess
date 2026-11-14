@@ -37,7 +37,7 @@ namespace BECore::Chess {
         if (!_on || _blocked) {
             return;
         }
-        if (const std::optional<size_t> ply = OldestUnrated()) {
+        if (const Optional<size_t> ply = OldestUnrated()) {
             StartSearch(*ply);
         }
     }
@@ -60,7 +60,7 @@ namespace BECore::Chess {
     }
 
     MoveRatings MoveRater::GetRatings(const ChessGameModel& model) const {
-        const eastl::vector<Move>& moves = model.GetMoves();
+        const Vector<Move>& moves = model.GetMoves();
         MoveRatings ratings(moves.size());
         if (Extends(model)) {
             eastl::copy(_ratings.begin(), _ratings.end(), ratings.begin());
@@ -68,10 +68,10 @@ namespace BECore::Chess {
         return ratings;
     }
 
-    Task<void> MoveRater::RunSearch(eastl::shared_ptr<Search> search, SearchRequest request) {
+    Task<void> MoveRater::RunSearch(SharedPtr<Search> search, SearchRequest request) {
         std::expected<Analysis, EngineError> answer = AnswerOfTask(co_await search->engine->AnalyseAsync(request, search->token));
         {
-            const std::lock_guard lock(search->mutex);
+            const LockGuard lock(search->mutex);
             search->answer = std::move(answer);
         }
         search->done.store(true, std::memory_order_release);
@@ -79,7 +79,7 @@ namespace BECore::Chess {
     }
 
     void MoveRater::SyncHistory(const ChessGameModel& model) {
-        const eastl::vector<Move>& moves = model.GetMoves();
+        const Vector<Move>& moves = model.GetMoves();
         if (!Extends(model)) {
             DropHistory();
             _startFen = model.GetStartFen();
@@ -92,7 +92,7 @@ namespace BECore::Chess {
     }
 
     bool MoveRater::Extends(const ChessGameModel& model) const {
-        const eastl::vector<Move>& moves = model.GetMoves();
+        const Vector<Move>& moves = model.GetMoves();
         return _startFen == model.GetStartFen() && moves.size() >= _moves.size() && eastl::equal(_moves.begin(), _moves.end(), moves.begin());
     }
 
@@ -101,7 +101,7 @@ namespace BECore::Chess {
         if (_search) {
             _search->token.Cancel();
         }
-        const bool hadRatings = eastl::any_of(_ratings.begin(), _ratings.end(), [](const std::optional<MoveRating>& rating) { return rating.has_value(); });
+        const bool hadRatings = eastl::any_of(_ratings.begin(), _ratings.end(), [](const Optional<MoveRating>& rating) { return rating.has_value(); });
         _moves.clear();
         _ratings.clear();
         _failed.clear();
@@ -114,7 +114,7 @@ namespace BECore::Chess {
     void MoveRater::TakeAnswer() {
         std::expected<Analysis, EngineError> answer = std::unexpected(EngineError{});
         {
-            const std::lock_guard lock(_search->mutex);
+            const LockGuard lock(_search->mutex);
             answer = std::move(_search->answer);
         }
         const bool wanted = !_search->token.IsCancelled() && _searchGeneration == _generation;
@@ -139,7 +139,7 @@ namespace BECore::Chess {
 
     void MoveRater::StartSearch(size_t ply) {
         if (!_engine) {
-            std::expected<eastl::shared_ptr<IChessEngine>, EngineError> made = _factory ? _factory(OpponentEngine::Own) : MakeAnalysisEngine(OpponentEngine::Own, OpponentSettings{});
+            std::expected<SharedPtr<IChessEngine>, EngineError> made = _factory ? _factory(OpponentEngine::Own) : MakeAnalysisEngine(OpponentEngine::Own, OpponentSettings{});
             if (!made) {
                 Fail(std::nullopt, std::move(made.error()));
                 return;
@@ -155,14 +155,14 @@ namespace BECore::Chess {
         request.moves.assign(_moves.begin(), _moves.begin() + ply);
         request.limits = SearchLimits{0, kRatingDepth};
         request.lines = kRatingLines;
-        _search = eastl::make_shared<Search>(_engine);
+        _search = MakeShared<Search>(_engine);
         _searchPly = ply;
         _searchGeneration = _generation;
         // Fire and forget: the task keeps itself alive until it ends, and the answer comes through _search, not through the handle
         TaskManager::GetInstance().Run(RunSearch(_search, std::move(request)));
     }
 
-    std::optional<size_t> MoveRater::OldestUnrated() const {
+    Optional<size_t> MoveRater::OldestUnrated() const {
         for (size_t ply = 0; ply < _ratings.size(); ++ply) {
             if (!_ratings[ply] && !_failed[ply]) {
                 return ply;
@@ -171,8 +171,8 @@ namespace BECore::Chess {
         return std::nullopt;
     }
 
-    void MoveRater::Fail(std::optional<size_t> ply, EngineError error) {
-        const eastl::string which = ply ? Format(" of ply {}", *ply + 1) : eastl::string();
+    void MoveRater::Fail(Optional<size_t> ply, EngineError error) {
+        const String which = ply ? Format(" of ply {}", *ply + 1) : String();
         LOG_ERROR("Move rater: no rating{}, {}: {}"_format(which, EnumUtils<EngineErrorKind>::ToString(error.kind), error.detail));
         _error = std::move(error);
         if (ply) {

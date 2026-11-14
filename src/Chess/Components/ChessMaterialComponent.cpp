@@ -19,10 +19,10 @@ namespace BECore::Chess {
         // The interned names of the variables and of the elements of the canvas, built on the first use (an interned name is not made per frame). A row is group * 5 + the index of its piece in
         // CapturableTypes()
         struct MaterialNames {
-            eastl::array<PoolString, kMaterialGroupCount * kMaterialRowsPerGroup> vars;   // materialTopQueen ..
-            eastl::array<PoolString, kMaterialGroupCount * kMaterialRowsPerGroup> rows;   // MaterialTopQueenRow ..
-            eastl::array<PoolString, kMaterialGroupCount * kMaterialRowsPerGroup> icons;  // MaterialTopQueenIcon ..
-            eastl::array<PoolString, kMaterialGroupCount> balanceVars;                    // materialTopBalance, materialBottomBalance
+            Array<PoolString, kMaterialGroupCount * kMaterialRowsPerGroup> vars;   // materialTopQueen ..
+            Array<PoolString, kMaterialGroupCount * kMaterialRowsPerGroup> rows;   // MaterialTopQueenRow ..
+            Array<PoolString, kMaterialGroupCount * kMaterialRowsPerGroup> icons;  // MaterialTopQueenIcon ..
+            Array<PoolString, kMaterialGroupCount> balanceVars;                    // materialTopBalance, materialBottomBalance
         };
 
         const char* GroupWord(size_t group) {
@@ -37,7 +37,7 @@ namespace BECore::Chess {
                 for (size_t group = 0; group < kMaterialGroupCount; ++group) {
                     for (size_t index = 0; index < kMaterialRowsPerGroup; ++index) {
                         const size_t row = group * kMaterialRowsPerGroup + index;
-                        const eastl::string_view type = EnumUtils<PieceType>::ToString(types[index]);
+                        const StringView type = EnumUtils<PieceType>::ToString(types[index]);
                         made.vars[row] = PoolString::Intern(Format("material{}{}", GroupWord(group), type).c_str());
                         made.rows[row] = PoolString::Intern(Format("Material{}{}Row", GroupWord(group), type).c_str());
                         made.icons[row] = PoolString::Intern(Format("Material{}{}Icon", GroupWord(group), type).c_str());
@@ -72,8 +72,8 @@ namespace BECore::Chess {
                 const size_t row = group * kMaterialRowsPerGroup + index;
                 const int count = summary.GetMissing(taken, types[index]);
                 _counts[row] = count;
-                const eastl::string word = count > 0 ? Format("x{}", count) : eastl::string();
-                vars.Set(names.vars[row], eastl::string_view(word.data(), word.size()));
+                const String word = count > 0 ? Format("x{}", count) : String();
+                vars.Set(names.vars[row], StringView(word));
                 if (iconsToo && canvas) {
                     if (UIElement* element = canvas->GetRoot().FindByName(names.icons[row])) {
                         if (UIImageComponent* icon = element->GetComponent<UIImageComponent>()) {
@@ -82,8 +82,8 @@ namespace BECore::Chess {
                     }
                 }
             }
-            const eastl::string balance = BalanceText(summary.GetPoints(color) - summary.GetPoints(taken));
-            vars.Set(names.balanceVars[group], eastl::string_view(balance.data(), balance.size()));
+            const String balance = BalanceText(summary.GetPoints(color) - summary.GetPoints(taken));
+            vars.Set(names.balanceVars[group], StringView(balance));
         }
     }
 

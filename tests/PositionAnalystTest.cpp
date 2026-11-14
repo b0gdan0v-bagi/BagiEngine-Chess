@@ -17,10 +17,10 @@ namespace BECore::Chess::Tests {
 
         constexpr int kManyUpdates = 1000;
         constexpr AnalysisScore kScore{AnalysisScoreKind::Centipawns, 35};
-        constexpr eastl::string_view kMateInOneFen = "6k1/5ppp/8/8/8/8/8/R3K3 w - - 0 1";  // Ra8#
-        constexpr eastl::string_view kMatedBlackFen = "7k/6Q1/6K1/8/8/8/8/8 b - - 0 1";
+        constexpr StringView kMateInOneFen = "6k1/5ppp/8/8/8/8/8/R3K3 w - - 0 1";  // Ra8#
+        constexpr StringView kMatedBlackFen = "7k/6Q1/6K1/8/8/8/8/8 b - - 0 1";
 
-        bool Play(ChessGameModel& model, eastl::string_view uci) {
+        bool Play(ChessGameModel& model, StringView uci) {
             const auto move = MoveGenerator::ParseUci(model.GetPosition(), uci);
             return move.has_value() && model.TryMove(*move).has_value();
         }
@@ -40,8 +40,8 @@ namespace BECore::Chess::Tests {
             }
         }
 
-        eastl::shared_ptr<AnalysingEngine> MakeEngine(AnalysisScore score = kScore, std::optional<Move> move = std::nullopt) {
-            return eastl::make_shared<AnalysingEngine>(score, move);
+        SharedPtr<AnalysingEngine> MakeEngine(AnalysisScore score = kScore, Optional<Move> move = std::nullopt) {
+            return MakeShared<AnalysingEngine>(score, move);
         }
 
         /// An engine that only plays: it keeps the default Analyse() of the interface
@@ -93,7 +93,7 @@ namespace BECore::Chess::Tests {
         EXPECT_FALSE(analyst.GetEvaluation(model).has_value()) << "nothing before the engine has answered";
         ASSERT_TRUE(UpdateUntil(analyst, model, OpponentEngine::Stockfish, [&] { return analyst.GetEvaluation(model).has_value(); })) << DescribeError(analyst.GetError()).c_str();
 
-        const std::optional<AnalysisLine> line = analyst.GetEvaluation(model);
+        const Optional<AnalysisLine> line = analyst.GetEvaluation(model);
         EXPECT_EQ(line->score, kScore);
         EXPECT_EQ(line->move, Mv("e2e4"));
         EXPECT_EQ(line->depth, 7);
@@ -165,7 +165,7 @@ namespace BECore::Chess::Tests {
         engine->Open();  // the old worker answers now, for the position before the move
         ASSERT_TRUE(UpdateUntil(analyst, model, OpponentEngine::Stockfish, [&] { return analyst.GetEvaluation(model).has_value(); })) << DescribeError(analyst.GetError()).c_str();
 
-        const std::optional<AnalysisLine> line = analyst.GetEvaluation(model);
+        const Optional<AnalysisLine> line = analyst.GetEvaluation(model);
         EXPECT_TRUE(MoveGenerator::ParseUci(model.GetPosition(), line->move.ToUci()).has_value()) << "a move of Black, from the new search, not the White move of the old one";
         EXPECT_EQ(engine->Calls(), 2);
         EXPECT_EQ(engine->LastRequest().moves.size(), 1u);
@@ -317,7 +317,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(PositionAnalystTest, AnEngineThatDoesNotAnalyseIsAnErrorNotACrash) {
-        CountingAnalysisFactory factory{eastl::make_shared<PlayingEngine>()};
+        CountingAnalysisFactory factory{MakeShared<PlayingEngine>()};
         ChessGameModel model;
         PositionAnalyst analyst;
         analyst.SetEngineFactory(factory.AsFactory());
@@ -635,7 +635,7 @@ namespace BECore::Chess::Tests {
 
         EXPECT_EQ(engine->LastRequest().lines, kAnalysisLines);
         EXPECT_EQ(kAnalysisLines, 2);
-        const eastl::vector<AnalysisLine> lines = analyst.GetLines(model);
+        const Vector<AnalysisLine> lines = analyst.GetLines(model);
         ASSERT_EQ(lines.size(), 2u);
         EXPECT_EQ(lines[0].move, Mv("e2e4"));
         EXPECT_EQ(lines[0].score, kScore);
@@ -723,7 +723,7 @@ namespace BECore::Chess::Tests {
         engine->Open();  // the old worker answers with two lines for the position before the move
         ASSERT_TRUE(UpdateUntil(analyst, model, OpponentEngine::Stockfish, [&] { return !analyst.GetLines(model).empty(); }));
 
-        const eastl::vector<AnalysisLine> lines = analyst.GetLines(model);
+        const Vector<AnalysisLine> lines = analyst.GetLines(model);
         ASSERT_EQ(lines.size(), 2u);
         for (const AnalysisLine& line : lines) {
             EXPECT_TRUE(MoveGenerator::ParseUci(model.GetPosition(), line.move.ToUci()).has_value()) << "moves of Black, from the new search: " << line.move.ToUci().c_str();
@@ -769,7 +769,7 @@ namespace BECore::Chess::Tests {
 
         ASSERT_TRUE(UpdateUntil(analyst, model, OpponentEngine::Own, [&] { return !analyst.GetLines(model).empty(); })) << DescribeError(analyst.GetError()).c_str();
 
-        const eastl::vector<AnalysisLine> lines = analyst.GetLines(model);
+        const Vector<AnalysisLine> lines = analyst.GetLines(model);
         ASSERT_EQ(lines.size(), 2u);
         EXPECT_EQ(lines[0].move, Mv("a1a8"));
         EXPECT_EQ(lines[0].score, (AnalysisScore{AnalysisScoreKind::Mate, 1}));
@@ -785,14 +785,14 @@ namespace BECore::Chess::Tests {
 
         ASSERT_TRUE(UpdateUntil(analyst, model, OpponentEngine::Stockfish, [&] { return !analyst.GetLines(model).empty() || analyst.GetError().has_value(); }));
 
-        const eastl::vector<AnalysisLine> lines = analyst.GetLines(model);
+        const Vector<AnalysisLine> lines = analyst.GetLines(model);
         ASSERT_EQ(lines.size(), 2u) << DescribeError(analyst.GetError()).c_str();
         EXPECT_NE(lines[0].move, lines[1].move);
         analyst.Shutdown();
     }
 
     TEST_F(PositionAnalystTest, TheDefaultFactoryMakesTheOwnEngineWithoutAPath) {
-        const std::expected<eastl::shared_ptr<IChessEngine>, EngineError> engine = MakeAnalysisEngine(OpponentEngine::Own, OpponentSettings{});
+        const std::expected<SharedPtr<IChessEngine>, EngineError> engine = MakeAnalysisEngine(OpponentEngine::Own, OpponentSettings{});
 
         ASSERT_TRUE(engine.has_value());
         ASSERT_NE(*engine, nullptr);
@@ -808,8 +808,8 @@ namespace BECore::Chess::Tests {
         OpponentSettings settings;
         settings.stockfishPath = "/no/such/file";
 
-        const std::expected<eastl::shared_ptr<IChessEngine>, EngineError> stockfish = MakeAnalysisEngine(OpponentEngine::Stockfish, settings);
-        const std::expected<eastl::shared_ptr<IChessEngine>, EngineError> own = MakeAnalysisEngine(OpponentEngine::Own, {});
+        const std::expected<SharedPtr<IChessEngine>, EngineError> stockfish = MakeAnalysisEngine(OpponentEngine::Stockfish, settings);
+        const std::expected<SharedPtr<IChessEngine>, EngineError> own = MakeAnalysisEngine(OpponentEngine::Own, {});
 
         ASSERT_FALSE(stockfish.has_value());
         EXPECT_EQ(stockfish.error().kind, EngineErrorKind::Unsupported) << "the path is not even looked at, and nothing falls back to the other engine";
@@ -824,11 +824,11 @@ namespace BECore::Chess::Tests {
         OpponentSettings settings;
         settings.stockfishPath = "/no/such/file";
 
-        const std::expected<eastl::shared_ptr<IChessEngine>, EngineError> engine = MakeAnalysisEngine(OpponentEngine::Stockfish, settings);
+        const std::expected<SharedPtr<IChessEngine>, EngineError> engine = MakeAnalysisEngine(OpponentEngine::Stockfish, settings);
 
         ASSERT_FALSE(engine.has_value());
         EXPECT_EQ(engine.error().kind, EngineErrorKind::LaunchFailed);
-        EXPECT_NE(engine.error().detail.find("/no/such/file"), eastl::string::npos) << engine.error().detail.c_str();
+        EXPECT_NE(engine.error().detail.find("/no/such/file"), String::npos) << engine.error().detail.c_str();
     }
 
 #endif  // CHESS_NO_STOCKFISH
@@ -842,7 +842,7 @@ namespace BECore::Chess::Tests {
 
         ASSERT_TRUE(UpdateUntil(analyst, model, OpponentEngine::Own, [&] { return analyst.GetHint(model).has_value(); })) << DescribeError(analyst.GetError()).c_str();
 
-        const std::optional<AnalysisLine> hint = analyst.GetHint(model);
+        const Optional<AnalysisLine> hint = analyst.GetHint(model);
         EXPECT_EQ(hint->move, Mv("a1a8"));
         EXPECT_EQ(hint->score, (AnalysisScore{AnalysisScoreKind::Mate, 1}));
         EXPECT_EQ(analyst.GetEvaluation(model)->score, hint->score);
@@ -860,7 +860,7 @@ namespace BECore::Chess::Tests {
         analyst.SetEvaluation(true);
         ASSERT_TRUE(UpdateUntil(analyst, model, OpponentEngine::Own, [&] { return !analyst.GetLines(model).empty() || analyst.GetError().has_value(); })) << DescribeError(analyst.GetError()).c_str();
 
-        const eastl::vector<AnalysisLine> lines = analyst.GetLines(model);
+        const Vector<AnalysisLine> lines = analyst.GetLines(model);
         ASSERT_EQ(lines.size(), expected->lines.size()) << DescribeError(analyst.GetError()).c_str();
         for (size_t i = 0; i < lines.size(); ++i) {
             EXPECT_EQ(lines[i].move, expected->lines[i].move) << "line " << i;
@@ -892,7 +892,7 @@ namespace BECore::Chess::Tests {
         /// Every move of @p model is rated
         bool AllRated(const PositionAnalyst& analyst, const ChessGameModel& model) {
             const MoveRatings ratings = analyst.GetRatings(model);
-            return !ratings.empty() && eastl::all_of(ratings.begin(), ratings.end(), [](const std::optional<MoveRating>& rating) { return rating.has_value(); });
+            return !ratings.empty() && eastl::all_of(ratings.begin(), ratings.end(), [](const Optional<MoveRating>& rating) { return rating.has_value(); });
         }
 
     }  // namespace

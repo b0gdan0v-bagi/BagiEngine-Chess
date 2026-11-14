@@ -10,14 +10,14 @@ namespace BECore::Chess {
     /// Error codes of Chess besides the shared ones (GameControlErrors, ControlErrors)
     namespace ChessControlErrors {
         /// The game is finished (checkmate, stalemate or a draw): it takes no move until reset or set_state
-        inline constexpr eastl::string_view kGameOver = "game_over";
+        inline constexpr StringView kGameOver = "game_over";
         /// The move is a pawn move onto the last rank and does not say what to promote to: "e7e8" instead of "e7e8q"
-        inline constexpr eastl::string_view kPromotionRequired = "promotion_required";
+        inline constexpr StringView kPromotionRequired = "promotion_required";
         /// set_state asked for a computer opponent and there is no engine to make it (no Stockfish found; the own engine cannot fail): the pick is refused as a whole, so the position and the opponent
         /// stay as they were and the error is in the state
-        inline constexpr eastl::string_view kEngineUnavailable = "engine_unavailable";
+        inline constexpr StringView kEngineUnavailable = "engine_unavailable";
         /// set_state asked for a hint on a side that the program plays (either side while two programs play): a hint is for the person (HintRefusalFor). On a finished game the code is game_over
-        inline constexpr eastl::string_view kNotYourTurn = "not_your_turn";
+        inline constexpr StringView kNotYourTurn = "not_your_turn";
     }  // namespace ChessControlErrors
 
     /**

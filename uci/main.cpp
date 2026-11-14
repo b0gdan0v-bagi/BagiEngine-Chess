@@ -5,19 +5,18 @@
 #include <Chess/Engine/OwnEngine.h>
 #include <Chess/Uci/UciServer.h>
 #include <iostream>
-#include <string>
 
 int main() {
     using namespace BECore;
 
-    Chess::Uci::UciServer server(eastl::make_shared<Chess::OwnEngine>(), [](eastl::string_view line) {
+    Chess::Uci::UciServer server(MakeShared<Chess::OwnEngine>(), [](StringView line) {
         std::cout.write(line.data(), static_cast<std::streamsize>(line.size()));
         std::cout << '\n' << std::flush;
     });
 
-    std::string line;
+    std::string line;  //-NoStd: std::getline reads into a std::string
     while (!server.WantsQuit() && std::getline(std::cin, line)) {
-        server.HandleLine(eastl::string_view(line.data(), line.size()));
+        server.HandleLine(FromStd(line));
     }
     // The end of the input is a quit: a search that is still running is cancelled and the program ends at once
     if (!server.WantsQuit()) {

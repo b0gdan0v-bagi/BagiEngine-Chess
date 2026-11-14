@@ -7,7 +7,7 @@ namespace BECore::Chess {
 
     /// No position has more than 218 legal moves; the pseudo-legal list before filtering stays well below this.
     constexpr size_t kMaxMoves = 256;
-    using MoveList = eastl::fixed_vector<Move, kMaxMoves, false>;
+    using MoveList = FixedVector<Move, kMaxMoves>;
 
     /**
      * @brief Legal move generation for the side to move: the standard rules of chess, Chess960 excluded.
@@ -23,7 +23,7 @@ namespace BECore::Chess {
         [[nodiscard]] static MoveList GenerateLegal(const Position& position);
 
         /// The legal move spelled @p text in UCI ("e2e4", "e7e8q", "e1g1"), or nothing if no legal move has that spelling.
-        [[nodiscard]] static std::optional<Move> ParseUci(const Position& position, eastl::string_view text);
+        [[nodiscard]] static Optional<Move> ParseUci(const Position& position, StringView text);
     };
 
 }  // namespace BECore::Chess

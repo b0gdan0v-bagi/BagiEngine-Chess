@@ -7,8 +7,8 @@ namespace BECore::Chess::Tests {
     namespace {
 
         /// gtest cannot stream an EASTL string view
-        std::string Text(eastl::string_view text) {
-            return std::string(text.data(), text.size());
+        String Text(StringView text) {
+            return String(text.data(), text.size());
         }
 
     }  // namespace
@@ -43,8 +43,8 @@ namespace BECore::Chess::Tests {
 
     TEST(PromotionChoicesTest, IdsAreLowerCaseAndUniqueAndLabelsAreWords) {
         for (const PieceType piece : PromotionPieces()) {
-            const eastl::string_view id = PromotionId(piece);
-            const eastl::string_view label = PromotionLabel(piece);
+            const StringView id = PromotionId(piece);
+            const StringView label = PromotionLabel(piece);
             ASSERT_FALSE(id.empty());
             ASSERT_FALSE(label.empty());
             for (const char c : id) {

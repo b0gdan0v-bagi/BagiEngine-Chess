@@ -11,7 +11,7 @@
 #include <thread>
 
 /// UciServer: the lines it answers, over the real OwnEngine at a shallow depth and over a scripted engine that records its limits and can be held
-/// until it is cancelled. No process, no TaskManager: the server's worker is a std::thread of its own
+/// until it is cancelled. No process, no TaskManager: the server's worker is a Thread of its own (the cases that send `go` skip themselves in a single-thread build)
 namespace BECore::Chess::Tests {
 
     namespace {
@@ -27,8 +27,8 @@ namespace BECore::Chess::Tests {
         /// The words a server line may begin with
         constexpr const char* kKnownKeywords[] = {"id", "option", "uciok", "readyok", "bestmove", "info"};
 
-        bool StartsWith(const eastl::string& text, eastl::string_view prefix) {
-            return eastl::string_view(text.data(), text.size()).starts_with(prefix);
+        bool StartsWith(const String& text, StringView prefix) {
+            return StringView(text).starts_with(prefix);
         }
 
         /// An engine of the tests: records every limit it is asked with, answers the legal move numbered by the depth (so the answer of each depth is told apart), and
@@ -44,7 +44,7 @@ namespace BECore::Chess::Tests {
                 _failure = kind;
             }
 
-            [[nodiscard]] eastl::vector<SearchLimits> Calls() const {
+            [[nodiscard]] Vector<SearchLimits> Calls() const {
                 const std::lock_guard lock(_mutex);
                 return _calls;
             }
@@ -113,21 +113,21 @@ namespace BECore::Chess::Tests {
             }
 
             mutable std::mutex _mutex;
-            eastl::vector<SearchLimits> _calls;
+            Vector<SearchLimits> _calls;
             std::atomic<int> _holdFromDepth = 0;
-            std::optional<EngineErrorKind> _failure;
+            Optional<EngineErrorKind> _failure;
         };
 
         /// A server and the lines it printed. The lines are declared first, so that they outlive the server (its worker may still print while it is destroyed)
         class Session {
         public:
-            explicit Session(eastl::shared_ptr<IChessEngine> engine = eastl::make_shared<OwnEngine>())
-                : _server(std::move(engine), [this](eastl::string_view line) {
+            explicit Session(SharedPtr<IChessEngine> engine = MakeShared<OwnEngine>())
+                : _server(std::move(engine), [this](StringView line) {
                       const std::lock_guard lock(_mutex);
                       _lines.emplace_back(line.data(), line.size());
                   }) {}
 
-            void Send(eastl::string_view line) {
+            void Send(StringView line) {
                 _server.HandleLine(line);
             }
 
@@ -140,38 +140,38 @@ namespace BECore::Chess::Tests {
                 }
             }
 
-            [[nodiscard]] eastl::vector<eastl::string> Lines() const {
+            [[nodiscard]] Vector<String> Lines() const {
                 const std::lock_guard lock(_mutex);
                 return _lines;
             }
 
-            [[nodiscard]] bool WaitForLine(eastl::string_view prefix) const {
+            [[nodiscard]] bool WaitForLine(StringView prefix) const {
                 return ScriptedEngine::WaitUntil([&] { return CountOf(prefix) > 0; });
             }
 
-            [[nodiscard]] size_t CountOf(eastl::string_view prefix) const {
+            [[nodiscard]] size_t CountOf(StringView prefix) const {
                 size_t count = 0;
-                for (const eastl::string& line : Lines()) {
+                for (const String& line : Lines()) {
                     count += StartsWith(line, prefix) ? 1 : 0;
                 }
                 return count;
             }
 
             /// The moves of the `bestmove` lines, in order ("(none)" as it is)
-            [[nodiscard]] eastl::vector<eastl::string> BestMoves() const {
-                eastl::vector<eastl::string> moves;
-                for (const eastl::string& line : Lines()) {
-                    if (const auto parsed = UciProtocol::ParseBestMove(eastl::string_view(line.data(), line.size()))) {
-                        moves.push_back(parsed->move.empty() ? eastl::string("(none)") : parsed->move);
+            [[nodiscard]] Vector<String> BestMoves() const {
+                Vector<String> moves;
+                for (const String& line : Lines()) {
+                    if (const auto parsed = UciProtocol::ParseBestMove(StringView(line))) {
+                        moves.push_back(parsed->move.empty() ? String("(none)") : parsed->move);
                     }
                 }
                 return moves;
             }
 
-            [[nodiscard]] eastl::string OnlyBestMove() const {
-                const eastl::vector<eastl::string> moves = BestMoves();
+            [[nodiscard]] String OnlyBestMove() const {
+                const Vector<String> moves = BestMoves();
                 EXPECT_EQ(moves.size(), 1u);
-                return moves.empty() ? eastl::string() : moves.front();
+                return moves.empty() ? String() : moves.front();
             }
 
             Uci::UciServer& Server() {
@@ -180,7 +180,7 @@ namespace BECore::Chess::Tests {
 
         private:
             mutable std::mutex _mutex;
-            eastl::vector<eastl::string> _lines;
+            Vector<String> _lines;
             Uci::UciServer _server;
         };
 
@@ -196,20 +196,20 @@ namespace BECore::Chess::Tests {
         }
 
         /// The move that BlunderEngine over OwnEngine answers for @p request
-        eastl::string BlunderAnswer(int percent, const SearchRequest& request) {
-            BlunderEngine engine(eastl::make_shared<OwnEngine>(), percent);
+        String BlunderAnswer(int percent, const SearchRequest& request) {
+            BlunderEngine engine(MakeShared<OwnEngine>(), percent);
             const auto move = engine.FindMove(request, CancellationToken::Create());
             EXPECT_TRUE(move.has_value());
-            return move ? move->ToUci() : eastl::string();
+            return move ? move->ToUci() : String();
         }
 
-        bool IsLegalIn(const SearchRequest& request, const eastl::string& uci) {
+        bool IsLegalIn(const SearchRequest& request, const String& uci) {
             const auto position = request.FinalPosition();
-            return position && MoveGenerator::ParseUci(*position, eastl::string_view(uci.data(), uci.size())).has_value();
+            return position && MoveGenerator::ParseUci(*position, StringView(uci)).has_value();
         }
 
-        eastl::shared_ptr<ScriptedEngine> MakeScripted() {
-            return eastl::make_shared<ScriptedEngine>();
+        SharedPtr<ScriptedEngine> MakeScripted() {
+            return MakeShared<ScriptedEngine>();
         }
 
     }  // namespace
@@ -217,7 +217,7 @@ namespace BECore::Chess::Tests {
     TEST(UciServerTest, UciAnswersIdOptionsAndEndsWithUciok) {
         Session session;
         session.Send("uci");
-        const eastl::vector<eastl::string> lines = session.Lines();
+        const Vector<String> lines = session.Lines();
         ASSERT_EQ(lines.size(), 6u);
         EXPECT_EQ(lines[0], "id name BagiChess Own");
         EXPECT_TRUE(StartsWith(lines[1], "id author "));
@@ -230,7 +230,7 @@ namespace BECore::Chess::Tests {
     TEST(UciServerTest, IsReadyAnswersReadyok) {
         Session session;
         session.Send("isready");
-        EXPECT_EQ(session.Lines(), eastl::vector<eastl::string>{"readyok"});
+        EXPECT_EQ(session.Lines(), Vector<String>{"readyok"});
     }
 
     TEST(UciServerTest, UnknownLinesAreSkippedInSilence) {
@@ -240,37 +240,42 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(UciServerTest, GoAfterMovesAnswersALegalMoveOfTheSideToMove) {
+        SKIP_WITHOUT_WORKER_THREADS();
         Session session;
         session.Play({"position startpos moves e2e4 e7e5", "go depth 2"});
-        const eastl::string move = session.OnlyBestMove();
+        const String move = session.OnlyBestMove();
         EXPECT_TRUE(IsLegalIn(StartRequest({"e2e4", "e7e5"}, SearchLimits{0, kShallow}), move)) << move.c_str();
     }
 
     TEST(UciServerTest, TheMoveIsReadByTheClientSideOfTheProtocol) {
+        SKIP_WITHOUT_WORKER_THREADS();
         Session session;
         session.Play({"position startpos moves e2e4", "go depth 1"});
-        const eastl::vector<eastl::string> lines = session.Lines();
+        const Vector<String> lines = session.Lines();
         ASSERT_EQ(lines.size(), 1u);
-        const auto parsed = UciProtocol::ParseBestMove(eastl::string_view(lines[0].data(), lines[0].size()));
+        const auto parsed = UciProtocol::ParseBestMove(StringView(lines[0]));
         ASSERT_TRUE(parsed.has_value());
         EXPECT_FALSE(parsed->IsNone());
     }
 
     TEST(UciServerTest, AMateInOneIsFound) {
+        SKIP_WITHOUT_WORKER_THREADS();
         Session session;
         session.Play({"position fen 6k1/5ppp/8/8/8/8/8/R3K3 w - - 0 1", "go depth 2"});
         EXPECT_EQ(session.OnlyBestMove(), "a1a8");
     }
 
     TEST(UciServerTest, TheSameGameAndDepthGiveTheSameMove) {
+        SKIP_WITHOUT_WORKER_THREADS();
         Session session;
         session.Play({"position startpos moves d2d4 g8f6 c2c4", "go depth 3", "go depth 3"});
-        const eastl::vector<eastl::string> moves = session.BestMoves();
+        const Vector<String> moves = session.BestMoves();
         ASSERT_EQ(moves.size(), 2u);
         EXPECT_EQ(moves[0], moves[1]);
     }
 
     TEST(UciServerTest, ABadPositionIsRefusedAndTheOldOneStays) {
+        SKIP_WITHOUT_WORKER_THREADS();
         Session session;
         session.Play({"position startpos moves e2e4", "position startpos moves e2e5", "position fen not a fen", "position startpos moves e2e4 e2e4", "go depth 1"});
         EXPECT_EQ(session.CountOf("info string "), 3u);
@@ -279,12 +284,14 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(UciServerTest, UciNewGameForgetsTheMovesAndKeepsTheOptions) {
+        SKIP_WITHOUT_WORKER_THREADS();
         Session session;
         session.Play({"setoption name BlunderPercent value 100", "position startpos moves e2e4", "ucinewgame", "go depth 2"});
         EXPECT_EQ(session.OnlyBestMove(), BlunderAnswer(100, StartRequest({}, SearchLimits{0, kShallow})));
     }
 
     TEST(UciServerTest, BlunderPercentPlaysTheMoveOfBlunderEngine) {
+        SKIP_WITHOUT_WORKER_THREADS();
         const SearchRequest request = StartRequest({"e2e4", "e7e5", "g1f3"}, SearchLimits{0, kShallow});
         Session session;
         session.Play({"setoption name BlunderPercent value 100", "position startpos moves e2e4 e7e5 g1f3", "go depth 2"});
@@ -292,6 +299,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(UciServerTest, OptionNamesMatchWithoutRegardToCase) {
+        SKIP_WITHOUT_WORKER_THREADS();
         const SearchRequest request = StartRequest({"e2e4"}, SearchLimits{0, kShallow});
         Session session;
         session.Play({"setoption name blunderpercent value 100", "position startpos moves e2e4", "go depth 2"});
@@ -300,12 +308,13 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(UciServerTest, ALevelPlaysAsTheGamePlaysIt) {
+        SKIP_WITHOUT_WORKER_THREADS();
         const OpponentLevel& easy = GetOpponentLevels()[*FindOpponentLevel("easy")];
         ASSERT_GT(easy.ownDepth, 0);
         ASSERT_GT(easy.blunderPercent, 0);
-        const eastl::vector<eastl::vector<const char*>> games = {{}, {"e2e4"}, {"d2d4", "d7d5"}, {"e2e4", "e7e5", "g1f3"}};
-        for (const eastl::vector<const char*>& moves : games) {
-            eastl::string position = "position startpos";
+        const Vector<Vector<const char*>> games = {{}, {"e2e4"}, {"d2d4", "d7d5"}, {"e2e4", "e7e5", "g1f3"}};
+        for (const Vector<const char*>& moves : games) {
+            String position = "position startpos";
             SearchRequest request = StartRequest({}, SearchLimits{0, easy.ownDepth});
             if (!moves.empty()) {
                 position.append(" moves");
@@ -321,6 +330,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(UciServerTest, TheLaterOptionWinsOverALevel) {
+        SKIP_WITHOUT_WORKER_THREADS();
         const OpponentLevel& hard = GetOpponentLevels()[*FindOpponentLevel("hard")];
         auto engine = MakeScripted();
         Session session(engine);
@@ -328,7 +338,7 @@ namespace BECore::Chess::Tests {
         session.Play({"setoption name Depth value 3", "go"});
         session.Play({"setoption name Level value custom", "go"});
         session.Play({"setoption name Level value hard", "setoption name Level value custom", "go"});
-        const eastl::vector<SearchLimits> calls = engine->Calls();
+        const Vector<SearchLimits> calls = engine->Calls();
         ASSERT_EQ(calls.size(), 4u);
         EXPECT_EQ(calls[0].depth, hard.ownDepth);
         EXPECT_EQ(calls[0].moveTimeMs, 0);
@@ -343,6 +353,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(UciServerTest, ABadOptionChangesNothing) {
+        SKIP_WITHOUT_WORKER_THREADS();
         auto engine = MakeScripted();
         Session session(engine);
         session.Send("setoption name Depth value 5");
@@ -357,11 +368,12 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(UciServerTest, TheClockOfTheSideToMoveSetsTheMoveTime) {
+        SKIP_WITHOUT_WORKER_THREADS();
         auto engine = MakeScripted();
         Session session(engine);
         session.Play({"setoption name Depth value 3", "go wtime 60000 btime 1000"});
         session.Play({"position startpos moves e2e4", "go wtime 60000 btime 1000 binc 500 movestogo 10"});
-        const eastl::vector<SearchLimits> calls = engine->Calls();
+        const Vector<SearchLimits> calls = engine->Calls();
         ASSERT_EQ(calls.size(), 2u);
         EXPECT_EQ(calls[0].depth, 3);
         EXPECT_EQ(calls[0].moveTimeMs, Uci::MoveTimeFor(60000, 0, std::nullopt));
@@ -370,22 +382,24 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(UciServerTest, AClockAloneIsABoundedSearchByTime) {
+        SKIP_WITHOUT_WORKER_THREADS();
         auto engine = MakeScripted();
         Session session(engine);
         session.Play({"go wtime 10000 btime 10000 winc 100 binc 100"});
-        const eastl::vector<SearchLimits> calls = engine->Calls();
+        const Vector<SearchLimits> calls = engine->Calls();
         ASSERT_EQ(calls.size(), 1u);
         EXPECT_EQ(calls[0].depth, 0);
         EXPECT_EQ(calls[0].moveTimeMs, Uci::MoveTimeFor(10000, 100, std::nullopt));
     }
 
     TEST(UciServerTest, MoveTimeBeatsTheClockAndDepthTakesTheSmallerOfTwo) {
+        SKIP_WITHOUT_WORKER_THREADS();
         auto engine = MakeScripted();
         Session session(engine);
         session.Play({"go movetime 50 wtime 60000 btime 60000"});
         session.Play({"setoption name Depth value 5", "go depth 3"});
         session.Play({"setoption name Depth value 2", "go depth 6"});
-        const eastl::vector<SearchLimits> calls = engine->Calls();
+        const Vector<SearchLimits> calls = engine->Calls();
         ASSERT_EQ(calls.size(), 3u);
         EXPECT_EQ(calls[0].moveTimeMs, 50);
         EXPECT_EQ(calls[0].depth, 0);
@@ -394,6 +408,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(UciServerTest, InfiniteDeepensAndStopAnswersTheLastFinishedDepth) {
+        SKIP_WITHOUT_WORKER_THREADS();
         auto engine = MakeScripted();
         engine->HoldFromDepth(kBlockedDepth);
         Session session(engine);
@@ -406,12 +421,14 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(UciServerTest, InfiniteEndsByItselfOnAMate) {
+        SKIP_WITHOUT_WORKER_THREADS();
         Session session;
         session.Play({"position fen 6k1/5ppp/8/8/8/8/8/R3K3 w - - 0 1", "go infinite"});
         EXPECT_EQ(session.OnlyBestMove(), "a1a8");
     }
 
     TEST(UciServerTest, StopDuringABoundedSearchAnswersADepthOneMove) {
+        SKIP_WITHOUT_WORKER_THREADS();
         auto engine = MakeScripted();
         engine->HoldFromDepth(2);
         Session session(engine);
@@ -424,6 +441,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(UciServerTest, PositionAndGoRightBehindStopAreNotRefused) {
+        SKIP_WITHOUT_WORKER_THREADS();
         auto engine = MakeScripted();
         engine->HoldFromDepth(kBlockedDepth);
         Session session(engine);
@@ -435,13 +453,14 @@ namespace BECore::Chess::Tests {
         session.Send("go depth 1");
         session.Server().WaitIdle();
         EXPECT_EQ(session.CountOf("info string "), 0u);
-        const eastl::vector<eastl::string> moves = session.BestMoves();
+        const Vector<String> moves = session.BestMoves();
         ASSERT_EQ(moves.size(), 2u);
         EXPECT_EQ(moves[0], ScriptedEngine::MoveFor(StartRequest({}, {}), kBlockedDepth - 1).ToUci());
         EXPECT_EQ(moves[1], ScriptedEngine::MoveFor(StartRequest({"d2d4"}, {}), 1).ToUci());
     }
 
     TEST(UciServerTest, PonderHitIsIgnoredAndTheSearchGoesOn) {
+        SKIP_WITHOUT_WORKER_THREADS();
         auto engine = MakeScripted();
         engine->HoldFromDepth(2);
         Session session(engine);
@@ -455,6 +474,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(UciServerTest, IsReadyIsAnsweredWhileASearchRuns) {
+        SKIP_WITHOUT_WORKER_THREADS();
         auto engine = MakeScripted();
         engine->HoldFromDepth(2);
         Session session(engine);
@@ -469,6 +489,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(UciServerTest, QuitDuringASearchReturnsWithOneAnswer) {
+        SKIP_WITHOUT_WORKER_THREADS();
         auto engine = MakeScripted();
         engine->HoldFromDepth(2);
         Session session(engine);
@@ -481,6 +502,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(UciServerTest, CommandsThatChangeTheGameAreRefusedWhileASearchRuns) {
+        SKIP_WITHOUT_WORKER_THREADS();
         auto engine = MakeScripted();
         engine->HoldFromDepth(2);
         Session session(engine);
@@ -499,6 +521,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(UciServerTest, AFinishedGameAnswersNone) {
+        SKIP_WITHOUT_WORKER_THREADS();
         for (const char* fen : {kMated, kStalemated}) {
             for (const char* go : {"go depth 2", "go infinite", "go movetime 50"}) {
                 Session session;
@@ -510,6 +533,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(UciServerTest, AnEngineErrorIsReportedAndStillAnswersALegalMove) {
+        SKIP_WITHOUT_WORKER_THREADS();
         auto engine = MakeScripted();
         engine->FailWith(EngineErrorKind::ProtocolError);
         Session session(engine);
@@ -520,26 +544,28 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(UciServerTest, ThePromotionIsSpelledWithItsPiece) {
+        SKIP_WITHOUT_WORKER_THREADS();
         Session session;
         session.Play({"position fen 8/P6k/8/8/8/8/8/K7 w - - 0 1", "go depth 1"});
-        const eastl::string move = session.OnlyBestMove();
+        const String move = session.OnlyBestMove();
         ASSERT_EQ(move.size(), 5u) << move.c_str();
         EXPECT_EQ(move, "a7a8q");
     }
 
     TEST(UciServerTest, EveryLineStartsWithAUciKeyword) {
+        SKIP_WITHOUT_WORKER_THREADS();
         Session session;
         session.Play({"uci", "isready", "setoption name Foo value 1", "position startpos moves e2e5", "position startpos moves e2e4", "go depth 1", "position fen 6k1/5ppp/8/8/8/8/8/R3K3 w - - 0 1",
                       "go infinite", "ucinewgame", "go wtime 100 btime 100", "stop"});
-        const eastl::vector<eastl::string> lines = session.Lines();
+        const Vector<String> lines = session.Lines();
         EXPECT_GT(lines.size(), 6u);
-        for (const eastl::string& line : lines) {
+        for (const String& line : lines) {
             bool known = false;
             for (const char* keyword : kKnownKeywords) {
                 known = known || line == keyword || StartsWith(line, Format("{} ", keyword));
             }
             EXPECT_TRUE(known) << line.c_str();
-            EXPECT_EQ(line.find('\n'), eastl::string::npos);
+            EXPECT_EQ(line.find('\n'), String::npos);
         }
         EXPECT_EQ(session.BestMoves().size(), 3u);
     }

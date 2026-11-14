@@ -8,10 +8,10 @@ namespace BECore::Chess {
 
     /// Makes the engine for one kind and level, or says why there is none. The default makes a UciEngine over the Stockfish the settings point at for Stockfish and an OwnEngine
     /// for Own (which cannot fail); a test gives a double
-    using EngineFactory = eastl::function<std::expected<eastl::shared_ptr<IChessEngine>, EngineError>(OpponentEngine, const OpponentLevel&)>;
+    using EngineFactory = eastl::function<std::expected<SharedPtr<IChessEngine>, EngineError>(OpponentEngine, const OpponentLevel&)>;
 
     /// Why no Stockfish was found: names the path that was tried when @p path is not empty, else the three places that are looked at. Shared with the analysis (PositionAnalyst)
-    [[nodiscard]] eastl::string NoStockfishDetail(const eastl::string& path);
+    [[nodiscard]] String NoStockfishDetail(const String& path);
 
     /// The error for an engine this build cannot run (IsOpponentEngineAvailable is false: Stockfish with CHESS_NO_STOCKFISH): `Unsupported`, with a sentence that says why. Shared with the analysis
     [[nodiscard]] EngineError UnavailableEngineError(OpponentEngine engine);
@@ -26,7 +26,7 @@ namespace BECore::Chess {
         }
 
         /// Nobody, or the one color given
-        [[nodiscard]] static constexpr ProgramSides Of(std::optional<PieceColor> computer) noexcept {
+        [[nodiscard]] static constexpr ProgramSides Of(Optional<PieceColor> computer) noexcept {
             return ProgramSides{computer == PieceColor::White, computer == PieceColor::Black};
         }
 
@@ -135,7 +135,7 @@ namespace BECore::Chess {
          * A side takes the choice of its seat and writes it into the other seat as well (the single-seat API treats the seats alike); nobody keeps both choices as they are.
          * Remakes the opponent and clears the error, as described above. Returns the engine factory's error when there is no engine: the pick is refused and nothing changed, GetError() has the error.
          */
-        std::expected<void, EngineError> SetSide(std::optional<PieceColor> computer);
+        std::expected<void, EngineError> SetSide(Optional<PieceColor> computer);
 
         /// The strength, an index of GetOpponentLevels(), for both seats; BadRequest (nothing changes) for one outside it. Remakes the opponents of the seats that play
         std::expected<void, EngineError> SetLevel(size_t level);
@@ -145,10 +145,10 @@ namespace BECore::Chess {
 
         /// Side and strength in one pick, the engine kept: one engine is made, not two. The same rules as SetSide() and SetLevel(); BadRequest, with nothing changed, for a level outside
         /// GetOpponentLevels()
-        std::expected<void, EngineError> Choose(std::optional<PieceColor> computer, size_t level);
+        std::expected<void, EngineError> Choose(Optional<PieceColor> computer, size_t level);
 
         /// Side, strength and engine in one pick: one engine is made, not three. BadRequest, with nothing changed, for a level outside GetOpponentLevels()
-        std::expected<void, EngineError> Choose(std::optional<PieceColor> computer, size_t level, OpponentEngine engine);
+        std::expected<void, EngineError> Choose(Optional<PieceColor> computer, size_t level, OpponentEngine engine);
 
         /// The engine, for both seats; remakes the opponents when the program plays (the factory is asked once per seat that plays), else only changes the choice and clears a standing pick error
         std::expected<void, EngineError> SetEngine(OpponentEngine engine);
@@ -167,7 +167,7 @@ namespace BECore::Chess {
         void Shutdown();
 
         /// The one color the program plays; nothing for two people AND for two programs (see IsWatching())
-        [[nodiscard]] std::optional<PieceColor> GetPlays() const noexcept {
+        [[nodiscard]] Optional<PieceColor> GetPlays() const noexcept {
             if (_seats[kWhite].opponent && !_seats[kBlack].opponent) {
                 return PieceColor::White;
             }
@@ -215,7 +215,7 @@ namespace BECore::Chess {
 
         /// Why the program does not play as asked: the refused pick, else the failed search of an opponent (White's seat first); empty when nothing is wrong. A refused pick does not stop a running
         /// opponent
-        [[nodiscard]] const std::optional<EngineError>& GetError() const noexcept {
+        [[nodiscard]] const Optional<EngineError>& GetError() const noexcept {
             if (_pickError) {
                 return _pickError;
             }
@@ -236,7 +236,7 @@ namespace BECore::Chess {
         /// One color's place: what it plays with and the opponent that plays it (null: nobody)
         struct Seat {
             SeatChoice choice;
-            eastl::unique_ptr<EngineOpponent> opponent;
+            UniquePtr<EngineOpponent> opponent;
             bool errorNoted = false;  ///< the error in `opponent` has been counted in the revision
         };
 
@@ -253,9 +253,9 @@ namespace BECore::Chess {
             return _seats[GetPlays() == PieceColor::Black ? kBlack : kWhite].choice;
         }
 
-        [[nodiscard]] std::expected<eastl::shared_ptr<IChessEngine>, EngineError> MakeEngine(OpponentEngine engine, const OpponentLevel& level) const;
+        [[nodiscard]] std::expected<SharedPtr<IChessEngine>, EngineError> MakeEngine(OpponentEngine engine, const OpponentLevel& level) const;
         /// The color of the first seat (White's first) whose picked engine this build cannot run, while the default factory is in use; nothing for a factory given by a test
-        [[nodiscard]] std::optional<PieceColor> FindUnavailableSeat(const eastl::array<SeatChoice, kSeatCount>& picked) const;
+        [[nodiscard]] Optional<PieceColor> FindUnavailableSeat(const Array<SeatChoice, kSeatCount>& picked) const;
         /// A pick of @p plays with @p level in both seats, the engines kept
         std::expected<void, EngineError> ChooseLevel(ProgramSides plays, size_t level);
         void FailPick(EngineError error, PieceColor computer, OpponentEngine engine, const OpponentLevel& level);
@@ -265,9 +265,9 @@ namespace BECore::Chess {
         ChessGameModel& _model;
         OpponentSettings _settings;
         EngineFactory _factory;  ///< empty: the Stockfish of _settings, the OwnEngine, each wrapped by WithHandicap
-        eastl::array<Seat, kSeatCount> _seats;
-        std::optional<EngineError> _pickError;  ///< the factory's failure of the last pick; the old opponents (if any) go on playing while it stands
-        uint64_t _errorVersion = 0;             ///< GetVersion() of the model when the standing error came
+        Array<Seat, kSeatCount> _seats;
+        Optional<EngineError> _pickError;  ///< the factory's failure of the last pick; the old opponents (if any) go on playing while it stands
+        uint64_t _errorVersion = 0;        ///< GetVersion() of the model when the standing error came
         uint64_t _revision = 0;
     };
 

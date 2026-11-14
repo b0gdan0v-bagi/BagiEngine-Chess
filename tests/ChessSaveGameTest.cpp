@@ -32,7 +32,7 @@ namespace BECore::Chess::Tests {
 
         constexpr double kFrame = 1.0 / 32.0;
         constexpr float kPixelTolerance = 0.01f;
-        constexpr eastl::string_view kGameInProgress = "e2e4 e7e5 g1f3 b8c6";
+        constexpr StringView kGameInProgress = "e2e4 e7e5 g1f3 b8c6";
         constexpr const char* kFoolsMate = "f2f3 e7e5 g2g4 d8h4";
         constexpr const char* kOddStartFen = "4k3/8/8/8/8/8/4P3/4K3 w - - 0 1";
 
@@ -40,14 +40,14 @@ namespace BECore::Chess::Tests {
             return std::filesystem::path(__FILE__).parent_path().parent_path() / "config" / "SceneConfig.xml";
         }
 
-        bool Play(ChessGameModel& model, eastl::string_view line) {
+        bool Play(ChessGameModel& model, StringView line) {
             size_t begin = 0;
             while (begin < line.size()) {
                 size_t end = line.find(' ', begin);
-                if (end == eastl::string_view::npos) {
+                if (end == StringView::npos) {
                     end = line.size();
                 }
-                const std::optional<Move> move = MoveGenerator::ParseUci(model.GetPosition(), line.substr(begin, end - begin));
+                const Optional<Move> move = MoveGenerator::ParseUci(model.GetPosition(), line.substr(begin, end - begin));
                 if (!move || !model.TryMove(*move).has_value()) {
                     return false;
                 }
@@ -56,14 +56,18 @@ namespace BECore::Chess::Tests {
             return true;
         }
 
-        std::vector<uint8_t> BytesOfFile(const std::filesystem::path& path) {
+        Vector<uint8_t> BytesOfFile(const std::filesystem::path& path) {
             std::ifstream file(path, std::ios::binary);
-            return std::vector<uint8_t>(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
+            Vector<uint8_t> bytes;
+            for (std::istreambuf_iterator<char> it(file), end; it != end; ++it) {
+                bytes.push_back(static_cast<uint8_t>(*it));
+            }
+            return bytes;
         }
 
-        std::string Member(const Json& json, eastl::string_view key) {
+        String Member(const Json& json, StringView key) {
             const auto value = GetJsonString(json, key);
-            return value ? std::string(value->c_str(), value->size()) : std::string("<missing>");
+            return value ? String(value->c_str(), value->size()) : String("<missing>");
         }
 
     }  // namespace
@@ -103,8 +107,8 @@ namespace BECore::Chess::Tests {
         void SetCommandLine(const Vector<String>& flags, bool withFolder) {
             Vector<String> arguments = flags;
             if (withFolder) {
-                const std::string path = _saves.string();
-                arguments.push_back(String("--save-dir=") + String(path.c_str(), path.size()));
+                const String path = FromStdString(_saves.string());
+                arguments.push_back(String("--save-dir=") + path);
             }
             CoreManager::GetCommandLine().Set(arguments);
         }
@@ -148,7 +152,7 @@ namespace BECore::Chess::Tests {
 
         /// The doubles of this test's engines (no process, nothing plays by itself while it is the person's turn)
         void UseDoubles() {
-            _factory = eastl::make_unique<CountingFactory>(std::initializer_list<eastl::shared_ptr<IChessEngine>>{eastl::make_shared<InstantEngine>()});
+            _factory = MakeUnique<CountingFactory>(std::initializer_list<SharedPtr<IChessEngine>>{MakeShared<InstantEngine>()});
             Game().GetOpponent().SetEngineFactory(_factory->AsFactory());
         }
 
@@ -183,7 +187,7 @@ namespace BECore::Chess::Tests {
             ASSERT_TRUE(service.Save(kChessSaveSlot, kChessSaveSchema, state).has_value());
         }
 
-        std::optional<ChessSaveState> Saved() const {
+        Optional<ChessSaveState> Saved() const {
             FileSystem fileSystem;
             SaveGameService service(fileSystem);
             ChessSaveState state;
@@ -207,7 +211,7 @@ namespace BECore::Chess::Tests {
         }
 
         /// A state with moves and a computer opponent, as the first run of a test would have left it
-        static ChessSaveState SavedGameOf(eastl::string_view moves, const char* plays) {
+        static ChessSaveState SavedGameOf(StringView moves, const char* plays) {
             ChessSaveState state;
             state.startFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
             state.moves = String(moves.data(), moves.size());
@@ -220,8 +224,8 @@ namespace BECore::Chess::Tests {
             return state;
         }
 
-        eastl::vector<IntrusivePtr<SceneNode>> PieceNodes() const {
-            eastl::vector<IntrusivePtr<SceneNode>> nodes;
+        Vector<IntrusivePtr<SceneNode>> PieceNodes() const {
+            Vector<IntrusivePtr<SceneNode>> nodes;
             for (const auto& node : _manager->GetSceneByName(PoolString::Intern("ChessScene"))->GetRootNode().GetChildren()) {
                 if (node->GetComponent<ChessPieceComponent>()) {
                     nodes.push_back(node);
@@ -255,7 +259,7 @@ namespace BECore::Chess::Tests {
         std::filesystem::path _saves;
         IntrusivePtr<RecordingRenderer> _renderer;
         IntrusivePtrAtomic<SceneManager> _manager;
-        eastl::unique_ptr<CountingFactory> _factory;
+        UniquePtr<CountingFactory> _factory;
         bool _started = false;
     };
 
@@ -282,7 +286,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessSaveGameTest, AControlRunIgnoresASaveThatNoFlagNames) {
         MakeSave(SavedGameOf(kGameInProgress, "none"));
-        const std::vector<uint8_t> before = BytesOfFile(SaveFile());
+        const Vector<uint8_t> before = BytesOfFile(SaveFile());
         SetCommandLine({"--control", "--headless", "--manual-clock"}, false);
         StartManager();
 
@@ -297,7 +301,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessSaveGameTest, NoSaveLeavesTheSaveAloneEvenWithASaveDir) {
         MakeSave(SavedGameOf(kGameInProgress, "none"));
-        const std::vector<uint8_t> before = BytesOfFile(SaveFile());
+        const Vector<uint8_t> before = BytesOfFile(SaveFile());
         SetCommandLine({"--no-save"}, true);
         StartManager();
 
@@ -319,7 +323,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(Game().GetChoice().SetLevel("hard").has_value());
         ASSERT_TRUE(Game().GetChoice().SetMode("computer").has_value());  // the person is White and it is White's turn: the program has nothing to answer
         Frames(3);
-        const std::string fen = std::string(Game().GetModel().GetPosition().ToFen().c_str());
+        const String fen = String(Game().GetModel().GetPosition().ToFen().c_str());
         const Json before = State();
 
         Restart();
@@ -344,7 +348,7 @@ namespace BECore::Chess::Tests {
 
         Frame();  // the first write of a run waits for nothing, and it is not the end of the game that writes it
 
-        const std::optional<ChessSaveState> saved = Saved();
+        const Optional<ChessSaveState> saved = Saved();
         ASSERT_TRUE(saved.has_value());
         EXPECT_EQ(saved->moves, "e2e4 e7e5");
     }
@@ -362,7 +366,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(Play(Game().GetModel(), "e7e5"));
         Frames(static_cast<int>(1.0 / kFrame) + 8);
 
-        const std::optional<ChessSaveState> saved = Saved();
+        const Optional<ChessSaveState> saved = Saved();
         ASSERT_TRUE(saved.has_value());
         EXPECT_EQ(saved->moves, "e2e4");
         EXPECT_EQ(saved->plays, "black");
@@ -395,7 +399,7 @@ namespace BECore::Chess::Tests {
             ASSERT_TRUE(Game().AsControllable()->SetState(request).has_value());
         }
         ASSERT_TRUE(Play(Game().GetModel(), "e2e4"));
-        const std::string fen = std::string(Game().GetModel().GetPosition().ToFen().c_str());
+        const String fen = String(Game().GetModel().GetPosition().ToFen().c_str());
         Frames(2);
 
         Restart();

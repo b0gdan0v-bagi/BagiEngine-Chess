@@ -15,8 +15,8 @@ namespace BECore::Chess {
 
     /// A program to start: the path of its executable (taken as it is, `PATH` is not searched) and the arguments after it
     struct ProcessLaunch {
-        eastl::string path;
-        eastl::vector<eastl::string> args;
+        String path;
+        Vector<String> args;
     };
 
     /**
@@ -56,7 +56,7 @@ namespace BECore::Chess {
         static constexpr std::chrono::milliseconds kDefaultCloseGrace{500};
 
         /// Starts @p launch. The program is started when this returns: a missing file or one that cannot be executed is LaunchFailed with the reason from the system in `detail`
-        [[nodiscard]] static std::expected<eastl::unique_ptr<UciProcess>, EngineError> Start(const ProcessLaunch& launch);
+        [[nodiscard]] static std::expected<UniquePtr<UciProcess>, EngineError> Start(const ProcessLaunch& launch);
 
         /// Close(kDefaultCloseGrace): the child never outlives the object, and is not left as a zombie
         ~UciProcess();
@@ -68,12 +68,12 @@ namespace BECore::Chess {
 
         /// Sends @p text and an end of line, unbuffered (nothing waits in the process for a flush). ProcessDied when the child has gone (a broken pipe),
         /// BadRequest when @p text holds an end of line (it would be two commands). A child that does not read blocks the call once the pipe (64 KiB) is full
-        [[nodiscard]] std::expected<void, EngineError> WriteLine(eastl::string_view text);
+        [[nodiscard]] std::expected<void, EngineError> WriteLine(StringView text);
 
         /// The next line the child wrote, without its end of line (`\n` or `\r\n`), waiting at most @p timeout. Timeout when none came whole in that time:
         /// the bytes that did come are kept for the next call, so a line that arrives in pieces, or several lines in one read, are no problem.
         /// ProcessDied once the child closed its output and the lines before that were read (an unfinished last line is dropped)
-        [[nodiscard]] std::expected<eastl::string, EngineError> ReadLine(std::chrono::milliseconds timeout);
+        [[nodiscard]] std::expected<String, EngineError> ReadLine(std::chrono::milliseconds timeout);
 
         /**
          * @brief Ends the child and waits for it, whatever it does; the child is reaped when this returns. A second call does nothing.
@@ -92,14 +92,14 @@ namespace BECore::Chess {
         }
 
     private:
-        std::optional<eastl::string> TakeBufferedLine();
+        Optional<String> TakeBufferedLine();
 
 #if CHESS_HAS_UCI_PROCESS && defined(_WIN32)
         struct WindowsState;  ///< the handles and the read in flight (UciProcessWindows.cpp: no <windows.h> in this header)
 
-        UciProcess(int processId, eastl::unique_ptr<WindowsState> state);
+        UciProcess(int processId, UniquePtr<WindowsState> state);
 
-        eastl::unique_ptr<WindowsState> _windows;
+        UniquePtr<WindowsState> _windows;
 #else
         UciProcess(int processId, int inputDescriptor, int outputDescriptor);
 
@@ -114,7 +114,7 @@ namespace BECore::Chess {
         int _pid = -1;
         bool _ended = false;        ///< the child is known to be gone or going: no more writes
         bool _outputEnded = false;  ///< end of file on the child's stdout: no more reads once the buffer is empty
-        eastl::string _buffer;      ///< bytes read and not yet given out; the next line starts at _head
+        String _buffer;             ///< bytes read and not yet given out; the next line starts at _head
         size_t _head = 0;
         size_t _scanned = 0;  ///< bytes after _head already searched for an end of line
     };

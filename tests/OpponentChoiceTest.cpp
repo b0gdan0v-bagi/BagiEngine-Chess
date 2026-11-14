@@ -10,24 +10,24 @@ namespace BECore::Chess::Tests {
 
     namespace {
 
-        constexpr eastl::string_view kHardId = "hard";
-        constexpr eastl::string_view kMediumId = "medium";
-        constexpr eastl::string_view kOwnId = "own";
-        constexpr eastl::string_view kStockfishId = "stockfish";
-        constexpr eastl::string_view kDefaultEngineId = kStockfishAvailable ? kStockfishId : kOwnId;  // the engine a game starts with in this build
-        constexpr std::optional<PieceColor> kNobody = std::nullopt;
+        constexpr StringView kHardId = "hard";
+        constexpr StringView kMediumId = "medium";
+        constexpr StringView kOwnId = "own";
+        constexpr StringView kStockfishId = "stockfish";
+        constexpr StringView kDefaultEngineId = kStockfishAvailable ? kStockfishId : kOwnId;  // the engine a game starts with in this build
+        constexpr Optional<PieceColor> kNobody = std::nullopt;
 
         EngineError NoStockfish() {
             return EngineError{EngineErrorKind::LaunchFailed, "no Stockfish in the test"};
         }
 
-        eastl::string Text(eastl::string_view text) {
-            return eastl::string(text.data(), text.size());
+        String Text(StringView text) {
+            return String(text.data(), text.size());
         }
 
         /// A controller, its factory and the choice over them; the factory hands out an InstantEngine
         struct Seat {
-            Seat() : factory({eastl::make_shared<InstantEngine>()}), controller(model), choice(controller) {
+            Seat() : factory({MakeShared<InstantEngine>()}), controller(model), choice(controller) {
                 controller.SetEngineFactory(factory.AsFactory());
             }
 
@@ -38,17 +38,17 @@ namespace BECore::Chess::Tests {
         };
 
         /// The spelling of a failed pick for a failed expectation
-        std::string Describe(const std::expected<void, ChoiceError>& picked) {
+        String Describe(const std::expected<void, ChoiceError>& picked) {
             if (picked) {
                 return "picked";
             }
-            return std::string(EnumUtils<ChoiceErrorKind>::ToString(picked.error().kind).data()) + ": " + picked.error().detail.c_str();
+            return String(EnumUtils<ChoiceErrorKind>::ToString(picked.error().kind).data()) + ": " + picked.error().detail.c_str();
         }
 
         /// The ids that no table has: empty, the wrong case, a prefix, a trailing or a leading space, a word of another table
-        const eastl::vector<eastl::string>& BadIds() {
-            static const eastl::vector<eastl::string> ids = {"",         "White",     "BLACK",     "whit", "black ",     " white", "Two",  "two players",
-                                                             "Computer", "computer ", "Stockfish", "OWN",  "own engine", "med",    "Hard", "hard\n"};
+        const Vector<String>& BadIds() {
+            static const Vector<String> ids = {"",         "White",     "BLACK",     "whit", "black ",     " white", "Two",  "two players",
+                                               "Computer", "computer ", "Stockfish", "OWN",  "own engine", "med",    "Hard", "hard\n"};
             return ids;
         }
 
@@ -80,7 +80,7 @@ namespace BECore::Chess::Tests {
         const auto picked = seat.choice.SetMode("computer");
 
         ASSERT_TRUE(picked.has_value()) << Describe(picked);
-        EXPECT_EQ(seat.controller.GetPlays(), std::optional<PieceColor>(PieceColor::Black));
+        EXPECT_EQ(seat.controller.GetPlays(), Optional<PieceColor>(PieceColor::Black));
         EXPECT_EQ(seat.choice.Mode(), OpponentMode::Computer);
         EXPECT_EQ(seat.choice.ModeId(), "computer");
         EXPECT_EQ(seat.choice.Color(), PieceColor::White);
@@ -114,7 +114,7 @@ namespace BECore::Chess::Tests {
 
         ASSERT_TRUE(seat.choice.SetMode("computer").has_value());
 
-        EXPECT_EQ(seat.controller.GetPlays(), std::optional<PieceColor>(PieceColor::White)) << "the person has Black, the program plays White";
+        EXPECT_EQ(seat.controller.GetPlays(), Optional<PieceColor>(PieceColor::White)) << "the person has Black, the program plays White";
         EXPECT_EQ(seat.choice.Color(), PieceColor::Black);
         EXPECT_EQ(seat.factory.Calls(), 1);
     }
@@ -126,14 +126,14 @@ namespace BECore::Chess::Tests {
 
         ASSERT_TRUE(seat.choice.SetColor("black").has_value());
 
-        EXPECT_EQ(seat.controller.GetPlays(), std::optional<PieceColor>(PieceColor::White));
+        EXPECT_EQ(seat.controller.GetPlays(), Optional<PieceColor>(PieceColor::White));
         EXPECT_EQ(seat.choice.Color(), PieceColor::Black);
         EXPECT_EQ(seat.factory.Calls(), 2) << "one engine for the first pick, one for the new side";
         EXPECT_EQ(seat.controller.GetRevision(), revision + 1);
 
         ASSERT_TRUE(seat.choice.SetColor("white").has_value());
 
-        EXPECT_EQ(seat.controller.GetPlays(), std::optional<PieceColor>(PieceColor::Black));
+        EXPECT_EQ(seat.controller.GetPlays(), Optional<PieceColor>(PieceColor::Black));
         EXPECT_EQ(seat.factory.Calls(), 3);
     }
 
@@ -151,7 +151,7 @@ namespace BECore::Chess::Tests {
 
         ASSERT_TRUE(seat.choice.SetMode("computer").has_value());
 
-        EXPECT_EQ(seat.controller.GetPlays(), std::optional<PieceColor>(PieceColor::White)) << "and Computer again plays against that color";
+        EXPECT_EQ(seat.controller.GetPlays(), Optional<PieceColor>(PieceColor::White)) << "and Computer again plays against that color";
     }
 
     TEST_F(OpponentChoiceTest, TheEngineAndTheLevelAreReadBackAndOnlyThePlayingProgramAsksAnEngine) {
@@ -194,8 +194,8 @@ namespace BECore::Chess::Tests {
             const int calls = seat.factory.Calls();
             const uint64_t revision = seat.controller.GetRevision();
 
-            for (const eastl::string& id : BadIds()) {
-                const eastl::string_view view(id.data(), id.size());
+            for (const String& id : BadIds()) {
+                const StringView view(id.data(), id.size());
                 const std::expected<void, ChoiceError> results[] = {seat.choice.SetMode(view), seat.choice.SetColor(view), seat.choice.SetEngine(view), seat.choice.SetLevel(view)};
                 for (const auto& result : results) {
                     ASSERT_FALSE(result.has_value()) << "'" << id.c_str() << "' was taken";
@@ -229,20 +229,20 @@ namespace BECore::Chess::Tests {
 
         EXPECT_FALSE(seat.choice.SetMode("Two").has_value());
 
-        EXPECT_EQ(seat.controller.GetPlays(), std::optional<PieceColor>(PieceColor::Black));
+        EXPECT_EQ(seat.controller.GetPlays(), Optional<PieceColor>(PieceColor::Black));
     }
 
     TEST_F(OpponentChoiceTest, AFailedStockfishPickLeavesTwoPlayersAndTheErrorAndTheOwnEngineIsTheWayOn) {
         ChessGameModel model;
         OpponentController controller(model);
         OpponentChoice choice(controller);
-        eastl::vector<eastl::string> asked;
-        controller.SetEngineFactory([&asked](OpponentEngine engine, const OpponentLevel&) -> std::expected<eastl::shared_ptr<IChessEngine>, EngineError> {
+        Vector<String> asked;
+        controller.SetEngineFactory([&asked](OpponentEngine engine, const OpponentLevel&) -> std::expected<SharedPtr<IChessEngine>, EngineError> {
             asked.push_back(Text(OpponentEngineId(engine)));
             if (engine == OpponentEngine::Stockfish) {
                 return std::unexpected(NoStockfish());
             }
-            return eastl::make_shared<InstantEngine>();
+            return MakeShared<InstantEngine>();
         });
         ASSERT_TRUE(choice.SetEngine("stockfish").has_value());  // already the engine of a new game where Stockfish is available; nobody plays: no factory call
 
@@ -270,7 +270,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(choice.Mode(), OpponentMode::Computer);
         ASSERT_EQ(asked.size(), 2u);
         EXPECT_EQ(asked[1], Text(kOwnId));
-        EXPECT_EQ(controller.GetPlays(), std::optional<PieceColor>(PieceColor::Black));
+        EXPECT_EQ(controller.GetPlays(), Optional<PieceColor>(PieceColor::Black));
     }
 
 #if CHESS_NO_STOCKFISH
@@ -294,7 +294,7 @@ namespace BECore::Chess::Tests {
         EXPECT_TRUE(choice.SetEngine("own").has_value()) << "the own engine is a pick that changes nothing, and clears the error";
         EXPECT_FALSE(controller.GetError().has_value());
         EXPECT_TRUE(choice.SetMode("computer").has_value());
-        EXPECT_EQ(controller.GetPlays(), std::optional<PieceColor>(PieceColor::Black));
+        EXPECT_EQ(controller.GetPlays(), Optional<PieceColor>(PieceColor::Black));
     }
 
 #endif
@@ -303,9 +303,9 @@ namespace BECore::Chess::Tests {
         ChessGameModel model;
         OpponentController controller(model);
         OpponentChoice choice(controller);
-        CountingFactory ok({eastl::make_shared<InstantEngine>()});
+        CountingFactory ok({MakeShared<InstantEngine>()});
         bool failNext = false;
-        controller.SetEngineFactory([&](OpponentEngine engine, const OpponentLevel& level) -> std::expected<eastl::shared_ptr<IChessEngine>, EngineError> {
+        controller.SetEngineFactory([&](OpponentEngine engine, const OpponentLevel& level) -> std::expected<SharedPtr<IChessEngine>, EngineError> {
             if (failNext) {
                 return std::unexpected(NoStockfish());
             }
@@ -320,7 +320,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(failed.error().kind, ChoiceErrorKind::Engine);
         EXPECT_EQ(choice.Mode(), OpponentMode::Computer) << "the old opponent goes on";
         EXPECT_EQ(choice.Color(), PieceColor::White) << "the color of the refused pick is not remembered";
-        EXPECT_EQ(controller.GetPlays(), std::optional<PieceColor>(PieceColor::Black));
+        EXPECT_EQ(controller.GetPlays(), Optional<PieceColor>(PieceColor::Black));
         EXPECT_TRUE(controller.GetError().has_value());
     }
 
@@ -340,7 +340,7 @@ namespace BECore::Chess::Tests {
 
         ASSERT_TRUE(seat.choice.SetMode("computer").has_value());
 
-        EXPECT_EQ(seat.controller.GetPlays(), std::optional<PieceColor>(PieceColor::White));
+        EXPECT_EQ(seat.controller.GetPlays(), Optional<PieceColor>(PieceColor::White));
     }
 
     TEST_F(OpponentChoiceTest, LeavingComputerRemembersTheColorEvenIfNobodyReadItBefore) {
@@ -379,10 +379,10 @@ namespace BECore::Chess::Tests {
             EXPECT_EQ(seat.choice.LevelId(), level.id);
         }
         for (const OpponentMode mode : EnumUtils<OpponentMode>::Values()) {
-            EXPECT_EQ(ParseMode(OpponentModeId(mode)), std::optional<OpponentMode>(mode));
+            EXPECT_EQ(ParseMode(OpponentModeId(mode)), Optional<OpponentMode>(mode));
         }
         for (const PieceColor color : {PieceColor::White, PieceColor::Black}) {
-            EXPECT_EQ(ParseColor(PieceColorId(color)), std::optional<PieceColor>(color));
+            EXPECT_EQ(ParseColor(PieceColorId(color)), Optional<PieceColor>(color));
         }
     }
 

@@ -10,18 +10,18 @@ namespace BECore::Chess {
 
         using std::chrono::milliseconds;
         using Clock = std::chrono::steady_clock;
-        using LinePredicate = bool (*)(eastl::string_view);
+        using LinePredicate = bool (*)(StringView);
 
         constexpr milliseconds kWaitSlice{20};  // the longest single wait for a line: how often a cancelled token is looked at
-        constexpr eastl::string_view kUciCommand = "uci";
-        constexpr eastl::string_view kIsReadyCommand = "isready";
-        constexpr eastl::string_view kNewGameCommand = "ucinewgame";
-        constexpr eastl::string_view kStopCommand = "stop";
-        constexpr eastl::string_view kQuitCommand = "quit";
-        constexpr eastl::string_view kUciOkReply = "uciok";
-        constexpr eastl::string_view kReadyOkReply = "readyok";
-        constexpr eastl::string_view kBestMoveReply = "bestmove";
-        constexpr eastl::string_view kMultiPvOption = "MultiPV";
+        constexpr StringView kUciCommand = "uci";
+        constexpr StringView kIsReadyCommand = "isready";
+        constexpr StringView kNewGameCommand = "ucinewgame";
+        constexpr StringView kStopCommand = "stop";
+        constexpr StringView kQuitCommand = "quit";
+        constexpr StringView kUciOkReply = "uciok";
+        constexpr StringView kReadyOkReply = "readyok";
+        constexpr StringView kBestMoveReply = "bestmove";
+        constexpr StringView kMultiPvOption = "MultiPV";
 
 #if !CHESS_NO_STOCKFISH
         constexpr const char* kStockfishVariable = "STOCKFISH";
@@ -35,19 +35,19 @@ namespace BECore::Chess {
 #endif
 #endif  // !CHESS_NO_STOCKFISH
 
-        std::unexpected<EngineError> Fail(EngineErrorKind kind, eastl::string detail) {
+        std::unexpected<EngineError> Fail(EngineErrorKind kind, String detail) {
             return std::unexpected(EngineError{kind, std::move(detail)});
         }
 
-        bool IsUciOk(eastl::string_view line) {
+        bool IsUciOk(StringView line) {
             return line == kUciOkReply;
         }
 
-        bool IsReadyOk(eastl::string_view line) {
+        bool IsReadyOk(StringView line) {
             return line == kReadyOkReply;
         }
 
-        bool IsBestMove(eastl::string_view line) {
+        bool IsBestMove(StringView line) {
             return UciProtocol::ParseBestMove(line).has_value();
         }
 
@@ -57,8 +57,8 @@ namespace BECore::Chess {
          * what was waited for in the sentence. A token that was never made (the default one) is never cancelled. @p skipped, when given, sees every
          * line that is skipped (the wait for `bestmove` passes one; the handshake and the answer to `stop` pass none).
          */
-        std::expected<eastl::string, EngineError> ReadUntil(UciProcess& process, LinePredicate wanted, eastl::string_view what, int timeoutMs, const CancellationToken& token,
-                                                            UciProtocol::LineCollector* skipped = nullptr) {
+        std::expected<String, EngineError> ReadUntil(UciProcess& process, LinePredicate wanted, StringView what, int timeoutMs, const CancellationToken& token,
+                                                     UciProtocol::LineCollector* skipped = nullptr) {
             const Clock::time_point deadline = Clock::now() + milliseconds(std::max(timeoutMs, 0));
             for (;;) {
                 if (token.IsCancelled()) {
@@ -71,9 +71,9 @@ namespace BECore::Chess {
 
                 auto line = process.ReadLine(std::min(kWaitSlice, std::chrono::ceil<milliseconds>(remaining)));
                 if (line) {
-                    const eastl::string_view text = UciProtocol::TrimLine(eastl::string_view(line->data(), line->size()));
+                    const StringView text = UciProtocol::TrimLine(StringView(line->data(), line->size()));
                     if (wanted(text)) {
-                        return eastl::string(text.data(), text.size());
+                        return String(text.data(), text.size());
                     }
                     if (skipped != nullptr) {
                         skipped->Offer(text);
@@ -92,18 +92,18 @@ namespace BECore::Chess {
 
 #if !CHESS_NO_STOCKFISH
         /// The first of the explicit path and $STOCKFISH that is set decides (see FindStockfish); nothing when it is not a file
-        std::optional<eastl::string> ExistingFile(const std::string& path) {
+        Optional<String> ExistingFile(const String& path) {
             std::error_code error;
-            if (!std::filesystem::is_regular_file(path, error)) {
+            if (!std::filesystem::is_regular_file(std::filesystem::path(ToStd(path)), error)) {
                 return std::nullopt;
             }
-            return eastl::string(path.c_str(), path.size());
+            return path;
         }
 
         /// The value of an environment variable; an empty string for one that is not set
-        std::string EnvironmentValue(const char* name) {
+        String EnvironmentValue(const char* name) {
 #if defined(_WIN32)
-            std::string text;
+            String text;
             char* value = nullptr;
             size_t length = 0;
             if (_dupenv_s(&value, &length, name) == 0 && value != nullptr) {
@@ -113,7 +113,7 @@ namespace BECore::Chess {
             return text;
 #else
             const char* value = std::getenv(name);
-            return value != nullptr ? std::string(value) : std::string();
+            return value != nullptr ? String(value) : String();
 #endif
         }
 
@@ -127,19 +127,18 @@ namespace BECore::Chess {
             return !error && (permissions & (perms::owner_exec | perms::group_exec | perms::others_exec)) != perms::none;
         }
 
-        std::optional<eastl::string> StockfishOnPath() {
-            const std::string directories = EnvironmentValue(kPathVariable);
+        Optional<String> StockfishOnPath() {
+            const String directories = EnvironmentValue(kPathVariable);
             size_t begin = 0;
             while (begin <= directories.size()) {
                 size_t end = directories.find(kPathSeparator, begin);
-                if (end == std::string::npos) {
+                if (end == String::npos) {
                     end = directories.size();
                 }
                 if (end > begin) {  // an empty entry would mean the working directory: not looked at
-                    const std::filesystem::path candidate = std::filesystem::path(directories.substr(begin, end - begin)) / kStockfishFileName;
+                    const std::filesystem::path candidate = std::filesystem::path(ToStd(StringView(directories).substr(begin, end - begin))) / kStockfishFileName;
                     if (IsExecutableFile(candidate)) {
-                        const std::string text = candidate.string();
-                        return eastl::string(text.c_str(), text.size());
+                        return FromStdString(candidate.string());
                     }
                 }
                 begin = end + 1;
@@ -157,7 +156,7 @@ namespace BECore::Chess {
     }
 
     std::expected<Move, EngineError> UciEngine::FindMove(const SearchRequest& request, const CancellationToken& token) {
-        const std::lock_guard lock(_mutex);
+        const LockGuard lock(_mutex);
         auto searched = RunSearch(request, kSingleLine, token);
         if (!searched) {
             return std::unexpected(std::move(searched.error()));
@@ -166,7 +165,7 @@ namespace BECore::Chess {
     }
 
     std::expected<Analysis, EngineError> UciEngine::Analyse(const SearchRequest& request, const CancellationToken& token) {
-        const std::lock_guard lock(_mutex);
+        const LockGuard lock(_mutex);
         auto searched = RunSearch(request, request.lines, token);
         if (!searched) {
             return std::unexpected(std::move(searched.error()));
@@ -185,7 +184,7 @@ namespace BECore::Chess {
             if (info.firstPvMove.empty()) {
                 continue;
             }
-            const std::optional<Move> move = MoveGenerator::ParseUci(searched->position, eastl::string_view(info.firstPvMove.data(), info.firstPvMove.size()));
+            const Optional<Move> move = MoveGenerator::ParseUci(searched->position, StringView(info.firstPvMove));
             if (!move) {
                 return Fail(EngineErrorKind::IllegalMove, Format("the engine answered '{}' for line {}, which is not legal in {}", info.firstPvMove, info.multiPv, searched->position.ToFen()));
             }
@@ -227,11 +226,11 @@ namespace BECore::Chess {
         }
 
         // The process is alive and in step from here on: it answered, so whatever is wrong with the answer, the next search can use it
-        const std::optional<UciProtocol::BestMove> best = UciProtocol::ParseBestMove(eastl::string_view(answer->data(), answer->size()));
+        const Optional<UciProtocol::BestMove> best = UciProtocol::ParseBestMove(StringView(answer->data(), answer->size()));
         if (!best || best->IsNone()) {
             return Fail(EngineErrorKind::NoMove, Format("the engine has no move here (it answered '{}') but the game has legal moves", *answer));
         }
-        const std::optional<Move> move = MoveGenerator::ParseUci(*position, eastl::string_view(best->move.data(), best->move.size()));
+        const Optional<Move> move = MoveGenerator::ParseUci(*position, StringView(best->move));
         if (!move) {
             return Fail(EngineErrorKind::IllegalMove, Format("the engine answered '{}', which is not legal in {}", best->move, position->ToFen()));
         }
@@ -264,8 +263,8 @@ namespace BECore::Chess {
         // The engine reads its input in order, so the option needs no `isready` of its own. A process has 1 line until told otherwise (the handshake does not touch the option),
         // and a search for one line puts it back, so the opponent's own search is never slowed by a line count an analysis left
         if (lineCount != _multiPv) {
-            const eastl::string value = Format("{}", lineCount);
-            if (auto sent = Send(UciProtocol::SetOptionCommand(kMultiPvOption, eastl::string_view(value.data(), value.size()))); !sent) {
+            const String value = Format("{}", lineCount);
+            if (auto sent = Send(UciProtocol::SetOptionCommand(kMultiPvOption, StringView(value))); !sent) {
                 return sent;
             }
             _multiPv = lineCount;
@@ -285,8 +284,8 @@ namespace BECore::Chess {
             return std::unexpected(std::move(reply.error()));
         }
         for (const auto& [name, value] : _settings.options) {
-            const eastl::string command = UciProtocol::SetOptionCommand(eastl::string_view(name.data(), name.size()), eastl::string_view(value.data(), value.size()));
-            if (auto sent = Send(eastl::string_view(command.data(), command.size())); !sent) {
+            const String command = UciProtocol::SetOptionCommand(StringView(name), StringView(value));
+            if (auto sent = Send(StringView(command)); !sent) {
                 return sent;
             }
         }
@@ -303,7 +302,7 @@ namespace BECore::Chess {
         return {};
     }
 
-    std::expected<void, EngineError> UciEngine::Send(eastl::string_view command) {
+    std::expected<void, EngineError> UciEngine::Send(StringView command) {
         return _process->WriteLine(command);
     }
 
@@ -343,14 +342,14 @@ namespace BECore::Chess {
         _multiPv = kSingleLine;
     }
 
-    std::optional<eastl::string> FindStockfish([[maybe_unused]] eastl::string_view explicitPath) {
+    Optional<String> FindStockfish([[maybe_unused]] StringView explicitPath) {
 #if CHESS_NO_STOCKFISH
         return std::nullopt;  // nothing is looked for: no file system walk, no environment, and no process could be started from what was found
 #else
         if (!explicitPath.empty()) {
-            return ExistingFile(std::string(explicitPath.data(), explicitPath.size()));
+            return ExistingFile(String(explicitPath.data(), explicitPath.size()));
         }
-        const std::string fromEnvironment = EnvironmentValue(kStockfishVariable);
+        const String fromEnvironment = EnvironmentValue(kStockfishVariable);
         if (!fromEnvironment.empty()) {
             return ExistingFile(fromEnvironment);
         }

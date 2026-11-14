@@ -17,7 +17,7 @@ namespace BECore::Chess {
      */
     struct SaveSettings {
         /// The attribute of the root element of both files
-        static constexpr eastl::string_view kRememberGameAttribute = "rememberGame";
+        static constexpr StringView kRememberGameAttribute = "rememberGame";
 
         bool rememberGame = false;
 
@@ -30,8 +30,8 @@ namespace BECore::Chess {
 
     /// The flags of the command line that the save policy reads (the control flags are the engine's: BECore/Control/ControlSettings.h)
     namespace SaveArguments {
-        inline constexpr eastl::string_view kNoSave = "--no-save";
-        inline constexpr eastl::string_view kSaveDir = "--save-dir";
+        inline constexpr StringView kNoSave = "--no-save";
+        inline constexpr StringView kSaveDir = "--save-dir";
     }  // namespace SaveArguments
 
     /// The per-user folder of the game for its saves (`saves` under the preference folder SDL gives for BagiEngine / BagiChess; SDL makes the preference folder, the keeper makes `saves`); empty, with
@@ -51,6 +51,6 @@ namespace BECore::Chess {
      *
      * A folder that comes back empty from the last step is "nothing".
      */
-    [[nodiscard]] std::optional<std::filesystem::path> ResolveSaveDirectory(const CommandLine& commandLine, bool rememberGame, std::filesystem::path (*defaultDirectory)() = &DefaultSaveDirectory);
+    [[nodiscard]] Optional<std::filesystem::path> ResolveSaveDirectory(const CommandLine& commandLine, bool rememberGame, std::filesystem::path (*defaultDirectory)() = &DefaultSaveDirectory);
 
 }  // namespace BECore::Chess

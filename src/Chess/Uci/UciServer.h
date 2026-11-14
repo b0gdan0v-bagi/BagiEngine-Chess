@@ -8,16 +8,16 @@
 namespace BECore::Chess::Uci {
 
     /// The name the engine gives in `id name`, and the author in `id author`
-    inline constexpr eastl::string_view kEngineName = "BagiChess Own";
-    inline constexpr eastl::string_view kEngineAuthor = "BagiEngine-Chess";
+    inline constexpr StringView kEngineName = "BagiChess Own";
+    inline constexpr StringView kEngineAuthor = "BagiEngine-Chess";
 
     /// The options of the engine (the names UCI shows to the GUI; matching is case-insensitive)
-    inline constexpr eastl::string_view kDepthOption = "Depth";
-    inline constexpr eastl::string_view kBlunderPercentOption = "BlunderPercent";
-    inline constexpr eastl::string_view kLevelOption = "Level";
+    inline constexpr StringView kDepthOption = "Depth";
+    inline constexpr StringView kBlunderPercentOption = "BlunderPercent";
+    inline constexpr StringView kLevelOption = "Level";
 
     /// The value of the Level option that changes nothing: the other options stay as they were set
-    inline constexpr eastl::string_view kCustomLevel = "custom";
+    inline constexpr StringView kCustomLevel = "custom";
 
     /// The range of the Depth option; 0 is no limit from the option. The top is the deepest the engine searches
     inline constexpr int kMaxDepthOption = 64;
@@ -43,10 +43,10 @@ namespace BECore::Chess::Uci {
      */
     class UciServer {
     public:
-        using Sink = eastl::function<void(eastl::string_view)>;
+        using Sink = eastl::function<void(StringView)>;
 
         /// @p engine answers the searches (not null); @p sink gets every line of the server
-        UciServer(eastl::shared_ptr<IChessEngine> engine, Sink sink);
+        UciServer(SharedPtr<IChessEngine> engine, Sink sink);
 
         /// Cancels a running search and waits for the worker (its `bestmove` still goes to the sink)
         ~UciServer();
@@ -55,7 +55,7 @@ namespace BECore::Chess::Uci {
         UciServer& operator=(const UciServer&) = delete;
 
         /// Handles one line of the GUI; a `go` returns at once
-        void HandleLine(eastl::string_view line);
+        void HandleLine(StringView line);
 
         /// True after `quit`
         [[nodiscard]] bool WantsQuit() const {
@@ -69,7 +69,7 @@ namespace BECore::Chess::Uci {
         /// What a worker needs for one `go`: copies of everything, so the reader may go on
         struct SearchJob {
             SearchRequest request;
-            eastl::shared_ptr<IChessEngine> engine;
+            SharedPtr<IChessEngine> engine;
             CancellationToken token;
             bool deepen = false;
         };
@@ -83,19 +83,19 @@ namespace BECore::Chess::Uci {
         [[nodiscard]] SearchLimits LimitsOf(const GoParams& params, bool whiteToMove) const;
 
         void RunSearch(const SearchJob& job);
-        void Say(eastl::string_view line);
-        void SayInfo(eastl::string_view text);
+        void Say(StringView line);
+        void SayInfo(StringView text);
         void SayBestMove(const Move* move);
 
-        eastl::shared_ptr<IChessEngine> _engine;
+        SharedPtr<IChessEngine> _engine;
         Sink _sink;
-        std::mutex _sinkMutex;
+        Mutex _sinkMutex{BE_LOCK_SITE("UciServer sink")};
 
         SearchRequest _game;
         int _depth = 0;
         int _blunderPercent = 0;
 
-        std::thread _worker;
+        Thread _worker;
         CancellationToken _token;
         std::atomic<bool> _searching = false;
         std::atomic<bool> _quit = false;

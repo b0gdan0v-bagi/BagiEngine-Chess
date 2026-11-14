@@ -41,7 +41,7 @@ namespace BECore::Chess {
      * not forced to fall: an engine that searches each line on its own (OwnEngine) may give line 2 a score a little above line 1's.
      */
     struct Analysis {
-        eastl::vector<AnalysisLine> lines;
+        Vector<AnalysisLine> lines;
 
         /// The first line. Only for an analysis that came back from an engine with a value (it has at least one line)
         [[nodiscard]] const AnalysisLine& Best() const {
@@ -83,6 +83,6 @@ namespace BECore::Chess {
      * Centipawns are shown as pawns with two decimals and a sign (none for zero); a centipawn is already a hundredth, so nothing is rounded.
      * A mate is `#` and the signed number of moves.
      */
-    [[nodiscard]] eastl::string ScoreText(const AnalysisScore& score);
+    [[nodiscard]] String ScoreText(const AnalysisScore& score);
 
 }  // namespace BECore::Chess

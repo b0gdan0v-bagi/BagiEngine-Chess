@@ -6,15 +6,15 @@ namespace BECore::Chess {
 
     namespace {
 
-        constexpr eastl::string_view kNobodyId = "none";
-        constexpr eastl::string_view kBothId = "both";
+        constexpr StringView kNobodyId = "none";
+        constexpr StringView kBothId = "both";
         constexpr char kMoveSeparator = ' ';
 
-        std::unexpected<SaveError> Corrupt(const eastl::string& reason) {
+        std::unexpected<SaveError> Corrupt(const String& reason) {
             return std::unexpected(SaveError{SaveErrorKind::Corrupt, Format("the saved {}", reason)});
         }
 
-        eastl::string_view PlaysId(ProgramSides sides) {
+        StringView PlaysId(ProgramSides sides) {
             if (sides.white && sides.black) {
                 return kBothId;
             }
@@ -27,42 +27,42 @@ namespace BECore::Chess {
             return kNobodyId;
         }
 
-        std::optional<ProgramSides> ParsePlays(eastl::string_view id) {
+        Optional<ProgramSides> ParsePlays(StringView id) {
             if (id == kNobodyId) {
                 return ProgramSides{};
             }
             if (id == kBothId) {
                 return ProgramSides{true, true};
             }
-            if (const std::optional<PieceColor> color = ParseColor(id)) {
+            if (const Optional<PieceColor> color = ParseColor(id)) {
                 return ProgramSides::Of(*color);
             }
             return std::nullopt;
         }
 
-        eastl::string_view View(const String& text) {
-            return eastl::string_view(text.data(), text.size());
+        StringView View(const String& text) {
+            return StringView(text);
         }
 
-        String Own(eastl::string_view text) {
+        String Own(StringView text) {
             return String(text.data(), text.size());
         }
 
         /// The moves of the file, played in their turn on a scratch model; an error names the number of the move, never its text
-        std::expected<eastl::vector<Move>, SaveError> ReplayMoves(const String& text, ChessGameModel& scratch) {
-            eastl::vector<Move> moves;
+        std::expected<Vector<Move>, SaveError> ReplayMoves(const String& text, ChessGameModel& scratch) {
+            Vector<Move> moves;
             if (text.empty()) {
                 return moves;
             }
-            const eastl::string_view all = View(text);
+            const StringView all = View(text);
             size_t begin = 0;
             while (begin <= all.size()) {
                 size_t end = all.find(kMoveSeparator, begin);
-                if (end == eastl::string_view::npos) {
+                if (end == StringView::npos) {
                     end = all.size();
                 }
                 const size_t number = moves.size() + 1;
-                const std::optional<Move> move = MoveGenerator::ParseUci(scratch.GetPosition(), all.substr(begin, end - begin));
+                const Optional<Move> move = MoveGenerator::ParseUci(scratch.GetPosition(), all.substr(begin, end - begin));
                 if (!move) {
                     return Corrupt(Format("move {} is not a legal move in its turn", number));
                 }
@@ -75,12 +75,12 @@ namespace BECore::Chess {
             return moves;
         }
 
-        std::expected<SeatChoice, SaveError> ParseSeat(const String& engineId, const String& levelId, eastl::string_view seat) {
-            const std::optional<OpponentEngine> engine = FindOpponentEngine(View(engineId));
+        std::expected<SeatChoice, SaveError> ParseSeat(const String& engineId, const String& levelId, StringView seat) {
+            const Optional<OpponentEngine> engine = FindOpponentEngine(View(engineId));
             if (!engine) {
                 return Corrupt(Format("{} engine is not an engine of this game", seat));
             }
-            const std::optional<size_t> level = FindOpponentLevel(View(levelId));
+            const Optional<size_t> level = FindOpponentLevel(View(levelId));
             if (!level) {
                 return Corrupt(Format("{} level is not a level of this game", seat));
             }
@@ -120,14 +120,14 @@ namespace BECore::Chess {
 
         ChessGameModel scratch;
         scratch.SetPosition(plan.start);
-        std::expected<eastl::vector<Move>, SaveError> moves = ReplayMoves(state.moves, scratch);
+        std::expected<Vector<Move>, SaveError> moves = ReplayMoves(state.moves, scratch);
         if (!moves) {
             return std::unexpected(std::move(moves.error()));
         }
         plan.moves = std::move(*moves);
         plan.finished = scratch.IsGameOver();
 
-        const std::optional<ProgramSides> plays = ParsePlays(View(state.plays));
+        const Optional<ProgramSides> plays = ParsePlays(View(state.plays));
         if (!plays) {
             return Corrupt("colors the program plays are not none, white, black or both");
         }
@@ -144,7 +144,7 @@ namespace BECore::Chess {
         plan.white = *white;
         plan.black = *black;
 
-        const std::optional<PieceColor> person = ParseColor(View(state.personColor));
+        const Optional<PieceColor> person = ParseColor(View(state.personColor));
         if (!person) {
             return Corrupt("color of the person is not white or black");
         }

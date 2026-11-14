@@ -15,17 +15,17 @@ namespace BECore::Chess {
 
         /// What Error() says for a kind it has no sentence for (a kind added to EngineErrorKind and not to the switch, which the compiler warns about). A test fails when any
         /// kind that exists gets it
-        inline constexpr eastl::string_view kUnknownErrorSentence = "Engine failed";
+        inline constexpr StringView kUnknownErrorSentence = "Engine failed";
 
         /// The segment of the opponent panel's first choice: "Computer" when @p computer, else "Two players". The one source of the two words, so a test can hold the scene to it
-        [[nodiscard]] eastl::string ModeLabel(bool computer);
+        [[nodiscard]] String ModeLabel(bool computer);
 
         /// The segment of the color choice, the color the PERSON plays: "White", "Black"
-        [[nodiscard]] eastl::string ColorLabel(PieceColor color);
+        [[nodiscard]] String ColorLabel(PieceColor color);
 
         /// A short sentence for a failure of the engine, at most kMaxErrorLength characters ("Engine not found", "Engine did not answer"). It is what the Status label shows while
         /// the error stands; the detail of the error (paths, the engine's own words) is for the log and the control API
-        [[nodiscard]] eastl::string Error(const EngineError& error);
+        [[nodiscard]] String Error(const EngineError& error);
 
     }  // namespace OpponentText
 

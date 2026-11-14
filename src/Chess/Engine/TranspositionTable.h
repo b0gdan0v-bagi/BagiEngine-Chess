@@ -82,7 +82,7 @@ namespace BECore::Chess {
             return static_cast<size_t>(key) & (_entries.size() - 1);
         }
 
-        eastl::vector<TableEntry> _entries;
+        Vector<TableEntry> _entries;
     };
 
 }  // namespace BECore::Chess

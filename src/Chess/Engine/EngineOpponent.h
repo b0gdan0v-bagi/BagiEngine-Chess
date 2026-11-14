@@ -34,7 +34,7 @@ namespace BECore::Chess {
      */
     class EngineOpponent {
     public:
-        EngineOpponent(eastl::shared_ptr<IChessEngine> engine, PieceColor side, SearchLimits limits);
+        EngineOpponent(SharedPtr<IChessEngine> engine, PieceColor side, SearchLimits limits);
 
         /// Cancels the search in flight and returns at once
         ~EngineOpponent();
@@ -62,7 +62,7 @@ namespace BECore::Chess {
 
         /// Why the last search failed (any EngineError, or a move the model refused); empty when none did, or after ClearError(). A Cancelled of a search the opponent
         /// itself cancelled is dropped, not an error; an engine that answers Cancelled without the opponent having cancelled is recorded as one (and no retry loop follows)
-        [[nodiscard]] const std::optional<EngineError>& GetLastError() const noexcept {
+        [[nodiscard]] const Optional<EngineError>& GetLastError() const noexcept {
             return _lastError;
         }
 
@@ -79,29 +79,29 @@ namespace BECore::Chess {
     private:
         /// What the worker and the opponent share. The worker writes the answer and then raises `done`; the opponent reads the answer after it sees `done`
         struct Search {
-            explicit Search(eastl::shared_ptr<IChessEngine> engineToAsk) : engine(std::move(engineToAsk)) {}
+            explicit Search(SharedPtr<IChessEngine> engineToAsk) : engine(std::move(engineToAsk)) {}
 
-            eastl::shared_ptr<IChessEngine> engine;
+            SharedPtr<IChessEngine> engine;
             CancellationToken token = CancellationToken::Create();
-            std::mutex mutex;  ///< guards `answer`
+            Mutex mutex{BE_LOCK_SITE("EngineOpponent")};  ///< guards `answer`
             std::expected<Move, EngineError> answer = std::unexpected(EngineError{EngineErrorKind::NoMove, "the search has not finished"});
             std::atomic<bool> done{false};
         };
 
         /// Runs on the pool: asks the engine and leaves the answer in @p search. Takes its arguments by value, so the frame owns everything it uses
-        static Task<void> RunSearch(eastl::shared_ptr<Search> search, SearchRequest request);
+        static Task<void> RunSearch(SharedPtr<Search> search, SearchRequest request);
 
         void StartSearch(const ChessGameModel& model);
         void CancelWhenStale(const ChessGameModel& model);
         void TakeAnswer(ChessGameModel& model);
         void Fail(EngineError error);
 
-        eastl::shared_ptr<IChessEngine> _engine;
+        SharedPtr<IChessEngine> _engine;
         PieceColor _side;
         SearchLimits _limits;
-        eastl::shared_ptr<Search> _search;  ///< the search under way, null when none; main thread only
-        uint64_t _searchVersion = 0;        ///< the version of the model when _search was asked
-        std::optional<EngineError> _lastError;
+        SharedPtr<Search> _search;    ///< the search under way, null when none; main thread only
+        uint64_t _searchVersion = 0;  ///< the version of the model when _search was asked
+        Optional<EngineError> _lastError;
     };
 
 }  // namespace BECore::Chess

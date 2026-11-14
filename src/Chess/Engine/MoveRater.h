@@ -14,7 +14,7 @@ namespace BECore::Chess {
     inline constexpr int kRatingLines = 2;
 
     /// One entry per played move, in the order of ChessGameModel::GetMoves(); an empty one is a move that is not rated (yet)
-    using MoveRatings = eastl::vector<std::optional<MoveRating>>;
+    using MoveRatings = Vector<Optional<MoveRating>>;
 
     /**
      * @brief Rates the moves of a ChessGameModel in the background: for every played move, an analysis of the position BEFORE it, and RateMove() over that analysis (MoveRating.h has the definition).
@@ -83,7 +83,7 @@ namespace BECore::Chess {
         [[nodiscard]] MoveRatings GetRatings(const ChessGameModel& model) const;
 
         /// Why the last search failed (any EngineError, an engine that could not be made included); empty when none did or after it went with a new history, a switch or Shutdown()
-        [[nodiscard]] const std::optional<EngineError>& GetError() const noexcept {
+        [[nodiscard]] const Optional<EngineError>& GetError() const noexcept {
             return _error;
         }
 
@@ -95,17 +95,17 @@ namespace BECore::Chess {
     private:
         /// What the worker and the rater share. The worker writes the answer and then raises `done`; the rater reads the answer after it sees `done`
         struct Search {
-            explicit Search(eastl::shared_ptr<IChessEngine> engineToAsk) : engine(std::move(engineToAsk)) {}
+            explicit Search(SharedPtr<IChessEngine> engineToAsk) : engine(std::move(engineToAsk)) {}
 
-            eastl::shared_ptr<IChessEngine> engine;
+            SharedPtr<IChessEngine> engine;
             CancellationToken token = CancellationToken::Create();
-            std::mutex mutex;  ///< guards `answer`
+            Mutex mutex{BE_LOCK_SITE("MoveRater")};  ///< guards `answer`
             std::expected<Analysis, EngineError> answer = std::unexpected(EngineError{EngineErrorKind::NoMove, "the search has not finished"});
             std::atomic<bool> done{false};
         };
 
         /// Runs on the pool: asks the engine and leaves the answer in @p search. Takes its arguments by value, so the frame owns everything it uses
-        static Task<void> RunSearch(eastl::shared_ptr<Search> search, SearchRequest request);
+        static Task<void> RunSearch(SharedPtr<Search> search, SearchRequest request);
 
         /// The game of @p model is the held one, perhaps grown: the same start FEN and the held moves as its first moves
         [[nodiscard]] bool Extends(const ChessGameModel& model) const;
@@ -113,25 +113,25 @@ namespace BECore::Chess {
         void DropHistory();
         void TakeAnswer();
         void StartSearch(size_t ply);
-        [[nodiscard]] std::optional<size_t> OldestUnrated() const;
-        void Fail(std::optional<size_t> ply, EngineError error);
+        [[nodiscard]] Optional<size_t> OldestUnrated() const;
+        void Fail(Optional<size_t> ply, EngineError error);
         void ClearError();
 
         AnalysisEngineFactory _factory;  ///< empty: MakeAnalysisEngine over empty settings
-        eastl::shared_ptr<IChessEngine> _engine;
+        SharedPtr<IChessEngine> _engine;
         bool _on = false;
 
-        eastl::string _startFen;  ///< the game the ratings belong to: its start position and the moves seen so far
-        eastl::vector<Move> _moves;
-        MoveRatings _ratings;         ///< aligned with _moves
-        eastl::vector<bool> _failed;  ///< aligned with _moves: the search for this move failed and is not retried
-        uint64_t _generation = 0;     ///< grows when the held history is dropped; a search of an older one is thrown away
+        String _startFen;  ///< the game the ratings belong to: its start position and the moves seen so far
+        Vector<Move> _moves;
+        MoveRatings _ratings;      ///< aligned with _moves
+        Vector<bool> _failed;      ///< aligned with _moves: the search for this move failed and is not retried
+        uint64_t _generation = 0;  ///< grows when the held history is dropped; a search of an older one is thrown away
 
-        eastl::shared_ptr<Search> _search;  ///< the search under way, null when none; main thread only
-        size_t _searchPly = 0;              ///< the move _search rates
+        SharedPtr<Search> _search;  ///< the search under way, null when none; main thread only
+        size_t _searchPly = 0;      ///< the move _search rates
         uint64_t _searchGeneration = 0;
 
-        std::optional<EngineError> _error;
+        Optional<EngineError> _error;
         bool _blocked = false;  ///< the engine could not be made: nothing is tried until the error goes
 
         uint64_t _revision = 0;

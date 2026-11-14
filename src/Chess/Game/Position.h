@@ -39,14 +39,14 @@ namespace BECore::Chess {
      */
     class Position {
     public:
-        static constexpr eastl::string_view kStartFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+        static constexpr StringView kStartFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
         [[nodiscard]] static Position Start();
 
         /// Parse a FEN string. The halfmove clock and fullmove number may be left out (they default to 0 and 1).
-        [[nodiscard]] static std::expected<Position, FenError> FromFen(eastl::string_view fen);
+        [[nodiscard]] static std::expected<Position, FenError> FromFen(StringView fen);
 
-        [[nodiscard]] eastl::string ToFen() const;
+        [[nodiscard]] String ToFen() const;
 
         [[nodiscard]] PieceColor SideToMove() const noexcept {
             return _sideToMove;
@@ -162,9 +162,9 @@ namespace BECore::Chess {
         void MovePiece(int from, int to) noexcept;
         void UpdateCheckInfo() noexcept;
 
-        eastl::array<Piece, kSquareCount> _board{};
-        eastl::array<Bitboard, 7> _byType{};  ///< Indexed by PieceType; the None slot stays empty.
-        eastl::array<Bitboard, 2> _byColor{};
+        Array<Piece, kSquareCount> _board{};
+        Array<Bitboard, 7> _byType{};  ///< Indexed by PieceType; the None slot stays empty.
+        Array<Bitboard, 2> _byColor{};
 
         PieceColor _sideToMove = PieceColor::White;
         int _castlingRights = 0;
@@ -175,7 +175,7 @@ namespace BECore::Chess {
         Bitboard _checkers = 0;
         Bitboard _pinned = 0;
 
-        eastl::vector<UndoInfo> _history;
+        Vector<UndoInfo> _history;
     };
 
 }  // namespace BECore::Chess

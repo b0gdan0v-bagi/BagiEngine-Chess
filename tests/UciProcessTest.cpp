@@ -50,14 +50,14 @@ namespace BECore::Chess::Tests {
         constexpr size_t kFloodLines = 20000;
         constexpr size_t kLineMargin = 1000;
 
-        eastl::unique_ptr<UciProcess> StartFake(std::initializer_list<eastl::string_view> flags = {}) {
+        UniquePtr<UciProcess> StartFake(std::initializer_list<StringView> flags = {}) {
             auto started = UciProcess::Start(FakeEngineLaunch(flags));
             EXPECT_TRUE(started.has_value()) << (started ? "" : started.error().detail.c_str());
             return started ? std::move(*started) : nullptr;
         }
 
         /// The next line; a failure of the read is a failure of the test and gives an empty line
-        eastl::string Read(UciProcess& process, milliseconds timeout = kMustNotTimeOut) {
+        String Read(UciProcess& process, milliseconds timeout = kMustNotTimeOut) {
             auto line = process.ReadLine(timeout);
             if (!line) {
                 ADD_FAILURE() << EnumUtils<EngineErrorKind>::ToString(line.error().kind).data() << ": " << line.error().detail.c_str();
@@ -67,8 +67,8 @@ namespace BECore::Chess::Tests {
         }
 
         /// Reads up to and including the line @p last, or up to the first failure
-        eastl::vector<eastl::string> ReadUntil(UciProcess& process, const char* last) {
-            eastl::vector<eastl::string> lines;
+        Vector<String> ReadUntil(UciProcess& process, const char* last) {
+            Vector<String> lines;
             for (;;) {
                 auto line = process.ReadLine(kMustNotTimeOut);
                 if (!line) {
@@ -82,7 +82,7 @@ namespace BECore::Chess::Tests {
             }
         }
 
-        void Write(UciProcess& process, eastl::string_view text) {
+        void Write(UciProcess& process, StringView text) {
             const auto written = process.WriteLine(text);
             EXPECT_TRUE(written.has_value()) << (written ? "" : written.error().detail.c_str());
         }
@@ -129,8 +129,8 @@ namespace BECore::Chess::Tests {
 
         ASSERT_FALSE(started.has_value());
         EXPECT_EQ(started.error().kind, EngineErrorKind::LaunchFailed);
-        EXPECT_NE(started.error().detail.find("/nonexistent-directory/engine"), eastl::string::npos) << started.error().detail.c_str();
-        EXPECT_NE(started.error().detail.find(kMissingProgramText), eastl::string::npos) << started.error().detail.c_str();
+        EXPECT_NE(started.error().detail.find("/nonexistent-directory/engine"), String::npos) << started.error().detail.c_str();
+        EXPECT_NE(started.error().detail.find(kMissingProgramText), String::npos) << started.error().detail.c_str();
     }
 
     TEST(UciProcessTest, ANoProgramAtAllIsLaunchFailed) {
@@ -156,8 +156,8 @@ namespace BECore::Chess::Tests {
         ASSERT_FALSE(refused.has_value());
         EXPECT_EQ(refused.error().kind, EngineErrorKind::LaunchFailed);
         // ERROR_BAD_EXE_FORMAT (193) or, for a file this short, ERROR_EXE_MACHINE_TYPE_MISMATCH (216): the number is the system's choice, the sentence names it
-        EXPECT_NE(refused.error().detail.find("(error "), eastl::string::npos) << refused.error().detail.c_str();
-        EXPECT_EQ(refused.error().detail.find("%1"), eastl::string::npos) << "the placeholder of the system's sentence is filled: " << refused.error().detail.c_str();
+        EXPECT_NE(refused.error().detail.find("(error "), String::npos) << refused.error().detail.c_str();
+        EXPECT_EQ(refused.error().detail.find("%1"), String::npos) << "the placeholder of the system's sentence is filled: " << refused.error().detail.c_str();
     }
 
     TEST(UciProcessTest, AnArgumentWithASpaceArrivesWhole) {
@@ -166,8 +166,8 @@ namespace BECore::Chess::Tests {
         const TempDirectory directory;
         const std::filesystem::path folder = directory.File("with space");
         std::filesystem::create_directories(folder);
-        const std::string logPath = (folder / "fake.log").string();
-        const eastl::string log(logPath.c_str(), logPath.size());
+        const String logPath = FromStdString((folder / "fake.log").string());
+        const String log(logPath.c_str(), logPath.size());
         const auto process = StartFake({"--log", log, "--moves", "a2a3"});
         ASSERT_NE(process, nullptr);
 
@@ -194,7 +194,7 @@ namespace BECore::Chess::Tests {
 
         ASSERT_FALSE(refused.has_value());
         EXPECT_EQ(refused.error().kind, EngineErrorKind::LaunchFailed);
-        EXPECT_NE(refused.error().detail.find("Permission denied"), eastl::string::npos) << refused.error().detail.c_str();
+        EXPECT_NE(refused.error().detail.find("Permission denied"), String::npos) << refused.error().detail.c_str();
 
         // With the bit the same file starts, so the refusal above was about the bit
         std::filesystem::permissions(program, std::filesystem::perms::owner_all, std::filesystem::perm_options::replace);
@@ -222,7 +222,7 @@ namespace BECore::Chess::Tests {
     TEST(UciProcessTest, ArgumentsReachTheChild) {
         SKIP_WITHOUT_FAKE_ENGINE();
         const TempDirectory directory;
-        const eastl::string log = directory.FileText("fake.log");
+        const String log = directory.FileText("fake.log");
         const auto process = StartFake({"--log", log, "--moves", "a2a3"});
         ASSERT_NE(process, nullptr);
 
@@ -283,7 +283,7 @@ namespace BECore::Chess::Tests {
 
     TEST(UciProcessTest, AFloodOfOutputIsReadInFull) {
         SKIP_WITHOUT_FAKE_ENGINE();
-        const eastl::string flood = Format("{}", kFloodLines);
+        const String flood = Format("{}", kFloodLines);
         const auto process = StartFake({"--flood", flood});
         ASSERT_NE(process, nullptr);
         Write(*process, "go");
@@ -298,12 +298,12 @@ namespace BECore::Chess::Tests {
 
     TEST(UciProcessTest, ALongLineBelowTheLimitIsRead) {
         SKIP_WITHOUT_FAKE_ENGINE();
-        const eastl::string length = Format("{}", UciProcess::kMaxLineBytes - kLineMargin);
+        const String length = Format("{}", UciProcess::kMaxLineBytes - kLineMargin);
         const auto process = StartFake({"--long-line", length});
         ASSERT_NE(process, nullptr);
         Write(*process, "go");
 
-        const eastl::string line = Read(*process);
+        const String line = Read(*process);
 
         EXPECT_EQ(line.size(), UciProcess::kMaxLineBytes - kLineMargin);
         EXPECT_EQ(Read(*process), "info depth 1 score cp 10 pv e2e4");
@@ -311,7 +311,7 @@ namespace BECore::Chess::Tests {
 
     TEST(UciProcessTest, ALineOverTheLimitIsAProtocolError) {
         SKIP_WITHOUT_FAKE_ENGINE();
-        const eastl::string length = Format("{}", UciProcess::kMaxLineBytes + kLineMargin);
+        const String length = Format("{}", UciProcess::kMaxLineBytes + kLineMargin);
         const auto process = StartFake({"--long-line", length});
         ASSERT_NE(process, nullptr);
         Write(*process, "go");
@@ -325,7 +325,7 @@ namespace BECore::Chess::Tests {
     TEST(UciProcessTest, AnEndOfLineInsideACommandIsRefused) {
         SKIP_WITHOUT_FAKE_ENGINE();
         const TempDirectory directory;
-        const eastl::string log = directory.FileText("fake.log");
+        const String log = directory.FileText("fake.log");
         const auto process = StartFake({"--log", log});
         ASSERT_NE(process, nullptr);
 
@@ -383,7 +383,7 @@ namespace BECore::Chess::Tests {
         Write(*process, "go");
 
         // Nothing here reads the child: it is the write that finds the pipe broken, once the child has exited
-        std::optional<EngineError> failure;
+        Optional<EngineError> failure;
         const Clock::time_point deadline = Clock::now() + kMustNotTimeOut;
         while (!failure && Clock::now() < deadline) {
             const auto written = process->WriteLine("ucinewgame");
@@ -403,7 +403,7 @@ namespace BECore::Chess::Tests {
     TEST(UciProcessTest, ClosingAPoliteChildEndsIt) {
         SKIP_WITHOUT_FAKE_ENGINE();
         const TempDirectory directory;
-        const eastl::string log = directory.FileText("fake.log");
+        const String log = directory.FileText("fake.log");
         const auto process = StartFake({"--log", log});
         ASSERT_NE(process, nullptr);
         Handshake(*process);
@@ -434,7 +434,7 @@ namespace BECore::Chess::Tests {
     TEST(UciProcessTest, ClosingAChildThatIgnoresQuitEndsItAfterTheGrace) {
         SKIP_WITHOUT_FAKE_ENGINE();
         const TempDirectory directory;
-        const eastl::string log = directory.FileText("fake.log");
+        const String log = directory.FileText("fake.log");
         const auto process = StartFake({"--ignore-quit", "--log", log});
         ASSERT_NE(process, nullptr);
         Handshake(*process);
@@ -455,7 +455,7 @@ namespace BECore::Chess::Tests {
     TEST(UciProcessTest, ClosingAChildThatIgnoresSigtermSendsSigkill) {
         SKIP_WITHOUT_FAKE_ENGINE();
         const TempDirectory directory;
-        const eastl::string log = directory.FileText("fake.log");
+        const String log = directory.FileText("fake.log");
         const auto process = StartFake({"--ignore-quit", "--ignore-term", "--log", log});
         ASSERT_NE(process, nullptr);
         Handshake(*process);  // the signal handler is installed before the first line is read
@@ -547,7 +547,7 @@ namespace BECore::Chess::Tests {
         launch.path = directory.FileText("wrapper.cmd");
         auto started = UciProcess::Start(launch);
         ASSERT_TRUE(started.has_value()) << (started ? "" : started.error().detail.c_str());
-        const eastl::unique_ptr<UciProcess> process = std::move(*started);
+        const UniquePtr<UciProcess> process = std::move(*started);
         Handshake(*process);  // the fake runs and has its log open
 
         process->Close(kShortGrace);
@@ -603,7 +603,7 @@ namespace BECore::Chess::Tests {
     TEST(UciProcessTest, TheFakeEngineDiesOnlyOnceWithAMarker) {
         SKIP_WITHOUT_FAKE_ENGINE();
         const TempDirectory directory;
-        const eastl::string marker = directory.FileText("died");
+        const String marker = directory.FileText("died");
 
         const auto first = StartFake({"--die-once", marker});
         ASSERT_NE(first, nullptr);

@@ -101,7 +101,7 @@ namespace BECore::Chess {
         Square _lastSquare = kOffBoard;  ///< The square the model gave last update (outside the board when captured).
         size_t _seenMoves = 0;           ///< Number of moves played when seen last.
         uint64_t _seenVersion = 0;       ///< Version of the model when seen last: a played move is exactly one more.
-        eastl::string _seenStartFen;     ///< Start position of the game when seen last.
+        String _seenStartFen;            ///< Start position of the game when seen last.
     };
 
 }  // namespace BECore::Chess

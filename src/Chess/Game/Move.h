@@ -54,8 +54,8 @@ namespace BECore::Chess {
         constexpr bool operator==(const Move& other) const noexcept = default;
 
         /// Long algebraic form used by UCI: "e2e4", "e7e8q"; "0000" for the null move.
-        [[nodiscard]] eastl::string ToUci() const {
-            eastl::string text;
+        [[nodiscard]] String ToUci() const {
+            String text;
             if (IsNull()) {
                 text = "0000";
                 return text;
@@ -76,7 +76,7 @@ namespace BECore::Chess {
         static constexpr int kPromotionMask = 0x3;
         static constexpr int kFirstPromotion = static_cast<int>(PieceType::Knight);
 
-        static void AppendSquare(eastl::string& text, Square s) {
+        static void AppendSquare(String& text, Square s) {
             text.push_back(static_cast<char>('a' + s.file));
             text.push_back(static_cast<char>('1' + s.rank));
         }

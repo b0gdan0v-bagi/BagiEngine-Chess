@@ -12,11 +12,11 @@ namespace BECore::Chess {
 
         constexpr const char* kSaveOrganization = "BagiEngine";
         constexpr const char* kSaveApplication = "BagiChess";
-        constexpr eastl::string_view kSaveSubfolder = "saves";
-        constexpr eastl::string_view kTrue = "true";
+        constexpr StringView kSaveSubfolder = "saves";
+        constexpr StringView kTrue = "true";
 
         /// The value of the attribute of @p root; nothing when the node or the attribute is missing
-        std::optional<bool> ReadRememberGame(const XmlNode& root) {
+        Optional<bool> ReadRememberGame(const XmlNode& root) {
             if (!root) {
                 return std::nullopt;
             }
@@ -38,14 +38,14 @@ namespace BECore::Chess {
 
     SaveSettings SaveSettings::FromConfig(const XmlNode& shared, const XmlNode& local) {
         SaveSettings settings;
-        const std::optional<bool> remembered = ReadRememberGame(local);
+        const Optional<bool> remembered = ReadRememberGame(local);
         settings.rememberGame = remembered ? *remembered : ReadRememberGame(shared).value_or(false);
         return settings;
     }
 
     SaveSettings SaveSettings::Load() {
         const ConfigManager& configs = CoreManager::GetConfigManager();
-        const auto root = [&configs](eastl::string_view name) { return configs.HasConfig(name) ? configs.GetConfig(name) : XmlNode{}; };
+        const auto root = [&configs](StringView name) { return configs.HasConfig(name) ? configs.GetConfig(name) : XmlNode{}; };
         return FromConfig(root(OpponentSettings::kSharedConfigName), root(OpponentSettings::kLocalConfigName));
     }
 
@@ -60,7 +60,7 @@ namespace BECore::Chess {
         return directory / std::filesystem::path(kSaveSubfolder.data(), kSaveSubfolder.data() + kSaveSubfolder.size());
     }
 
-    std::optional<std::filesystem::path> ResolveSaveDirectory(const CommandLine& commandLine, bool rememberGame, std::filesystem::path (*defaultDirectory)()) {
+    Optional<std::filesystem::path> ResolveSaveDirectory(const CommandLine& commandLine, bool rememberGame, std::filesystem::path (*defaultDirectory)()) {
         if (commandLine.HasFlag(SaveArguments::kNoSave)) {
             return std::nullopt;
         }

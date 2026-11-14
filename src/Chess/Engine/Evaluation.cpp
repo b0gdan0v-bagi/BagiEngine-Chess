@@ -4,7 +4,7 @@ namespace BECore::Chess {
 
     namespace {
 
-        using PieceSquareTable = eastl::array<int, kSquareCount>;
+        using PieceSquareTable = Array<int, kSquareCount>;
 
         /// Black reads a table at the square flipped over the horizontal middle: a1 <-> a8
         constexpr int kMirrorMask = 56;

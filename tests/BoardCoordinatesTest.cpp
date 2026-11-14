@@ -11,10 +11,10 @@ namespace BECore::Chess::Tests {
         constexpr PieceColor kBlack = PieceColor::Black;
         constexpr int kBoardSize = 8;  // files and ranks
 
-        eastl::string Joined(bool files, PieceColor bottom) {
-            eastl::string text;
+        String Joined(bool files, PieceColor bottom) {
+            String text;
             for (int index = 0; index < kBoardSize; ++index) {
-                const eastl::string_view label = files ? FileLabel(index, bottom) : RankLabel(index, bottom);
+                const StringView label = files ? FileLabel(index, bottom) : RankLabel(index, bottom);
                 text.append(label.data(), label.size());
             }
             return text;
@@ -106,7 +106,7 @@ namespace BECore::Chess::Tests {
             for (int column = 0; column < kBoardSize; ++column) {
                 // The rule ChessBoardComponent paints with, for the square drawn in this cell
                 for (const PieceColor bottom : {kWhite, kBlack}) {
-                    const std::optional<Square> square = SquareAt(column, row, bottom);
+                    const Optional<Square> square = SquareAt(column, row, bottom);
                     ASSERT_TRUE(square.has_value());
                     EXPECT_EQ(IsLightCell(column, row), ((square->file + square->rank) % 2) != 0) << column << "," << row;
                 }

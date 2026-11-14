@@ -11,12 +11,12 @@ namespace BECore::Chess::Tests {
 
     namespace {
 
-        bool Click(ChessGameModel& model, eastl::string_view square) {
+        bool Click(ChessGameModel& model, StringView square) {
             return model.OnSquareClicked(Sq(square));
         }
 
         /// Plays a move given in UCI through TryMove (so castling, en passant and under-promotion work too).
-        bool Play(ChessGameModel& model, eastl::string_view uci) {
+        bool Play(ChessGameModel& model, StringView uci) {
             const auto move = MoveGenerator::ParseUci(model.GetPosition(), uci);
             return move.has_value() && model.TryMove(*move).has_value();
         }
@@ -43,7 +43,7 @@ namespace BECore::Chess::Tests {
             }
 
             /// The handle that started on @p square.
-            [[nodiscard]] const void* At(eastl::string_view square) const {
+            [[nodiscard]] const void* At(StringView square) const {
                 return AtIndex(SqIdx(square));
             }
             [[nodiscard]] const void* AtIndex(int sq) const {
@@ -51,13 +51,13 @@ namespace BECore::Chess::Tests {
             }
 
         private:
-            eastl::array<char, kSquareCount> _slots{};
+            Array<char, kSquareCount> _slots{};
         };
 
         /// Each handle stands on a square that holds the piece it reports, and every piece of the position has exactly one handle
         void ExpectEveryPieceHasOneHandle(const ChessGameModel& model, const Handles& handles) {
             const Position opening = Position::Start();
-            eastl::array<int, kSquareCount> handlesOnSquare{};
+            Array<int, kSquareCount> handlesOnSquare{};
             for (int start = 0; start < kSquareCount; ++start) {
                 if (opening.GetPieceAt(Square::FromIndex(start)).IsEmpty()) {
                     continue;
@@ -85,7 +85,7 @@ namespace BECore::Chess::Tests {
         EXPECT_FALSE(model.IsInCheck());
         EXPECT_FALSE(model.HasSelection());
         EXPECT_FALSE(model.GetWinner().has_value());
-        EXPECT_EQ(model.GetPosition().ToFen(), eastl::string(Position::kStartFen));
+        EXPECT_EQ(model.GetPosition().ToFen(), String(Position::kStartFen));
     }
 
     TEST(ChessGameModelTest, SelectingAPieceShowsItsLegalMoves) {
@@ -164,7 +164,7 @@ namespace BECore::Chess::Tests {
         EXPECT_FALSE(model.TryMove(Mv("e2e5"))) << "a pawn cannot jump three squares";
         EXPECT_FALSE(model.TryMove(Mv("e7e5"))) << "not black's turn";
         EXPECT_FALSE(model.TryMove(Move{}));
-        EXPECT_EQ(model.GetPosition().ToFen(), eastl::string(Position::kStartFen));
+        EXPECT_EQ(model.GetPosition().ToFen(), String(Position::kStartFen));
     }
 
     TEST(ChessGameModelTest, TryMoveSaysWhyItRefusedAMove) {
@@ -240,20 +240,20 @@ namespace BECore::Chess::Tests {
 
     namespace {
 
-        constexpr eastl::string_view kPromotionFen = "8/P6k/8/8/8/8/8/K7 w - - 0 1";
-        constexpr eastl::string_view kPromotingCaptureFen = "1r5k/P7/8/8/8/8/8/K7 w - - 0 1";
-        constexpr eastl::string_view kMatingPromotionFen = "7k/P5pp/8/8/8/8/8/K7 w - - 0 1";
-        constexpr eastl::string_view kBlackPromotionFen = "k7/8/8/8/8/8/p6K/8 b - - 0 1";
+        constexpr StringView kPromotionFen = "8/P6k/8/8/8/8/8/K7 w - - 0 1";
+        constexpr StringView kPromotingCaptureFen = "1r5k/P7/8/8/8/8/8/K7 w - - 0 1";
+        constexpr StringView kMatingPromotionFen = "7k/P5pp/8/8/8/8/8/K7 w - - 0 1";
+        constexpr StringView kBlackPromotionFen = "k7/8/8/8/8/8/p6K/8 b - - 0 1";
 
         /// A model on @p fen with the pawn selected and its promotion target clicked
-        void StartPromotion(ChessGameModel& model, eastl::string_view fen, eastl::string_view from, eastl::string_view to) {
+        void StartPromotion(ChessGameModel& model, StringView fen, StringView from, StringView to) {
             model.SetPosition(PositionFromFen(fen));
             Click(model, from);
             Click(model, to);
         }
 
         /// The handle that stands on @p square now, or null
-        const void* HandleOn(const ChessGameModel& model, const Handles& handles, eastl::string_view square) {
+        const void* HandleOn(const ChessGameModel& model, const Handles& handles, StringView square) {
             for (int sq = 0; sq < kSquareCount; ++sq) {
                 if (model.IsActive(handles.AtIndex(sq)) && model.GetSquareOf(handles.AtIndex(sq)) == Sq(square)) {
                     return handles.AtIndex(sq);
@@ -268,7 +268,7 @@ namespace BECore::Chess::Tests {
         ChessGameModel model;
         model.SetPosition(PositionFromFen(kPromotionFen));
         const uint64_t version = model.GetVersion();
-        const eastl::string fen = model.GetPosition().ToFen();
+        const String fen = model.GetPosition().ToFen();
         EXPECT_FALSE(model.HasPendingPromotion());
 
         EXPECT_FALSE(Click(model, "a7"));
@@ -286,7 +286,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(ChessGameModelTest, EachChoiceOfThePickerPlaysItsPiece) {
-        const eastl::array<std::pair<PieceType, const char*>, 4> choices{{
+        const Array<Pair<PieceType, const char*>, 4> choices{{
             {PieceType::Queen, "a7a8q"},
             {PieceType::Rook, "a7a8r"},
             {PieceType::Bishop, "a7a8b"},
@@ -319,7 +319,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(ChessGameModelTest, PromotingCaptureWaitsForAPieceToo) {
-        const eastl::array<std::pair<PieceType, const char*>, 4> choices{{
+        const Array<Pair<PieceType, const char*>, 4> choices{{
             {PieceType::Queen, "a7b8q"},
             {PieceType::Rook, "a7b8r"},
             {PieceType::Bishop, "a7b8b"},
@@ -345,7 +345,7 @@ namespace BECore::Chess::Tests {
         ChessGameModel model;
         model.SetPosition(PositionFromFen(kPromotionFen));
         const uint64_t version = model.GetVersion();
-        const eastl::string fen = model.GetPosition().ToFen();
+        const String fen = model.GetPosition().ToFen();
 
         for (const PieceType piece : {PieceType::Queen, PieceType::Knight, PieceType::Pawn}) {
             const auto result = model.ChoosePromotion(piece);
@@ -587,7 +587,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(model.GetStatus(), GameStatus::Ongoing);
         EXPECT_FALSE(model.IsInCheck());
         EXPECT_TRUE(model.GetTurn() == PieceColor::White);
-        EXPECT_EQ(model.GetPosition().ToFen(), eastl::string(Position::kStartFen));
+        EXPECT_EQ(model.GetPosition().ToFen(), String(Position::kStartFen));
         EXPECT_TRUE(Play(model, "e2e4"));
     }
 
@@ -608,7 +608,7 @@ namespace BECore::Chess::Tests {
     TEST(ChessGameModelTest, PlayedMovesAreKeptInOrder) {
         ChessGameModel model;
         EXPECT_TRUE(model.GetMoves().empty());
-        EXPECT_EQ(model.GetStartFen(), eastl::string(Position::kStartFen));
+        EXPECT_EQ(model.GetStartFen(), String(Position::kStartFen));
 
         for (const char* uci : {"e2e4", "e7e5", "g1f3"}) {
             ASSERT_TRUE(Play(model, uci)) << uci;
@@ -667,8 +667,8 @@ namespace BECore::Chess::Tests {
 
         model.SetPosition(PositionFromFen(kKiwipeteFen));
 
-        EXPECT_EQ(model.GetPosition().ToFen(), eastl::string(kKiwipeteFen));
-        EXPECT_EQ(model.GetStartFen(), eastl::string(kKiwipeteFen));
+        EXPECT_EQ(model.GetPosition().ToFen(), String(kKiwipeteFen));
+        EXPECT_EQ(model.GetStartFen(), String(kKiwipeteFen));
         EXPECT_TRUE(model.GetMoves().empty());
         EXPECT_FALSE(model.HasSelection());
         EXPECT_EQ(model.GetStatus(), GameStatus::Ongoing);
@@ -862,7 +862,7 @@ namespace BECore::Chess::Tests {
 
     namespace {
 
-        void PlayAll(ChessGameModel& model, const eastl::vector<const char*>& moves, size_t count) {
+        void PlayAll(ChessGameModel& model, const Vector<const char*>& moves, size_t count) {
             for (size_t i = 0; i < count; ++i) {
                 ASSERT_TRUE(Play(model, moves[i])) << "move " << i << ": " << moves[i];
             }
@@ -887,7 +887,7 @@ namespace BECore::Chess::Tests {
         /// the piece it reports, no two share a square, and the active handles are exactly the pieces of the position
         void ExpectHandlesMatchTheBoard(const ChessGameModel& model, const Handles& handles) {
             const Position opening = Position::Start();
-            eastl::array<int, kSquareCount> handlesOnSquare{};
+            Array<int, kSquareCount> handlesOnSquare{};
             for (int start = 0; start < kSquareCount; ++start) {
                 const void* handle = handles.AtIndex(start);
                 if (opening.GetPieceAt(Square::FromIndex(start)).IsEmpty() || !model.IsActive(handle)) {
@@ -917,7 +917,7 @@ namespace BECore::Chess::Tests {
 
         /// For every k, TakeBack(k) on a model that played all of @p moves equals a model that played the first moves.size() - k.
         /// An empty @p startFen is the opening; else the game begins from that FEN through SetPosition().
-        void ExpectTakeBackMatchesAFreshModel(eastl::string_view startFen, const eastl::vector<const char*>& moves) {
+        void ExpectTakeBackMatchesAFreshModel(StringView startFen, const Vector<const char*>& moves) {
             for (size_t back = 1; back <= moves.size(); ++back) {
                 SCOPED_TRACE(testing::Message() << "taken back: " << back);
                 ChessGameModel taken;
@@ -946,11 +946,11 @@ namespace BECore::Chess::Tests {
 
         EXPECT_EQ(model.TakeBack(), 1u);
 
-        EXPECT_EQ(model.GetPosition().ToFen(), eastl::string(Position::kStartFen));
+        EXPECT_EQ(model.GetPosition().ToFen(), String(Position::kStartFen));
         EXPECT_TRUE(model.GetMoves().empty());
         EXPECT_EQ(model.GetVersion(), version + 1);
         EXPECT_TRUE(model.GetTurn() == PieceColor::White);
-        EXPECT_EQ(model.GetStartFen(), eastl::string(Position::kStartFen));
+        EXPECT_EQ(model.GetStartFen(), String(Position::kStartFen));
     }
 
     TEST(ChessGameModelTest, TakeBackOfNothingChangesNothingAndKeepsTheVersion) {
@@ -959,7 +959,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(model.TakeBack(), 0u) << "no moves";
         EXPECT_EQ(model.TakeBack(5), 0u);
         EXPECT_EQ(model.GetVersion(), version);
-        EXPECT_EQ(model.GetPosition().ToFen(), eastl::string(Position::kStartFen));
+        EXPECT_EQ(model.GetPosition().ToFen(), String(Position::kStartFen));
 
         ASSERT_TRUE(Play(model, "e2e4"));
         ASSERT_TRUE(Play(model, "e7e5"));
@@ -972,7 +972,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(ChessGameModelTest, TakeBackTwoEqualsAGameOfTwoMovesLess) {
-        const eastl::vector<const char*> moves = {"e2e4", "e7e5", "g1f3", "b8c6", "f1c4"};
+        const Vector<const char*> moves = {"e2e4", "e7e5", "g1f3", "b8c6", "f1c4"};
         ChessGameModel model;
         PlayAll(model, moves, moves.size());
         EXPECT_EQ(model.TakeBack(2), 2u);
@@ -993,7 +993,7 @@ namespace BECore::Chess::Tests {
         }
         EXPECT_EQ(model.TakeBack(100), 3u);
         EXPECT_TRUE(model.GetMoves().empty());
-        EXPECT_EQ(model.GetPosition().ToFen(), eastl::string(Position::kStartFen));
+        EXPECT_EQ(model.GetPosition().ToFen(), String(Position::kStartFen));
         EXPECT_EQ(model.TakeBack(100), 0u);
     }
 
@@ -1047,7 +1047,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(ChessGameModelTest, TakeBackFromAThreefoldDrawKeepsTheRepetitionCountRight) {
-        const eastl::vector<const char*> cycle = {"g1f3", "g8f6", "f3g1", "f6g8"};
+        const Vector<const char*> cycle = {"g1f3", "g8f6", "f3g1", "f6g8"};
         ChessGameModel model;
         for (int round = 0; round < 2; ++round) {
             PlayAll(model, cycle, cycle.size());
@@ -1079,11 +1079,11 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(Play(model, "e8c8"));
 
         EXPECT_EQ(model.TakeBack(10), 2u);
-        EXPECT_EQ(model.GetPosition().ToFen(), eastl::string(kKiwipeteFen));
-        EXPECT_EQ(model.GetStartFen(), eastl::string(kKiwipeteFen));
+        EXPECT_EQ(model.GetPosition().ToFen(), String(kKiwipeteFen));
+        EXPECT_EQ(model.GetStartFen(), String(kKiwipeteFen));
         EXPECT_TRUE(model.GetMoves().empty());
         EXPECT_EQ(model.TakeBack(), 0u);
-        EXPECT_EQ(model.GetPosition().ToFen(), eastl::string(kKiwipeteFen));
+        EXPECT_EQ(model.GetPosition().ToFen(), String(kKiwipeteFen));
     }
 
     TEST(ChessGameModelTest, TakeBackOfAGameThatBeganFinishedChangesNothing) {
@@ -1208,7 +1208,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(ChessGameModelTest, TakeBackOneMoveAtATimeIsAFreshModelEveryTime) {
-        const eastl::vector<const char*> moves = {"e2e4", "e7e5", "g1f3", "b8c6", "f1c4", "f8c5"};
+        const Vector<const char*> moves = {"e2e4", "e7e5", "g1f3", "b8c6", "f1c4", "f8c5"};
         ChessGameModel model;
         const Handles handles(model);
         for (size_t i = 0; i < moves.size(); ++i) {
@@ -1230,18 +1230,18 @@ namespace BECore::Chess::Tests {
 
     namespace {
 
-        bool PremoveClick(ChessGameModel& model, eastl::string_view square, PieceColor premover = PieceColor::White) {
+        bool PremoveClick(ChessGameModel& model, StringView square, PieceColor premover = PieceColor::White) {
             return model.OnPremoveClicked(premover, Sq(square));
         }
 
         /// A premove by two clicks; true when the second one queued it
-        bool Queue(ChessGameModel& model, eastl::string_view from, eastl::string_view to, PieceColor premover = PieceColor::White) {
+        bool Queue(ChessGameModel& model, StringView from, StringView to, PieceColor premover = PieceColor::White) {
             PremoveClick(model, from, premover);
             return PremoveClick(model, to, premover);
         }
 
         /// A game from @p fen (the side to move in it is the program's)
-        ChessGameModel ModelFrom(eastl::string_view fen) {
+        ChessGameModel ModelFrom(StringView fen) {
             ChessGameModel model;
             model.SetPosition(PositionFromFen(fen));
             return model;
@@ -1254,7 +1254,7 @@ namespace BECore::Chess::Tests {
             return model;
         }
 
-        bool HasTarget(const ChessGameModel& model, eastl::string_view square) {
+        bool HasTarget(const ChessGameModel& model, StringView square) {
             const auto& targets = model.GetLegalMoves();
             return eastl::find(targets.begin(), targets.end(), Sq(square)) != targets.end();
         }

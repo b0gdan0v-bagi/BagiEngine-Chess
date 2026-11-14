@@ -31,7 +31,7 @@ namespace BECore::Chess {
         constexpr int kHardOwnDepth = 3;
         constexpr int kMaxOwnDepth = 5;
 
-        constexpr eastl::array<OpponentLevel, 4> kLevels{
+        constexpr Array<OpponentLevel, 4> kLevels{
             OpponentLevel{"easy", "Easy", kEasySkillLevel, kEasyMoveTimeMs, kEasyOwnDepth, kEasyBlunderPercent},
             OpponentLevel{"medium", "Medium", kMediumSkillLevel, kMediumMoveTimeMs, kMediumOwnDepth, kMediumBlunderPercent},
             OpponentLevel{"hard", "Hard", kHardSkillLevel, kHardMoveTimeMs, kHardOwnDepth, kHardBlunderPercent},
@@ -40,15 +40,15 @@ namespace BECore::Chess {
         static_assert(!kLevels.empty());
         static_assert(kDefaultOpponentLevel < kLevels.size());
 
-        constexpr eastl::string_view kSkillLevelOption = "Skill Level";
+        constexpr StringView kSkillLevelOption = "Skill Level";
 
     }  // namespace
 
-    eastl::span<const OpponentLevel> GetOpponentLevels() {
-        return eastl::span<const OpponentLevel>(kLevels.data(), kLevels.size());
+    Span<const OpponentLevel> GetOpponentLevels() {
+        return Span<const OpponentLevel>(kLevels.data(), kLevels.size());
     }
 
-    std::optional<size_t> FindOpponentLevel(eastl::string_view id) {
+    Optional<size_t> FindOpponentLevel(StringView id) {
         for (size_t index = 0; index < kLevels.size(); ++index) {
             if (kLevels[index].id == id) {
                 return index;
@@ -57,11 +57,11 @@ namespace BECore::Chess {
         return std::nullopt;
     }
 
-    eastl::shared_ptr<IChessEngine> WithHandicap(eastl::shared_ptr<IChessEngine> engine, const OpponentLevel& level) {
+    SharedPtr<IChessEngine> WithHandicap(SharedPtr<IChessEngine> engine, const OpponentLevel& level) {
         if (level.blunderPercent <= 0) {
             return engine;
         }
-        return eastl::make_shared<BlunderEngine>(std::move(engine), level.blunderPercent);
+        return MakeShared<BlunderEngine>(std::move(engine), level.blunderPercent);
     }
 
     SearchLimits LimitsOf(OpponentEngine engine, const OpponentLevel& level) {
@@ -74,9 +74,9 @@ namespace BECore::Chess {
         return SearchLimits{};
     }
 
-    eastl::vector<eastl::pair<eastl::string, eastl::string>> EngineOptionsOf(const OpponentLevel& level) {
-        eastl::vector<eastl::pair<eastl::string, eastl::string>> options;
-        options.emplace_back(eastl::string(kSkillLevelOption.data(), kSkillLevelOption.size()), Format("{}", level.skillLevel));
+    Vector<Pair<String, String>> EngineOptionsOf(const OpponentLevel& level) {
+        Vector<Pair<String, String>> options;
+        options.emplace_back(String(kSkillLevelOption.data(), kSkillLevelOption.size()), Format("{}", level.skillLevel));
         return options;
     }
 

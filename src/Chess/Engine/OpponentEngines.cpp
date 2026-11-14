@@ -2,7 +2,7 @@
 
 namespace BECore::Chess {
 
-    eastl::string_view OpponentEngineId(OpponentEngine engine) {
+    StringView OpponentEngineId(OpponentEngine engine) {
         switch (engine) {
             case OpponentEngine::Stockfish:
                 return "stockfish";
@@ -12,7 +12,7 @@ namespace BECore::Chess {
         return "";
     }
 
-    eastl::string_view OpponentEngineName(OpponentEngine engine) {
+    StringView OpponentEngineName(OpponentEngine engine) {
         switch (engine) {
             case OpponentEngine::Stockfish:
                 return "Stockfish";
@@ -22,7 +22,7 @@ namespace BECore::Chess {
         return "";
     }
 
-    std::optional<OpponentEngine> FindOpponentEngine(eastl::string_view id) {
+    Optional<OpponentEngine> FindOpponentEngine(StringView id) {
         for (const OpponentEngine engine : EnumUtils<OpponentEngine>::Values()) {
             if (OpponentEngineId(engine) == id) {
                 return engine;

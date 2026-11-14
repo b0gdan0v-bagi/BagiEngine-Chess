@@ -47,12 +47,12 @@ namespace BECore::Chess {
         friend class OwnEngine;
         struct Impl;
 
-        explicit OwnSearch(eastl::unique_ptr<Impl> impl) noexcept;
+        explicit OwnSearch(UniquePtr<Impl> impl) noexcept;
 
         /// Validates, finds the position and its moves, and starts the search of the first line; @p lines is the number of lines wanted (before the legal moves limit it)
         [[nodiscard]] static std::expected<OwnSearch, EngineError> Begin(const SearchRequest& request, const CancellationToken& token, int lines);
 
-        eastl::unique_ptr<Impl> _impl;
+        UniquePtr<Impl> _impl;
     };
 
     /**

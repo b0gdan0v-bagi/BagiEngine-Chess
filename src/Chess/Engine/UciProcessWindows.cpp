@@ -9,9 +9,6 @@
 #if !defined(NOMINMAX)
 #define NOMINMAX
 #endif
-#include <algorithm>
-#include <atomic>
-#include <string>
 #include <windows.h>
 
 namespace BECore::Chess {
@@ -24,25 +21,25 @@ namespace BECore::Chess {
         constexpr wchar_t kNullDevice[] = L"NUL";  // the child's stderr
         constexpr wchar_t kPipeNamePrefix[] = L"\\\\.\\pipe\\BagiChess-uci-";
 
-        std::unexpected<EngineError> Fail(EngineErrorKind kind, eastl::string detail) {
+        std::unexpected<EngineError> Fail(EngineErrorKind kind, String detail) {
             return std::unexpected(EngineError{kind, std::move(detail)});
         }
 
         /// UTF-16 of UTF-8 text, nothing for text that is not UTF-8
-        std::optional<std::wstring> Widen(eastl::string_view text) {
+        Optional<std::wstring> Widen(StringView text) {  //-NoStd: Win32 wide API
             if (text.empty()) {
-                return std::wstring();
+                return std::wstring();  //-NoStd: Win32 wide API
             }
             const int length = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text.data(), static_cast<int>(text.size()), nullptr, 0);
             if (length <= 0) {
                 return std::nullopt;
             }
-            std::wstring wide(static_cast<size_t>(length), L'\0');
+            std::wstring wide(static_cast<size_t>(length), L'\0');  //-NoStd: Win32 wide API
             MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text.data(), static_cast<int>(text.size()), wide.data(), length);
             return wide;
         }
 
-        eastl::string Narrow(const wchar_t* text, size_t length) {
+        String Narrow(const wchar_t* text, size_t length) {
             if (length == 0) {
                 return {};
             }
@@ -50,14 +47,14 @@ namespace BECore::Chess {
             if (size <= 0) {
                 return {};
             }
-            eastl::string narrow(static_cast<size_t>(size), '\0');
+            String narrow(static_cast<size_t>(size), '\0');
             WideCharToMultiByte(CP_UTF8, 0, text, static_cast<int>(length), narrow.data(), size, nullptr, nullptr);
             return narrow;
         }
 
         /// The system's sentence for @p code, in its language, without the end of line and the full stop, and the number: "Access is denied (error 5)".
         /// A few sentences have a placeholder for the file ("This version of %1 is not compatible ..."): it becomes "the program"
-        eastl::string ErrorText(DWORD code) {
+        String ErrorText(DWORD code) {
             wchar_t* message = nullptr;
             const DWORD length =
                 FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, nullptr, code, 0, reinterpret_cast<wchar_t*>(&message), 0, nullptr);
@@ -65,10 +62,10 @@ namespace BECore::Chess {
             while (end > 0 && (message[end - 1] == L'\r' || message[end - 1] == L'\n' || message[end - 1] == L' ' || message[end - 1] == L'.')) {
                 --end;
             }
-            eastl::string text = message != nullptr ? Narrow(message, end) : eastl::string();
+            String text = message != nullptr ? Narrow(message, end) : String();
             LocalFree(message);
-            constexpr eastl::string_view kPlaceholder = "%1";
-            for (size_t at = text.find(kPlaceholder.data(), 0, kPlaceholder.size()); at != eastl::string::npos; at = text.find(kPlaceholder.data(), at, kPlaceholder.size())) {
+            constexpr StringView kPlaceholder = "%1";
+            for (size_t at = text.find(kPlaceholder.data(), 0, kPlaceholder.size()); at != String::npos; at = text.find(kPlaceholder.data(), at, kPlaceholder.size())) {
                 text.replace(at, kPlaceholder.size(), "the program");
             }
             if (text.empty()) {
@@ -147,13 +144,13 @@ namespace BECore::Chess {
             }
 
         private:
-            eastl::vector<char> _storage;
+            Vector<char> _storage;
             bool _initialized = false;
         };
 
         /// @p argument quoted so that the C runtime of the child (CommandLineToArgvW, the MSVC CRT) gives it back as it is: backslashes are literal except before a quote
-        void AppendQuoted(std::wstring& line, const std::wstring& argument) {
-            if (!argument.empty() && argument.find_first_of(L" \t\n\v\"") == std::wstring::npos) {
+        void AppendQuoted(std::wstring& line, const std::wstring& argument) {                       //-NoStd: Win32 wide API
+            if (!argument.empty() && argument.find_first_of(L" \t\n\v\"") == std::wstring::npos) {  //-NoStd: Win32 wide API
                 line += argument;
                 return;
             }
@@ -179,9 +176,9 @@ namespace BECore::Chess {
         }
 
         /// A name no other pipe of this machine has: the id of this process and a counter
-        std::wstring UniquePipeName() {
+        std::wstring UniquePipeName() {  //-NoStd: Win32 wide API
             static std::atomic<uint32_t> counter{0};
-            return std::wstring(kPipeNamePrefix) + std::to_wstring(GetCurrentProcessId()) + L"-" + std::to_wstring(counter.fetch_add(1));
+            return std::wstring(kPipeNamePrefix) + std::to_wstring(GetCurrentProcessId()) + L"-" + std::to_wstring(counter.fetch_add(1));  //-NoStd: Win32 wide API
         }
 
         /// A job whose processes are killed when its last handle closes; none when the system refuses one
@@ -231,27 +228,27 @@ namespace BECore::Chess {
         }
     };
 
-    UciProcess::UciProcess(int processId, eastl::unique_ptr<WindowsState> state) : _windows(std::move(state)), _pid(processId) {}
+    UciProcess::UciProcess(int processId, UniquePtr<WindowsState> state) : _windows(std::move(state)), _pid(processId) {}
 
     UciProcess::~UciProcess() {
         Close(kDefaultCloseGrace);
     }
 
-    std::expected<eastl::unique_ptr<UciProcess>, EngineError> UciProcess::Start(const ProcessLaunch& launch) {
+    std::expected<UniquePtr<UciProcess>, EngineError> UciProcess::Start(const ProcessLaunch& launch) {
         if (launch.path.empty()) {
             return Fail(EngineErrorKind::LaunchFailed, "no program to start");
         }
-        const auto cannotStart = [&launch](eastl::string_view reason) { return Fail(EngineErrorKind::LaunchFailed, Format("cannot start {}: {}", launch.path, reason)); };
+        const auto cannotStart = [&launch](StringView reason) { return Fail(EngineErrorKind::LaunchFailed, Format("cannot start {}: {}", launch.path, reason)); };
 
-        std::optional<std::wstring> application = Widen(launch.path);
+        Optional<std::wstring> application = Widen(launch.path);  //-NoStd: Win32 wide API
         if (!application) {
             return cannotStart("the path is not UTF-8");
         }
         std::replace(application->begin(), application->end(), L'/', L'\\');
         // argv[0] is read by other rules (no escapes, quotes only), and a path holds no quote: it is always quoted
-        std::wstring commandLine = L"\"" + *application + L"\"";
-        for (const eastl::string& argument : launch.args) {
-            const std::optional<std::wstring> wide = Widen(argument);
+        std::wstring commandLine = L"\"" + *application + L"\"";  //-NoStd: Win32 wide API
+        for (const String& argument : launch.args) {
+            const Optional<std::wstring> wide = Widen(argument);  //-NoStd: Win32 wide API
             if (!wide) {
                 return cannotStart("an argument is not UTF-8");
             }
@@ -259,7 +256,7 @@ namespace BECore::Chess {
             AppendQuoted(commandLine, *wide);
         }
 
-        auto state = eastl::make_unique<WindowsState>();
+        auto state = MakeUnique<WindowsState>();
         SECURITY_ATTRIBUTES inheritable{sizeof(SECURITY_ATTRIBUTES), nullptr, TRUE};
 
         // stdin: an anonymous pipe, our end kept from the child
@@ -275,7 +272,7 @@ namespace BECore::Chess {
         }
 
         // stdout: a named pipe, because an anonymous one cannot be read with a timeout; the child's end is an ordinary synchronous handle
-        const std::wstring pipeName = UniquePipeName();
+        const std::wstring pipeName = UniquePipeName();  //-NoStd: Win32 wide API
         state->output = UniqueHandle(CreateNamedPipeW(pipeName.c_str(), PIPE_ACCESS_INBOUND | FILE_FLAG_OVERLAPPED | FILE_FLAG_FIRST_PIPE_INSTANCE,
                                                       PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT | PIPE_REJECT_REMOTE_CLIENTS, 1, 0, kPipeBytes, 0, nullptr));
         if (!state->output) {
@@ -326,18 +323,18 @@ namespace BECore::Chess {
         CloseHandle(created.hThread);
 
         // The child's ends close here as the handles above go out of scope: only the child holds them now, so we see the end of its output, and it the end of its input
-        return eastl::unique_ptr<UciProcess>(new UciProcess(static_cast<int>(created.dwProcessId), std::move(state)));
+        return UniquePtr<UciProcess>(new UciProcess(static_cast<int>(created.dwProcessId), std::move(state)));
     }
 
-    std::expected<void, EngineError> UciProcess::WriteLine(eastl::string_view text) {
-        if (text.find_first_of("\r\n") != eastl::string_view::npos) {
+    std::expected<void, EngineError> UciProcess::WriteLine(StringView text) {
+        if (text.find_first_of("\r\n") != StringView::npos) {
             return Fail(EngineErrorKind::BadRequest, "a command line must not hold an end of line");
         }
         if (_ended || !_windows->input) {
             return Fail(EngineErrorKind::ProcessDied, Format("process {} is not running", _pid));
         }
 
-        eastl::string line(text.data(), text.size());
+        String line(text.data(), text.size());
         line.push_back('\n');
         size_t written = 0;
         while (written < line.size()) {
@@ -352,7 +349,7 @@ namespace BECore::Chess {
         return {};
     }
 
-    std::expected<eastl::string, EngineError> UciProcess::ReadLine(std::chrono::milliseconds timeout) {
+    std::expected<String, EngineError> UciProcess::ReadLine(std::chrono::milliseconds timeout) {
         using Clock = std::chrono::steady_clock;
         const Clock::time_point deadline = Clock::now() + timeout;
         WindowsState& state = *_windows;
@@ -364,7 +361,7 @@ namespace BECore::Chess {
         };
 
         for (;;) {
-            if (std::optional<eastl::string> line = TakeBufferedLine()) {
+            if (Optional<String> line = TakeBufferedLine()) {
                 if (line->size() > kMaxLineBytes) {
                     return tooLong();  // it came whole within one read, but it is no line of ours
                 }

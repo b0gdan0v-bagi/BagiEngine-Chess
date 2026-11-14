@@ -14,11 +14,11 @@ namespace BECore::Chess::Tests {
         constexpr int kHighestSkillLevel = 20;
 
         /// gtest cannot stream an EASTL string view
-        std::string Text(eastl::string_view text) {
-            return std::string(text.data(), text.size());
+        String Text(StringView text) {
+            return String(text.data(), text.size());
         }
 
-        bool IsWireName(eastl::string_view id) {
+        bool IsWireName(StringView id) {
             if (id.empty()) {
                 return false;
             }
@@ -106,7 +106,7 @@ namespace BECore::Chess::Tests {
         const auto levels = GetOpponentLevels();
 
         for (size_t i = 0; i + 1 < levels.size(); ++i) {
-            const std::string at = Text(levels[i + 1].id);
+            const String at = Text(levels[i + 1].id);
             EXPECT_LE(levels[i].skillLevel, levels[i + 1].skillLevel) << at;
             EXPECT_LT(levels[i].moveTimeMs, levels[i + 1].moveTimeMs) << at;
             EXPECT_GE(levels[i].blunderPercent, levels[i + 1].blunderPercent) << at;
@@ -123,7 +123,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(OpponentLevelsTest, WithHandicapKeepsTheEngineWhenThereIsNoBlunderPercent) {
-        const auto engine = eastl::make_shared<InstantEngine>();
+        const auto engine = MakeShared<InstantEngine>();
         const OpponentLevel plain{"plain", "Plain", 5, 100, 2, 0};
 
         EXPECT_EQ(WithHandicap(engine, plain), engine);
@@ -136,13 +136,13 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(OpponentLevelsTest, WithHandicapWrapsTheEngineInABlunderEngineOfTheLevelsPercent) {
-        const auto engine = eastl::make_shared<InstantEngine>();
+        const auto engine = MakeShared<InstantEngine>();
         const OpponentLevel custom{"custom", "Custom", 5, 100, 2, 50};
 
-        const eastl::shared_ptr<IChessEngine> wrapped = WithHandicap(engine, custom);
+        const SharedPtr<IChessEngine> wrapped = WithHandicap(engine, custom);
 
         ASSERT_NE(wrapped, nullptr);
-        EXPECT_NE(wrapped, eastl::shared_ptr<IChessEngine>(engine));
+        EXPECT_NE(wrapped, SharedPtr<IChessEngine>(engine));
         const auto blunder = eastl::dynamic_pointer_cast<BlunderEngine>(wrapped);
         ASSERT_NE(blunder, nullptr);
         EXPECT_EQ(blunder->Percent(), 50);
@@ -174,8 +174,8 @@ namespace BECore::Chess::Tests {
             ASSERT_TRUE(found.has_value()) << Text(levels[index].id);
             EXPECT_EQ(*found, index);
         }
-        EXPECT_EQ(FindOpponentLevel("easy"), std::optional<size_t>(0));
-        EXPECT_EQ(FindOpponentLevel("max"), std::optional<size_t>(levels.size() - 1));
+        EXPECT_EQ(FindOpponentLevel("easy"), Optional<size_t>(0));
+        EXPECT_EQ(FindOpponentLevel("max"), Optional<size_t>(levels.size() - 1));
     }
 
     TEST(OpponentLevelsTest, FindOpponentLevelMissesWhatIsNotAnId) {

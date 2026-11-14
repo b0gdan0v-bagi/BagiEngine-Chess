@@ -8,13 +8,13 @@ namespace BECore::Chess {
 
         struct CapturableEntry {
             PieceType type;
-            eastl::string_view id;
+            StringView id;
             int startCount;
         };
 
         constexpr int kPawnStartCount = 8;
 
-        constexpr eastl::array<CapturableEntry, 5> kCapturable{{
+        constexpr Array<CapturableEntry, 5> kCapturable{{
             {PieceType::Queen, "queen", 1},
             {PieceType::Rook, "rook", 2},
             {PieceType::Bishop, "bishop", 2},
@@ -22,7 +22,7 @@ namespace BECore::Chess {
             {PieceType::Pawn, "pawn", kPawnStartCount},
         }};
 
-        constexpr eastl::array<PieceType, 5> kCapturableTypes{kCapturable[0].type, kCapturable[1].type, kCapturable[2].type, kCapturable[3].type, kCapturable[4].type};
+        constexpr Array<PieceType, 5> kCapturableTypes{kCapturable[0].type, kCapturable[1].type, kCapturable[2].type, kCapturable[3].type, kCapturable[4].type};
 
         constexpr int kMaxBalanceShown = 99;
 
@@ -54,11 +54,11 @@ namespace BECore::Chess {
         return 0;
     }
 
-    eastl::span<const PieceType> CapturableTypes() {
+    Span<const PieceType> CapturableTypes() {
         return kCapturableTypes;
     }
 
-    eastl::string_view CapturedId(PieceType type) {
+    StringView CapturedId(PieceType type) {
         for (const CapturableEntry& entry : kCapturable) {
             if (entry.type == type) {
                 return entry.id;
@@ -67,7 +67,7 @@ namespace BECore::Chess {
         return {};
     }
 
-    std::optional<PieceType> FindCaptured(eastl::string_view id) {
+    Optional<PieceType> FindCaptured(StringView id) {
         for (const CapturableEntry& entry : kCapturable) {
             if (entry.id == id) {
                 return entry.type;
@@ -108,7 +108,7 @@ namespace BECore::Chess {
         return summary;
     }
 
-    eastl::string BalanceText(int pointsAhead) {
+    String BalanceText(int pointsAhead) {
         if (pointsAhead <= 0) {
             return {};
         }

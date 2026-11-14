@@ -6,7 +6,7 @@
 namespace BECore::Chess {
 
     /// Why no Stockfish was found; names the path that was tried when the settings gave one, else the three places that are looked at
-    eastl::string NoStockfishDetail(const eastl::string& path) {
+    String NoStockfishDetail(const String& path) {
         if (!path.empty()) {
             return Format(
                 "no Stockfish file at '{}' (stockfishPath in config/ChessSettings.local.xml or ChessSettings.xml): the path is used as written, '~' and environment variables are not expanded, "
@@ -24,11 +24,11 @@ namespace BECore::Chess {
     namespace {
 
         /// The default factory: a UciEngine over the Stockfish that FindStockfish() finds for the settings, with the Skill Level of the level, under the handicap of the level (WithHandicap)
-        std::expected<eastl::shared_ptr<IChessEngine>, EngineError> MakeStockfishEngine(const OpponentSettings& settings, const OpponentLevel& level) {
+        std::expected<SharedPtr<IChessEngine>, EngineError> MakeStockfishEngine(const OpponentSettings& settings, const OpponentLevel& level) {
             if (!IsOpponentEngineAvailable(OpponentEngine::Stockfish)) {
                 return std::unexpected(UnavailableEngineError(OpponentEngine::Stockfish));
             }
-            const std::optional<eastl::string> program = FindStockfish(settings.stockfishPath);
+            const Optional<String> program = FindStockfish(settings.stockfishPath);
             if (!program) {
                 return std::unexpected(EngineError{EngineErrorKind::LaunchFailed, NoStockfishDetail(settings.stockfishPath)});
             }
@@ -36,7 +36,7 @@ namespace BECore::Chess {
             engine.launch.path = *program;
             engine.options = EngineOptionsOf(level);
             engine.quitGraceMs = OpponentController::kQuitGraceMs;
-            return WithHandicap(eastl::make_shared<UciEngine>(std::move(engine)), level);
+            return WithHandicap(MakeShared<UciEngine>(std::move(engine)), level);
         }
 
     }  // namespace
@@ -55,7 +55,7 @@ namespace BECore::Chess {
         _factory = std::move(factory);
     }
 
-    std::expected<void, EngineError> OpponentController::SetSide(std::optional<PieceColor> computer) {
+    std::expected<void, EngineError> OpponentController::SetSide(Optional<PieceColor> computer) {
         // A side takes the choice of its seat for both; nobody keeps the choices as they are
         const SeatChoice white = computer ? _seats[SeatIndex(*computer)].choice : _seats[kWhite].choice;
         const SeatChoice black = computer ? _seats[SeatIndex(*computer)].choice : _seats[kBlack].choice;
@@ -74,11 +74,11 @@ namespace BECore::Chess {
         return ChooseLevel(GetSides(), level);
     }
 
-    std::expected<void, EngineError> OpponentController::Choose(std::optional<PieceColor> computer, size_t level) {
+    std::expected<void, EngineError> OpponentController::Choose(Optional<PieceColor> computer, size_t level) {
         return ChooseLevel(ProgramSides::Of(computer), level);
     }
 
-    std::expected<void, EngineError> OpponentController::Choose(std::optional<PieceColor> computer, size_t level, OpponentEngine engine) {
+    std::expected<void, EngineError> OpponentController::Choose(Optional<PieceColor> computer, size_t level, OpponentEngine engine) {
         const SeatChoice choice{engine, level};
         return ChooseSeats(ProgramSides::Of(computer), choice, choice);
     }
@@ -96,11 +96,11 @@ namespace BECore::Chess {
     }
 
     std::expected<void, EngineError> OpponentController::CycleSide() {
-        const std::optional<PieceColor> plays = GetPlays();
+        const Optional<PieceColor> plays = GetPlays();
         if (!plays) {
-            return SetSide(IsWatching() ? std::nullopt : std::optional<PieceColor>(PieceColor::Black));
+            return SetSide(IsWatching() ? std::nullopt : Optional<PieceColor>(PieceColor::Black));
         }
-        return SetSide(*plays == PieceColor::Black ? std::optional<PieceColor>(PieceColor::White) : std::nullopt);
+        return SetSide(*plays == PieceColor::Black ? Optional<PieceColor>(PieceColor::White) : std::nullopt);
     }
 
     std::expected<void, EngineError> OpponentController::CycleLevel() {
@@ -143,8 +143,8 @@ namespace BECore::Chess {
     }
 
     std::expected<void, EngineError> OpponentController::ChooseSeats(ProgramSides plays, SeatChoice white, SeatChoice black) {
-        const eastl::span<const OpponentLevel> levels = GetOpponentLevels();
-        const eastl::array<SeatChoice, kSeatCount> picked = {white, black};
+        const Span<const OpponentLevel> levels = GetOpponentLevels();
+        const Array<SeatChoice, kSeatCount> picked = {white, black};
         for (const SeatChoice& choice : picked) {
             if (choice.level >= levels.size()) {
                 return std::unexpected(EngineError{EngineErrorKind::BadRequest, Format("there is no level {}, the levels are 0 to {}", choice.level, levels.size() - 1)});
@@ -152,7 +152,7 @@ namespace BECore::Chess {
         }
 
         // An engine this build cannot run is refused for every seat, the one nobody plays included (a pick of it would only fail at the first search)
-        if (const std::optional<PieceColor> refused = FindUnavailableSeat(picked)) {
+        if (const Optional<PieceColor> refused = FindUnavailableSeat(picked)) {
             const SeatChoice& choice = picked[SeatIndex(*refused)];
             FailPick(UnavailableEngineError(choice.engine), *refused, choice.engine, levels[choice.level]);
             return std::unexpected(*_pickError);
@@ -176,8 +176,8 @@ namespace BECore::Chess {
         }
 
         // The engines first: a pick that finds none for any seat is refused and everything stays as it was, the running opponents and their searches included
-        eastl::array<bool, kSeatCount> remake = {};
-        eastl::array<eastl::shared_ptr<IChessEngine>, kSeatCount> made;
+        Array<bool, kSeatCount> remake = {};
+        Array<SharedPtr<IChessEngine>, kSeatCount> made;
         for (const PieceColor color : EnumUtils<PieceColor>::Values()) {
             const size_t index = SeatIndex(color);
             const Seat& seat = _seats[index];
@@ -186,7 +186,7 @@ namespace BECore::Chess {
                 continue;
             }
             const OpponentLevel& chosen = levels[picked[index].level];
-            std::expected<eastl::shared_ptr<IChessEngine>, EngineError> engine = MakeEngine(picked[index].engine, chosen);
+            std::expected<SharedPtr<IChessEngine>, EngineError> engine = MakeEngine(picked[index].engine, chosen);
             if (engine && !*engine) {
                 engine = std::unexpected(EngineError{EngineErrorKind::LaunchFailed, "the engine factory made no engine"});
             }
@@ -220,7 +220,7 @@ namespace BECore::Chess {
             if (!remake[index]) {
                 continue;
             }
-            _seats[index].opponent = eastl::make_unique<EngineOpponent>(std::move(made[index]), color, LimitsOf(picked[index].engine, levels[picked[index].level]));
+            _seats[index].opponent = MakeUnique<EngineOpponent>(std::move(made[index]), color, LimitsOf(picked[index].engine, levels[picked[index].level]));
             if (_model.GetTurn() == color) {
                 _model.ClearSelection();
             }
@@ -228,7 +228,7 @@ namespace BECore::Chess {
         return {};
     }
 
-    std::expected<eastl::shared_ptr<IChessEngine>, EngineError> OpponentController::MakeEngine(OpponentEngine engine, const OpponentLevel& level) const {
+    std::expected<SharedPtr<IChessEngine>, EngineError> OpponentController::MakeEngine(OpponentEngine engine, const OpponentLevel& level) const {
         if (_factory) {
             return _factory(engine, level);
         }
@@ -236,12 +236,12 @@ namespace BECore::Chess {
             case OpponentEngine::Stockfish:
                 return MakeStockfishEngine(_settings, level);
             case OpponentEngine::Own:
-                return WithHandicap(eastl::make_shared<OwnEngine>(), level);
+                return WithHandicap(MakeShared<OwnEngine>(), level);
         }
         return std::unexpected(EngineError{EngineErrorKind::BadRequest, "unknown engine"});
     }
 
-    std::optional<PieceColor> OpponentController::FindUnavailableSeat(const eastl::array<SeatChoice, kSeatCount>& picked) const {
+    Optional<PieceColor> OpponentController::FindUnavailableSeat(const Array<SeatChoice, kSeatCount>& picked) const {
         if (_factory) {
             return std::nullopt;
         }

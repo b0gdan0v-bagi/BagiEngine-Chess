@@ -13,8 +13,8 @@ namespace BECore::Chess {
      * a worker thread while the model goes on changing on the main one.
      */
     struct SearchRequest {
-        eastl::string startFen;
-        eastl::vector<Move> moves;
+        String startFen;
+        Vector<Move> moves;
         SearchLimits limits;
         /// How many lines IChessEngine::Analyse() returns (1..kMaxAnalysisLines, best first); FindMove() always gives one move, but still validates it. The factories give 1
         int lines = 1;

@@ -38,15 +38,15 @@ namespace BECore::Chess::Tests {
         constexpr int kQuitGraceMs = OpponentController::kQuitGraceMs;
         constexpr std::chrono::milliseconds kShutdownBudget{1000};   ///< Shutdown() cancels and returns, it does not wait for the search; only the yardstick checks it
         constexpr std::chrono::milliseconds kChildEndBudget{30000};  ///< the give-up limit of the wait for the child to leave after the cancel (`stop`, then the close): it only ends a broken test
-        constexpr eastl::string_view kMissingPath = "/no/such/file";
-        constexpr eastl::string_view kEasyLevelId = "easy";
-        constexpr eastl::string_view kHardLevelId = "hard";
-        constexpr eastl::string_view kMaxLevelId = "max";
+        constexpr StringView kMissingPath = "/no/such/file";
+        constexpr StringView kEasyLevelId = "easy";
+        constexpr StringView kHardLevelId = "hard";
+        constexpr StringView kMaxLevelId = "max";
         constexpr const char* kLaunchLogName = "launches.log";
         constexpr const char* kPidLogName = "pids.log";
         constexpr const char* kStdinLogName = "stdin.log";
-        constexpr eastl::string_view kMaxGoCommand = "go movetime 2000";  ///< what the Max level sends (kMaxMoveTimeMs of OpponentLevels.cpp)
-        constexpr eastl::string_view kStopCommand = "stop";
+        constexpr StringView kMaxGoCommand = "go movetime 2000";  ///< what the Max level sends (kMaxMoveTimeMs of OpponentLevels.cpp)
+        constexpr StringView kStopCommand = "stop";
         constexpr const char* kWrapperName = "stockfish-wrapper.sh";
         constexpr std::filesystem::perms kScriptPermissions = std::filesystem::perms::owner_all | std::filesystem::perms::group_read | std::filesystem::perms::group_exec |
                                                               std::filesystem::perms::others_read | std::filesystem::perms::others_exec;  // 755
@@ -58,13 +58,13 @@ namespace BECore::Chess::Tests {
         constexpr int kYardstickReferenceDepth = 3;  ///< the own engine that the Stockfish levels play against
         constexpr const char* kYardstickGamesVariable = "CHESS_YARDSTICK_GAMES";
 
-        std::optional<int> ParseInt(const char* text, size_t length) {
+        Optional<int> ParseInt(const char* text, size_t length) {
             int value = 0;
             const auto [end, error] = std::from_chars(text, text + length, value);
-            return error == std::errc{} && end == text + length ? std::optional<int>(value) : std::nullopt;
+            return error == std::errc{} && end == text + length ? Optional<int>(value) : std::nullopt;
         }
 
-        bool Play(ChessGameModel& model, eastl::string_view uci) {
+        bool Play(ChessGameModel& model, StringView uci) {
             const auto move = MoveGenerator::ParseUci(model.GetPosition(), uci);
             return move.has_value() && model.TryMove(*move).has_value();
         }
@@ -78,34 +78,33 @@ namespace BECore::Chess::Tests {
             });
         }
 
-        size_t LevelIndex(eastl::string_view id) {
-            const std::optional<size_t> index = FindOpponentLevel(id);
+        size_t LevelIndex(StringView id) {
+            const Optional<size_t> index = FindOpponentLevel(id);
             EXPECT_TRUE(index.has_value()) << id.data();
             return index.value_or(kDefaultOpponentLevel);
         }
 
-        OpponentSettings SettingsFor(eastl::string_view path) {
-            return OpponentSettings{eastl::string(path.data(), path.size())};
+        OpponentSettings SettingsFor(StringView path) {
+            return OpponentSettings{String(path.data(), path.size())};
         }
 
         OpponentSettings SettingsFor(const std::filesystem::path& program) {
-            const std::string path = program.string();
-            return SettingsFor(eastl::string_view(path.c_str(), path.size()));
+            return OpponentSettings{FromStdString(program.string())};
         }
 
         /// A Stockfish at @p path at the weakest `Skill Level`, the way the game starts one for the weakest level (but not through the factory: the games ask it directly)
-        UciEngineSettings WeakStockfish(const eastl::string& path) {
+        UciEngineSettings WeakStockfish(const String& path) {
             UciEngineSettings settings = StockfishSettings(path);
             settings.options.emplace_back("Skill Level", Format("{}", kStockfishSkill));
             settings.quitGraceMs = kQuitGraceMs;
             return settings;
         }
 
-        eastl::string ResultOf(const ChessGameModel& model) {
+        String ResultOf(const ChessGameModel& model) {
             if (!model.IsGameOver()) {
                 return "unfinished";
             }
-            const std::optional<PieceColor> winner = model.GetWinner();
+            const Optional<PieceColor> winner = model.GetWinner();
             return winner ? Format("{} wins ({})", PieceColorId(*winner), EnumUtils<GameStatus>::ToString(model.GetStatus())) : Format("draw ({})", EnumUtils<GameStatus>::ToString(model.GetStatus()));
         }
 
@@ -113,7 +112,7 @@ namespace BECore::Chess::Tests {
         /// A shell script that notes its start in @p launches, its process id in @p pidFile and, when @p stdinLog is given, a copy of every line the game sends in that file
         /// (tee), then becomes the Stockfish at @p stockfish. Without @p stdinLog the script `exec`s the program, so its id is the engine's. With it the script stays the
         /// parent of a pipe `tee | program`: the second line of @p pidFile is the id of the program itself (a shell that `exec`s it), the first is the script's
-        std::filesystem::path WriteWrapper(const TempDirectory& directory, const eastl::string& stockfish, const char* pidFile, const char* stdinLog = nullptr) {
+        std::filesystem::path WriteWrapper(const TempDirectory& directory, const String& stockfish, const char* pidFile, const char* stdinLog = nullptr) {
             const std::filesystem::path script = directory.File(kWrapperName);
             {
                 std::ofstream out(script);
@@ -132,8 +131,8 @@ namespace BECore::Chess::Tests {
         }
 
         /// The process id on line @p index (from 0) of @p pidFile, once the script has written it
-        std::optional<int> ProcessIdAt(const std::filesystem::path& pidFile, size_t index) {
-            const eastl::vector<eastl::string> lines = ReadFileLines(pidFile);
+        Optional<int> ProcessIdAt(const std::filesystem::path& pidFile, size_t index) {
+            const Vector<String> lines = ReadFileLines(pidFile);
             return index < lines.size() ? ParseInt(lines[index].c_str(), lines[index].size()) : std::nullopt;
         }
 
@@ -144,7 +143,7 @@ namespace BECore::Chess::Tests {
 
         /// Starts a max level search of the Stockfish at @p stockfishPath, calls Shutdown() while it runs and checks what is left: the processes are gone, the program was told
         /// `stop`, nothing late is played. With @p checkSpeed Shutdown() must also have returned within kShutdownBudget (the yardstick; a normal run decides nothing by a clock)
-        void ShutdownDuringAMaxLevelSearch(const eastl::string& stockfishPath, bool checkSpeed) {
+        void ShutdownDuringAMaxLevelSearch(const String& stockfishPath, bool checkSpeed) {
             const TempDirectory directory;
             const std::filesystem::path wrapper = WriteWrapper(directory, stockfishPath, kPidLogName, kStdinLogName);  // a copy of what the game writes to the program lands in stdin.log
             ChessGameModel model;
@@ -194,7 +193,7 @@ namespace BECore::Chess::Tests {
 
                 PlayGame(model, subjectIsWhite ? subjectPlayer : referencePlayer, subjectIsWhite ? referencePlayer : subjectPlayer, kYardstickPlies);
 
-                const std::optional<PieceColor> winner = model.GetWinner();
+                const Optional<PieceColor> winner = model.GetWinner();
                 const PieceColor subjectColor = subjectIsWhite ? PieceColor::White : PieceColor::Black;
                 if (winner.has_value()) {
                     ++(*winner == subjectColor ? result.wins : result.losses);
@@ -219,7 +218,7 @@ namespace BECore::Chess::Tests {
 
         int YardstickGames() {
             const char* value = std::getenv(kYardstickGamesVariable);
-            const std::optional<int> games = value != nullptr ? ParseInt(value, std::strlen(value)) : std::nullopt;
+            const Optional<int> games = value != nullptr ? ParseInt(value, std::strlen(value)) : std::nullopt;
             return games.has_value() && *games > 0 ? *games : kYardstickGames;
         }
 
@@ -243,12 +242,12 @@ namespace BECore::Chess::Tests {
             const Player engine = EnginePlayer(stockfish, SearchLimits{kGameMoveTimeMs, 0});
             const Player mover = RandomPlayer(random);
 
-            const eastl::vector<eastl::string> moves = PlayGame(model, stockfishIsWhite ? engine : mover, stockfishIsWhite ? mover : engine, kRandomGamePlies);
+            const Vector<String> moves = PlayGame(model, stockfishIsWhite ? engine : mover, stockfishIsWhite ? mover : engine, kRandomGamePlies);
 
             // Every move was accepted (PlayGame); the one claim about the result is that the random side did not win
             EXPECT_TRUE(model.IsGameOver() || model.GetMoves().size() == kRandomGamePlies) << "game " << game;
             EXPECT_GE(moves.size(), kShortestMate) << "a game, not a stop at the first move";
-            const std::optional<PieceColor> winner = model.GetWinner();
+            const Optional<PieceColor> winner = model.GetWinner();
             const PieceColor randomColor = stockfishIsWhite ? PieceColor::Black : PieceColor::White;
             EXPECT_FALSE(winner.has_value() && *winner == randomColor) << "game " << game << " was won by the random mover: " << ResultOf(model).c_str();
         }
@@ -265,12 +264,12 @@ namespace BECore::Chess::Tests {
             const Player ownPlayer = EnginePlayer(own, SearchLimits{0, kOwnDepth});
             const Player stockfishPlayer = EnginePlayer(stockfish, SearchLimits{kGameMoveTimeMs, 0});
 
-            const eastl::vector<eastl::string> moves = PlayGame(model, ownIsWhite ? ownPlayer : stockfishPlayer, ownIsWhite ? stockfishPlayer : ownPlayer, kOwnGamePlies);
+            const Vector<String> moves = PlayGame(model, ownIsWhite ? ownPlayer : stockfishPlayer, ownIsWhite ? stockfishPlayer : ownPlayer, kOwnGamePlies);
 
             // No refused move and no EngineError (the players report both); the result is recorded, not asserted: a time-limited Stockfish is not deterministic
             EXPECT_TRUE(model.IsGameOver() || model.GetMoves().size() == kOwnGamePlies) << "game " << game;
             EXPECT_GE(moves.size(), kShortestMate) << "a game, not a stop at the first move";
-            const eastl::string result = Format("own engine plays {}: {} after {} plies", ownIsWhite ? "White" : "Black", ResultOf(model), model.GetMoves().size());
+            const String result = Format("own engine plays {}: {} after {} plies", ownIsWhite ? "White" : "Black", ResultOf(model), model.GetMoves().size());
             RecordProperty(Format("game{}", game).c_str(), result.c_str());
             std::printf("[   RESULT ] %s\n", result.c_str());
         }
@@ -279,7 +278,7 @@ namespace BECore::Chess::Tests {
     namespace {
 
         /// A person's e2e4 answered through the default factory (no SetEngineFactory: the controller starts the Stockfish at the path itself, under the handicap of the level)
-        void ExpectALegalAnswerAtLevel(eastl::string_view level) {
+        void ExpectALegalAnswerAtLevel(StringView level) {
             SKIP_WITHOUT_STOCKFISH(path);
             ChessGameModel model;
             OpponentController controller(model, SettingsFor(*path));
@@ -356,7 +355,7 @@ namespace BECore::Chess::Tests {
 
         ASSERT_FALSE(refused.has_value());
         EXPECT_EQ(refused.error().kind, EngineErrorKind::LaunchFailed);
-        EXPECT_NE(refused.error().detail.find(kMissingPath.data(), 0, kMissingPath.size()), eastl::string::npos) << refused.error().detail.c_str();
+        EXPECT_NE(refused.error().detail.find(kMissingPath.data(), 0, kMissingPath.size()), String::npos) << refused.error().detail.c_str();
         EXPECT_FALSE(controller.GetPlays().has_value()) << "a pick that finds no engine changes nothing";
         ASSERT_TRUE(controller.GetError().has_value());
         EXPECT_EQ(controller.GetError()->kind, EngineErrorKind::LaunchFailed);
@@ -384,7 +383,7 @@ namespace BECore::Chess::Tests {
                     kYardstickMoveTimeMs, games, kYardstickPlies);
         PrintYardstickHeader("depth");
         for (const OpponentLevel& level : GetOpponentLevels()) {
-            const eastl::shared_ptr<IChessEngine> own = WithHandicap(eastl::make_shared<OwnEngine>(), level);
+            const SharedPtr<IChessEngine> own = WithHandicap(MakeShared<OwnEngine>(), level);
             const YardstickResult result = PlayYardstick(*own, LimitsOf(OpponentEngine::Own, level), stockfish, SearchLimits{kYardstickMoveTimeMs, 0}, games);
             PrintYardstickRow(level, level.ownDepth, result);
             RecordProperty(Format("{}", level.id).c_str(), Format("wins {} draws {} losses {}", result.wins, result.draws, result.losses).c_str());
@@ -407,7 +406,7 @@ namespace BECore::Chess::Tests {
             UciEngineSettings settings = StockfishSettings(*path);
             settings.options = EngineOptionsOf(level);
             settings.quitGraceMs = kQuitGraceMs;
-            const eastl::shared_ptr<IChessEngine> subject = WithHandicap(eastl::make_shared<UciEngine>(settings), level);
+            const SharedPtr<IChessEngine> subject = WithHandicap(MakeShared<UciEngine>(settings), level);
             const YardstickResult result = PlayYardstick(*subject, LimitsOf(OpponentEngine::Stockfish, level), reference, referenceLimits, games);
             PrintYardstickRow(level, level.skillLevel, result);
             RecordProperty(Format("{}", level.id).c_str(), Format("wins {} draws {} losses {}", result.wins, result.draws, result.losses).c_str());

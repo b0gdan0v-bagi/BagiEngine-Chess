@@ -19,7 +19,7 @@ namespace BECore::Chess {
         _hasWritten = false;
         _failureLogged = false;
 
-        const std::optional<std::filesystem::path> directory = ResolveSaveDirectory(CoreManager::GetCommandLine(), SaveSettings::Load().rememberGame);
+        const Optional<std::filesystem::path> directory = ResolveSaveDirectory(CoreManager::GetCommandLine(), SaveSettings::Load().rememberGame);
         if (!directory) {
             return;
         }

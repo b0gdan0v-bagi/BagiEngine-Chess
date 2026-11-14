@@ -25,15 +25,15 @@ namespace BECore::Chess::Tests {
         constexpr int kManyUpdates = 1000;
         constexpr const char* kLogName = "fake.log";
         constexpr const char* kThinksUntilStopped = "60000";  // the fake thinks for a minute unless it is sent `stop`
-        constexpr eastl::string_view kGoCommand = "go movetime 50";
-        constexpr eastl::string_view kMatedBlackFen = "7k/6Q1/6K1/8/8/8/8/8 b - - 0 1";
+        constexpr StringView kGoCommand = "go movetime 50";
+        constexpr StringView kMatedBlackFen = "7k/6Q1/6K1/8/8/8/8/8 b - - 0 1";
 #if !CHESS_HAS_UCI_PROCESS
         constexpr EngineErrorKind kMissingProgramError = EngineErrorKind::Unsupported;
 #else
         constexpr EngineErrorKind kMissingProgramError = EngineErrorKind::LaunchFailed;
 #endif
 
-        bool Play(ChessGameModel& model, eastl::string_view uci) {
+        bool Play(ChessGameModel& model, StringView uci) {
             const auto move = MoveGenerator::ParseUci(model.GetPosition(), uci);
             return move.has_value() && model.TryMove(*move).has_value();
         }
@@ -60,25 +60,25 @@ namespace BECore::Chess::Tests {
             });
         }
 
-        eastl::string Describe(const std::optional<EngineError>& error) {
-            return error ? Format("{}: {}", EnumUtils<EngineErrorKind>::ToString(error->kind), error->detail) : eastl::string("no error");
+        String Describe(const Optional<EngineError>& error) {
+            return error ? Format("{}: {}", EnumUtils<EngineErrorKind>::ToString(error->kind), error->detail) : String("no error");
         }
 
-        eastl::string StartPositionCommand() {
+        String StartPositionCommand() {
             return Format("position fen {}", Position::kStartFen);
         }
 
         /// The fake UCI engine with @p flags, as the engine of an opponent
-        eastl::shared_ptr<UciEngine> MakeFakeEngine(std::initializer_list<eastl::string_view> flags) {
+        SharedPtr<UciEngine> MakeFakeEngine(std::initializer_list<StringView> flags) {
             UciEngineSettings settings;
             settings.launch = FakeEngineLaunch(flags);
-            return eastl::make_shared<UciEngine>(std::move(settings));
+            return MakeShared<UciEngine>(std::move(settings));
         }
 
         /// Counts how often the engine inside it is asked
         class CountingEngine final : public IChessEngine {
         public:
-            explicit CountingEngine(eastl::shared_ptr<IChessEngine> inner) : _inner(std::move(inner)) {}
+            explicit CountingEngine(SharedPtr<IChessEngine> inner) : _inner(std::move(inner)) {}
 
             std::expected<Move, EngineError> FindMove(const SearchRequest& request, const CancellationToken& token) override {
                 _calls.fetch_add(1);
@@ -90,15 +90,15 @@ namespace BECore::Chess::Tests {
             }
 
         private:
-            eastl::shared_ptr<IChessEngine> _inner;
+            SharedPtr<IChessEngine> _inner;
             std::atomic<int> _calls{0};
         };
 
         /// An engine with no process that answers a script, one move per call and without looking at its token. A gated one waits for Open() before it answers
         class ScriptedEngine final : public IChessEngine {
         public:
-            ScriptedEngine(std::initializer_list<eastl::string_view> moves, bool gated) : _open(!gated) {
-                for (const eastl::string_view move : moves) {
+            ScriptedEngine(std::initializer_list<StringView> moves, bool gated) : _open(!gated) {
+                for (const StringView move : moves) {
                     _moves.push_back(Mv(move));
                 }
             }
@@ -124,13 +124,13 @@ namespace BECore::Chess::Tests {
             }
 
         private:
-            eastl::vector<Move> _moves;
+            Vector<Move> _moves;
             std::atomic<int> _calls{0};
             std::atomic<bool> _open;
         };
 
-        eastl::shared_ptr<ScriptedEngine> MakeScripted(std::initializer_list<eastl::string_view> moves, bool gated = false) {
-            return eastl::make_shared<ScriptedEngine>(moves, gated);
+        SharedPtr<ScriptedEngine> MakeScripted(std::initializer_list<StringView> moves, bool gated = false) {
+            return MakeShared<ScriptedEngine>(moves, gated);
         }
 
         /// The plainest engine there is: the first legal move of the final position, at once. It stands for any IChessEngine
@@ -162,7 +162,7 @@ namespace BECore::Chess::Tests {
         SKIP_WITHOUT_FAKE_ENGINE();
         SKIP_WITHOUT_WORKER_THREADS();
         const TempDirectory directory;
-        const eastl::string log = directory.FileText(kLogName);
+        const String log = directory.FileText(kLogName);
         ChessGameModel model;
         EngineOpponent opponent(MakeFakeEngine({"--log", log, "--moves", "e7e5,g8f6"}), PieceColor::Black, kLimits);
         const uint64_t versionBefore = model.GetVersion();
@@ -192,7 +192,7 @@ namespace BECore::Chess::Tests {
         SKIP_WITHOUT_FAKE_ENGINE();
         SKIP_WITHOUT_WORKER_THREADS();
         const TempDirectory directory;
-        const eastl::string log = directory.FileText(kLogName);
+        const String log = directory.FileText(kLogName);
         ChessGameModel model;
         EngineOpponent opponent(MakeFakeEngine({"--log", log, "--think-ms", kThinksUntilStopped, "--moves", "e7e5"}), PieceColor::Black, kLimits);
         ASSERT_TRUE(Play(model, "e2e4"));
@@ -248,7 +248,7 @@ namespace BECore::Chess::Tests {
         SKIP_WITHOUT_FAKE_ENGINE();
         SKIP_WITHOUT_WORKER_THREADS();
         const TempDirectory directory;
-        const eastl::string log = directory.FileText(kLogName);
+        const String log = directory.FileText(kLogName);
         // The first search thinks until it is stopped and then answers e7e5; the second answers d7d5 at once
         ChessGameModel model;
         EngineOpponent opponent(MakeFakeEngine({"--log", log, "--think-ms", kThinksUntilStopped, "--think-first-only", "--moves", "e7e5,d7d5"}), PieceColor::Black, kLimits);
@@ -333,7 +333,7 @@ namespace BECore::Chess::Tests {
     TEST_F(EngineOpponentTest, AMissingProgramIsAnErrorThatIsNotRetriedUntilItIsCleared) {
         UciEngineSettings settings;
         settings.launch.path = "/nonexistent-directory/engine";
-        const auto engine = eastl::make_shared<CountingEngine>(eastl::make_shared<UciEngine>(std::move(settings)));
+        const auto engine = MakeShared<CountingEngine>(MakeShared<UciEngine>(std::move(settings)));
         ChessGameModel model;
         EngineOpponent opponent(engine, PieceColor::Black, kLimits);
         ASSERT_TRUE(Play(model, "e2e4"));
@@ -385,7 +385,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(UpdateUntil(opponent, model, [&] { return opponent.GetLastError().has_value(); }));
 
         EXPECT_EQ(opponent.GetLastError()->kind, EngineErrorKind::IllegalMove);
-        EXPECT_NE(opponent.GetLastError()->detail.find("e2e4"), eastl::string::npos) << Describe(opponent.GetLastError()).c_str();
+        EXPECT_NE(opponent.GetLastError()->detail.find("e2e4"), String::npos) << Describe(opponent.GetLastError()).c_str();
         EXPECT_EQ(model.GetVersion(), version);
         for (int frame = 0; frame < kManyUpdates; ++frame) {
             opponent.Update(model);
@@ -397,7 +397,7 @@ namespace BECore::Chess::Tests {
     TEST_F(EngineOpponentTest, ADyingEngineIsProcessDiedAndTheOpponentRecoversAfterClearError) {
         SKIP_WITHOUT_FAKE_ENGINE();
         const TempDirectory directory;
-        const eastl::string marker = directory.FileText("died-once");
+        const String marker = directory.FileText("died-once");
         ChessGameModel model;
         EngineOpponent opponent(MakeFakeEngine({"--die-once", marker, "--moves", "e7e5"}), PieceColor::Black, kLimits);
         ASSERT_TRUE(Play(model, "e2e4"));
@@ -418,7 +418,7 @@ namespace BECore::Chess::Tests {
         SKIP_WITHOUT_FAKE_ENGINE();
         SKIP_WITHOUT_WORKER_THREADS();
         const TempDirectory directory;
-        const eastl::string log = directory.FileText(kLogName);
+        const String log = directory.FileText(kLogName);
         ChessGameModel model;
         {
             EngineOpponent opponent(MakeFakeEngine({"--log", log, "--think-ms", kThinksUntilStopped}), PieceColor::Black, kLimits);
@@ -434,8 +434,8 @@ namespace BECore::Chess::Tests {
 
     TEST_F(EngineOpponentTest, AGameInARowEndsLikeTheSameMovesPlayedByHand) {
         SKIP_WITHOUT_FAKE_ENGINE();
-        constexpr eastl::string_view kWhiteMoves[] = {"e2e4", "g1f3", "f1b5"};
-        constexpr eastl::string_view kBlackMoves[] = {"e7e5", "b8c6", "a7a6"};
+        constexpr StringView kWhiteMoves[] = {"e2e4", "g1f3", "f1b5"};
+        constexpr StringView kBlackMoves[] = {"e7e5", "b8c6", "a7a6"};
         ChessGameModel model;
         EngineOpponent opponent(MakeFakeEngine({"--moves", "e7e5,b8c6,a7a6"}), PieceColor::Black, kLimits);
         ChessGameModel byHand;
@@ -461,7 +461,7 @@ namespace BECore::Chess::Tests {
         ChessGameModel model;
         const auto expected = OwnEngine().FindMove(SearchRequest::FromModel(model, kOwnLimits), CancellationToken::Create());
         ASSERT_TRUE(expected.has_value());
-        EngineOpponent opponent(eastl::make_shared<OwnEngine>(), PieceColor::White, kOwnLimits);
+        EngineOpponent opponent(MakeShared<OwnEngine>(), PieceColor::White, kOwnLimits);
 
         opponent.Update(model);
         EXPECT_TRUE(opponent.IsThinking());
@@ -475,7 +475,7 @@ namespace BECore::Chess::Tests {
     TEST_F(EngineOpponentTest, TheOwnEnginesAnswerIsDroppedWhenTheVersionMovesMeanwhile) {
         constexpr SearchLimits kOwnLimits{0, 4};
         ChessGameModel model;
-        EngineOpponent opponent(eastl::make_shared<OwnEngine>(), PieceColor::White, kOwnLimits);
+        EngineOpponent opponent(MakeShared<OwnEngine>(), PieceColor::White, kOwnLimits);
 
         opponent.Update(model);
         EXPECT_TRUE(opponent.IsThinking());
@@ -491,7 +491,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(EngineOpponentTest, AnyEngineWillDoAndTwoOpponentsCanPlayEachOther) {
         constexpr size_t kPlies = 24;
-        const auto engine = eastl::make_shared<FirstLegalMoveEngine>();
+        const auto engine = MakeShared<FirstLegalMoveEngine>();
         ChessGameModel model;
         EngineOpponent white(engine, PieceColor::White, kLimits);
         EngineOpponent black(engine, PieceColor::Black, kLimits);

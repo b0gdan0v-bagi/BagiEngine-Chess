@@ -55,7 +55,7 @@ namespace BECore::Chess::Tests {
 
     TEST(BoardOrientationTest, SquareAtInvertsCellOfAndEveryCellIsHitOnce) {
         for (const PieceColor bottom : {kWhite, kBlack}) {
-            eastl::array<bool, kSquareCount> hit{};
+            Array<bool, kSquareCount> hit{};
             int hitCount = 0;
             for (int index = 0; index < kSquareCount; ++index) {
                 const Square square = Square::FromIndex(index);

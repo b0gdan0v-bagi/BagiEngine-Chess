@@ -4,7 +4,7 @@ namespace BECore::Chess::Tests {
 
     namespace {
 
-        bool IsRejectedWith(eastl::string_view fen, FenError expected) {
+        bool IsRejectedWith(StringView fen, FenError expected) {
             const auto position = Position::FromFen(fen);
             return !position.has_value() && position.error() == expected;
         }
@@ -15,12 +15,12 @@ namespace BECore::Chess::Tests {
 
     TEST(PositionTest, StartPositionRoundTripsThroughFen) {
         const Position start = Position::Start();
-        EXPECT_EQ(start.ToFen(), eastl::string(Position::kStartFen));
+        EXPECT_EQ(start.ToFen(), String(Position::kStartFen));
     }
 
     TEST(PositionTest, StandardTestPositionsRoundTripThroughFen) {
         for (const auto fen : {kKiwipeteFen, kPosition3Fen, kPosition4Fen, kPosition5Fen, kPosition6Fen}) {
-            EXPECT_EQ(PositionFromFen(fen).ToFen(), eastl::string(fen));
+            EXPECT_EQ(PositionFromFen(fen).ToFen(), String(fen));
         }
     }
 
@@ -217,7 +217,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(PositionTest, CastlingMovesTheRookAndDropsTheRights) {
-        const eastl::string_view fen = "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1";
+        const StringView fen = "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1";
         Position position = PositionFromFen(fen);
 
         position.DoMove(CastlingMove("e1g1"));
@@ -227,7 +227,7 @@ namespace BECore::Chess::Tests {
 
         position.UndoMove();
         position.UndoMove();
-        EXPECT_EQ(position.ToFen(), eastl::string(fen));
+        EXPECT_EQ(position.ToFen(), String(fen));
     }
 
     TEST(PositionTest, MovingARookOrKingLosesOnlyTheRelatedRights) {
@@ -245,12 +245,12 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(PositionTest, PromotionReplacesThePawnAndUndoRestoresIt) {
-        const eastl::string_view fen = "4k3/P7/8/8/8/8/8/4K3 w - - 0 1";
+        const StringView fen = "4k3/P7/8/8/8/8/8/4K3 w - - 0 1";
         Position position = PositionFromFen(fen);
         position.DoMove(Mv("a7a8q"));
         EXPECT_EQ(position.ToFen(), "Q3k3/8/8/8/8/8/8/4K3 b - - 0 1");
         position.UndoMove();
-        EXPECT_EQ(position.ToFen(), eastl::string(fen));
+        EXPECT_EQ(position.ToFen(), String(fen));
     }
 
     TEST(PositionTest, UnderPromotionAndPromotionByCapture) {
@@ -263,7 +263,7 @@ namespace BECore::Chess::Tests {
 
     TEST(PositionTest, UndoRestoresEverythingAfterALongLine) {
         Position position = PositionFromFen(kKiwipeteFen);
-        const eastl::string before = position.ToFen();
+        const String before = position.ToFen();
         const ZobristKey keyBefore = position.Key();
         const Bitboard checkersBefore = position.Checkers();
 
@@ -285,7 +285,7 @@ namespace BECore::Chess::Tests {
     TEST(PositionTest, UndoWithNothingToUndoChangesNothing) {
         Position position = Position::Start();
         position.UndoMove();
-        EXPECT_EQ(position.ToFen(), eastl::string(Position::kStartFen));
+        EXPECT_EQ(position.ToFen(), String(Position::kStartFen));
     }
 
     TEST(PositionTest, IncrementalKeyEqualsTheKeyOfTheSameFen) {

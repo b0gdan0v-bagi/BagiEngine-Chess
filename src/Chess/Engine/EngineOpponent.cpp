@@ -4,7 +4,7 @@
 
 namespace BECore::Chess {
 
-    EngineOpponent::EngineOpponent(eastl::shared_ptr<IChessEngine> engine, PieceColor side, SearchLimits limits) : _engine(std::move(engine)), _side(side), _limits(limits) {}
+    EngineOpponent::EngineOpponent(SharedPtr<IChessEngine> engine, PieceColor side, SearchLimits limits) : _engine(std::move(engine)), _side(side), _limits(limits) {}
 
     EngineOpponent::~EngineOpponent() {
         Cancel();
@@ -34,10 +34,10 @@ namespace BECore::Chess {
         }
     }
 
-    Task<void> EngineOpponent::RunSearch(eastl::shared_ptr<Search> search, SearchRequest request) {
+    Task<void> EngineOpponent::RunSearch(SharedPtr<Search> search, SearchRequest request) {
         std::expected<Move, EngineError> answer = AnswerOfTask(co_await search->engine->FindMoveAsync(request, search->token));
         {
-            const std::lock_guard lock(search->mutex);
+            const LockGuard lock(search->mutex);
             search->answer = std::move(answer);
         }
         search->done.store(true, std::memory_order_release);
@@ -45,7 +45,7 @@ namespace BECore::Chess {
     }
 
     void EngineOpponent::StartSearch(const ChessGameModel& model) {
-        _search = eastl::make_shared<Search>(_engine);
+        _search = MakeShared<Search>(_engine);
         _searchVersion = model.GetVersion();
         // Fire and forget: the task keeps itself alive until it ends, and the answer comes through _search, not through the handle
         TaskManager::GetInstance().Run(RunSearch(_search, SearchRequest::FromModel(model, _limits)));
@@ -61,13 +61,13 @@ namespace BECore::Chess {
     void EngineOpponent::TakeAnswer(ChessGameModel& model) {
         std::expected<Move, EngineError> answer = std::unexpected(EngineError{});
         {
-            const std::lock_guard lock(_search->mutex);
+            const LockGuard lock(_search->mutex);
             answer = std::move(_search->answer);
         }
         const bool wanted = !_search->token.IsCancelled() && _searchVersion == model.GetVersion();
         _search.reset();
 
-        const eastl::string_view side = EnumUtils<PieceColor>::ToString(_side);
+        const StringView side = EnumUtils<PieceColor>::ToString(_side);
         if (!wanted) {
             LOG_INFO("Engine opponent ({}): the answer of a cancelled or out-of-date search is dropped"_format(side));
             return;

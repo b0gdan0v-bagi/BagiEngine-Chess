@@ -7,44 +7,44 @@ namespace BECore::Chess::Uci {
 
     namespace {
 
-        constexpr eastl::string_view kLineSeparators = " \t";
-        constexpr eastl::string_view kUciToken = "uci";
-        constexpr eastl::string_view kIsReadyToken = "isready";
-        constexpr eastl::string_view kNewGameToken = "ucinewgame";
-        constexpr eastl::string_view kSetOptionToken = "setoption";
-        constexpr eastl::string_view kPositionToken = "position";
-        constexpr eastl::string_view kGoToken = "go";
-        constexpr eastl::string_view kStopToken = "stop";
-        constexpr eastl::string_view kPonderHitToken = "ponderhit";
-        constexpr eastl::string_view kQuitToken = "quit";
-        constexpr eastl::string_view kNameToken = "name";
-        constexpr eastl::string_view kValueToken = "value";
-        constexpr eastl::string_view kStartPosToken = "startpos";
-        constexpr eastl::string_view kFenToken = "fen";
-        constexpr eastl::string_view kMovesToken = "moves";
-        constexpr eastl::string_view kDepthToken = "depth";
-        constexpr eastl::string_view kMoveTimeToken = "movetime";
-        constexpr eastl::string_view kWTimeToken = "wtime";
-        constexpr eastl::string_view kBTimeToken = "btime";
-        constexpr eastl::string_view kWIncToken = "winc";
-        constexpr eastl::string_view kBIncToken = "binc";
-        constexpr eastl::string_view kMovesToGoToken = "movestogo";
-        constexpr eastl::string_view kInfiniteToken = "infinite";
-        constexpr eastl::string_view kPonderToken = "ponder";
+        constexpr StringView kLineSeparators = " \t";
+        constexpr StringView kUciToken = "uci";
+        constexpr StringView kIsReadyToken = "isready";
+        constexpr StringView kNewGameToken = "ucinewgame";
+        constexpr StringView kSetOptionToken = "setoption";
+        constexpr StringView kPositionToken = "position";
+        constexpr StringView kGoToken = "go";
+        constexpr StringView kStopToken = "stop";
+        constexpr StringView kPonderHitToken = "ponderhit";
+        constexpr StringView kQuitToken = "quit";
+        constexpr StringView kNameToken = "name";
+        constexpr StringView kValueToken = "value";
+        constexpr StringView kStartPosToken = "startpos";
+        constexpr StringView kFenToken = "fen";
+        constexpr StringView kMovesToken = "moves";
+        constexpr StringView kDepthToken = "depth";
+        constexpr StringView kMoveTimeToken = "movetime";
+        constexpr StringView kWTimeToken = "wtime";
+        constexpr StringView kBTimeToken = "btime";
+        constexpr StringView kWIncToken = "winc";
+        constexpr StringView kBIncToken = "binc";
+        constexpr StringView kMovesToGoToken = "movestogo";
+        constexpr StringView kInfiniteToken = "infinite";
+        constexpr StringView kPonderToken = "ponder";
 
-        using Tokens = eastl::vector<eastl::string_view>;
+        using Tokens = Vector<StringView>;
 
         /// The words of @p line, views into it
-        Tokens Split(eastl::string_view line) {
+        Tokens Split(StringView line) {
             Tokens tokens;
             size_t start = 0;
             while (start < line.size()) {
                 const size_t begin = line.find_first_not_of(kLineSeparators, start);
-                if (begin == eastl::string_view::npos) {
+                if (begin == StringView::npos) {
                     break;
                 }
                 size_t end = line.find_first_of(kLineSeparators, begin);
-                if (end == eastl::string_view::npos) {
+                if (end == StringView::npos) {
                     end = line.size();
                 }
                 tokens.push_back(line.substr(begin, end - begin));
@@ -53,12 +53,8 @@ namespace BECore::Chess::Uci {
             return tokens;
         }
 
-        eastl::string ToString(eastl::string_view text) {
-            return eastl::string(text.data(), text.size());
-        }
-
         /// The field a `go` keyword fills, nothing for a word that is not one
-        std::optional<int>* GoField(GoParams& params, eastl::string_view token) {
+        Optional<int>* GoField(GoParams& params, StringView token) {
             if (token == kDepthToken) {
                 return &params.depth;
             }
@@ -88,12 +84,12 @@ namespace BECore::Chess::Uci {
         GoParams ParseGo(const Tokens& tokens) {
             GoParams params;
             for (size_t i = 1; i < tokens.size(); ++i) {
-                const eastl::string_view token = tokens[i];
+                const StringView token = tokens[i];
                 if (token == kInfiniteToken || token == kPonderToken) {
                     params.infinite = true;
-                } else if (std::optional<int>* field = GoField(params, token)) {
+                } else if (Optional<int>* field = GoField(params, token)) {
                     if (i + 1 < tokens.size()) {
-                        if (const std::optional<int> value = ParseInt(tokens[i + 1])) {
+                        if (const Optional<int> value = ParseInt(tokens[i + 1])) {
                             *field = value;
                             ++i;
                         }
@@ -110,7 +106,7 @@ namespace BECore::Chess::Uci {
             }
             size_t next = 2;
             if (tokens[1] == kStartPosToken) {
-                params.startFen = ToString(Position::kStartFen);
+                params.startFen = String(Position::kStartFen);
             } else if (tokens[1] == kFenToken) {
                 for (; next < tokens.size() && tokens[next] != kMovesToken; ++next) {
                     if (!params.startFen.empty()) {
@@ -123,7 +119,7 @@ namespace BECore::Chess::Uci {
             }
             if (next < tokens.size() && tokens[next] == kMovesToken) {
                 for (++next; next < tokens.size(); ++next) {
-                    params.moves.push_back(ToString(tokens[next]));
+                    params.moves.push_back(String(tokens[next]));
                 }
             }
             return true;
@@ -154,7 +150,7 @@ namespace BECore::Chess::Uci {
 
     }  // namespace
 
-    std::optional<int> ParseInt(eastl::string_view text) {
+    Optional<int> ParseInt(StringView text) {
         int value = 0;
         if (text.empty()) {
             return std::nullopt;
@@ -166,13 +162,13 @@ namespace BECore::Chess::Uci {
         return value;
     }
 
-    UciCommand ParseCommand(eastl::string_view line) {
+    UciCommand ParseCommand(StringView line) {
         UciCommand command;
         const Tokens tokens = Split(UciProtocol::TrimLine(line));
         if (tokens.empty()) {
             return command;
         }
-        const eastl::string_view first = tokens.front();
+        const StringView first = tokens.front();
         if (first == kUciToken) {
             command.kind = UciCommandKind::Uci;
         } else if (first == kIsReadyToken) {
