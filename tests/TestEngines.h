@@ -15,7 +15,7 @@ namespace BECore::Chess::Tests {
 
     using MadeEngine = std::expected<SharedPtr<IChessEngine>, EngineError>;
 
-    inline constexpr std::chrono::milliseconds kEngineWaitLimit{30000};  ///< the give-up limit of a wait for something that must happen: it only ends a broken test, so it is generous under load
+    inline constexpr std::chrono::milliseconds kEngineWaitLimit{30000};  ///< only ends a broken test, so it is generous under load
     inline constexpr std::chrono::milliseconds kEnginePollInterval{1};
     inline constexpr std::chrono::milliseconds kGateGiveUp{30000};  ///< a gated engine that is never opened answers a Timeout after this, so a lost test frees its worker
 
@@ -75,7 +75,6 @@ namespace BECore::Chess::Tests {
             return _answered.load();
         }
 
-        /// The limits of the latest request
         [[nodiscard]] SearchLimits LastLimits() const {
             const std::lock_guard lock(_mutex);
             return _lastLimits;
@@ -181,11 +180,10 @@ namespace BECore::Chess::Tests {
     /**
      * @brief An engine for the tests of the analysis: Analyse() answers a scripted line, or the first legal move of the position with a given score. FindMove() is the first legal move.
      *
-     * It counts how often it is asked, keeps the latest request and can hold its answer at a gate until Open(): a gate that honors the CancellationToken returns Cancelled at once when the
-     * token is cancelled (WasCancelled()), one that ignores it stays and answers when it is opened, which is how the tests show that a stale answer is thrown away. A gate that is never
-     * opened gives up with a Timeout after kGateGiveUp. FailWith() makes every Analyse() fail. For a request of two lines or more it adds a second line: the first legal move that is not the
-     * first line's, with the score of SetSecondLine() (a position with no other legal move has one line, as an engine gives it). Configure it while no search runs; the reads are thread safe (a search
-     * runs on a pool worker).
+     * It counts how often it is asked, keeps the latest request and can hold its answer at a gate until Open(), honoring the token or ignoring it and giving up after kGateGiveUp as
+     * GatedEngine's gate does. FailWith() makes every Analyse() fail. For a request of two lines or more it adds a second line: the first legal move that is not the first line's, with the
+     * score of SetSecondLine() (a position with no other legal move has one line, as an engine gives it). Configure it while no search runs; the reads are thread safe (a search runs on a
+     * pool worker).
      */
     class AnalysingEngine final : public IChessEngine {
     public:
@@ -201,7 +199,7 @@ namespace BECore::Chess::Tests {
             _open.store(true);
         }
 
-        /// The score and depth of the second line a request for two lines or more gets. Configure it while no search runs
+        /// The score and depth of the second line a request for two lines or more gets
         void SetSecondLine(AnalysisScore score, int depth = 6) {
             _secondScore = score;
             _secondDepth = depth;
@@ -309,7 +307,7 @@ namespace BECore::Chess::Tests {
      * @brief The AnalysisEngineFactory of a test: counts how often it is asked and for which engines, and hands out what the test decided.
      *
      * The first call gets the first engine, the second the second, and so on, the last engine repeating; or every call fails with one error. It is asked on the main thread only (where
-     * PositionAnalyst::Update() calls it). AsFactory() captures `this`: keep the object alive as long as the analyst can call it, and do not move it.
+     * PositionAnalyst::Update() calls it), so it takes no lock. AsFactory() captures `this`: keep the object alive as long as the analyst can call it, and do not move it.
      */
     class CountingAnalysisFactory {
     public:
@@ -322,7 +320,6 @@ namespace BECore::Chess::Tests {
             return [this](OpponentEngine engine) { return Make(engine); };
         }
 
-        /// How often the factory was asked
         [[nodiscard]] int Calls() const {
             return static_cast<int>(_engineIds.size());
         }
@@ -351,9 +348,8 @@ namespace BECore::Chess::Tests {
     /**
      * @brief The EngineFactory of a test: counts how often it is asked and for which engines and levels, and hands out what the test decided.
      *
-     * The first call gets the first engine, the second the second, and so on, the last engine repeating; or every call fails with one error. It is asked on
-     * the main thread only (that is where OpponentController calls its factory), so it keeps its log without a lock. AsFactory() captures `this`: keep the
-     * object alive as long as the controller can call it, and do not move it.
+     * Engines and failures as CountingAnalysisFactory hands them out. It is asked on the main thread only (that is where OpponentController calls its factory), so it keeps its
+     * log without a lock. AsFactory() captures `this`: keep the object alive as long as the controller can call it, and do not move it.
      */
     class CountingFactory {
     public:
@@ -366,7 +362,6 @@ namespace BECore::Chess::Tests {
             return [this](OpponentEngine engine, const OpponentLevel& level) { return Make(engine, level); };
         }
 
-        /// How often the factory was asked
         [[nodiscard]] int Calls() const {
             return static_cast<int>(_levels.size());
         }
