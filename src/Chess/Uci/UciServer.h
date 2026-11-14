@@ -46,7 +46,7 @@ namespace BECore::Chess::Uci {
         using Sink = eastl::function<void(StringView)>;
 
         /// @p engine answers the searches (not null); @p sink gets every line of the server
-        UciServer(eastl::shared_ptr<IChessEngine> engine, Sink sink);
+        UciServer(SharedPtr<IChessEngine> engine, Sink sink);
 
         /// Cancels a running search and waits for the worker (its `bestmove` still goes to the sink)
         ~UciServer();
@@ -69,7 +69,7 @@ namespace BECore::Chess::Uci {
         /// What a worker needs for one `go`: copies of everything, so the reader may go on
         struct SearchJob {
             SearchRequest request;
-            eastl::shared_ptr<IChessEngine> engine;
+            SharedPtr<IChessEngine> engine;
             CancellationToken token;
             bool deepen = false;
         };
@@ -87,7 +87,7 @@ namespace BECore::Chess::Uci {
         void SayInfo(StringView text);
         void SayBestMove(const Move* move);
 
-        eastl::shared_ptr<IChessEngine> _engine;
+        SharedPtr<IChessEngine> _engine;
         Sink _sink;
         std::mutex _sinkMutex;
 

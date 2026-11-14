@@ -80,7 +80,7 @@ namespace BECore::Chess::Uci {
 
     }  // namespace
 
-    UciServer::UciServer(eastl::shared_ptr<IChessEngine> engine, Sink sink) : _engine(std::move(engine)), _sink(std::move(sink)) {
+    UciServer::UciServer(SharedPtr<IChessEngine> engine, Sink sink) : _engine(std::move(engine)), _sink(std::move(sink)) {
         ASSERT(_engine != nullptr, "UciServer needs an engine");
         _game.startFen.assign(Position::kStartFen.data(), Position::kStartFen.size());
     }
@@ -249,7 +249,7 @@ namespace BECore::Chess::Uci {
 
         SearchJob job;
         job.request = _game;
-        job.engine = eastl::make_shared<BlunderEngine>(_engine, _blunderPercent);
+        job.engine = MakeShared<BlunderEngine>(_engine, _blunderPercent);
         job.token = CancellationToken::Create();
 
         const auto position = _game.FinalPosition();

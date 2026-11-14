@@ -57,11 +57,11 @@ namespace BECore::Chess {
         return std::nullopt;
     }
 
-    eastl::shared_ptr<IChessEngine> WithHandicap(eastl::shared_ptr<IChessEngine> engine, const OpponentLevel& level) {
+    SharedPtr<IChessEngine> WithHandicap(SharedPtr<IChessEngine> engine, const OpponentLevel& level) {
         if (level.blunderPercent <= 0) {
             return engine;
         }
-        return eastl::make_shared<BlunderEngine>(std::move(engine), level.blunderPercent);
+        return MakeShared<BlunderEngine>(std::move(engine), level.blunderPercent);
     }
 
     SearchLimits LimitsOf(OpponentEngine engine, const OpponentLevel& level) {
@@ -74,8 +74,8 @@ namespace BECore::Chess {
         return SearchLimits{};
     }
 
-    Vector<eastl::pair<String, String>> EngineOptionsOf(const OpponentLevel& level) {
-        Vector<eastl::pair<String, String>> options;
+    Vector<Pair<String, String>> EngineOptionsOf(const OpponentLevel& level) {
+        Vector<Pair<String, String>> options;
         options.emplace_back(String(kSkillLevelOption.data(), kSkillLevelOption.size()), Format("{}", level.skillLevel));
         return options;
     }

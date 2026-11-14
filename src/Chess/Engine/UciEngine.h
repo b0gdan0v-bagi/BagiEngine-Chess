@@ -15,7 +15,7 @@ namespace BECore::Chess {
         static constexpr int kDefaultQuitGraceMs = 5000;          ///< how long a closed engine gets to leave after `quit` before it is sent a signal
 
         ProcessLaunch launch;
-        Vector<eastl::pair<String, String>> options;  ///< `setoption name <first> value <second>`, in this order, after `uciok`
+        Vector<Pair<String, String>> options;  ///< `setoption name <first> value <second>`, in this order, after `uciok`
         int startupTimeoutMs = kDefaultStartupTimeoutMs;
         int answerSlackMs = kDefaultAnswerSlackMs;
         int depthOnlyTimeoutMs = kDefaultDepthOnlyTimeoutMs;

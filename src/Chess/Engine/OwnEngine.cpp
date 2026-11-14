@@ -134,7 +134,7 @@ namespace BECore::Chess {
         }
         // A position with fewer legal moves than lines asked for gives as many lines as it has moves
         const size_t lineCount = eastl::min(static_cast<size_t>(lines), static_cast<size_t>(legal.size()));
-        auto impl = eastl::make_unique<Impl>(std::move(*found), std::move(legal), request.limits, start, token, lineCount);
+        auto impl = MakeUnique<Impl>(std::move(*found), std::move(legal), request.limits, start, token, lineCount);
         impl->StartJob(false);
         return OwnSearch(std::move(impl));
     }

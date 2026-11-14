@@ -31,7 +31,7 @@ namespace BECore::Chess {
      * object each time, so it is a second process, never the opponent's. Without Stockfish in the build (CHESS_NO_STOCKFISH) Stockfish is `Unsupported` (UnavailableEngineError) and the picked engine,
      * which a game starts with, is Own.
      */
-    [[nodiscard]] std::expected<eastl::shared_ptr<IChessEngine>, EngineError> MakeAnalysisEngine(OpponentEngine engine, const OpponentSettings& settings);
+    [[nodiscard]] std::expected<SharedPtr<IChessEngine>, EngineError> MakeAnalysisEngine(OpponentEngine engine, const OpponentSettings& settings);
 
     /**
      * @brief Analyses the position of a ChessGameModel in the background and keeps the answer for exactly that version of the game: the evaluation and the hint.
@@ -187,9 +187,9 @@ namespace BECore::Chess {
     private:
         /// What the worker and the analyst share. The worker writes the answer and then raises `done`; the analyst reads the answer after it sees `done`
         struct Search {
-            explicit Search(eastl::shared_ptr<IChessEngine> engineToAsk) : engine(std::move(engineToAsk)) {}
+            explicit Search(SharedPtr<IChessEngine> engineToAsk) : engine(std::move(engineToAsk)) {}
 
-            eastl::shared_ptr<IChessEngine> engine;
+            SharedPtr<IChessEngine> engine;
             CancellationToken token = CancellationToken::Create();
             std::mutex mutex;  ///< guards `answer`
             std::expected<Analysis, EngineError> answer = std::unexpected(EngineError{EngineErrorKind::NoMove, "the search has not finished"});
@@ -197,7 +197,7 @@ namespace BECore::Chess {
         };
 
         /// Runs on the pool: asks the engine and leaves the answer in @p search. Takes its arguments by value, so the frame owns everything it uses
-        static Task<void> RunSearch(eastl::shared_ptr<Search> search, SearchRequest request);
+        static Task<void> RunSearch(SharedPtr<Search> search, SearchRequest request);
 
         /// Update() without the rater: the analysis search of the evaluation and the hint
         void UpdateSearch(const ChessGameModel& model, OpponentEngine picked);
@@ -211,14 +211,14 @@ namespace BECore::Chess {
         void ClearError();
 
         AnalysisEngineFactory _factory;  ///< empty: MakeAnalysisEngine over empty settings
-        eastl::shared_ptr<IChessEngine> _engine;
+        SharedPtr<IChessEngine> _engine;
         OpponentEngine _engineKind = kDefaultOpponentEngine;  ///< what _engine was made for; meaningless while it is null
 
         bool _evaluationOn = false;
         Optional<uint64_t> _hintVersion;  ///< the version of the model a hint was asked at
 
-        eastl::shared_ptr<Search> _search;  ///< the search under way, null when none; main thread only
-        uint64_t _searchVersion = 0;        ///< the version of the model when _search was asked
+        SharedPtr<Search> _search;    ///< the search under way, null when none; main thread only
+        uint64_t _searchVersion = 0;  ///< the version of the model when _search was asked
         OpponentEngine _searchEngine = kDefaultOpponentEngine;
 
         Optional<AnalysisLine> _result;  ///< the answer, for _resultVersion and _resultEngine

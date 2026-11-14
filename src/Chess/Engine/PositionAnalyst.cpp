@@ -22,7 +22,7 @@ namespace BECore::Chess {
         return HintRefusalFor(model, ProgramSides::Of(programPlays));
     }
 
-    std::expected<eastl::shared_ptr<IChessEngine>, EngineError> MakeAnalysisEngine(OpponentEngine engine, const OpponentSettings& settings) {
+    std::expected<SharedPtr<IChessEngine>, EngineError> MakeAnalysisEngine(OpponentEngine engine, const OpponentSettings& settings) {
         switch (engine) {
             case OpponentEngine::Stockfish: {
                 if (!IsOpponentEngineAvailable(OpponentEngine::Stockfish)) {
@@ -35,10 +35,10 @@ namespace BECore::Chess {
                 UciEngineSettings uci;
                 uci.launch.path = *program;
                 uci.quitGraceMs = OpponentController::kQuitGraceMs;
-                return eastl::make_shared<UciEngine>(std::move(uci));
+                return MakeShared<UciEngine>(std::move(uci));
             }
             case OpponentEngine::Own:
-                return eastl::make_shared<OwnEngine>();
+                return MakeShared<OwnEngine>();
         }
         return std::unexpected(EngineError{EngineErrorKind::BadRequest, "unknown engine"});
     }
@@ -175,7 +175,7 @@ namespace BECore::Chess {
         return lines;
     }
 
-    Task<void> PositionAnalyst::RunSearch(eastl::shared_ptr<Search> search, SearchRequest request) {
+    Task<void> PositionAnalyst::RunSearch(SharedPtr<Search> search, SearchRequest request) {
         std::expected<Analysis, EngineError> answer = AnswerOfTask(co_await search->engine->AnalyseAsync(request, search->token));
         {
             const std::lock_guard lock(search->mutex);
@@ -248,7 +248,7 @@ namespace BECore::Chess {
     void PositionAnalyst::StartSearch(const ChessGameModel& model, OpponentEngine picked) {
         const uint64_t version = model.GetVersion();
         if (!_engine) {
-            std::expected<eastl::shared_ptr<IChessEngine>, EngineError> made = _factory ? _factory(picked) : MakeAnalysisEngine(picked, OpponentSettings{});
+            std::expected<SharedPtr<IChessEngine>, EngineError> made = _factory ? _factory(picked) : MakeAnalysisEngine(picked, OpponentSettings{});
             if (!made) {
                 Fail(version, picked, std::move(made.error()));
                 return;
@@ -256,7 +256,7 @@ namespace BECore::Chess {
             _engine = std::move(*made);
             _engineKind = picked;
         }
-        _search = eastl::make_shared<Search>(_engine);
+        _search = MakeShared<Search>(_engine);
         _searchVersion = version;
         _searchEngine = picked;
         const SearchLimits limits = LimitsOf(picked, GetOpponentLevels().back());

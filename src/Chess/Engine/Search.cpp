@@ -292,7 +292,7 @@ namespace BECore::Chess {
 
         Frame& Searcher::Acquire(int ply) {
             if (static_cast<size_t>(ply) >= _frames.size()) {
-                _frames.push_back(eastl::make_unique<Frame>());
+                _frames.push_back(MakeUnique<Frame>());
             }
             _top = ply;
             return *_frames[static_cast<size_t>(ply)];
@@ -669,7 +669,7 @@ namespace BECore::Chess {
         Searcher searcher;
     };
 
-    SearchJob::SearchJob(Position position, SearchSettings settings, SearchControl control) : _impl(eastl::make_unique<Impl>(eastl::move(position), eastl::move(settings), eastl::move(control))) {}
+    SearchJob::SearchJob(Position position, SearchSettings settings, SearchControl control) : _impl(MakeUnique<Impl>(eastl::move(position), eastl::move(settings), eastl::move(control))) {}
 
     SearchJob::~SearchJob() = default;
     SearchJob::SearchJob(SearchJob&&) noexcept = default;

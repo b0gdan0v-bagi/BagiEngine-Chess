@@ -4,7 +4,7 @@
 
 namespace BECore::Chess {
 
-    EngineOpponent::EngineOpponent(eastl::shared_ptr<IChessEngine> engine, PieceColor side, SearchLimits limits) : _engine(std::move(engine)), _side(side), _limits(limits) {}
+    EngineOpponent::EngineOpponent(SharedPtr<IChessEngine> engine, PieceColor side, SearchLimits limits) : _engine(std::move(engine)), _side(side), _limits(limits) {}
 
     EngineOpponent::~EngineOpponent() {
         Cancel();
@@ -34,7 +34,7 @@ namespace BECore::Chess {
         }
     }
 
-    Task<void> EngineOpponent::RunSearch(eastl::shared_ptr<Search> search, SearchRequest request) {
+    Task<void> EngineOpponent::RunSearch(SharedPtr<Search> search, SearchRequest request) {
         std::expected<Move, EngineError> answer = AnswerOfTask(co_await search->engine->FindMoveAsync(request, search->token));
         {
             const std::lock_guard lock(search->mutex);
@@ -45,7 +45,7 @@ namespace BECore::Chess {
     }
 
     void EngineOpponent::StartSearch(const ChessGameModel& model) {
-        _search = eastl::make_shared<Search>(_engine);
+        _search = MakeShared<Search>(_engine);
         _searchVersion = model.GetVersion();
         // Fire and forget: the task keeps itself alive until it ends, and the answer comes through _search, not through the handle
         TaskManager::GetInstance().Run(RunSearch(_search, SearchRequest::FromModel(model, _limits)));

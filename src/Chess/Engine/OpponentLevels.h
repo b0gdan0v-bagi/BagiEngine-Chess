@@ -31,7 +31,7 @@ namespace BECore::Chess {
 
     /// The engine as the game plays this level: the same pointer when the level has no blunderPercent, else a BlunderEngine around it. The handicap is the same for
     /// Stockfish and for the own engine, and a blunder starts neither of them
-    [[nodiscard]] eastl::shared_ptr<IChessEngine> WithHandicap(eastl::shared_ptr<IChessEngine> engine, const OpponentLevel& level);
+    [[nodiscard]] SharedPtr<IChessEngine> WithHandicap(SharedPtr<IChessEngine> engine, const OpponentLevel& level);
 
     /// What the engine gets for a move at this level (the handicap of the level is not a limit: see WithHandicap). Stockfish: the move time of the level and no depth. The own engine: the depth of the
     /// level, with kOwnMoveTimeCapMs as the protection of the window. A level without an ownDepth gives the own engine a depth of 0 (a request the search refuses)
@@ -39,6 +39,6 @@ namespace BECore::Chess {
 
     /// The UCI options of this level for UciEngineSettings::options (the Skill Level only; no UCI_Elo, it has the same floor as Skill Level 0): name and value of `setoption name <first> value
     /// <second>`
-    [[nodiscard]] Vector<eastl::pair<String, String>> EngineOptionsOf(const OpponentLevel& level);
+    [[nodiscard]] Vector<Pair<String, String>> EngineOptionsOf(const OpponentLevel& level);
 
 }  // namespace BECore::Chess

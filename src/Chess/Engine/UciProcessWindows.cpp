@@ -256,7 +256,7 @@ namespace BECore::Chess {
             AppendQuoted(commandLine, *wide);
         }
 
-        auto state = eastl::make_unique<WindowsState>();
+        auto state = MakeUnique<WindowsState>();
         SECURITY_ATTRIBUTES inheritable{sizeof(SECURITY_ATTRIBUTES), nullptr, TRUE};
 
         // stdin: an anonymous pipe, our end kept from the child

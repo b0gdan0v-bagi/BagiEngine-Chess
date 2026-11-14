@@ -68,7 +68,7 @@ namespace BECore::Chess {
         return ratings;
     }
 
-    Task<void> MoveRater::RunSearch(eastl::shared_ptr<Search> search, SearchRequest request) {
+    Task<void> MoveRater::RunSearch(SharedPtr<Search> search, SearchRequest request) {
         std::expected<Analysis, EngineError> answer = AnswerOfTask(co_await search->engine->AnalyseAsync(request, search->token));
         {
             const std::lock_guard lock(search->mutex);
@@ -139,7 +139,7 @@ namespace BECore::Chess {
 
     void MoveRater::StartSearch(size_t ply) {
         if (!_engine) {
-            std::expected<eastl::shared_ptr<IChessEngine>, EngineError> made = _factory ? _factory(OpponentEngine::Own) : MakeAnalysisEngine(OpponentEngine::Own, OpponentSettings{});
+            std::expected<SharedPtr<IChessEngine>, EngineError> made = _factory ? _factory(OpponentEngine::Own) : MakeAnalysisEngine(OpponentEngine::Own, OpponentSettings{});
             if (!made) {
                 Fail(std::nullopt, std::move(made.error()));
                 return;
@@ -155,7 +155,7 @@ namespace BECore::Chess {
         request.moves.assign(_moves.begin(), _moves.begin() + ply);
         request.limits = SearchLimits{0, kRatingDepth};
         request.lines = kRatingLines;
-        _search = eastl::make_shared<Search>(_engine);
+        _search = MakeShared<Search>(_engine);
         _searchPly = ply;
         _searchGeneration = _generation;
         // Fire and forget: the task keeps itself alive until it ends, and the answer comes through _search, not through the handle

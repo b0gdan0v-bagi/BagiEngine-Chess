@@ -95,9 +95,9 @@ namespace BECore::Chess {
     private:
         /// What the worker and the rater share. The worker writes the answer and then raises `done`; the rater reads the answer after it sees `done`
         struct Search {
-            explicit Search(eastl::shared_ptr<IChessEngine> engineToAsk) : engine(std::move(engineToAsk)) {}
+            explicit Search(SharedPtr<IChessEngine> engineToAsk) : engine(std::move(engineToAsk)) {}
 
-            eastl::shared_ptr<IChessEngine> engine;
+            SharedPtr<IChessEngine> engine;
             CancellationToken token = CancellationToken::Create();
             std::mutex mutex;  ///< guards `answer`
             std::expected<Analysis, EngineError> answer = std::unexpected(EngineError{EngineErrorKind::NoMove, "the search has not finished"});
@@ -105,7 +105,7 @@ namespace BECore::Chess {
         };
 
         /// Runs on the pool: asks the engine and leaves the answer in @p search. Takes its arguments by value, so the frame owns everything it uses
-        static Task<void> RunSearch(eastl::shared_ptr<Search> search, SearchRequest request);
+        static Task<void> RunSearch(SharedPtr<Search> search, SearchRequest request);
 
         /// The game of @p model is the held one, perhaps grown: the same start FEN and the held moves as its first moves
         [[nodiscard]] bool Extends(const ChessGameModel& model) const;
@@ -118,7 +118,7 @@ namespace BECore::Chess {
         void ClearError();
 
         AnalysisEngineFactory _factory;  ///< empty: MakeAnalysisEngine over empty settings
-        eastl::shared_ptr<IChessEngine> _engine;
+        SharedPtr<IChessEngine> _engine;
         bool _on = false;
 
         String _startFen;  ///< the game the ratings belong to: its start position and the moves seen so far
@@ -127,8 +127,8 @@ namespace BECore::Chess {
         Vector<bool> _failed;      ///< aligned with _moves: the search for this move failed and is not retried
         uint64_t _generation = 0;  ///< grows when the held history is dropped; a search of an older one is thrown away
 
-        eastl::shared_ptr<Search> _search;  ///< the search under way, null when none; main thread only
-        size_t _searchPly = 0;              ///< the move _search rates
+        SharedPtr<Search> _search;  ///< the search under way, null when none; main thread only
+        size_t _searchPly = 0;      ///< the move _search rates
         uint64_t _searchGeneration = 0;
 
         Optional<EngineError> _error;
