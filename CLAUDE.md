@@ -4,6 +4,8 @@
 
 `ChessGame` is an `IGame` (name `Chess`, scene `ChessScene`). Executable `BagiChess`. Infrastructure and how a game is registered: `engine/src/Modules/Games/CLAUDE.md`. Namespace `BECore::Chess`. The content is in `config/` (`ApplicationConfig.xml`, `SceneConfig.xml`, `TextureLibrary.xml`, `ChessSettings.xml`) and `assets/`. `BagiChess` starts in Game mode (`mode="Game"` in its `ApplicationConfig.xml`, no editor); set `mode="Editor"` to open it in the scene editor (a local edit only: `ChessWebConfigTest` fails with it). The game has a web target with the own engine only (CMake switch `CHESS_NO_STOCKFISH`, no control API, no editor there): see "The web build".
 
+Style is the engine's (`engine/CLAUDE.md`); use `BECore::Format`, not `fmt::` (`BagiChessFmtLayerCheck`).
+
 ## Layout
 
 ```
@@ -68,4 +70,4 @@ New rule code goes into `Game/` with a gtest case; do not patch around the gener
 
 ## Tests
 
-`tests/`, executable `ChessTests`, plus the control smoke `BagiChessControlSmoke` (`tests/control_smoke.py`) and the recorded scenarios `BagiChessScenario.*` (`tests/scenarios/`) under ctest. Where a test goes, the helpers, the fake UCI engine and the build variants are in `tests/CLAUDE.md`: read it before adding or changing a test. Tests that need Stockfish skip themselves without one.
+`tests/`, executable `ChessTests`, plus the control smoke `BagiChessControlSmoke` (`tests/control_smoke.py`) and the recorded scenarios `BagiChessScenario.*` (`tests/scenarios/`) under ctest. Where a test goes, the helpers, the fake UCI engine and the build variants are in `tests/CLAUDE.md`: read it before adding or changing a test.

@@ -120,6 +120,13 @@ if(ENGINE_BUILD_TESTS)
         # The unit tests of the match tool (standard library unittest, no Stockfish, no executable)
         add_test(NAME BagiChessMatchToolTests COMMAND ${Python3_EXECUTABLE} -m unittest discover -s ${CMAKE_CURRENT_SOURCE_DIR}/tools/tests -p "test_match_*.py" WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
         set_tests_properties(BagiChessMatchToolTests PROPERTIES TIMEOUT 120)
+
+        # The game formats through the engine's layer (BECore::Format), not fmt:: (tests/check_fmt_layer.py runs the engine's codemod over src, tests and uci); skipped (77) without the engine's tool
+        add_test(NAME BagiChessFmtLayerCheck COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_fmt_layer.py)
+        set_tests_properties(BagiChessFmtLayerCheck PROPERTIES
+            SKIP_RETURN_CODE 77
+            TIMEOUT 60
+        )
     endif()
 
     # The files of the preload package of the web build are exactly the game's (cmake/ChessWeb.cmake); a cmake -P script, no Python, no executable
