@@ -5590,7 +5590,7 @@ namespace BECore::Chess::Tests {
                 ++notchCases;
                 if (!controls.empty()) {
                     ++notchCasesWithAnOverlap;
-                    // Not only close: the Turn label lies on top of the balance of the upper group, and of its first rows (src/Chess/Components/CLAUDE.md, "The captured material", limit (b))
+                    // Not only close: the Turn label lies on top of the balance of the upper group, and of its first rows (src/Chess/Components/CLAUDE.md, "The captured material", "Known limits")
                     const eastl::string touching = MaterialClearance(material->GetLayout(), hud->GetLayout(), 0.0f);
                     EXPECT_NE(touching.find("MaterialTopBalance ("), eastl::string::npos) << matrixCase.label.c_str() << ":\n" << touching.c_str();
                     EXPECT_NE(touching.find("MaterialTopQueenRow ("), eastl::string::npos) << matrixCase.label.c_str() << ":\n" << touching.c_str();
