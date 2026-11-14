@@ -101,7 +101,7 @@ namespace BECore::Chess::Tests {
         Vector<String> lines;
         //-NoStd: file layer (engine-file-layer)
         std::ifstream stream(file);
-        std::string line;  //-NoStd: std::getline
+        std::string line;  //-NoStd: file layer (engine-file-layer)
         //-NoStd: file layer (engine-file-layer)
         while (std::getline(stream, line)) {
             lines.emplace_back(line.c_str(), line.size());
