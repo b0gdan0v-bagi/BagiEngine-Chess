@@ -23,7 +23,6 @@ namespace BECore::Chess::Tests {
         constexpr int kShallow = 2;
         constexpr int kBlockedDepth = 4;
 
-        /// The words a server line may begin with
         constexpr const char* kKnownKeywords[] = {"id", "option", "uciok", "readyok", "bestmove", "info"};
 
         bool StartsWith(const String& text, StringView prefix) {
