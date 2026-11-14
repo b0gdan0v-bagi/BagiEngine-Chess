@@ -30,16 +30,13 @@ namespace BECore::Chess {
         constexpr Color kLegalCaptureSquare{220, 90, 90, 160};
         constexpr Color kCheckSquare{230, 60, 60, 210};
         constexpr Color kMateSquare{150, 20, 20, 240};
-        // The hint (the best move the engine found): the square the piece leaves in a lighter blue, the square it goes to in a stronger one. A first guess nobody has seen on screen: neither the
-        // red of check nor the green of the selection, drawn under the selection so that one stays readable on top of it
+        // The hint, the last move and the premoves each have a hue of their own, apart from the green of the selection and the red of check; the colors are not yet judged on screen.
+        // The hint (the best move the engine found): the square the piece leaves lighter, the square it goes to stronger
         constexpr Color kHintFromSquare{60, 130, 230, 110};
         constexpr Color kHintToSquare{60, 130, 230, 200};
-        // The last move (both squares, one color): an amber that is neither the green of the selection and the legal moves, nor the red of check, nor the blue of the hint. At alpha 140 it
-        // turns the light square (240,217,181) to about (243,211,111) and the dark one (181,136,99) to about (214,171,76), so it reads on both; drawn under all of them. A first guess nobody has seen
-        // on screen
+        // The last move (both squares, one color): the alpha is chosen so that it reads on both the light and the dark squares
         constexpr Color kLastMoveSquare{245, 205, 50, 140};
-        // The queued premoves (the from and the to square of each, one color): a purple that is neither the green of the selection, the amber of the last move, the red of check nor the blue of the
-        // hint. Drawn after the hint and before the selection, so the selection of the next premove stays readable on top. A first guess nobody has seen on screen
+        // The queued premoves (the from and the to square of each, one color)
         constexpr Color kPremoveSquare{150, 90, 200, 150};
 
         // How far, in scene units, the pointer must go from the press before the piece is lifted: a click with a shaky hand never lifts one. It decides only the picture, not the move
@@ -55,10 +52,10 @@ namespace BECore::Chess {
             }
         }
 
-        // The interned names of the variables of the labels at the edges of the board, built on the first use (an interned name is not made per frame)
+        // Interned on the first use, not per frame
         struct CoordinateVars {
-            Array<PoolString, kLastBoardIndex + 1> files;  // coordFile0..7, by column
-            Array<PoolString, kLastBoardIndex + 1> ranks;  // coordRank0..7, by row from the top
+            Array<PoolString, kLastBoardIndex + 1> files;  // by column
+            Array<PoolString, kLastBoardIndex + 1> ranks;  // by row from the top
         };
 
         const CoordinateVars& GetCoordinateVars() {
@@ -98,7 +95,7 @@ namespace BECore::Chess {
         }
         _enginesChecked = true;
         if (!IsOpponentEngineAvailable(OpponentEngine::Stockfish)) {
-            // A scene without the panel has nothing to hide: the call finds no element and does nothing
+            // A scene without the panel has nothing to hide: the call does nothing
             UICanvasComponent::SetElementVisibleByName(GetScene(), "EngineStockfish"_intern, false);
         }
     }
@@ -111,7 +108,7 @@ namespace BECore::Chess {
         }
         // The opponent plays here, on the main thread, and not in OnDraw(): it changes the model
         game->GetOpponent().Update();
-        game->GetAnalyst().Update(game->GetModel(), game->GetOpponent().GetEngine());  // the engine search for the evaluation and the hint, on the pool; never waits
+        game->GetAnalyst().Update(game->GetModel(), game->GetOpponent().GetEngine());  // the search runs on the pool; never waits
         static_cast<void>(game->GetChoice().Color());  // reading it remembers the person's color of a side set from outside (the control API) before that side is cleared
         game->UpdateKeeper();                          // after the opponent and the choice: a move the program just played is saved in this frame's key
         LogResultOnce(game->GetModel());
@@ -161,8 +158,7 @@ namespace BECore::Chess {
         const OpponentChoice& choice = game->GetChoice();
         // Read on every refresh, also when nothing else changed: it remembers the person's color, which a set_state of the control API could otherwise take with it
         const PieceColor personColor = choice.Color();
-        // A search starts and ends without a move of the game, and a side or a level changes without one: all of it is a reason to say the words again. The person's
-        // color changes without any of them while two people play
+        // A search starts and ends without a move of the game, and a side or a level changes without one; the person's color changes without any of them while two people play
         const bool thinking = opponent.IsThinking();
         const bool opponentChanged = &model != _publishedModel || opponent.GetRevision() != _publishedRevision;
         if (!opponentChanged && model.GetVersion() == _publishedVersion && thinking == _publishedThinking && personColor == _publishedColor) {
@@ -182,7 +178,7 @@ namespace BECore::Chess {
         UIVars& vars = CoreManager::GetUIVars();
         vars.Set("turn"_intern, StringView(turn));
         vars.Set("status"_intern, StringView(status));
-        // The ids of the opponent panel, those of the control API (the person's color, not the program's); the words are the text of the segments in the scene
+        // The ids of the opponent panel, those of the control API (the person's color, not the program's)
         vars.Set("opponentMode"_intern, choice.ModeId());
         vars.Set("opponentColor"_intern, choice.ColorId());
         vars.Set("opponentEngine"_intern, choice.EngineId());
@@ -191,7 +187,6 @@ namespace BECore::Chess {
     }
 
     void ChessBoardComponent::AnswerSetAction(const InputEvents::ActionEvent& event) {
-        // The actions of the segments of the opponent panel; `value` is the id the person chose
         OpponentChoice* choice = ChessGame::GetActiveChoice();
         if (!choice) {
             return;
@@ -239,7 +234,7 @@ namespace BECore::Chess {
     }
 
     void ChessBoardComponent::ShowMenuSection(Optional<MenuSection> shown) {
-        // The list and the section canvases are modal canvases of the scene, hidden at the start; a scene without one has nothing to show or hide
+        // A scene without a section canvas has nothing to show or hide
         for (const MenuSection& section : MenuSections()) {
             UICanvasComponent::SetVisibleByName(GetScene(), PoolString::Intern(section.node), shown && shown->id == section.id);
         }
@@ -268,7 +263,6 @@ namespace BECore::Chess {
     }
 
     void ChessBoardComponent::OnAction(const InputEvents::ActionEvent& event) {
-        // The actions of the buttons of the HUD in config/SceneConfig.xml
         const PoolString resetAction = "ChessReset"_intern;
         if (event.action == resetAction) {
             if (ChessGameModel* model = ChessGame::GetActiveModel()) {
@@ -295,7 +289,6 @@ namespace BECore::Chess {
     }
 
     void ChessBoardComponent::SquareToPixel(int file, int rank, PieceColor bottom, float& outX, float& outY) const {
-        // The cell comes from BoardOrientation.h: White's back rank is at the bottom unless the program plays White.
         const BoardCell cell = CellOf(Square{static_cast<int8_t>(file), static_cast<int8_t>(rank)}, bottom);
         outX = _originX + static_cast<float>(cell.column) * _squareSize;
         outY = _originY + static_cast<float>(cell.rowFromTop) * _squareSize;
@@ -308,7 +301,6 @@ namespace BECore::Chess {
         const PieceColor bottom = GetBottomColor();  // once per draw: every square of this frame is placed for the same orientation
         PublishCoordinates(bottom);                  // before the model check: the labels show also when no game is active
 
-        // Checkered base.
         for (int rank = 0; rank < 8; ++rank) {
             for (int file = 0; file < 8; ++file) {
                 float px = 0.0f;
@@ -324,8 +316,7 @@ namespace BECore::Chess {
             return;
         }
 
-        // The last move, read from the model's history (the component keeps nothing): the two squares of the move, under the check, the hint and the selection. Castling is the king's
-        // move, en passant and a promotion the pawn's; no move yet (a new game, a reset, a position set from a FEN) marks nothing
+        // The last move, under the check, the hint and the selection; no move yet (a new game, a reset, a position set from a FEN) marks nothing
         if (!model->GetMoves().empty()) {
             const Move last = model->GetMoves().back();
             float mx = 0.0f;
@@ -336,7 +327,6 @@ namespace BECore::Chess {
             renderer.DrawFilledRect(mx, my, _squareSize, _squareSize, kLastMoveSquare);
         }
 
-        // The king that is attacked: bright red while the game goes on, dark red once it is mate.
         if (model->IsInCheck()) {
             const Square king = model->GetKingSquare(model->GetTurn());
             float kx = 0.0f;
@@ -345,8 +335,8 @@ namespace BECore::Chess {
             renderer.DrawFilledRect(kx, ky, _squareSize, _squareSize, model->IsGameOver() ? kMateSquare : kCheckSquare);
         }
 
-        // The hint, once the engine has answered for this very position: the two squares of the move, under the selection. It is never played, and the analyst gives nothing for another
-        // version, so any change of the position takes it off at the next frame
+        // The hint, under the selection, once the engine has answered for this very position: the analyst gives nothing for another version, so any change of the position takes it off at the next
+        // frame
         if (const PositionAnalyst* analyst = ChessGame::GetActiveAnalyst(); analyst && !model->IsGameOver()) {
             if (const Optional<AnalysisLine> hint = analyst->GetHint(*model)) {
                 float hx = 0.0f;
@@ -358,7 +348,7 @@ namespace BECore::Chess {
             }
         }
 
-        // The queued premoves of the person, read from the model (the component keeps nothing); they stand until the program has answered, so they are under the selection of the next one
+        // The queued premoves stand until the program has answered, so they are drawn under the selection of the next one
         for (const Premove& premove : model->GetPremoves()) {
             float qx = 0.0f;
             float qy = 0.0f;
@@ -405,15 +395,14 @@ namespace BECore::Chess {
             return;
         }
 
-        // After the game has ended a click on the board starts the next one.
+        // After the game has ended a click on the board starts the next one
         if (model->IsGameOver()) {
             model->Reset();
             return;
         }
 
-        // The program's turn: the person has no move to make, and a selection of the ordinary kind would only fight the search that is under way. When the program plays this side only, the
-        // click is a premove for the other color (the person's), queued on the premove board and played after the program's answer; no drag is armed and no promotion is asked (a premoved
-        // promotion plays as a queen). While two programs play (a watch) the board takes no click on either turn
+        // The program's turn: the person has no move to make. When the program plays this side only, the click is a premove for the other color (no drag is armed, no promotion is asked: it
+        // plays as a queen); while two programs play the board takes no click on either turn
         const OpponentController* opponent = ChessGame::GetActiveOpponent();
         if (opponent && opponent->PlaysFor(model->GetTurn())) {
             const PieceColor person = Opposite(model->GetTurn());
@@ -426,11 +415,11 @@ namespace BECore::Chess {
         if (model->OnSquareClicked(*clicked)) {
             LogResultOnce(*model);
         }
-        // The click may have left a promotion pending (the panel asks for the piece) or dropped one
+        // The click may have left a promotion pending or dropped one
         SyncPromotionPanel(*model);
 
-        // The press has acted as a click. When it left the piece on the pressed square selected (it selected or re-selected a piece of the side to move; a press that played a move
-        // leaves no selection) the left button also arms a drag; the release decides whether it plays a move
+        // The press has acted as a click. When it left the piece on the pressed square selected (a press that played a move leaves no selection) the left button also arms a drag; the
+        // release decides whether it plays a move
         if (e.button.button == SDL_BUTTON_LEFT && !model->IsGameOver() && !model->HasPendingPromotion() && model->HasSelection() && model->GetSelected() == *clicked) {
             const float sceneX = GetScene().ScreenToSceneX(e.button.x);
             const float sceneY = GetScene().ScreenToSceneY(e.button.y);
