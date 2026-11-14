@@ -1226,4 +1226,292 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(model.GetMoves().size(), moves.size());
     }
 
+    // ---- Premoves ----
+
+    namespace {
+
+        bool PremoveClick(ChessGameModel& model, eastl::string_view square, PieceColor premover = PieceColor::White) {
+            return model.OnPremoveClicked(premover, Sq(square));
+        }
+
+        /// A premove by two clicks; true when the second one queued it
+        bool Queue(ChessGameModel& model, eastl::string_view from, eastl::string_view to, PieceColor premover = PieceColor::White) {
+            PremoveClick(model, from, premover);
+            return PremoveClick(model, to, premover);
+        }
+
+        /// A game from @p fen (the side to move in it is the program's)
+        ChessGameModel ModelFrom(eastl::string_view fen) {
+            ChessGameModel model;
+            model.SetPosition(PositionFromFen(fen));
+            return model;
+        }
+
+        /// The person plays White, the program has answered nothing yet: Black is to move
+        ChessGameModel BlackToMoveAfterE4() {
+            ChessGameModel model;
+            EXPECT_TRUE(Play(model, "e2e4"));
+            return model;
+        }
+
+        bool HasTarget(const ChessGameModel& model, eastl::string_view square) {
+            const auto& targets = model.GetLegalMoves();
+            return eastl::find(targets.begin(), targets.end(), Sq(square)) != targets.end();
+        }
+
+    }  // namespace
+
+    TEST(ChessGameModelTest, PremoveClickSelectsAnOwnPieceWithItsPremoveTargets) {
+        ChessGameModel model = BlackToMoveAfterE4();
+        EXPECT_FALSE(PremoveClick(model, "d2"));
+        ASSERT_TRUE(model.HasSelection());
+        EXPECT_EQ(model.GetSelected(), Sq("d2"));
+        EXPECT_TRUE(HasTarget(model, "d3"));
+        EXPECT_TRUE(HasTarget(model, "d4"));
+        EXPECT_FALSE(HasTarget(model, "d5"));
+        EXPECT_TRUE(model.GetPremoves().empty());
+        EXPECT_FALSE(model.GetPremoveColor().has_value());
+    }
+
+    TEST(ChessGameModelTest, PremoveClickOnATargetQueuesTheMoveAndEndsTheSelection) {
+        ChessGameModel model = BlackToMoveAfterE4();
+        EXPECT_TRUE(Queue(model, "d2", "d4"));
+        ASSERT_EQ(model.GetPremoves().size(), 1U);
+        EXPECT_EQ(model.GetPremoves()[0], (Premove{Sq("d2"), Sq("d4")}));
+        EXPECT_EQ(model.GetPremoveColor(), PieceColor::White);
+        EXPECT_FALSE(model.HasSelection());
+        EXPECT_TRUE(model.GetLegalMoves().empty());
+        EXPECT_EQ(model.GetTurn(), PieceColor::Black) << "queueing moves nothing";
+    }
+
+    TEST(ChessGameModelTest, PremoveClickOnAnotherOwnPieceReselects) {
+        ChessGameModel model = BlackToMoveAfterE4();
+        PremoveClick(model, "d2");
+        EXPECT_FALSE(PremoveClick(model, "g1"));
+        ASSERT_TRUE(model.HasSelection());
+        EXPECT_EQ(model.GetSelected(), Sq("g1"));
+        EXPECT_TRUE(HasTarget(model, "f3"));
+        EXPECT_TRUE(model.GetPremoves().empty());
+    }
+
+    TEST(ChessGameModelTest, PremoveClickElsewhereCancelsTheWholeQueue) {
+        ChessGameModel model = BlackToMoveAfterE4();
+        ASSERT_TRUE(Queue(model, "d2", "d4"));
+        ASSERT_TRUE(Queue(model, "g1", "f3"));
+        ASSERT_EQ(model.GetPremoves().size(), 2U);
+
+        EXPECT_FALSE(PremoveClick(model, "a5")) << "an empty square with no selection";
+        EXPECT_TRUE(model.GetPremoves().empty());
+        EXPECT_FALSE(model.GetPremoveColor().has_value());
+
+        ASSERT_TRUE(Queue(model, "d2", "d4"));
+        PremoveClick(model, "b1");
+        EXPECT_TRUE(model.HasSelection());
+        EXPECT_FALSE(PremoveClick(model, "h5")) << "a square that is no target of the selection";
+        EXPECT_FALSE(model.HasSelection());
+        EXPECT_TRUE(model.GetPremoves().empty());
+    }
+
+    TEST(ChessGameModelTest, PremoveClickOnAnEnemyPieceCancelsToo) {
+        ChessGameModel model = BlackToMoveAfterE4();
+        ASSERT_TRUE(Queue(model, "d2", "d4"));
+        EXPECT_FALSE(PremoveClick(model, "e7"));
+        EXPECT_TRUE(model.GetPremoves().empty());
+        EXPECT_FALSE(model.HasSelection());
+    }
+
+    TEST(ChessGameModelTest, PremoveClickIsRefusedForTheSideToMoveAndOutsideTheBoardAndAfterTheEnd) {
+        ChessGameModel model;
+        EXPECT_FALSE(PremoveClick(model, "e2")) << "White is the side to move";
+        EXPECT_FALSE(model.HasSelection());
+
+        ChessGameModel after = BlackToMoveAfterE4();
+        EXPECT_FALSE(after.OnPremoveClicked(PieceColor::White, Square{8, 0}));
+        EXPECT_FALSE(after.OnPremoveClicked(PieceColor::White, Square{-1, -1}));
+        EXPECT_FALSE(after.HasSelection());
+        EXPECT_FALSE(PremoveClick(after, "e7", PieceColor::Black)) << "Black is the side to move";
+        EXPECT_FALSE(after.HasSelection());
+
+        ChessGameModel mated = ModelFrom("7k/5Q2/6K1/8/8/8/8/8 b - - 0 1");
+        ASSERT_TRUE(mated.IsGameOver());
+        EXPECT_FALSE(PremoveClick(mated, "g6"));
+        EXPECT_FALSE(mated.HasSelection());
+    }
+
+    TEST(ChessGameModelTest, TheSecondPremoveMovesThePieceTheFirstOneMoved) {
+        ChessGameModel model = BlackToMoveAfterE4();
+        ASSERT_TRUE(Queue(model, "g1", "f3"));
+        EXPECT_FALSE(PremoveClick(model, "f3"));
+        EXPECT_EQ(model.GetSelected(), Sq("f3"));
+        EXPECT_TRUE(HasTarget(model, "e5"));
+        EXPECT_TRUE(PremoveClick(model, "e5"));
+        ASSERT_EQ(model.GetPremoves().size(), 2U);
+        EXPECT_EQ(model.GetPremoves()[1], (Premove{Sq("f3"), Sq("e5")}));
+        EXPECT_EQ(model.GetPieceAt(Sq("g1")).type, PieceType::Knight) << "the real board is as it was";
+        EXPECT_TRUE(model.GetPieceAt(Sq("f3")).IsEmpty());
+    }
+
+    TEST(ChessGameModelTest, NoPremoveClickMovesTheVersion) {
+        ChessGameModel model = BlackToMoveAfterE4();
+        const uint64_t version = model.GetVersion();
+        PremoveClick(model, "d2");
+        PremoveClick(model, "g1");
+        Queue(model, "d2", "d4");
+        PremoveClick(model, "a5");
+        model.ClearPremoves();
+        EXPECT_EQ(model.GetVersion(), version);
+    }
+
+    TEST(ChessGameModelTest, PlayPremovePlaysTheFrontOneAndKeepsTheRest) {
+        ChessGameModel model = BlackToMoveAfterE4();
+        ASSERT_TRUE(Queue(model, "g1", "f3"));
+        ASSERT_TRUE(Queue(model, "f3", "e5"));
+
+        EXPECT_FALSE(model.PlayPremove()) << "White is not on the move yet";
+        EXPECT_EQ(model.GetPremoves().size(), 2U);
+
+        ASSERT_TRUE(Play(model, "e7e6"));
+        const uint64_t version = model.GetVersion();
+        EXPECT_TRUE(model.PlayPremove());
+        EXPECT_EQ(model.GetVersion(), version + 1) << "the move it plays is a move";
+        EXPECT_EQ(model.GetMoves().back(), Mv("g1f3"));
+        EXPECT_EQ(model.GetTurn(), PieceColor::Black);
+        ASSERT_EQ(model.GetPremoves().size(), 1U);
+        EXPECT_EQ(model.GetPremoves()[0], (Premove{Sq("f3"), Sq("e5")}));
+        EXPECT_EQ(model.GetPremoveColor(), PieceColor::White);
+
+        EXPECT_FALSE(model.PlayPremove()) << "Black is on the move again";
+        ASSERT_TRUE(Play(model, "d7d6"));
+        EXPECT_TRUE(model.PlayPremove());
+        EXPECT_EQ(model.GetMoves().back(), Mv("f3e5"));
+        EXPECT_TRUE(model.GetPremoves().empty());
+        EXPECT_FALSE(model.GetPremoveColor().has_value());
+        EXPECT_FALSE(model.PlayPremove()) << "an empty queue plays nothing";
+    }
+
+    TEST(ChessGameModelTest, APremoveThatStaysLegalPlaysAsTheNextMove) {
+        ChessGameModel model = ModelFrom("6k1/8/8/8/8/8/P3N3/4K3 b - - 0 1");
+        ASSERT_TRUE(Queue(model, "e2", "g3"));
+        ASSERT_TRUE(Play(model, "g8h8"));
+        EXPECT_TRUE(model.PlayPremove());
+        EXPECT_EQ(model.GetPieceAt(Sq("g3")).type, PieceType::Knight);
+    }
+
+    TEST(ChessGameModelTest, APremoveWhosePieceWasCapturedDropsTheWholeQueue) {
+        ChessGameModel model = ModelFrom("r3k3/8/8/8/8/8/8/R3K3 b - - 0 1");
+        ASSERT_TRUE(Queue(model, "a1", "a7"));
+        ASSERT_TRUE(Queue(model, "e1", "e2"));
+        ASSERT_TRUE(Play(model, "a8a1"));
+
+        const uint64_t version = model.GetVersion();
+        EXPECT_FALSE(model.PlayPremove());
+        EXPECT_TRUE(model.GetPremoves().empty());
+        EXPECT_FALSE(model.GetPremoveColor().has_value());
+        EXPECT_EQ(model.GetVersion(), version) << "a dropped queue is no change of the game";
+        EXPECT_EQ(model.GetMoves().size(), 1U);
+    }
+
+    TEST(ChessGameModelTest, APremoveThatWouldLeaveTheKingInCheckDropsTheWholeQueue) {
+        // The black rook comes to the e file and pins the knight against the king
+        ChessGameModel model = ModelFrom("r5k1/8/8/8/8/8/4N3/4K3 b - - 0 1");
+        ASSERT_TRUE(Queue(model, "e2", "c3"));
+        ASSERT_TRUE(Queue(model, "e1", "d1"));
+        ASSERT_TRUE(Play(model, "a8e8"));
+
+        const uint64_t version = model.GetVersion();
+        EXPECT_FALSE(model.PlayPremove());
+        EXPECT_TRUE(model.GetPremoves().empty());
+        EXPECT_EQ(model.GetVersion(), version);
+    }
+
+    TEST(ChessGameModelTest, APremovedPromotionPlaysAsAQueen) {
+        ChessGameModel model = ModelFrom("4k3/P7/8/8/8/8/8/4K3 b - - 0 1");
+        ASSERT_TRUE(Queue(model, "a7", "a8"));
+        ASSERT_TRUE(Play(model, "e8f7"));
+        EXPECT_TRUE(model.PlayPremove());
+        EXPECT_EQ(model.GetPieceAt(Sq("a8")).type, PieceType::Queen);
+        EXPECT_EQ(model.GetPieceAt(Sq("a8")).color, PieceColor::White);
+        EXPECT_TRUE(model.GetMoves().back().IsPromotion());
+        EXPECT_EQ(model.GetMoves().back().PromotionType(), PieceType::Queen);
+    }
+
+    TEST(ChessGameModelTest, APremovedPawnDiagonalPlaysAsEnPassantWhenItIsLegal) {
+        // White pawn on e5; Black answers d7d5, so exd6 is en passant when its turn comes
+        ChessGameModel model = ModelFrom("4k3/3p4/8/4P3/8/8/8/4K3 b - - 0 1");
+        ASSERT_TRUE(Queue(model, "e5", "d6"));
+        ASSERT_TRUE(Play(model, "d7d5"));
+        EXPECT_TRUE(model.PlayPremove());
+        EXPECT_EQ(model.GetMoves().back().Kind(), MoveKind::EnPassant);
+        EXPECT_TRUE(model.GetPieceAt(Sq("d5")).IsEmpty());
+    }
+
+    TEST(ChessGameModelTest, AMoveThatEndsTheGameDropsTheRestOfTheQueue) {
+        // A back-rank mate by the premove, a second premove behind it
+        ChessGameModel mate = ModelFrom("6k1/1p3ppp/8/8/8/8/8/R3K3 b - - 0 1");
+        ASSERT_TRUE(Queue(mate, "a1", "a8"));
+        ASSERT_TRUE(Queue(mate, "e1", "e2"));
+        ASSERT_TRUE(Play(mate, "b7b6"));
+        EXPECT_TRUE(mate.PlayPremove());
+        EXPECT_EQ(mate.GetStatus(), GameStatus::Checkmate);
+        EXPECT_TRUE(mate.GetPremoves().empty());
+        EXPECT_FALSE(mate.GetPremoveColor().has_value());
+
+        // The knight takes the last rook: a draw by insufficient material
+        ChessGameModel draw = ModelFrom("4k3/8/8/8/8/1r6/8/N3K3 b - - 0 1");
+        ASSERT_TRUE(Queue(draw, "a1", "b3"));
+        ASSERT_TRUE(Queue(draw, "b3", "c5"));
+        ASSERT_TRUE(Play(draw, "e8d8"));
+        EXPECT_TRUE(draw.PlayPremove());
+        EXPECT_EQ(draw.GetStatus(), GameStatus::DrawInsufficientMaterial);
+        EXPECT_TRUE(draw.GetPremoves().empty());
+    }
+
+    TEST(ChessGameModelTest, TheQueueIsDroppedByResetSetPositionAndTakeBack) {
+        ChessGameModel reset = BlackToMoveAfterE4();
+        ASSERT_TRUE(Queue(reset, "d2", "d4"));
+        reset.Reset();
+        EXPECT_TRUE(reset.GetPremoves().empty());
+        EXPECT_FALSE(reset.GetPremoveColor().has_value());
+
+        ChessGameModel set = BlackToMoveAfterE4();
+        ASSERT_TRUE(Queue(set, "d2", "d4"));
+        set.SetPosition(PositionFromFen("6k1/8/8/8/8/8/4N3/4K3 b - - 0 1"));
+        EXPECT_TRUE(set.GetPremoves().empty());
+        EXPECT_FALSE(set.GetPremoveColor().has_value());
+
+        ChessGameModel back = BlackToMoveAfterE4();
+        ASSERT_TRUE(Queue(back, "d2", "d4"));
+        ASSERT_EQ(back.TakeBack(), 1U);
+        EXPECT_TRUE(back.GetPremoves().empty());
+        EXPECT_FALSE(back.GetPremoveColor().has_value());
+    }
+
+    TEST(ChessGameModelTest, AMoveOfThePremoversColorThatDidNotComeFromTheQueueDropsIt) {
+        ChessGameModel model = BlackToMoveAfterE4();
+        ASSERT_TRUE(Queue(model, "g1", "f3"));
+        ASSERT_TRUE(Play(model, "e7e5"));
+        ASSERT_EQ(model.GetPremoves().size(), 1U) << "the other side's move keeps it";
+
+        ASSERT_TRUE(Play(model, "d2d4")) << "a client played for the person";
+        EXPECT_TRUE(model.GetPremoves().empty());
+        EXPECT_FALSE(model.GetPremoveColor().has_value());
+    }
+
+    TEST(ChessGameModelTest, ClearSelectionKeepsTheQueue) {
+        ChessGameModel model = BlackToMoveAfterE4();
+        ASSERT_TRUE(Queue(model, "d2", "d4"));
+        PremoveClick(model, "g1");
+        model.ClearSelection();
+        EXPECT_FALSE(model.HasSelection());
+        EXPECT_EQ(model.GetPremoves().size(), 1U);
+        EXPECT_EQ(model.GetPremoveColor(), PieceColor::White);
+    }
+
+    TEST(ChessGameModelTest, ARefusedMoveKeepsTheQueue) {
+        ChessGameModel model = BlackToMoveAfterE4();
+        ASSERT_TRUE(Queue(model, "d2", "d4"));
+        EXPECT_FALSE(Play(model, "e7e3"));
+        EXPECT_EQ(model.GetPremoves().size(), 1U);
+    }
+
 }  // namespace BECore::Chess::Tests
