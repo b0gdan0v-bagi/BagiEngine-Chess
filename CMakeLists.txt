@@ -107,6 +107,15 @@ if(ENGINE_BUILD_TESTS)
             )
         endif()
 
+        # Real games of Stockfish against BagiChess (the last group of tools/tests/test_stockfish.py, played by pytest); skipped (77) without
+        # Stockfish, pytest or the executable
+        add_test(NAME BagiChessStockfishGames COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/stockfish_games_smoke.py --exe $<TARGET_FILE:BagiChess>)
+        set_tests_properties(BagiChessStockfishGames PROPERTIES
+            SKIP_RETURN_CODE 77
+            TIMEOUT 700
+            RUN_SERIAL TRUE
+        )
+
         # The unit tests of the match tool (standard library unittest, no Stockfish, no executable)
         add_test(NAME BagiChessMatchToolTests COMMAND ${Python3_EXECUTABLE} -m unittest discover -s ${CMAKE_CURRENT_SOURCE_DIR}/tools/tests -p "test_match_*.py" WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
         set_tests_properties(BagiChessMatchToolTests PROPERTIES TIMEOUT 120)
