@@ -13,10 +13,10 @@ insufficient material, which the engines do not report, and its list of legal mo
 --max-plies is a draw. The opponent thinks `--opponent-movetime` ms per move; the own engine plays as the game plays it (the depth of its
 level or of its `depth=` step, no time limit).
 
-The rating of a step is the Elo that scores as it did against the opponent's Elo steps (`elo_rating.py`: the 95 % bar is 1.96 standard
-errors; a step that won, or lost, every game is only a bound, marked `saturated`). It is **an Elo on Stockfish's `UCI_Elo` scale at the
-chosen movetime**: not a CCRL rating and not a rating of a person; it moves with the Stockfish version, the machine and the build type
-(a Debug build is slow, measure with Release). `--out` is rewritten after every finished pair.
+The rating of a step is the Elo that scores as it did against the opponent's Elo steps (`elo_rating.py`; a step that won, or lost,
+every game is only a bound, marked `saturated`). It is **an Elo on Stockfish's `UCI_Elo` scale at the chosen movetime**: not a CCRL
+rating and not a rating of a person; it moves with the Stockfish version, the machine and the build type (a Debug build is slow,
+measure with Release).
 
 The opponent is looked for in --opponent, the environment variable STOCKFISH, then PATH. With `--port` (no `--referee`) the tool joins a game
 that runs with `--control`; that game's opponent must play nobody (the start of every game does; clear it with

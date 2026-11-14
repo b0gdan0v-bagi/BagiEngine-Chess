@@ -31,14 +31,14 @@ RATING_LOWEST = -2000.0  # the bracket of the bisection; a result is clamped int
 RATING_HIGHEST = 6000.0
 RATING_TOLERANCE = 1e-6
 MAX_BISECTIONS = 200
-RESIDUAL_ZERO = 1e-12  # a sum of squared residuals below this is zero (the bisection leaves ~1e-18 of rounding)
-SATURATION_SHORTFALL = 0.5  # games short of the extreme score that stand in for "all won" / "all lost"
+RESIDUAL_ZERO = 1e-12  # a sum of squared residuals below this is zero: the bisection leaves rounding
+SATURATION_SHORTFALL = 0.5
 
 BOUND_NONE = ""
 BOUND_LOWER = ">="  # all won: the rating is at least this
 BOUND_UPPER = "<="  # all lost: the rating is at most this
 
-Result = tuple[float, float]  # (opponent_elo, score of one game: 1.0, 0.5 or 0.0)
+Result = tuple[float, float]
 
 
 @dataclass(frozen=True)
@@ -57,7 +57,7 @@ class Rating:
 
 
 def expected_score(rating: float, opponent_rating: float) -> float:
-    """The score (0..1) that a player of `rating` is expected to make against `opponent_rating`."""
+    """The expected score (0..1) of a player of `rating` against `opponent_rating`."""
     return 1.0 / (1.0 + 10.0 ** ((opponent_rating - rating) / ELO_SCALE))
 
 
