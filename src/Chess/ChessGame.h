@@ -11,24 +11,15 @@
 namespace BECore::Chess {
 
     /**
-     * @brief Concrete IGame for chess.
+     * @brief Concrete IGame for chess; its scene is "ChessScene".
      *
-     * Owns the shared ChessGameModel that ChessBoardComponent and ChessPieceComponent
-     * read/write through GameManager::GetActive(). Activates "ChessScene" when started.
+     * Owns the model the scene shares (components reach it, the opponent, the choice and the analyst through the GetActive*() calls), the computer opponent (OpponentController), the choice the
+     * opponent panel makes over it (OpponentChoice: it remembers the person's color while nobody plays), the analysis of the position (PositionAnalyst, with the default factory over the settings the
+     * controller holds), the save keeper and the adapter of the control API (ChessGameControl). A game starts with nobody as the opponent (it is made when a side is picked) and the analysis off.
      *
-     * Auto-registered into AbstractFactory<IGame> via the BE_CLASS reflection
-     * machinery — no extra hand-written registrar required.
-     *
-     * Owns the adapter of the external control API (ChessGameControl) next to the model it drives, and the seat of the computer opponent
-     * (OpponentController). A game starts with nobody as the opponent: Start() loads the settings (where Stockfish is); the opponent
-     * is made when a side is picked on GetOpponent(). The choice the opponent panel makes (OpponentChoice: a mode, the person's color, an engine and a level by id) is owned
-     * here too, over the same controller, and remembers the person's color while nobody plays. The analysis of the position (PositionAnalyst: the evaluation, the hint and, through its MoveRater, the
-     * ratings of the played moves) is owned here as well, with the default factory over the settings the controller holds; it starts switched off and Start() puts it back to that. IGame has no
-     * per-frame hook, so ChessBoardComponent runs GetOpponent().Update() and GetAnalyst().Update() every frame. Stop() destroys the opponent and shuts the analyst down, which happens before the task
-     * system goes down (Application::Cleanup()): a search that nobody cancelled would hold the join of the pool.
-     *
-     * The game remembers itself (ChessSaveKeeper, when the run asks for it: Chess/Save/SaveSettings.h): Start() ends by restoring the saved game and the opponent choice into the fresh ones, Stop()
-     * starts by writing them (before the opponent goes), and ChessBoardComponent calls UpdateKeeper() every frame for the debounced write in between.
+     * IGame has no per-frame hook, so ChessBoardComponent runs GetOpponent().Update(), GetAnalyst().Update() and UpdateKeeper() every frame. Start() ends by restoring the saved game and the
+     * opponent choice (ChessSaveKeeper, when the run asks for it). Stop() starts by writing them, then destroys the opponent and shuts the analyst down, which happens before the task system goes
+     * down (Application::Cleanup()): a search that nobody cancelled would hold the join of the pool.
      */
     class ChessGame : public IGame {
         BE_CLASS(ChessGame)
@@ -81,19 +72,19 @@ namespace BECore::Chess {
         /// nothing
         void UpdateKeeper();
 
-        /// The active game, or nullptr when no game is active or the active game is not Chess.
+        /// The active game, or nullptr when no game is active or the active game is not Chess (the same for the GetActive*() below)
         static ChessGame* GetActive();
 
-        /// The model of the active game, or nullptr when no game is active or the active game is not Chess.
+        /// The model of the active game
         static ChessGameModel* GetActiveModel();
 
-        /// The opponent of the active game, or nullptr when no game is active or the active game is not Chess.
+        /// The opponent of the active game
         static OpponentController* GetActiveOpponent();
 
-        /// The choice of the opponent of the active game, or nullptr when no game is active or the active game is not Chess.
+        /// The choice of the opponent of the active game
         static OpponentChoice* GetActiveChoice();
 
-        /// The analyst of the active game, or nullptr when no game is active or the active game is not Chess.
+        /// The analyst of the active game
         static PositionAnalyst* GetActiveAnalyst();
 
     private:

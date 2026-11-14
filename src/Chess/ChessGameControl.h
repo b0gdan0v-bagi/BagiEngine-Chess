@@ -41,15 +41,13 @@ namespace BECore::Chess {
      * for another pick. A pick of Stockfish succeeds whenever a Stockfish file is found (a launch that fails shows only at the first search, as error
      * "launch_failed"); a pick of "own" always succeeds.
      *
-     * material is {"balance", "capturedByWhite", "capturedByBlack"}, derived from the position at every call (it has no version of its own; a move that
-     * changes it changes the state version anyway): balance is White's points minus Black's on the board (pawn 1, knight 3, bishop 3, rook 5, queen 9; a
-     * piece made by a promotion counts, so it is not a count of what was taken), positive when White is ahead; capturedByWhite is the Black pieces that are gone
-     * and capturedByBlack the White ones, each {"queen", "rook", "bishop", "knight", "pawn"} with a count (never negative). Position-only: a piece beyond
-     * the starting set is a promoted pawn (it counts in the points and is not a missing pawn), a pawn that promoted into a piece that was missing shows as
-     * a pawn gone, and a promoted piece that is taken later shows as a missing pawn.
+     * material is {"balance", "capturedByWhite", "capturedByBlack"}, derived from the position at every call (it has no version of its own): balance is White's points minus Black's on the board (pawn
+     * 1, knight 3, bishop 3, rook 5, queen 9; a piece made by a promotion counts, so it is not a count of what was taken), positive when White is ahead; capturedByWhite is the Black pieces that are
+     * gone and capturedByBlack the White ones, each {"queen", "rook", "bishop", "knight", "pawn"} with a count (never negative). Position-only: a piece beyond the starting set is a promoted pawn (it
+     * counts in the points and is not a missing pawn), and a promoted piece that is taken later shows as a missing pawn.
      *
-     * analysis is {"evaluationOn", "hintRequested", "thinking", "evaluation", "hint", "lines", "ratingsOn", "ratings", "error"} (the analysis of the position by the engine the person picked, never
-     * handicapped, at the limits of the strongest level; PositionAnalyst): evaluationOn whether the evaluation is switched on (off at the start of every game), hintRequested
+     * analysis is {"evaluationOn", "hintRequested", "thinking", "evaluation", "hint", "lines", "ratingsOn", "ratings", "error"} (PositionAnalyst: the engine the person picked, never
+     * handicapped, at the limits of the strongest level): evaluationOn whether the evaluation is switched on (off at the start of every game), hintRequested
      * whether a hint was asked for the position now on the board (a hint belongs to its position: a move, a reset or a set_state drops the request), thinking whether a search runs.
      * evaluation is null while it is off or not yet computed for this position, else {"score": {"kind": "centipawns"|"mate", "value": int}, "text": "+0.35"|"#3", "depth": int}
      * **from White's view** (value positive: White is better, or White mates; the text is of the same score). hint is null until the answer for this very position has come, else
@@ -62,10 +60,10 @@ namespace BECore::Chess {
      * opponent.error; it belongs to the position and the engine, and goes with the next move, the next pick of the engine or a new hint request.
      * ratingsOn is whether the moves are being rated (off at the start of every game, it costs CPU; a reset keeps the switch). ratings has one entry per move of "moves", in the same
      * order: null while the move is not rated, else {"brilliant": bool, "reason": "brilliant"|"not_best"|"forced"|"obvious"} (MoveRater, MoveRating.h). A move is brilliant when it is the
-     * best move of the own engine at depth 5 in the position it was played in (the engine's first line before the move) and it was a choice: "forced" is a position with one legal move,
-     * "obvious" one where the second line is 200 centipawns or more behind (a forced recapture, a mate in one); "not_best" is any other move. Rated in the background, the oldest move first, with
-     * an engine of its own that is always the own engine, whatever opponent.engine is, so the same game gets the same ratings twice; the ratings of earlier moves stay after a new move and go
-     * with a reset or a set_state of a fen. Independent of hintRequested and of the evaluation, and of the turn of the person. The rater's failure (an engine that cannot be made, a search
+     * best move of the own engine at depth 5 in the position it was played in and it was a choice: "forced" is a position with one legal move,
+     * "obvious" one where the second line is 200 centipawns or more behind (a forced recapture, a mate in one); "not_best" is any other move. Rated in the background, the oldest move first, always by
+     * the own engine, whatever opponent.engine is, so the same game gets the same ratings twice; the ratings of earlier moves stay after a new move and go with a reset or a set_state of a fen.
+     * Independent of hintRequested, of the evaluation and of the turn of the person. The rater's failure (an engine that cannot be made, a search
      * that fails) is not in analysis.error: it is logged, and the move stays null.
      *
      * Actions: {"type": "move", "uci": "e2e4"}, every legal move once; none once the game is over. The list does not change with the opponent: the program's
@@ -77,7 +75,7 @@ namespace BECore::Chess {
      * SetState takes {"fen": ".."} (any position that Position::FromFen() accepts, which may be a finished game), {"opponent": {"plays": .., "level": ..,
      * "engine": .., "white": {"engine": .., "level": ..}, "black": {..}}} (inside it a missing member means unchanged, per seat; plays is "white", "black", "both" or null;
      * level and engine an id, "stockfish" or "own" for the engine, exactly as written) or both; none of fen, opponent, analysis is invalid_params. level and engine set BOTH
-     * seats (the old shape); the seat objects "white" and "black" (members optional, nothing else allowed in them) then override one seat; plays says who plays and a missing
+     * seats; the seat objects "white" and "black" (members optional, nothing else allowed in them) then override one seat; plays says who plays and a missing
      * plays keeps the sides as they are. "both" starts a game of two programs, each with an engine object of its own; "plays": "white" while both play is a takeover (the person
      * has Black, White's program and its search stay), null ends it. Everything is checked before anything changes, so a refused call (invalid_params) changes nothing.
      * The opponent is applied first, then the position. SetState also takes {"analysis": {"evaluation": bool, "hint": bool, "ratings": bool}} (a missing member means unchanged; {} changes
@@ -90,12 +88,11 @@ namespace BECore::Chess {
      * standing) does nothing: a running Stockfish is not restarted. With an error standing, the same "plays" asks for an engine again, and plays null clears it.
      * Without Stockfish (CHESS_NO_STOCKFISH) "stockfish" is engine_unavailable in "engine" and in the seat objects, also while nobody plays, and the default engine is "own".
      *
-     * The state version is the version of the game plus the revision of the opponent (a pick, an error that appears or goes) plus the revision of the analyst (a switch,
-     * a hint asked or dropped, an answer that arrives, an error that appears or goes, a switch of the ratings, a rating that arrives or is dropped; an error of the rater that appears
-     * or goes moves it too, although it is not in get_state), so a push reports a change of the opponent and a hint or a rating that came as well; it never goes back.
+     * The state version is the version of the game plus the revision of the opponent (a pick, an error that appears or goes) plus the revision of the analyst (a switch of the evaluation or
+     * the ratings, a hint asked or dropped, an answer or a rating that arrives or is dropped, an error that appears or goes, also the rater's, which is not in get_state), so a push reports a
+     * change of the opponent and a hint or a rating that came as well; it never goes back.
      *
-     * The model, the opponent and the analyst belong to ChessGame, which owns this adapter, so all three are always there. The analyst is told of a changed engine pick by SetState
-     * at once, so a get_state right after never shows the old engine's answer.
+     * The analyst is told of a changed engine pick by SetState at once, so a get_state right after never shows the old engine's answer.
      */
     class ChessGameControl : public IControllableGame {
     public:
@@ -110,7 +107,7 @@ namespace BECore::Chess {
         [[nodiscard]] uint64_t GetStateVersion() const override;
 
     private:
-        /// The legal moves of the side to move; empty once the game is over
+        /// Empty once the game is over
         [[nodiscard]] MoveList LegalMoves() const;
 
         [[nodiscard]] Json OpponentJson() const;
