@@ -111,8 +111,8 @@ namespace BECore::Chess::Tests {
             }
 
             /// The UCI spellings of the actions, in the order they were listed
-            eastl::vector<eastl::string> ActionMoves() {
-                eastl::vector<eastl::string> moves;
+            Vector<eastl::string> ActionMoves() {
+                Vector<eastl::string> moves;
                 const Json actions = Actions();
                 for (size_t index = 0; index < actions.size(); ++index) {
                     moves.push_back(GetJsonString(actions[index], "uci").value_or(eastl::string()));
@@ -440,7 +440,7 @@ namespace BECore::Chess::Tests {
 
         // Five king moves, four promotions on a8 and four promoting captures of the rook on b8
         SetFen("1r2k3/P7/8/8/8/8/8/4K3 w - - 0 1");
-        const eastl::vector<eastl::string> moves = ActionMoves();
+        const Vector<eastl::string> moves = ActionMoves();
         EXPECT_EQ(moves.size(), 13u);
         for (const char* promotion : {"a7b8q", "a7b8r", "a7b8b", "a7b8n", "a7a8q", "a7a8n"}) {
             EXPECT_NE(eastl::find(moves.begin(), moves.end(), promotion), moves.end()) << promotion;
@@ -834,7 +834,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessGameControlTest, AClientThatGetsEngineUnavailableForStockfishCanSwitchToTheOwnEngine) {
         // Stockfish is missing, the own engine is not: the factory fails only for the first
-        eastl::vector<eastl::string> asked;
+        Vector<eastl::string> asked;
         opponent.SetEngineFactory([&asked](OpponentEngine engine, const OpponentLevel&) -> MadeEngine {
             const StringView id = OpponentEngineId(engine);
             asked.emplace_back(id.data(), id.size());
@@ -870,7 +870,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, AFailedSwitchFromTheOwnEngineToStockfishIsRefusedAndTheOpponentStaysAsItWas) {
-        eastl::vector<eastl::string> asked;
+        Vector<eastl::string> asked;
         opponent.SetEngineFactory([&asked](OpponentEngine engine, const OpponentLevel&) -> MadeEngine {
             const StringView id = OpponentEngineId(engine);
             asked.emplace_back(id.data(), id.size());
@@ -1480,7 +1480,7 @@ namespace BECore::Chess::Tests {
         EXPECT_TRUE(AnalysisMember("evaluation").is_null()) << "the evaluation is off: the search had a score, but it is not shown";
         EXPECT_EQ(GetJsonBool(AnalysisOfState(), "evaluationOn"), false);
 
-        const eastl::vector<eastl::string> moves = ActionMoves();
+        const Vector<eastl::string> moves = ActionMoves();
         EXPECT_NE(eastl::find(moves.begin(), moves.end(), "d2d4"), moves.end()) << "the hint is one of the listed actions";
     }
 
@@ -1766,7 +1766,7 @@ namespace BECore::Chess::Tests {
         const auto engine = Analyser(kPawnUp, Mv("d2d4"));
         CountingAnalysisFactory factory{engine};
         analyst.SetEngineFactory(factory.AsFactory());
-        const eastl::vector<eastl::string> before = ActionMoves();
+        const Vector<eastl::string> before = ActionMoves();
 
         AnalyseWith(true, true);
         ASSERT_TRUE(FrameUntil([&] { return !AnalysisMember("hint").is_null(); }));
@@ -1838,7 +1838,7 @@ namespace BECore::Chess::Tests {
         /// A factory that makes @p engine for the own engine and cannot make Stockfish (as a machine with none)
         struct OwnOnlyFactory {
             eastl::shared_ptr<IChessEngine> engine;
-            eastl::vector<eastl::string> asked;  ///< "engine/level" of each call
+            Vector<eastl::string> asked;  ///< "engine/level" of each call
 
             EngineFactory AsFactory() {
                 return [this](OpponentEngine kind, const OpponentLevel& level) -> MadeEngine {
@@ -2247,8 +2247,8 @@ namespace BECore::Chess::Tests {
         }
 
         /// The reasons of the ratings, in order ("<null>" for a move not rated)
-        eastl::vector<std::string> ReasonsOfRatings(const Json& ratings) {
-            eastl::vector<std::string> reasons;
+        Vector<std::string> ReasonsOfRatings(const Json& ratings) {
+            Vector<std::string> reasons;
             for (size_t index = 0; index < ratings.size(); ++index) {
                 reasons.push_back(ratings[index].is_null() ? std::string("<null>") : StringMember(ratings[index], "reason"));
             }
@@ -2307,7 +2307,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(FrameUntil([&] { return AllRated(AnalysisMember("ratings"), 2); })) << AnalysisOfState().dump().c_str();
 
         const Json ratings = AnalysisMember("ratings");
-        EXPECT_EQ(ReasonsOfRatings(ratings), (eastl::vector<std::string>{"brilliant", "not_best"}));
+        EXPECT_EQ(ReasonsOfRatings(ratings), (Vector<std::string>{"brilliant", "not_best"}));
         EXPECT_EQ(GetJsonBool(ratings[0], "brilliant"), true);
         EXPECT_EQ(GetJsonBool(ratings[1], "brilliant"), false);
         EXPECT_EQ(ratings[0].size(), 2u) << "brilliant and reason";
@@ -2335,7 +2335,7 @@ namespace BECore::Chess::Tests {
         Perform("e2e4");
         EXPECT_TRUE(AnalysisMember("ratings")[0].is_null()) << "not rated until the new game's own search has answered";
         ASSERT_TRUE(FrameUntil([&] { return AllRated(AnalysisMember("ratings"), 1); })) << "the next game is rated from its first move";
-        EXPECT_EQ(ReasonsOfRatings(AnalysisMember("ratings")), (eastl::vector<std::string>{"brilliant"}));
+        EXPECT_EQ(ReasonsOfRatings(AnalysisMember("ratings")), (Vector<std::string>{"brilliant"}));
     }
 
     TEST_F(ChessGameControlTest, AFenDropsTheRatingsAndSwitchingOffKeepsThem) {
@@ -2366,7 +2366,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(control.SetState(RatingsRequest(true)).has_value()) << "no refusal: the moves of a finished game are rated like any";
 
         ASSERT_TRUE(FrameUntil([&] { return AllRated(AnalysisMember("ratings"), 1); }));
-        EXPECT_EQ(ReasonsOfRatings(AnalysisMember("ratings")), (eastl::vector<std::string>{"brilliant"}));
+        EXPECT_EQ(ReasonsOfRatings(AnalysisMember("ratings")), (Vector<std::string>{"brilliant"}));
     }
 
     TEST_F(ChessGameControlTest, ARefusedHintDoesNotApplyTheRatingsSwitchOfTheSameCall) {
@@ -2405,16 +2405,16 @@ namespace BECore::Chess::Tests {
             return ReasonsOfRatings(AnalysisMember("ratings"));
         };
 
-        const eastl::vector<std::string> first = playTheGame();
+        const Vector<std::string> first = playTheGame();
         const int searchesOfTheFirstGame = engine->Analyses();
         EXPECT_EQ(searchesOfTheFirstGame, 4) << "one search per move";
 
         ASSERT_TRUE(control.Reset(Json::object()).has_value());
         Frames(1);  // the rater sees the empty game and lets go of the old ratings, so the second game is rated from nothing
         ASSERT_TRUE(AnalysisMember("ratings").empty());
-        const eastl::vector<std::string> second = playTheGame();
+        const Vector<std::string> second = playTheGame();
 
-        EXPECT_EQ(first, (eastl::vector<std::string>{"not_best", "brilliant", "not_best", "brilliant"}));
+        EXPECT_EQ(first, (Vector<std::string>{"not_best", "brilliant", "not_best", "brilliant"}));
         EXPECT_EQ(engine->Analyses(), 2 * searchesOfTheFirstGame) << "the second game was really searched again, not read from the old ratings";
         EXPECT_EQ(second, first) << "a fixed depth: the same game, the same ratings";
         EXPECT_TRUE(AnalysisMember("error").is_null());

@@ -44,7 +44,7 @@ namespace BECore::Chess::Tests {
                 _failure = kind;
             }
 
-            [[nodiscard]] eastl::vector<SearchLimits> Calls() const {
+            [[nodiscard]] Vector<SearchLimits> Calls() const {
                 const std::lock_guard lock(_mutex);
                 return _calls;
             }
@@ -113,7 +113,7 @@ namespace BECore::Chess::Tests {
             }
 
             mutable std::mutex _mutex;
-            eastl::vector<SearchLimits> _calls;
+            Vector<SearchLimits> _calls;
             std::atomic<int> _holdFromDepth = 0;
             Optional<EngineErrorKind> _failure;
         };
@@ -140,7 +140,7 @@ namespace BECore::Chess::Tests {
                 }
             }
 
-            [[nodiscard]] eastl::vector<eastl::string> Lines() const {
+            [[nodiscard]] Vector<eastl::string> Lines() const {
                 const std::lock_guard lock(_mutex);
                 return _lines;
             }
@@ -158,8 +158,8 @@ namespace BECore::Chess::Tests {
             }
 
             /// The moves of the `bestmove` lines, in order ("(none)" as it is)
-            [[nodiscard]] eastl::vector<eastl::string> BestMoves() const {
-                eastl::vector<eastl::string> moves;
+            [[nodiscard]] Vector<eastl::string> BestMoves() const {
+                Vector<eastl::string> moves;
                 for (const eastl::string& line : Lines()) {
                     if (const auto parsed = UciProtocol::ParseBestMove(StringView(line))) {
                         moves.push_back(parsed->move.empty() ? eastl::string("(none)") : parsed->move);
@@ -169,7 +169,7 @@ namespace BECore::Chess::Tests {
             }
 
             [[nodiscard]] eastl::string OnlyBestMove() const {
-                const eastl::vector<eastl::string> moves = BestMoves();
+                const Vector<eastl::string> moves = BestMoves();
                 EXPECT_EQ(moves.size(), 1u);
                 return moves.empty() ? eastl::string() : moves.front();
             }
@@ -180,7 +180,7 @@ namespace BECore::Chess::Tests {
 
         private:
             mutable std::mutex _mutex;
-            eastl::vector<eastl::string> _lines;
+            Vector<eastl::string> _lines;
             Uci::UciServer _server;
         };
 
@@ -217,7 +217,7 @@ namespace BECore::Chess::Tests {
     TEST(UciServerTest, UciAnswersIdOptionsAndEndsWithUciok) {
         Session session;
         session.Send("uci");
-        const eastl::vector<eastl::string> lines = session.Lines();
+        const Vector<eastl::string> lines = session.Lines();
         ASSERT_EQ(lines.size(), 6u);
         EXPECT_EQ(lines[0], "id name BagiChess Own");
         EXPECT_TRUE(StartsWith(lines[1], "id author "));
@@ -230,7 +230,7 @@ namespace BECore::Chess::Tests {
     TEST(UciServerTest, IsReadyAnswersReadyok) {
         Session session;
         session.Send("isready");
-        EXPECT_EQ(session.Lines(), eastl::vector<eastl::string>{"readyok"});
+        EXPECT_EQ(session.Lines(), Vector<eastl::string>{"readyok"});
     }
 
     TEST(UciServerTest, UnknownLinesAreSkippedInSilence) {
@@ -249,7 +249,7 @@ namespace BECore::Chess::Tests {
     TEST(UciServerTest, TheMoveIsReadByTheClientSideOfTheProtocol) {
         Session session;
         session.Play({"position startpos moves e2e4", "go depth 1"});
-        const eastl::vector<eastl::string> lines = session.Lines();
+        const Vector<eastl::string> lines = session.Lines();
         ASSERT_EQ(lines.size(), 1u);
         const auto parsed = UciProtocol::ParseBestMove(StringView(lines[0]));
         ASSERT_TRUE(parsed.has_value());
@@ -265,7 +265,7 @@ namespace BECore::Chess::Tests {
     TEST(UciServerTest, TheSameGameAndDepthGiveTheSameMove) {
         Session session;
         session.Play({"position startpos moves d2d4 g8f6 c2c4", "go depth 3", "go depth 3"});
-        const eastl::vector<eastl::string> moves = session.BestMoves();
+        const Vector<eastl::string> moves = session.BestMoves();
         ASSERT_EQ(moves.size(), 2u);
         EXPECT_EQ(moves[0], moves[1]);
     }
@@ -303,8 +303,8 @@ namespace BECore::Chess::Tests {
         const OpponentLevel& easy = GetOpponentLevels()[*FindOpponentLevel("easy")];
         ASSERT_GT(easy.ownDepth, 0);
         ASSERT_GT(easy.blunderPercent, 0);
-        const eastl::vector<eastl::vector<const char*>> games = {{}, {"e2e4"}, {"d2d4", "d7d5"}, {"e2e4", "e7e5", "g1f3"}};
-        for (const eastl::vector<const char*>& moves : games) {
+        const Vector<Vector<const char*>> games = {{}, {"e2e4"}, {"d2d4", "d7d5"}, {"e2e4", "e7e5", "g1f3"}};
+        for (const Vector<const char*>& moves : games) {
             eastl::string position = "position startpos";
             SearchRequest request = StartRequest({}, SearchLimits{0, easy.ownDepth});
             if (!moves.empty()) {
@@ -328,7 +328,7 @@ namespace BECore::Chess::Tests {
         session.Play({"setoption name Depth value 3", "go"});
         session.Play({"setoption name Level value custom", "go"});
         session.Play({"setoption name Level value hard", "setoption name Level value custom", "go"});
-        const eastl::vector<SearchLimits> calls = engine->Calls();
+        const Vector<SearchLimits> calls = engine->Calls();
         ASSERT_EQ(calls.size(), 4u);
         EXPECT_EQ(calls[0].depth, hard.ownDepth);
         EXPECT_EQ(calls[0].moveTimeMs, 0);
@@ -361,7 +361,7 @@ namespace BECore::Chess::Tests {
         Session session(engine);
         session.Play({"setoption name Depth value 3", "go wtime 60000 btime 1000"});
         session.Play({"position startpos moves e2e4", "go wtime 60000 btime 1000 binc 500 movestogo 10"});
-        const eastl::vector<SearchLimits> calls = engine->Calls();
+        const Vector<SearchLimits> calls = engine->Calls();
         ASSERT_EQ(calls.size(), 2u);
         EXPECT_EQ(calls[0].depth, 3);
         EXPECT_EQ(calls[0].moveTimeMs, Uci::MoveTimeFor(60000, 0, std::nullopt));
@@ -373,7 +373,7 @@ namespace BECore::Chess::Tests {
         auto engine = MakeScripted();
         Session session(engine);
         session.Play({"go wtime 10000 btime 10000 winc 100 binc 100"});
-        const eastl::vector<SearchLimits> calls = engine->Calls();
+        const Vector<SearchLimits> calls = engine->Calls();
         ASSERT_EQ(calls.size(), 1u);
         EXPECT_EQ(calls[0].depth, 0);
         EXPECT_EQ(calls[0].moveTimeMs, Uci::MoveTimeFor(10000, 100, std::nullopt));
@@ -385,7 +385,7 @@ namespace BECore::Chess::Tests {
         session.Play({"go movetime 50 wtime 60000 btime 60000"});
         session.Play({"setoption name Depth value 5", "go depth 3"});
         session.Play({"setoption name Depth value 2", "go depth 6"});
-        const eastl::vector<SearchLimits> calls = engine->Calls();
+        const Vector<SearchLimits> calls = engine->Calls();
         ASSERT_EQ(calls.size(), 3u);
         EXPECT_EQ(calls[0].moveTimeMs, 50);
         EXPECT_EQ(calls[0].depth, 0);
@@ -435,7 +435,7 @@ namespace BECore::Chess::Tests {
         session.Send("go depth 1");
         session.Server().WaitIdle();
         EXPECT_EQ(session.CountOf("info string "), 0u);
-        const eastl::vector<eastl::string> moves = session.BestMoves();
+        const Vector<eastl::string> moves = session.BestMoves();
         ASSERT_EQ(moves.size(), 2u);
         EXPECT_EQ(moves[0], ScriptedEngine::MoveFor(StartRequest({}, {}), kBlockedDepth - 1).ToUci());
         EXPECT_EQ(moves[1], ScriptedEngine::MoveFor(StartRequest({"d2d4"}, {}), 1).ToUci());
@@ -531,7 +531,7 @@ namespace BECore::Chess::Tests {
         Session session;
         session.Play({"uci", "isready", "setoption name Foo value 1", "position startpos moves e2e5", "position startpos moves e2e4", "go depth 1", "position fen 6k1/5ppp/8/8/8/8/8/R3K3 w - - 0 1",
                       "go infinite", "ucinewgame", "go wtime 100 btime 100", "stop"});
-        const eastl::vector<eastl::string> lines = session.Lines();
+        const Vector<eastl::string> lines = session.Lines();
         EXPECT_GT(lines.size(), 6u);
         for (const eastl::string& line : lines) {
             bool known = false;

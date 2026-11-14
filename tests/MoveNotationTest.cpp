@@ -27,7 +27,7 @@ namespace BECore::Chess::Tests {
         }
 
         /// The SANs of a game played from @p fen, joined by spaces
-        eastl::string SanLine(StringView fen, eastl::vector<StringView> moves) {
+        eastl::string SanLine(StringView fen, Vector<StringView> moves) {
             Position position = PositionFromFen(fen);
             eastl::string line;
             for (const StringView uci : moves) {
@@ -52,7 +52,7 @@ namespace BECore::Chess::Tests {
         /// others of the position, and its suffix says what the position after the move says
         void ExpectSansAreSound(const Position& position) {
             const std::string fen = position.ToFen().c_str();
-            eastl::vector<eastl::string> seen;
+            Vector<eastl::string> seen;
             for (const Move move : MoveGenerator::GenerateLegal(position)) {
                 const eastl::string san = SanOf(position, move);
                 ASSERT_FALSE(san.empty()) << fen << " " << move.ToUci().c_str();

@@ -50,8 +50,8 @@ namespace BECore::Chess::Tests {
             return text;
         }
 
-        std::vector<uint8_t> BytesOf(const Vector<uint8_t>& bytes) {
-            return std::vector<uint8_t>(bytes.begin(), bytes.end());
+        Vector<uint8_t> BytesOf(const Vector<uint8_t>& bytes) {
+            return Vector<uint8_t>(bytes.begin(), bytes.end());
         }
 
         constexpr StringView kFoolsMate = "f2f3 e7e5 g2g4 d8h4";
@@ -112,9 +112,9 @@ namespace BECore::Chess::Tests {
             ASSERT_TRUE(saved.has_value()) << saved.error().detail.c_str();
         }
 
-        std::vector<uint8_t> FileBytes() const {
+        Vector<uint8_t> FileBytes() const {
             const std::expected<Vector<uint8_t>, SaveError> bytes = _service.ReadSlot(kChessSaveSlot);
-            return bytes ? BytesOf(*bytes) : std::vector<uint8_t>();
+            return bytes ? BytesOf(*bytes) : Vector<uint8_t>();
         }
 
         /// Everything that must not move when a file is refused
@@ -143,7 +143,7 @@ namespace BECore::Chess::Tests {
             PlayLine(game.model, kGameInProgress);
             ASSERT_TRUE(game.controller.ChooseSeats(ProgramSides::Of(PieceColor::Black), Seat(OpponentEngine::Own, "hard"), Seat(OpponentEngine::Own, "hard")).has_value());
             const Snapshot before = Snap(game);
-            const std::vector<uint8_t> fileBefore = FileBytes();
+            const Vector<uint8_t> fileBefore = FileBytes();
 
             const std::expected<SaveInfo, SaveError> restored = LoadAndRestore(game);
 

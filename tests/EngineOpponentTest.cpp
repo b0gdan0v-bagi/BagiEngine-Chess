@@ -124,7 +124,7 @@ namespace BECore::Chess::Tests {
             }
 
         private:
-            eastl::vector<Move> _moves;
+            Vector<Move> _moves;
             std::atomic<int> _calls{0};
             std::atomic<bool> _open;
         };

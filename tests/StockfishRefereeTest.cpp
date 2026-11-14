@@ -28,13 +28,13 @@ namespace BECore::Chess::Tests {
 
         /// What `go perft N` printed: the leaves under each root move (in the order Stockfish gave them) and the total
         struct PerftResult {
-            eastl::vector<eastl::pair<eastl::string, uint64_t>> divide;
+            Vector<eastl::pair<eastl::string, uint64_t>> divide;
             uint64_t nodes = 0;
         };
 
         /// The moves of a `go perft 1` result, sorted
-        eastl::vector<eastl::string> MoveTexts(const PerftResult& result) {
-            eastl::vector<eastl::string> moves;
+        Vector<eastl::string> MoveTexts(const PerftResult& result) {
+            Vector<eastl::string> moves;
             for (const auto& entry : result.divide) {
                 moves.push_back(entry.first);
             }
@@ -73,7 +73,7 @@ namespace BECore::Chess::Tests {
         class StockfishReferee {
         public:
             /// Starts the program at @p path and does the `uci` / `isready` handshake once; empty on a failure (already reported)
-            static eastl::unique_ptr<StockfishReferee> Start(const eastl::string& path) {
+            static UniquePtr<StockfishReferee> Start(const eastl::string& path) {
                 ProcessLaunch launch;
                 launch.path = path;
                 auto process = UciProcess::Start(launch);
@@ -81,7 +81,7 @@ namespace BECore::Chess::Tests {
                     ADD_FAILURE() << "could not start Stockfish at " << path.c_str() << ": " << process.error().detail.c_str();
                     return nullptr;
                 }
-                eastl::unique_ptr<StockfishReferee> referee(new StockfishReferee(std::move(*process)));
+                UniquePtr<StockfishReferee> referee(new StockfishReferee(std::move(*process)));
                 if (!referee->Handshake()) {
                     return nullptr;
                 }
@@ -132,7 +132,7 @@ namespace BECore::Chess::Tests {
             }
 
             /// The legal moves of @p fen as Stockfish counts them, sorted; nothing on a failure
-            Optional<eastl::vector<eastl::string>> Moves(StringView fen) {
+            Optional<Vector<eastl::string>> Moves(StringView fen) {
                 const Optional<PerftResult> result = Perft(fen, 1);
                 if (!result) {
                     return std::nullopt;
@@ -141,7 +141,7 @@ namespace BECore::Chess::Tests {
             }
 
         private:
-            explicit StockfishReferee(eastl::unique_ptr<UciProcess> process) : _process(std::move(process)) {}
+            explicit StockfishReferee(UniquePtr<UciProcess> process) : _process(std::move(process)) {}
 
             bool Send(const eastl::string& line, const eastl::string& where) {
                 const auto written = _process->WriteLine(line);
@@ -168,11 +168,11 @@ namespace BECore::Chess::Tests {
                 return Send("uci", "the handshake") && WaitFor("uciok") && Send("isready", "the handshake") && WaitFor("readyok");
             }
 
-            eastl::unique_ptr<UciProcess> _process;
+            UniquePtr<UciProcess> _process;
         };
 
         /// "e2e4 g1f3" style list of the elements of @p moves that @p others does not hold
-        eastl::string Missing(const eastl::vector<eastl::string>& moves, const eastl::vector<eastl::string>& others) {
+        eastl::string Missing(const Vector<eastl::string>& moves, const Vector<eastl::string>& others) {
             eastl::string text;
             for (const eastl::string& move : moves) {
                 if (eastl::find(others.begin(), others.end(), move) == others.end()) {
@@ -182,8 +182,8 @@ namespace BECore::Chess::Tests {
             return text;
         }
 
-        eastl::vector<eastl::string> OurMoves(const Position& position) {
-            eastl::vector<eastl::string> moves;
+        Vector<eastl::string> OurMoves(const Position& position) {
+            Vector<eastl::string> moves;
             for (const Move move : MoveGenerator::GenerateLegal(position)) {
                 moves.push_back(move.ToUci());
             }
@@ -194,11 +194,11 @@ namespace BECore::Chess::Tests {
         /// Compares the move sets for @p position; true when equal, else the failure lists the moves only one side has
         bool ExpectSameMoves(StockfishReferee& referee, const Position& position) {
             const eastl::string fen = position.ToFen();
-            const Optional<eastl::vector<eastl::string>> theirs = referee.Moves(fen);
+            const Optional<Vector<eastl::string>> theirs = referee.Moves(fen);
             if (!theirs) {
                 return false;
             }
-            const eastl::vector<eastl::string> ours = OurMoves(position);
+            const Vector<eastl::string> ours = OurMoves(position);
             if (ours == *theirs) {
                 return true;
             }
@@ -296,7 +296,7 @@ namespace BECore::Chess::Tests {
 
         for (const StringView fen : {kMateFen, kStalemateFen}) {
             SCOPED_TRACE(eastl::string(fen.data(), fen.size()).c_str());
-            const Optional<eastl::vector<eastl::string>> theirs = referee->Moves(fen);
+            const Optional<Vector<eastl::string>> theirs = referee->Moves(fen);
             ASSERT_TRUE(theirs.has_value());
             EXPECT_TRUE(theirs->empty());
             EXPECT_TRUE(MoveGenerator::GenerateLegal(PositionFromFen(fen)).empty());

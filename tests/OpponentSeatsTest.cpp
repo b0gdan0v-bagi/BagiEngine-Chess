@@ -120,7 +120,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OpponentSeatsTest, TwoSeatsOfOnePickAreTwoEngineObjects) {
         ChessGameModel model;
-        eastl::vector<eastl::shared_ptr<InstantEngine>> made;
+        Vector<eastl::shared_ptr<InstantEngine>> made;
         OpponentController controller(model);
         controller.SetEngineFactory([&](OpponentEngine, const OpponentLevel&) -> MadeEngine {
             made.push_back(eastl::make_shared<InstantEngine>());
@@ -654,7 +654,7 @@ namespace BECore::Chess::Tests {
                 kGameBudget);
             EXPECT_TRUE(done) << "moves so far: " << model.GetMoves().size() << ", " << DescribeError(controller.GetError()).c_str();
             EXPECT_FALSE(controller.GetError().has_value()) << DescribeError(controller.GetError()).c_str();
-            eastl::vector<eastl::string> moves;
+            Vector<eastl::string> moves;
             for (const Move& played : model.GetMoves()) {
                 if (moves.size() == kPlyCap) {
                     break;  // a search that was already running when the cap was reached may have played one more
@@ -664,7 +664,7 @@ namespace BECore::Chess::Tests {
             return moves;
         };
 
-        const eastl::vector<eastl::string> first = playedTheGame();
+        const Vector<eastl::string> first = playedTheGame();
         ASSERT_FALSE(first.empty());
 
         // Every move is legal in its position (so the turns alternate): the moves replayed on a model of our own
@@ -675,7 +675,7 @@ namespace BECore::Chess::Tests {
 
         // A reset starts the game again, with the same two programs, and it goes the same way
         model.Reset();
-        const eastl::vector<eastl::string> second = playedTheGame();
+        const Vector<eastl::string> second = playedTheGame();
         EXPECT_EQ(first, second);
     }
 

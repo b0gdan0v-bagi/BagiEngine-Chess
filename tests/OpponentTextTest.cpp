@@ -30,7 +30,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(OpponentTextTest, NoTwoSegmentsOfAGroupOfThePanelSayTheSameWord) {
-        const auto distinct = [](const eastl::vector<eastl::string>& words) {
+        const auto distinct = [](const Vector<eastl::string>& words) {
             for (size_t a = 0; a < words.size(); ++a) {
                 EXPECT_FALSE(words[a].empty());
                 for (size_t b = a + 1; b < words.size(); ++b) {
@@ -41,13 +41,13 @@ namespace BECore::Chess::Tests {
 
         distinct({OpponentText::ModeLabel(false), OpponentText::ModeLabel(true)});
         distinct({OpponentText::ColorLabel(PieceColor::White), OpponentText::ColorLabel(PieceColor::Black)});
-        eastl::vector<eastl::string> engines;
+        Vector<eastl::string> engines;
         for (const OpponentEngine engine : EnumUtils<OpponentEngine>::Values()) {
             const StringView name = OpponentEngineName(engine);
             engines.emplace_back(name.data(), name.size());
         }
         distinct(engines);
-        eastl::vector<eastl::string> levels;
+        Vector<eastl::string> levels;
         for (const OpponentLevel& level : GetOpponentLevels()) {
             levels.emplace_back(level.name.data(), level.name.size());
         }
@@ -65,7 +65,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(OpponentTextTest, EveryKindOfErrorHasItsOwnShortSentence) {
-        eastl::vector<eastl::string> sentences;
+        Vector<eastl::string> sentences;
         for (const EngineErrorKind kind : EnumUtils<EngineErrorKind>::Values()) {
             const eastl::string sentence = ErrorWords(kind);
             const std::string name = KindName(kind);

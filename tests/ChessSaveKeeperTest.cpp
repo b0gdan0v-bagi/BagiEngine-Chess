@@ -43,9 +43,13 @@ namespace BECore::Chess::Tests {
             return "stub-default-folder";
         }
 
-        std::vector<uint8_t> BytesOfFile(const std::filesystem::path& path) {
+        Vector<uint8_t> BytesOfFile(const std::filesystem::path& path) {
             std::ifstream file(path, std::ios::binary);
-            return std::vector<uint8_t>(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
+            Vector<uint8_t> bytes;
+            for (std::istreambuf_iterator<char> it(file), end; it != end; ++it) {
+                bytes.push_back(static_cast<uint8_t>(*it));
+            }
+            return bytes;
         }
 
         void WriteBytes(const std::filesystem::path& path, const std::string& bytes) {
@@ -276,7 +280,7 @@ namespace BECore::Chess::Tests {
         SetCommandLine({}, false);  // no flag, and config/ is not mounted: rememberGame is false
         std::filesystem::create_directories(_saves);
         WriteBytes(SaveFile(), "a game of somebody");
-        const std::vector<uint8_t> before = BytesOfFile(SaveFile());
+        const Vector<uint8_t> before = BytesOfFile(SaveFile());
         KeptGame game;
 
         game.Start();
@@ -424,7 +428,7 @@ namespace BECore::Chess::Tests {
             first.Flush();
         }
         ASSERT_TRUE(std::filesystem::exists(SaveFile()));
-        const std::vector<uint8_t> before = BytesOfFile(SaveFile());
+        const Vector<uint8_t> before = BytesOfFile(SaveFile());
 
         KeptGame second;
         second.Start();
@@ -446,7 +450,7 @@ namespace BECore::Chess::Tests {
         SetCommandLine({});
         std::filesystem::create_directories(_saves);
         WriteBytes(SaveFile(), "this is not a save file");
-        const std::vector<uint8_t> before = BytesOfFile(SaveFile());
+        const Vector<uint8_t> before = BytesOfFile(SaveFile());
         KeptGame game;
 
         game.Start();
@@ -478,7 +482,7 @@ namespace BECore::Chess::Tests {
             ChessSaveState state;
             ASSERT_TRUE(service.Save(kChessSaveSlot, SaveSchema{"Checkers", 1, 1}, state).has_value());
         }
-        const std::vector<uint8_t> before = BytesOfFile(SaveFile());
+        const Vector<uint8_t> before = BytesOfFile(SaveFile());
         KeptGame game;
 
         game.Start();

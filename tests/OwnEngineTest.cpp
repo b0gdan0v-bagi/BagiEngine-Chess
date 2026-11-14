@@ -278,13 +278,13 @@ namespace BECore::Chess::Tests {
         const auto play = [&](OwnEngine& engine) {
             ChessGameModel model;
             const Player player = EnginePlayer(engine, Depth(kSelfPlayDepth));
-            eastl::vector<eastl::string> moves = PlayGame(model, player, player);
+            Vector<eastl::string> moves = PlayGame(model, player, player);
             EXPECT_TRUE(model.IsGameOver() || model.GetMoves().size() == kPlyCap) << "the game ended or reached the cap, no move was refused";
             return moves;
         };
 
-        const eastl::vector<eastl::string> first = play(_engine);
-        const eastl::vector<eastl::string> again = play(second);
+        const Vector<eastl::string> first = play(_engine);
+        const Vector<eastl::string> again = play(second);
 
         EXPECT_GT(first.size(), 20u) << "a game, not a stop at the first move";
         EXPECT_EQ(first, again);

@@ -51,13 +51,13 @@ namespace BECore::Chess::Tests {
             }
 
         private:
-            eastl::array<char, kSquareCount> _slots{};
+            Array<char, kSquareCount> _slots{};
         };
 
         /// Each handle stands on a square that holds the piece it reports, and every piece of the position has exactly one handle
         void ExpectEveryPieceHasOneHandle(const ChessGameModel& model, const Handles& handles) {
             const Position opening = Position::Start();
-            eastl::array<int, kSquareCount> handlesOnSquare{};
+            Array<int, kSquareCount> handlesOnSquare{};
             for (int start = 0; start < kSquareCount; ++start) {
                 if (opening.GetPieceAt(Square::FromIndex(start)).IsEmpty()) {
                     continue;
@@ -286,7 +286,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(ChessGameModelTest, EachChoiceOfThePickerPlaysItsPiece) {
-        const eastl::array<std::pair<PieceType, const char*>, 4> choices{{
+        const Array<std::pair<PieceType, const char*>, 4> choices{{
             {PieceType::Queen, "a7a8q"},
             {PieceType::Rook, "a7a8r"},
             {PieceType::Bishop, "a7a8b"},
@@ -319,7 +319,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(ChessGameModelTest, PromotingCaptureWaitsForAPieceToo) {
-        const eastl::array<std::pair<PieceType, const char*>, 4> choices{{
+        const Array<std::pair<PieceType, const char*>, 4> choices{{
             {PieceType::Queen, "a7b8q"},
             {PieceType::Rook, "a7b8r"},
             {PieceType::Bishop, "a7b8b"},
@@ -862,7 +862,7 @@ namespace BECore::Chess::Tests {
 
     namespace {
 
-        void PlayAll(ChessGameModel& model, const eastl::vector<const char*>& moves, size_t count) {
+        void PlayAll(ChessGameModel& model, const Vector<const char*>& moves, size_t count) {
             for (size_t i = 0; i < count; ++i) {
                 ASSERT_TRUE(Play(model, moves[i])) << "move " << i << ": " << moves[i];
             }
@@ -887,7 +887,7 @@ namespace BECore::Chess::Tests {
         /// the piece it reports, no two share a square, and the active handles are exactly the pieces of the position
         void ExpectHandlesMatchTheBoard(const ChessGameModel& model, const Handles& handles) {
             const Position opening = Position::Start();
-            eastl::array<int, kSquareCount> handlesOnSquare{};
+            Array<int, kSquareCount> handlesOnSquare{};
             for (int start = 0; start < kSquareCount; ++start) {
                 const void* handle = handles.AtIndex(start);
                 if (opening.GetPieceAt(Square::FromIndex(start)).IsEmpty() || !model.IsActive(handle)) {
@@ -917,7 +917,7 @@ namespace BECore::Chess::Tests {
 
         /// For every k, TakeBack(k) on a model that played all of @p moves equals a model that played the first moves.size() - k.
         /// An empty @p startFen is the opening; else the game begins from that FEN through SetPosition().
-        void ExpectTakeBackMatchesAFreshModel(StringView startFen, const eastl::vector<const char*>& moves) {
+        void ExpectTakeBackMatchesAFreshModel(StringView startFen, const Vector<const char*>& moves) {
             for (size_t back = 1; back <= moves.size(); ++back) {
                 SCOPED_TRACE(testing::Message() << "taken back: " << back);
                 ChessGameModel taken;
@@ -972,7 +972,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(ChessGameModelTest, TakeBackTwoEqualsAGameOfTwoMovesLess) {
-        const eastl::vector<const char*> moves = {"e2e4", "e7e5", "g1f3", "b8c6", "f1c4"};
+        const Vector<const char*> moves = {"e2e4", "e7e5", "g1f3", "b8c6", "f1c4"};
         ChessGameModel model;
         PlayAll(model, moves, moves.size());
         EXPECT_EQ(model.TakeBack(2), 2u);
@@ -1047,7 +1047,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(ChessGameModelTest, TakeBackFromAThreefoldDrawKeepsTheRepetitionCountRight) {
-        const eastl::vector<const char*> cycle = {"g1f3", "g8f6", "f3g1", "f6g8"};
+        const Vector<const char*> cycle = {"g1f3", "g8f6", "f3g1", "f6g8"};
         ChessGameModel model;
         for (int round = 0; round < 2; ++round) {
             PlayAll(model, cycle, cycle.size());
@@ -1208,7 +1208,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(ChessGameModelTest, TakeBackOneMoveAtATimeIsAFreshModelEveryTime) {
-        const eastl::vector<const char*> moves = {"e2e4", "e7e5", "g1f3", "b8c6", "f1c4", "f8c5"};
+        const Vector<const char*> moves = {"e2e4", "e7e5", "g1f3", "b8c6", "f1c4", "f8c5"};
         ChessGameModel model;
         const Handles handles(model);
         for (size_t i = 0; i < moves.size(); ++i) {

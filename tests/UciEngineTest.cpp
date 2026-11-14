@@ -95,7 +95,7 @@ namespace BECore::Chess::Tests {
             return AnalysisScore{AnalysisScoreKind::Mate, moves};
         }
 
-        size_t CountLines(const eastl::vector<eastl::string>& lines, StringView text) {
+        size_t CountLines(const Vector<eastl::string>& lines, StringView text) {
             return static_cast<size_t>(std::count_if(lines.begin(), lines.end(), [text](const eastl::string& line) { return StringView(line) == text; }));
         }
 
@@ -193,7 +193,7 @@ namespace BECore::Chess::Tests {
         ExpectMove(engine.FindMove(MakeRequest({"e2e4", "e7e5", "g1f3"}, SearchLimits{0, 6}), CancellationToken()), "d7d5");
         ExpectMove(engine.FindMove(MakeRequest({"e2e4", "e7e5", "g1f3", "d7d5"}, SearchLimits{80, 8}), CancellationToken()), "e4d5");
 
-        const eastl::vector<eastl::string> lines = ReadFileLines(directory.File(kLogName));
+        const Vector<eastl::string> lines = ReadFileLines(directory.File(kLogName));
         EXPECT_EQ(CountLines(lines, Format("{} moves e2e4 e7e5", StartPositionCommand())), 1u);
         EXPECT_EQ(CountLines(lines, Format("{} moves e2e4 e7e5 g1f3", StartPositionCommand())), 1u);
         EXPECT_EQ(CountLines(lines, Format("{} moves e2e4 e7e5 g1f3 d7d5", StartPositionCommand())), 1u);
@@ -254,7 +254,7 @@ namespace BECore::Chess::Tests {
 
         ExpectError(none, EngineErrorKind::NoMove);
         ExpectMove(next, "a7a6");
-        const eastl::vector<eastl::string> lines = ReadFileLines(directory.File(kLogName));
+        const Vector<eastl::string> lines = ReadFileLines(directory.File(kLogName));
         EXPECT_EQ(CountLines(lines, "uci"), 1u) << "the engine was alive and in step: no new process";
         EXPECT_EQ(CountLines(lines, "quit"), 0u);
     }
@@ -296,7 +296,7 @@ namespace BECore::Chess::Tests {
             EXPECT_NE(illegal.error().detail.find("e2e5"), eastl::string::npos) << illegal.error().detail.c_str();
         }
         ExpectMove(again, "e2e4");
-        const eastl::vector<eastl::string> lines = ReadFileLines(directory.File(kLogName));
+        const Vector<eastl::string> lines = ReadFileLines(directory.File(kLogName));
         EXPECT_EQ(CountLines(lines, "uci"), 1u) << "the same process answered both";
         EXPECT_EQ(CountLines(lines, "ucinewgame"), 1u) << "the same position again is not a new game";
         EXPECT_EQ(CountLines(lines, "quit"), 0u);
@@ -321,7 +321,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(CountLines(ReadFileLines(directory.File(kLogName)), "uci"), 1u);
 
         ExpectError(engine.FindMove(request, CancellationToken()), EngineErrorKind::Timeout);
-        const eastl::vector<eastl::string> lines = ReadFileLines(directory.File(kLogName));
+        const Vector<eastl::string> lines = ReadFileLines(directory.File(kLogName));
         EXPECT_EQ(CountLines(lines, "uci"), 2u) << "the second search started a process of its own";
         EXPECT_EQ(CountLines(lines, "ucinewgame"), 2u) << "and a new process starts a game";
     }
@@ -420,7 +420,7 @@ namespace BECore::Chess::Tests {
 
         ExpectError(cancelled, EngineErrorKind::Cancelled);
         ExpectMove(engine.FindMove(MakeRequest({}), CancellationToken()), "d2d4");
-        const eastl::vector<eastl::string> lines = ReadFileLines(directory.File(kLogName));
+        const Vector<eastl::string> lines = ReadFileLines(directory.File(kLogName));
         EXPECT_EQ(CountLines(lines, "stop"), 1u);
         EXPECT_EQ(CountLines(lines, "uci"), 1u) << "the engine answered `stop`: it stays";
         EXPECT_EQ(CountLines(lines, "quit"), 0u);
@@ -443,7 +443,7 @@ namespace BECore::Chess::Tests {
         ExpectError(result, EngineErrorKind::Cancelled);
         EXPECT_GE(returned - canceller.CancelledAt(), milliseconds(kStopGraceMs)) << "the engine had its grace to answer `stop`";
         EXPECT_TRUE(WaitForLogLine(directory.File(kLogName), "quit")) << "and then it was closed";
-        const eastl::vector<eastl::string> lines = ReadFileLines(directory.File(kLogName));
+        const Vector<eastl::string> lines = ReadFileLines(directory.File(kLogName));
         EXPECT_EQ(CountLines(lines, "stop"), 1u);
     }
 
@@ -532,13 +532,13 @@ namespace BECore::Chess::Tests {
 
         ASSERT_TRUE(results[0].has_value()) << Describe(results[0].error()).c_str();
         ASSERT_TRUE(results[1].has_value()) << Describe(results[1].error()).c_str();
-        eastl::vector<eastl::string> answers = {results[0]->ToUci(), results[1]->ToUci()};
+        Vector<eastl::string> answers = {results[0]->ToUci(), results[1]->ToUci()};
         std::sort(answers.begin(), answers.end());
         EXPECT_EQ(answers, Lines({"d2d4", "e2e4"})) << "each search got the answer of its own go";
         EXPECT_GE(took, 2 * kThink) << "the second search waited for the first";
 
         // Commands never interleave: every position is followed by its go, then the next search's position
-        eastl::vector<eastl::string> searchLines;
+        Vector<eastl::string> searchLines;
         for (const eastl::string& line : ReadFileLines(directory.File(kLogName))) {
             if (line.find("position") == 0 || line.find("go") == 0) {
                 searchLines.push_back(line);
@@ -591,7 +591,7 @@ namespace BECore::Chess::Tests {
         }
         ExpectMove(played, "d2d4");  // the same object, the same process: a move needs no score
         ExpectAnalysisError(second, EngineErrorKind::ProtocolError);
-        const eastl::vector<eastl::string> lines = ReadFileLines(directory.File(kLogName));
+        const Vector<eastl::string> lines = ReadFileLines(directory.File(kLogName));
         EXPECT_EQ(CountLines(lines, "uci"), 1u) << "the engine was in step: no new process";
         EXPECT_EQ(CountLines(lines, "ucinewgame"), 1u);
         EXPECT_EQ(CountLines(lines, "quit"), 0u);
@@ -613,7 +613,7 @@ namespace BECore::Chess::Tests {
         ExpectAnalysis(analyser.Analyse(request, CancellationToken()), "g1f3", Cp(10), 1);
         ExpectMove(player.FindMove(request, CancellationToken()), "g1f3");
 
-        const eastl::vector<eastl::string> lines = ReadFileLines(directory.File("analyse.log"));
+        const Vector<eastl::string> lines = ReadFileLines(directory.File("analyse.log"));
         EXPECT_EQ(lines, ReadFileLines(directory.File("find.log")));
         EXPECT_EQ(CountLines(lines, "go depth 8 movetime 80"), 1u);
         EXPECT_EQ(CountLines(lines, Format("{} moves e2e4 e7e5", StartPositionCommand())), 1u);
@@ -647,7 +647,7 @@ namespace BECore::Chess::Tests {
         ExpectAnalysisError(none, EngineErrorKind::NoMove);
         ExpectAnalysisError(zeros, EngineErrorKind::NoMove);
         ExpectAnalysis(next, "a7a6", Cp(10), 1);
-        const eastl::vector<eastl::string> lines = ReadFileLines(directory.File(kLogName));
+        const Vector<eastl::string> lines = ReadFileLines(directory.File(kLogName));
         EXPECT_EQ(CountLines(lines, "uci"), 1u);
         EXPECT_EQ(CountLines(lines, "quit"), 0u);
     }
@@ -666,7 +666,7 @@ namespace BECore::Chess::Tests {
             EXPECT_NE(illegal.error().detail.find("e2e5"), eastl::string::npos) << illegal.error().detail.c_str();
         }
         ExpectAnalysis(again, "e2e4", Cp(10), 1);
-        const eastl::vector<eastl::string> lines = ReadFileLines(directory.File(kLogName));
+        const Vector<eastl::string> lines = ReadFileLines(directory.File(kLogName));
         EXPECT_EQ(CountLines(lines, "uci"), 1u);
         EXPECT_EQ(CountLines(lines, "quit"), 0u);
     }
@@ -747,7 +747,7 @@ namespace BECore::Chess::Tests {
 
         ExpectAnalysisError(cancelled, EngineErrorKind::Cancelled);
         ExpectAnalysis(engine.Analyse(MakeRequest({}), CancellationToken()), "d2d4", Cp(2), 1);
-        const eastl::vector<eastl::string> lines = ReadFileLines(directory.File(kLogName));
+        const Vector<eastl::string> lines = ReadFileLines(directory.File(kLogName));
         EXPECT_EQ(CountLines(lines, "stop"), 1u);
         EXPECT_EQ(CountLines(lines, "uci"), 1u) << "the engine answered `stop`: it stays";
         EXPECT_EQ(CountLines(lines, "quit"), 0u);
@@ -832,7 +832,7 @@ namespace BECore::Chess::Tests {
             }
         }
 
-        size_t CountMultiPvOptions(const eastl::vector<eastl::string>& lines) {
+        size_t CountMultiPvOptions(const Vector<eastl::string>& lines) {
             return static_cast<size_t>(std::count_if(lines.begin(), lines.end(), [](const eastl::string& line) { return line.find("setoption name MultiPV") == 0; }));
         }
 
@@ -894,7 +894,7 @@ namespace BECore::Chess::Tests {
         ExpectMove(engine.FindMove(MakeRequest({}), CancellationToken()), "e2e4");
         ExpectMove(engine.FindMove(MakeRequest({}), CancellationToken()), "e2e4");
 
-        const eastl::vector<eastl::string> lines = ReadFileLines(directory.File(kLogName));
+        const Vector<eastl::string> lines = ReadFileLines(directory.File(kLogName));
         EXPECT_EQ(CountLines(lines, "setoption name MultiPV value 3"), 1u);
         EXPECT_EQ(CountLines(lines, "setoption name MultiPV value 1"), 1u) << "once, not before every search";
         EXPECT_EQ(CountMultiPvOptions(lines), 2u);
@@ -911,7 +911,7 @@ namespace BECore::Chess::Tests {
         ExpectAnalysisError(engine.Analyse(request, CancellationToken()), EngineErrorKind::ProcessDied);
         ExpectLines(engine.Analyse(request, CancellationToken()), {{"e2e4", Cp(30)}, {"d2d4", Cp(20)}});
 
-        const eastl::vector<eastl::string> lines = ReadFileLines(directory.File(kLogName));
+        const Vector<eastl::string> lines = ReadFileLines(directory.File(kLogName));
         EXPECT_EQ(CountLines(lines, "uci"), 2u);
         EXPECT_EQ(CountLines(lines, "setoption name MultiPV value 2"), 2u) << "the new process has one line again";
     }
@@ -930,7 +930,7 @@ namespace BECore::Chess::Tests {
             EXPECT_NE(illegal.error().detail.find("e2e5"), eastl::string::npos) << illegal.error().detail.c_str();
         }
         ExpectAnalysis(again, "e2e4", Cp(30), 1);
-        const eastl::vector<eastl::string> lines = ReadFileLines(directory.File(kLogName));
+        const Vector<eastl::string> lines = ReadFileLines(directory.File(kLogName));
         EXPECT_EQ(CountLines(lines, "uci"), 1u);
         EXPECT_EQ(CountLines(lines, "quit"), 0u);
     }

@@ -50,7 +50,7 @@ namespace BECore::Chess::Tests {
         constexpr size_t kFloodLines = 20000;
         constexpr size_t kLineMargin = 1000;
 
-        eastl::unique_ptr<UciProcess> StartFake(std::initializer_list<StringView> flags = {}) {
+        UniquePtr<UciProcess> StartFake(std::initializer_list<StringView> flags = {}) {
             auto started = UciProcess::Start(FakeEngineLaunch(flags));
             EXPECT_TRUE(started.has_value()) << (started ? "" : started.error().detail.c_str());
             return started ? std::move(*started) : nullptr;
@@ -67,8 +67,8 @@ namespace BECore::Chess::Tests {
         }
 
         /// Reads up to and including the line @p last, or up to the first failure
-        eastl::vector<eastl::string> ReadUntil(UciProcess& process, const char* last) {
-            eastl::vector<eastl::string> lines;
+        Vector<eastl::string> ReadUntil(UciProcess& process, const char* last) {
+            Vector<eastl::string> lines;
             for (;;) {
                 auto line = process.ReadLine(kMustNotTimeOut);
                 if (!line) {
@@ -547,7 +547,7 @@ namespace BECore::Chess::Tests {
         launch.path = directory.FileText("wrapper.cmd");
         auto started = UciProcess::Start(launch);
         ASSERT_TRUE(started.has_value()) << (started ? "" : started.error().detail.c_str());
-        const eastl::unique_ptr<UciProcess> process = std::move(*started);
+        const UniquePtr<UciProcess> process = std::move(*started);
         Handshake(*process);  // the fake runs and has its log open
 
         process->Close(kShortGrace);

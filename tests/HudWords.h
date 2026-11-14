@@ -15,9 +15,9 @@
 namespace BECore::Chess::Tests {
 
     struct HudWords {
-        eastl::vector<eastl::string> turn;           ///< `{turn}`: whose move it is, who won, "Computer is thinking"
-        eastl::vector<eastl::string> status;         ///< `{status}`: the status of the game ("" included) and every sentence of an engine error
-        eastl::vector<eastl::string> opponentError;  ///< `{opponentError}` of the opponent panel: "" and every sentence of an engine error
+        Vector<eastl::string> turn;           ///< `{turn}`: whose move it is, who won, "Computer is thinking"
+        Vector<eastl::string> status;         ///< `{status}`: the status of the game ("" included) and every sentence of an engine error
+        Vector<eastl::string> opponentError;  ///< `{opponentError}` of the opponent panel: "" and every sentence of an engine error
 
         /// How many rounds cover every word: round i takes the word i of each list (the shorter lists wrap round). The elements of the HUD lay out independently of one another,
         /// so a word needs a round with some word of the others, not with each of them
@@ -34,7 +34,7 @@ namespace BECore::Chess::Tests {
         }
 
     private:
-        static StringView View(const eastl::vector<eastl::string>& words, size_t round) {
+        static StringView View(const Vector<eastl::string>& words, size_t round) {
             const eastl::string& word = words[round % words.size()];
             return StringView(word);
         }
@@ -42,7 +42,7 @@ namespace BECore::Chess::Tests {
 
     namespace HudWordsDetail {
 
-        inline void Add(eastl::vector<eastl::string>& words, eastl::string word) {
+        inline void Add(Vector<eastl::string>& words, eastl::string word) {
             if (eastl::find(words.begin(), words.end(), word) == words.end()) {
                 words.push_back(std::move(word));
             }
@@ -54,7 +54,7 @@ namespace BECore::Chess::Tests {
         }
 
         /// What the HUD says about the model as it stands; @p seen gets the status of the game, so AllHudWords() can tell that every status was reached
-        inline void Collect(HudWords& words, eastl::vector<GameStatus>& seen, const ChessGameModel& model) {
+        inline void Collect(HudWords& words, Vector<GameStatus>& seen, const ChessGameModel& model) {
             if (eastl::find(seen.begin(), seen.end(), model.GetStatus()) == seen.end()) {
                 seen.push_back(model.GetStatus());
             }
@@ -70,7 +70,7 @@ namespace BECore::Chess::Tests {
     inline HudWords AllHudWords() {
         using namespace HudWordsDetail;
         HudWords words;
-        eastl::vector<GameStatus> seen;
+        Vector<GameStatus> seen;
 
         ChessGameModel model;
         Collect(words, seen, model);

@@ -174,7 +174,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(MoveRatingTest, TheIdsAreLowerCaseSnakeCaseAndUnique) {
-        eastl::vector<eastl::string> seen;
+        Vector<eastl::string> seen;
         for (const MoveRatingReason reason : EnumUtils<MoveRatingReason>::Values()) {
             const eastl::string id(MoveRatingReasonId(reason));
             EXPECT_FALSE(id.empty());

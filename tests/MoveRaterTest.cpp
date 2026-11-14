@@ -70,7 +70,7 @@ namespace BECore::Chess::Tests {
          */
         class PlyEngine final : public IChessEngine {
         public:
-            explicit PlyEngine(eastl::vector<Move> best = {}, int gap = 25) : _best(std::move(best)), _gap(gap) {}
+            explicit PlyEngine(Vector<Move> best = {}, int gap = 25) : _best(std::move(best)), _gap(gap) {}
 
             void Gate(bool honorsToken) {
                 _gated = true;
@@ -110,7 +110,7 @@ namespace BECore::Chess::Tests {
                 return _answered.load();
             }
 
-            [[nodiscard]] eastl::vector<SearchRequest> Requests() const {
+            [[nodiscard]] Vector<SearchRequest> Requests() const {
                 const std::lock_guard lock(_mutex);
                 return _requests;
             }
@@ -156,21 +156,21 @@ namespace BECore::Chess::Tests {
                 return analysis;
             }
 
-            eastl::vector<Move> _best;
+            Vector<Move> _best;
             int _gap;
             bool _gated = false;
             bool _honorsToken = false;
             Optional<EngineError> _error;
             Optional<size_t> _failPly;
             mutable std::mutex _mutex;  ///< guards _requests
-            eastl::vector<SearchRequest> _requests;
+            Vector<SearchRequest> _requests;
             std::atomic<bool> _open{false};
             std::atomic<bool> _cancelled{false};
             std::atomic<int> _calls{0};
             std::atomic<int> _answered{0};
         };
 
-        eastl::shared_ptr<PlyEngine> MakeEngine(eastl::vector<Move> best = {}, int gap = 25) {
+        eastl::shared_ptr<PlyEngine> MakeEngine(Vector<Move> best = {}, int gap = 25) {
             return eastl::make_shared<PlyEngine>(std::move(best), gap);
         }
 
@@ -236,7 +236,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(ReasonAt(rater, model, 0), MoveRatingReason::Brilliant) << "e2e4 is the engine's move";
         EXPECT_EQ(ReasonAt(rater, model, 1), MoveRatingReason::NotBest) << "e7e5, the engine wanted d7d5";
         EXPECT_EQ(ReasonAt(rater, model, 2), MoveRatingReason::Brilliant);
-        const eastl::vector<SearchRequest> requests = engine->Requests();
+        const Vector<SearchRequest> requests = engine->Requests();
         ASSERT_EQ(requests.size(), 3u) << "one search per move";
         for (size_t ply = 0; ply < requests.size(); ++ply) {
             EXPECT_EQ(requests[ply].startFen, model.GetStartFen()) << ply;
@@ -744,13 +744,13 @@ namespace BECore::Chess::Tests {
         }
 
         /// A game from @p fen: the moves of @p ucis rated, as the reasons in order
-        eastl::vector<MoveRatingReason> ReasonsOf(StringView fen, std::initializer_list<StringView> ucis) {
+        Vector<MoveRatingReason> ReasonsOf(StringView fen, std::initializer_list<StringView> ucis) {
             ChessGameModel model;
             if (!fen.empty()) {
                 model.SetPosition(PositionFromFen(fen));
             }
             EXPECT_TRUE(PlayAll(model, ucis));
-            eastl::vector<MoveRatingReason> reasons;
+            Vector<MoveRatingReason> reasons;
             for (const Optional<MoveRating>& rating : RateWithTheOwnEngine(model)) {
                 EXPECT_TRUE(rating.has_value());
                 reasons.push_back(rating ? rating->reason : MoveRatingReason::NotBest);
@@ -762,21 +762,21 @@ namespace BECore::Chess::Tests {
 
     TEST_F(MoveRaterTest, OwnEngineAMateInOneThatIsPlayedIsObvious) {
         // 6k1/5ppp/8/8/8/8/8/R3K3 w: Ra8# is Mate 1, line 2 (Kd2) is +2.40: a gap of 99660, "the only reasonable move"
-        EXPECT_EQ(ReasonsOf("6k1/5ppp/8/8/8/8/8/R3K3 w - - 0 1", {"a1a8"}), (eastl::vector<MoveRatingReason>{MoveRatingReason::Obvious}));
+        EXPECT_EQ(ReasonsOf("6k1/5ppp/8/8/8/8/8/R3K3 w - - 0 1", {"a1a8"}), (Vector<MoveRatingReason>{MoveRatingReason::Obvious}));
     }
 
     TEST_F(MoveRaterTest, OwnEngineAnotherMoveThanTheMateInOneIsNotBest) {
-        EXPECT_EQ(ReasonsOf("6k1/5ppp/8/8/8/8/8/R3K3 w - - 0 1", {"e1d2"}), (eastl::vector<MoveRatingReason>{MoveRatingReason::NotBest}));
+        EXPECT_EQ(ReasonsOf("6k1/5ppp/8/8/8/8/8/R3K3 w - - 0 1", {"e1d2"}), (Vector<MoveRatingReason>{MoveRatingReason::NotBest}));
     }
 
     TEST_F(MoveRaterTest, OwnEngineTakingAHangingQueenIsObvious) {
         // 4k3/8/8/3q4/8/8/8/3RK3 w: Rxd5 is +4.75, the best other move (Rd2) -4.05: a gap of 880
-        EXPECT_EQ(ReasonsOf("4k3/8/8/3q4/8/8/8/3RK3 w - - 0 1", {"d1d5"}), (eastl::vector<MoveRatingReason>{MoveRatingReason::Obvious}));
-        EXPECT_EQ(ReasonsOf("4k3/8/8/3q4/8/8/8/3RK3 w - - 0 1", {"d1d2"}), (eastl::vector<MoveRatingReason>{MoveRatingReason::NotBest}));
+        EXPECT_EQ(ReasonsOf("4k3/8/8/3q4/8/8/8/3RK3 w - - 0 1", {"d1d5"}), (Vector<MoveRatingReason>{MoveRatingReason::Obvious}));
+        EXPECT_EQ(ReasonsOf("4k3/8/8/3q4/8/8/8/3RK3 w - - 0 1", {"d1d2"}), (Vector<MoveRatingReason>{MoveRatingReason::NotBest}));
     }
 
     TEST_F(MoveRaterTest, OwnEngineTheOnlyLegalMoveIsForced) {
-        EXPECT_EQ(ReasonsOf(kOneMoveFen, {"a8b8"}), (eastl::vector<MoveRatingReason>{MoveRatingReason::Forced}));
+        EXPECT_EQ(ReasonsOf(kOneMoveFen, {"a8b8"}), (Vector<MoveRatingReason>{MoveRatingReason::Forced}));
     }
 
     TEST_F(MoveRaterTest, OwnEngineABestMoveWithACloseSecondIsBrilliantAndALegalOtherMoveIsNotBest) {
@@ -785,7 +785,7 @@ namespace BECore::Chess::Tests {
         // engine's pick, and e5, Nc6 and Nf6 are its pick with a second line within the margin (gaps 0, 20 and 15): brilliant
         using Reason = MoveRatingReason;
         EXPECT_EQ(ReasonsOf({}, {"e2e4", "e7e5", "g1f3", "b8c6", "f1c4", "g8f6"}),
-                  (eastl::vector<Reason>{Reason::NotBest, Reason::Brilliant, Reason::NotBest, Reason::Brilliant, Reason::NotBest, Reason::Brilliant}));
+                  (Vector<Reason>{Reason::NotBest, Reason::Brilliant, Reason::NotBest, Reason::Brilliant, Reason::NotBest, Reason::Brilliant}));
     }
 
     /// The rater awaits the async search (many slices at depth 5); its rating is the one the blocking Analyse of the same request gives

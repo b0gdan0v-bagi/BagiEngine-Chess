@@ -156,8 +156,8 @@ namespace BECore::Tests {
             }
         };
 
-        std::unique_ptr<Compiled> Compile(const std::string& html, const std::string& css) {
-            auto compiled = std::make_unique<Compiled>();
+        UniquePtr<Compiled> Compile(const std::string& html, const std::string& css) {
+            auto compiled = MakeUnique<Compiled>();
             const std::string source = "<style>" + css + "</style>" + html;
             compiled->xml = UIWebCompiler::Compile(FromStd(source), {}, compiled->report);
             compiled->document.load_string(compiled->xml.c_str());
@@ -319,7 +319,7 @@ namespace BECore::Tests {
             const char* group;
             const char* bind;
             const char* action;
-            std::vector<std::pair<const char*, const char*>> segments;
+            Vector<std::pair<const char*, const char*>> segments;
         } groups[] = {{"ModeGroup", "opponentMode", "ChessSetMode", {{"ModeTwo", "two"}, {"ModeComputer", "computer"}}},
                       {"ColorGroup", "opponentColor", "ChessSetColor", {{"ColorWhite", "white"}, {"ColorBlack", "black"}}},
                       {"EngineGroup", "opponentEngine", "ChessSetEngine", {{"EngineStockfish", "stockfish"}, {"EngineOwn", "own"}}},

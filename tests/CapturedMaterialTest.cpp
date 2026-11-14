@@ -17,7 +17,7 @@ namespace BECore::Chess::Tests {
             return std::string(text.data(), text.size());
         }
 
-        eastl::array<StringView, 6> PerftFens() {
+        Array<StringView, 6> PerftFens() {
             return {Position::kStartFen, kKiwipeteFen, kPosition3Fen, kPosition4Fen, kPosition5Fen, kPosition6Fen};
         }
 

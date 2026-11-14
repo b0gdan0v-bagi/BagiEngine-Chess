@@ -114,8 +114,8 @@ namespace BECore::Chess::Tests {
             return c;
         }
 
-        inline std::vector<std::string> SplitOn(const std::string& text, char separator) {
-            std::vector<std::string> parts;
+        inline Vector<std::string> SplitOn(const std::string& text, char separator) {
+            Vector<std::string> parts;
             std::string current;
             for (const char c : text) {
                 if (c == separator) {
@@ -134,10 +134,10 @@ namespace BECore::Chess::Tests {
     /// The same game seen from the other side of the table: ranks flipped, colors swapped, the other side to move,
     /// the castling rights and the en passant square swapped with them
     inline std::string MirrorFen(StringView fen) {
-        const std::vector<std::string> fields = MirrorDetail::SplitOn(std::string(fen.data(), fen.size()), ' ');
+        const Vector<std::string> fields = MirrorDetail::SplitOn(std::string(fen.data(), fen.size()), ' ');
         EXPECT_GE(fields.size(), 4U);
 
-        std::vector<std::string> ranks = MirrorDetail::SplitOn(fields[0], '/');
+        Vector<std::string> ranks = MirrorDetail::SplitOn(fields[0], '/');
         std::string placement;
         for (auto rank = ranks.rbegin(); rank != ranks.rend(); ++rank) {
             if (!placement.empty()) {

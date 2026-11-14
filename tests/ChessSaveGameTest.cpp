@@ -56,9 +56,13 @@ namespace BECore::Chess::Tests {
             return true;
         }
 
-        std::vector<uint8_t> BytesOfFile(const std::filesystem::path& path) {
+        Vector<uint8_t> BytesOfFile(const std::filesystem::path& path) {
             std::ifstream file(path, std::ios::binary);
-            return std::vector<uint8_t>(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
+            Vector<uint8_t> bytes;
+            for (std::istreambuf_iterator<char> it(file), end; it != end; ++it) {
+                bytes.push_back(static_cast<uint8_t>(*it));
+            }
+            return bytes;
         }
 
         std::string Member(const Json& json, StringView key) {
@@ -220,8 +224,8 @@ namespace BECore::Chess::Tests {
             return state;
         }
 
-        eastl::vector<IntrusivePtr<SceneNode>> PieceNodes() const {
-            eastl::vector<IntrusivePtr<SceneNode>> nodes;
+        Vector<IntrusivePtr<SceneNode>> PieceNodes() const {
+            Vector<IntrusivePtr<SceneNode>> nodes;
             for (const auto& node : _manager->GetSceneByName(PoolString::Intern("ChessScene"))->GetRootNode().GetChildren()) {
                 if (node->GetComponent<ChessPieceComponent>()) {
                     nodes.push_back(node);
@@ -255,7 +259,7 @@ namespace BECore::Chess::Tests {
         std::filesystem::path _saves;
         IntrusivePtr<RecordingRenderer> _renderer;
         IntrusivePtrAtomic<SceneManager> _manager;
-        eastl::unique_ptr<CountingFactory> _factory;
+        UniquePtr<CountingFactory> _factory;
         bool _started = false;
     };
 
@@ -282,7 +286,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessSaveGameTest, AControlRunIgnoresASaveThatNoFlagNames) {
         MakeSave(SavedGameOf(kGameInProgress, "none"));
-        const std::vector<uint8_t> before = BytesOfFile(SaveFile());
+        const Vector<uint8_t> before = BytesOfFile(SaveFile());
         SetCommandLine({"--control", "--headless", "--manual-clock"}, false);
         StartManager();
 
@@ -297,7 +301,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessSaveGameTest, NoSaveLeavesTheSaveAloneEvenWithASaveDir) {
         MakeSave(SavedGameOf(kGameInProgress, "none"));
-        const std::vector<uint8_t> before = BytesOfFile(SaveFile());
+        const Vector<uint8_t> before = BytesOfFile(SaveFile());
         SetCommandLine({"--no-save"}, true);
         StartManager();
 

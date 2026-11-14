@@ -80,8 +80,8 @@ namespace BECore::Chess::Tests {
     };
 
     /// The lines of a text file, none when it does not exist (the fake engine's --log file: what the engine received)
-    inline eastl::vector<eastl::string> ReadFileLines(const std::filesystem::path& file) {
-        eastl::vector<eastl::string> lines;
+    inline Vector<eastl::string> ReadFileLines(const std::filesystem::path& file) {
+        Vector<eastl::string> lines;
         std::ifstream stream(file);
         std::string line;
         while (std::getline(stream, line)) {
@@ -91,8 +91,8 @@ namespace BECore::Chess::Tests {
     }
 
     /// A list of lines to compare with ReadFileLines()
-    inline eastl::vector<eastl::string> Lines(std::initializer_list<StringView> texts) {
-        eastl::vector<eastl::string> lines;
+    inline Vector<eastl::string> Lines(std::initializer_list<StringView> texts) {
+        Vector<eastl::string> lines;
         for (const StringView text : texts) {
             lines.emplace_back(text.data(), text.size());
         }

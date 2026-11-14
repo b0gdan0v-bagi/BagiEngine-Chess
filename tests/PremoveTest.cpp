@@ -14,8 +14,8 @@ namespace BECore::Chess::Tests {
         }
 
         /// The targets of a piece as a sorted list of names, so a test reads "e3 e4"
-        std::vector<std::string> TargetsOf(const PremoveBoard& board, StringView from, PieceColor color) {
-            std::vector<std::string> names;
+        Vector<std::string> TargetsOf(const PremoveBoard& board, StringView from, PieceColor color) {
+            Vector<std::string> names;
             for (const Square square : board.Targets(Sq(from), color)) {
                 names.push_back(NameOf(square));
             }
@@ -23,8 +23,8 @@ namespace BECore::Chess::Tests {
             return names;
         }
 
-        std::vector<std::string> Names(std::initializer_list<const char*> list) {
-            std::vector<std::string> names(list.begin(), list.end());
+        Vector<std::string> Names(std::initializer_list<const char*> list) {
+            Vector<std::string> names(list.begin(), list.end());
             std::sort(names.begin(), names.end());
             return names;
         }

@@ -258,12 +258,12 @@ namespace BECore::Chess::Tests {
                 _values.push_back(event.value);
             }
 
-            eastl::vector<PoolString> _actions;
-            eastl::vector<PoolString> _values;
+            Vector<PoolString> _actions;
+            Vector<PoolString> _values;
         };
 
         /// Every control with text in the tree, depth first (a stack and a choice group have none of their own)
-        void CollectControls(const UIElement& element, eastl::vector<const UIElement*>& found) {
+        void CollectControls(const UIElement& element, Vector<const UIElement*>& found) {
             if (TextOf(element) != nullptr) {
                 found.push_back(&element);
             }
@@ -273,8 +273,8 @@ namespace BECore::Chess::Tests {
         }
 
         /// @p root and every element below it, depth first
-        eastl::vector<const UIElement*> AllElements(const UIElement& root) {
-            eastl::vector<const UIElement*> found;
+        Vector<const UIElement*> AllElements(const UIElement& root) {
+            Vector<const UIElement*> found;
             found.push_back(&root);
             for (const auto& child : root.children) {
                 for (const UIElement* below : AllElements(*child)) {
@@ -290,7 +290,7 @@ namespace BECore::Chess::Tests {
         eastl::string PanelProblems(const UICanvasLayout& layout, const char* plateName = "Plate") {
             eastl::string problems;
             const float scale = layout.GetResolved().scale;
-            eastl::vector<const UIElement*> controls;
+            Vector<const UIElement*> controls;
             CollectControls(*layout.root, controls);
             for (const UIElement* control : controls) {
                 if (control->rect.IsEmpty()) {
@@ -320,7 +320,7 @@ namespace BECore::Chess::Tests {
             return problems;
         }
 
-        bool HasIssue(const eastl::vector<UIMatrixFailure>& failures, UILayoutIssueKind kind) {
+        bool HasIssue(const Vector<UIMatrixFailure>& failures, UILayoutIssueKind kind) {
             for (const auto& failure : failures) {
                 for (const UILayoutIssue& issue : failure.issues) {
                     if (issue.kind == kind) {
@@ -345,8 +345,8 @@ namespace BECore::Chess::Tests {
         }
 
         /// The ten segments, all of it taken from the tables of the game (the mode and color words of OpponentText, the engines, the levels); the scene is held to this list
-        eastl::vector<PanelSegment> ExpectedPanelSegments() {
-            eastl::vector<PanelSegment> segments;
+        Vector<PanelSegment> ExpectedPanelSegments() {
+            Vector<PanelSegment> segments;
             for (const OpponentMode mode : EnumUtils<OpponentMode>::Values()) {
                 const StringView id = OpponentModeId(mode);
                 segments.push_back({Joined("Mode", EnumUtils<OpponentMode>::ToString(mode)), "ModeGroup", kSetModeAction, OpponentText::ModeLabel(mode == OpponentMode::Computer),
@@ -389,8 +389,8 @@ namespace BECore::Chess::Tests {
             int row = 0;
         };
 
-        eastl::vector<BoardLabel> ExpectedBoardLabels() {
-            eastl::vector<BoardLabel> labels;
+        Vector<BoardLabel> ExpectedBoardLabels() {
+            Vector<BoardLabel> labels;
             for (int row = 0; row <= kLastBoardIndex; ++row) {
                 labels.push_back({Format("RankLabel{}", row), false, kLabelColumn, row});
             }
@@ -575,7 +575,7 @@ namespace BECore::Chess::Tests {
         /// @p gap, one to a line
         eastl::string MaterialClearance(const UICanvasLayout& material, const UICanvasLayout& other, float gap) {
             eastl::string problems;
-            eastl::vector<const UIElement*> mine;
+            Vector<const UIElement*> mine;
             for (const char* group : kMaterialGroups) {
                 for (const char* piece : kMaterialPieces) {
                     mine.push_back(material.root->FindByName(PoolString::Intern(Format("Material{}{}Row", group, piece).c_str())));
@@ -1076,12 +1076,12 @@ namespace BECore::Chess::Tests {
         }
 
         /// The recorded fills of the hint in the last frame: the squares it leaves and goes to, in drawing order
-        [[nodiscard]] std::pair<eastl::vector<const DrawCall*>, eastl::vector<const DrawCall*>> HintFills() const {
+        [[nodiscard]] std::pair<Vector<const DrawCall*>, Vector<const DrawCall*>> HintFills() const {
             return {RectCalls(kHintFromColor), RectCalls(kHintToColor)};
         }
 
         /// The recorded fills of the last move in the last frame, in drawing order (the square it leaves, then the one it goes to)
-        [[nodiscard]] eastl::vector<const DrawCall*> LastMoveFills() const {
+        [[nodiscard]] Vector<const DrawCall*> LastMoveFills() const {
             return RectCalls(kLastMoveColor);
         }
 
@@ -1217,11 +1217,11 @@ namespace BECore::Chess::Tests {
         }
 
         /// The validator on the whole matrix for each round of words (the error line of the panel changes with the round): every finding of every round
-        eastl::vector<UIMatrixFailure> ValidateWithWords(UICanvasLayout& layout) const {
+        Vector<UIMatrixFailure> ValidateWithWords(UICanvasLayout& layout) const {
             UILayoutValidatorOptions options;
             options.minTouchSize = CoreManager::GetUIEnvironment().GetSettings().minTouchSize;
             const HudWords words = AllHudWords();
-            eastl::vector<UIMatrixFailure> all;
+            Vector<UIMatrixFailure> all;
             for (size_t round = 0; round < words.Rounds(); ++round) {
                 words.Publish(round);
                 const auto failures = ValidateOnMatrix(layout, options, ViewContext());
@@ -1476,7 +1476,7 @@ namespace BECore::Chess::Tests {
         IntrusivePtr<ITexture> GiveAtlasCell(const char* nodeName) const {
             auto sprite = PieceSprite(nodeName);
             EXPECT_TRUE(sprite) << nodeName;
-            const eastl::vector<uint8_t> pixels(static_cast<size_t>(kAtlasWidth) * kAtlasHeight * 4, 0);
+            const Vector<uint8_t> pixels(static_cast<size_t>(kAtlasWidth) * kAtlasHeight * 4, 0);
             IntrusivePtr<ITexture> texture = _renderer->CreateTexture(pixels.data(), kAtlasWidth, kAtlasHeight);
             if (sprite) {
                 sprite->SetTexture(texture);
@@ -1496,8 +1496,8 @@ namespace BECore::Chess::Tests {
         }
 
         /// The recorded rect fills of one color, in drawing order
-        eastl::vector<const DrawCall*> RectCalls(const Color& color) const {
-            eastl::vector<const DrawCall*> found;
+        Vector<const DrawCall*> RectCalls(const Color& color) const {
+            Vector<const DrawCall*> found;
             for (const DrawCall& call : _renderer->calls) {
                 if (call.kind == DrawKind::Rect && SameColor(call.color, color)) {
                     found.push_back(&call);
@@ -1700,7 +1700,7 @@ namespace BECore::Chess::Tests {
     // ---- the opponent panel: the words and the ids come from the tables ------------------------------------------------------------
 
     TEST_F(ChessUiTest, TheTextAndTheValueOfEverySegmentAreThoseOfTheTables) {
-        const eastl::vector<PanelSegment> expected = ExpectedPanelSegments();
+        const Vector<PanelSegment> expected = ExpectedPanelSegments();
         ASSERT_EQ(expected.size(), kPanelSegments);
 
         for (const PanelSegment& want : expected) {
@@ -2269,7 +2269,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, ARefusedPickLeavesTheOrientationAsItWas) {
         SKIP_WITHOUT_WORKER_THREADS();
-        eastl::vector<eastl::string> asked;
+        Vector<eastl::string> asked;
         Opponent().SetEngineFactory([&asked](OpponentEngine engine, const OpponentLevel&) -> MadeEngine {
             const StringView id = OpponentEngineId(engine);
             asked.emplace_back(id.data(), id.size());
@@ -2714,7 +2714,7 @@ namespace BECore::Chess::Tests {
             return text;
         };
         const auto rects = [&] {
-            eastl::vector<Rect> found;
+            Vector<Rect> found;
             for (const BoardLabel& spec : ExpectedBoardLabels()) {
                 const UIElement* label = CoordinateLabel(spec.name.c_str());
                 found.push_back(label != nullptr ? label->rect : Rect{});
@@ -2724,13 +2724,13 @@ namespace BECore::Chess::Tests {
 
         EXPECT_EQ(read(true), "abcdefgh") << "White at the bottom: a..h from the left";
         EXPECT_EQ(read(false), "87654321") << "8 at the top";
-        const eastl::vector<Rect> upright = rects();
+        const Vector<Rect> upright = rects();
 
         ControlPlays("white");
         _manager->UpdateAll();
         EXPECT_EQ(read(true), "hgfedcba") << "the board is turned by 180 degrees: h..a from the left";
         EXPECT_EQ(read(false), "12345678") << "1 at the top";
-        const eastl::vector<Rect> turned = rects();
+        const Vector<Rect> turned = rects();
         ASSERT_EQ(turned.size(), upright.size());
         for (size_t i = 0; i < turned.size(); ++i) {
             EXPECT_TRUE(SameRect(turned[i], upright[i])) << "label " << i << " is fixed on the screen";
@@ -2748,7 +2748,7 @@ namespace BECore::Chess::Tests {
         CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         Draw();
-        eastl::vector<Color> before;
+        Vector<Color> before;
         for (const BoardLabel& spec : ExpectedBoardLabels()) {
             const UIElement* label = CoordinateLabel(spec.name.c_str());
             ASSERT_NE(label, nullptr);
@@ -3908,7 +3908,7 @@ namespace BECore::Chess::Tests {
     TEST_F(ChessUiTest, WhenNoStockfishIsFoundTheEngineRowLeadsToTheOwnEngineAndComputerPlays) {
         // The user's path through the panel's actions: Stockfish is not installed, Computer says so and leaves two people, Own engine and Computer again let the program play.
         // The factory fails for Stockfish and nothing else, so the program cannot have fallen back by itself
-        eastl::vector<eastl::string> asked;
+        Vector<eastl::string> asked;
         Opponent().SetEngineFactory([&asked](OpponentEngine engine, const OpponentLevel&) -> MadeEngine {
             const StringView id = OpponentEngineId(engine);
             asked.emplace_back(id.data(), id.size());
@@ -4098,7 +4098,7 @@ namespace BECore::Chess::Tests {
         _manager->UpdateAll();
         ASSERT_TRUE(OpenThePanel());
         ActionLog log;
-        const eastl::vector<PanelSegment> segments = ExpectedPanelSegments();
+        const Vector<PanelSegment> segments = ExpectedPanelSegments();
         // A build without Stockfish hides its segment: nine are on the screen to click
         const auto IsShown = [](const PanelSegment& segment) { return kStockfishAvailable || segment.name != "EngineStockfish"; };
 
@@ -4268,7 +4268,7 @@ namespace BECore::Chess::Tests {
     TEST_F(ChessUiTest, ARefusedStockfishPickOnThePanelKeepsComputerTheOwnEngineAndTheLevelAndTheProgramStillAnswers) {
         // The owner's report: choosing Stockfish switched the mode to Two players. An engine that cannot be had cannot be saved: nothing changes and the error is said
         SKIP_WITHOUT_STOCKFISH_SEGMENT();  // the pick of the name is the action's in that build: WithoutStockfishThePickOfTheNameOnTheActionIsRefused...
-        eastl::vector<eastl::string> asked;
+        Vector<eastl::string> asked;
         Opponent().SetEngineFactory([&asked](OpponentEngine engine, const OpponentLevel&) -> MadeEngine {
             const StringView id = OpponentEngineId(engine);
             asked.emplace_back(id.data(), id.size());
@@ -4446,7 +4446,7 @@ namespace BECore::Chess::Tests {
     TEST_F(ChessUiTest, WhenNoStockfishIsFoundThePanelLeadsToTheOwnEngineAndTheProgramPlays) {
         // Was WhenNoStockfishIsFoundTheEngineButtonLeadsToTheOwnEngine... (the action-level twin is WhenNoStockfishIsFoundTheEngineRowLeadsToTheOwnEngineAndComputerPlays). The
         // factory stands in for "no Stockfish found" and nothing else: it never makes the own engine for a Stockfish pick, so the program cannot have fallen back by itself
-        eastl::vector<eastl::string> asked;
+        Vector<eastl::string> asked;
         Opponent().SetEngineFactory([&asked](OpponentEngine engine, const OpponentLevel&) -> MadeEngine {
             const StringView id = OpponentEngineId(engine);
             asked.emplace_back(id.data(), id.size());
@@ -4630,7 +4630,7 @@ namespace BECore::Chess::Tests {
         constexpr float kPromotionPlateHeight = 224.0f;  // 16 + 44 + 56 + 56 + 3 x 12 + 16, the comment of the scene
 
         /// Every element name of a tree, depth first
-        void CollectNames(const UIElement& element, eastl::vector<PoolString>& names) {
+        void CollectNames(const UIElement& element, Vector<PoolString>& names) {
             if (!element.name.ToStringView().empty()) {
                 names.push_back(element.name);
             }
@@ -4948,7 +4948,7 @@ namespace BECore::Chess::Tests {
         EXPECT_NEAR(PromotionElement(kPromotionPlate).rect.w, 640.0f, kPixelTolerance);
 
         const float minTouch = CoreManager::GetUIEnvironment().GetSettings().minTouchSize;
-        eastl::vector<eastl::string> buttons{"PromotionCancel"};
+        Vector<eastl::string> buttons{"PromotionCancel"};
         for (const PieceType piece : PromotionPieces()) {
             buttons.push_back(PromoteButton(piece));
         }
@@ -5035,7 +5035,7 @@ namespace BECore::Chess::Tests {
         // Every button of the canvas emits ChessPromote or ChessCancelPromotion, and the board answers both (pressed here as the buttons would)
         auto panel = Promotion();
         ASSERT_TRUE(panel);
-        eastl::vector<const UIElement*> controls;
+        Vector<const UIElement*> controls;
         CollectControls(panel->GetRoot(), controls);
         size_t buttons = 0;
         for (const UIElement* control : controls) {
@@ -5068,7 +5068,7 @@ namespace BECore::Chess::Tests {
             IntrusivePtr<UICanvasComponent> canvas;
         } canvases[] = {{"Hud", Hud()}, {"BoardCoordinates", Coordinate()}, {"Material", Material()}, {"OpponentPanel", Panel()}, {"PromotionPanel", Promotion()}};
         constexpr size_t kCanvasCount = std::size(canvases);
-        eastl::vector<PoolString> names[kCanvasCount];
+        Vector<PoolString> names[kCanvasCount];
         for (size_t i = 0; i < kCanvasCount; ++i) {
             ASSERT_TRUE(canvases[i].canvas) << canvases[i].node;
             CollectNames(canvases[i].canvas->GetRoot(), names[i]);
@@ -5654,7 +5654,7 @@ namespace BECore::Chess::Tests {
     TEST_F(ChessUiTest, TheMaterialCanvasHasTheElementsAndTheOrderOfTheScene) {
         const auto canvas = Material();
         ASSERT_TRUE(canvas);
-        eastl::vector<eastl::string> expected;
+        Vector<eastl::string> expected;
         for (const char* group : kMaterialGroups) {
             expected.push_back(Format("Material{}List", group));
             for (const char* piece : kMaterialPieces) {
@@ -5664,7 +5664,7 @@ namespace BECore::Chess::Tests {
             }
             expected.push_back(Format("Material{}Balance", group));
         }
-        const eastl::vector<const UIElement*> elements = AllElements(canvas->GetRoot());
+        const Vector<const UIElement*> elements = AllElements(canvas->GetRoot());
         ASSERT_EQ(elements.size(), 35u) << "the root and 2 lists, 10 rows, 10 icons, 10 counts and 2 balances";
         size_t stacks = 0;
         size_t images = 0;
@@ -5845,7 +5845,7 @@ namespace BECore::Chess::Tests {
     TEST_F(ChessUiTest, AnIconKeepsTheAspectOfItsAtlasCellCenteredInsideItsRow) {
         // The library is empty in the test, so every icon is given the atlas of the pieces and a cell of it by hand; UIImageComponent fits the cell into its rect
         StartFrom("4k3/8/8/8/8/8/8/4K3 w - - 0 1");
-        const eastl::vector<uint8_t> pixels(static_cast<size_t>(kAtlasWidth) * kAtlasHeight * 4, 0);
+        const Vector<uint8_t> pixels(static_cast<size_t>(kAtlasWidth) * kAtlasHeight * 4, 0);
         const IntrusivePtr<ITexture> atlas = _renderer->CreateTexture(pixels.data(), kAtlasWidth, kAtlasHeight);
         for (const char* group : kMaterialGroups) {
             for (const char* piece : kMaterialPieces) {
@@ -5861,7 +5861,7 @@ namespace BECore::Chess::Tests {
             _renderer->calls.clear();
             DrawAt(size.first, size.second);
             ASSERT_NE(ShownMaterialRows(), "");
-            eastl::vector<const DrawCall*> drawn;
+            Vector<const DrawCall*> drawn;
             for (const DrawCall& call : _renderer->calls) {
                 if (call.kind == DrawKind::Texture && call.texture == atlas.Get()) {
                     drawn.push_back(&call);

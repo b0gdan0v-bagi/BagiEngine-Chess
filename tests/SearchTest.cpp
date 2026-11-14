@@ -104,8 +104,8 @@ namespace BECore::Chess::Tests {
             return forced;
         }
 
-        eastl::vector<Move> MateInTwoKeys(Position& position) {
-            eastl::vector<Move> keys;
+        Vector<Move> MateInTwoKeys(Position& position) {
+            Vector<Move> keys;
             for (const Move move : MoveGenerator::GenerateLegal(position)) {
                 if (ForcesMateInTwo(position, move)) {
                     keys.push_back(move);

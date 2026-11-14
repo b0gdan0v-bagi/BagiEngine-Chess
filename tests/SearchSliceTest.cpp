@@ -54,7 +54,7 @@ namespace BECore::Chess::Tests {
         struct GoldenCase {
             eastl::string name;
             StringView fen;
-            eastl::vector<const char*> moves;
+            Vector<const char*> moves;
             int depth = 1;
             bool table = true;
             bool quietOrdering = true;
@@ -87,8 +87,8 @@ namespace BECore::Chess::Tests {
         }
 
         /// The cases of the golden table, in the order of its rows. The names are the key: a row of the table is found by name
-        std::vector<GoldenCase> BuildGoldenCases() {
-            std::vector<GoldenCase> cases;
+        Vector<GoldenCase> BuildGoldenCases() {
+            Vector<GoldenCase> cases;
             // The six positions at depth 3 and 4 with the defaults, with no table, with the old quiet order, and (depth 3) with neither
             // quiescence nor extension: plain depth-limited alpha-beta
             for (const NamedFen& position : kPerftPositions) {
@@ -352,7 +352,7 @@ namespace BECore::Chess::Tests {
     // -- the golden results --------------------------------------------------------------------------------------------------
 
     TEST(SearchSliceTest, TheGoldenTableHasARowPerCase) {
-        const std::vector<GoldenCase> cases = BuildGoldenCases();
+        const Vector<GoldenCase> cases = BuildGoldenCases();
 
         ASSERT_EQ(std::size(kGoldenRows), cases.size());
         for (size_t i = 0; i < cases.size(); ++i) {
@@ -362,7 +362,7 @@ namespace BECore::Chess::Tests {
 
     TEST(SearchSliceTest, TheSearchGivesTheGoldenResults) {
         // Every row was taken from the recursive search before it was rewritten. A row that moves means the search gives another answer
-        const std::vector<GoldenCase> cases = BuildGoldenCases();
+        const Vector<GoldenCase> cases = BuildGoldenCases();
         ASSERT_EQ(std::size(kGoldenRows), cases.size());
 
         for (size_t i = 0; i < cases.size(); ++i) {
@@ -399,7 +399,7 @@ namespace BECore::Chess::Tests {
             SlicePolicy policy;
         };
 
-        size_t IndexOfCase(const std::vector<GoldenCase>& cases, const char* name) {
+        size_t IndexOfCase(const Vector<GoldenCase>& cases, const char* name) {
             for (size_t i = 0; i < cases.size(); ++i) {
                 if (cases[i].name == name) {
                     return i;
@@ -428,7 +428,7 @@ namespace BECore::Chess::Tests {
     TEST(SearchSliceTest, TheSlicedSearchGivesTheOneCallResult) {
         // Every row of the golden table (the six perft positions with and without the table, the old quiet order and an excluded root move, the
         // positions with a history, the mates, the node limits) driven in slices gives the numbers of the one call
-        const std::vector<GoldenCase> cases = BuildGoldenCases();
+        const Vector<GoldenCase> cases = BuildGoldenCases();
         ASSERT_EQ(std::size(kGoldenRows), cases.size());
 
         const NamedPolicy everySize[] = {
@@ -510,7 +510,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(SearchSliceTest, TheNodeLimitIsTheSameInSlices) {
-        const std::vector<GoldenCase> cases = BuildGoldenCases();
+        const Vector<GoldenCase> cases = BuildGoldenCases();
         const NamedPolicy sizes[] = {
             {"1 node", Fixed(kSliceOfOneNode)}, {"7 nodes", Fixed(kSliceOfSevenNodes)}, {"256 nodes", Fixed(kSearchSliceNodes)}, {"1000 nodes", Fixed(kSliceOfManyNodes)}, {"varying", Varying},
         };
@@ -851,7 +851,7 @@ namespace BECore::Chess::Tests {
         const NamedPolicy sizes[] = {{"1 node", Fixed(kSliceOfOneNode)}, {"7 nodes", Fixed(kSliceOfSevenNodes)}, {"256 nodes", Fixed(kSearchSliceNodes)}, {"varying", Varying}};
 
         for (const int depth : kEngineDepths) {
-            std::vector<std::pair<std::string, SearchRequest>> requests;
+            Vector<std::pair<std::string, SearchRequest>> requests;
             for (const NamedFen& position : kPerftPositions) {
                 requests.emplace_back(position.name, RequestFor(position.fen, depth));
             }
@@ -1489,8 +1489,8 @@ namespace BECore::Chess::Tests {
         };
 
         /// Depth 4 on the six positions, depth 5 on the start position and Kiwipete: about 70 ms of work in Release (one pass over the rows)
-        std::vector<BenchmarkPosition> BenchmarkPositions() {
-            std::vector<BenchmarkPosition> positions;
+        Vector<BenchmarkPosition> BenchmarkPositions() {
+            Vector<BenchmarkPosition> positions;
             for (const NamedFen& position : kPerftPositions) {
                 positions.push_back({position.name, position.fen, kGoldenDepth});
             }
@@ -1532,8 +1532,8 @@ namespace BECore::Chess::Tests {
 
         /// Runs every column over every position and prints `name depth nodes ms Mnodes/s` per row and a total per column
         /// (the sum of the nodes over the sum of the fastest times)
-        void RunBenchmark(const std::vector<BenchmarkColumn>& columns) {
-            const std::vector<BenchmarkPosition> positions = BenchmarkPositions();
+        void RunBenchmark(const Vector<BenchmarkColumn>& columns) {
+            const Vector<BenchmarkPosition> positions = BenchmarkPositions();
             for (const BenchmarkColumn& column : columns) {
                 std::cout << "\n" << column.title << "\n";
                 std::cout << std::left << std::setw(10) << "name" << std::right << std::setw(6) << "depth" << std::setw(12) << "nodes" << std::setw(12) << "ms" << std::setw(12) << "Mnodes/s" << "\n";

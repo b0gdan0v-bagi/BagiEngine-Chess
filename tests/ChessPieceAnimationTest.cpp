@@ -131,8 +131,8 @@ namespace BECore::Chess::Tests {
         }
 
         /// Every piece node the scene has
-        eastl::vector<IntrusivePtr<SceneNode>> PieceNodes() const {
-            eastl::vector<IntrusivePtr<SceneNode>> nodes;
+        Vector<IntrusivePtr<SceneNode>> PieceNodes() const {
+            Vector<IntrusivePtr<SceneNode>> nodes;
             for (const auto& node : GetScene().GetRootNode().GetChildren()) {
                 if (node->GetComponent<ChessPieceComponent>()) {
                     nodes.push_back(node);
@@ -228,8 +228,8 @@ namespace BECore::Chess::Tests {
         }
 
         /// Where every piece node is now, by node name
-        eastl::vector<std::pair<PoolString, Origin>> Origins() const {
-            eastl::vector<std::pair<PoolString, Origin>> origins;
+        Vector<std::pair<PoolString, Origin>> Origins() const {
+            Vector<std::pair<PoolString, Origin>> origins;
             for (const auto& node : PieceNodes()) {
                 origins.emplace_back(node->GetName(), OriginOf(node));
             }
@@ -237,7 +237,7 @@ namespace BECore::Chess::Tests {
         }
 
         /// The pieces other than @p moving have not left the origins in @p before
-        void ExpectOthersStill(const eastl::vector<std::pair<PoolString, Origin>>& before, const IntrusivePtr<SceneNode>& moving) const {
+        void ExpectOthersStill(const Vector<std::pair<PoolString, Origin>>& before, const IntrusivePtr<SceneNode>& moving) const {
             const auto now = Origins();
             ASSERT_EQ(now.size(), before.size());
             for (size_t i = 0; i < now.size(); ++i) {

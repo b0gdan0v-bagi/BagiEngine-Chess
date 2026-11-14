@@ -370,7 +370,7 @@ namespace BECore::Chess::Tests {
     }  // namespace
 
     TEST(UciProtocolTest, TheCollectorKeepsTheLastDepthOfEachOfThreeLines) {
-        const eastl::vector<UciProtocol::Info> lines = CollectTranscript(3).Lines();
+        const Vector<UciProtocol::Info> lines = CollectTranscript(3).Lines();
 
         ASSERT_EQ(lines.size(), 3u);
         EXPECT_EQ(lines[0].multiPv, 1);
@@ -388,7 +388,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(UciProtocolTest, TheCollectorOfOneLineTakesOnlyIndexOne) {
-        const eastl::vector<UciProtocol::Info> lines = CollectTranscript(1).Lines();
+        const Vector<UciProtocol::Info> lines = CollectTranscript(1).Lines();
 
         ASSERT_EQ(lines.size(), 1u);
         EXPECT_EQ(lines[0].multiPv, 1);
@@ -398,7 +398,7 @@ namespace BECore::Chess::Tests {
 
     TEST(UciProtocolTest, TheCollectorOfOneLineReadsALineWithoutMultiPvAsTheFirst) {
         // A search for one line sends no `multipv` word at all
-        const eastl::vector<UciProtocol::Info> lines = Collect(1, {"info depth 1 score cp 10 pv e2e4", "info depth 2 score cp 14 pv e2e4 e7e5"}).Lines();
+        const Vector<UciProtocol::Info> lines = Collect(1, {"info depth 1 score cp 10 pv e2e4", "info depth 2 score cp 14 pv e2e4 e7e5"}).Lines();
 
         ASSERT_EQ(lines.size(), 1u);
         EXPECT_EQ(lines[0].multiPv, 1);
@@ -407,7 +407,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(UciProtocolTest, TheCollectorOfTwoLinesLeavesIndexThreeOut) {
-        const eastl::vector<UciProtocol::Info> lines = CollectTranscript(2).Lines();
+        const Vector<UciProtocol::Info> lines = CollectTranscript(2).Lines();
 
         ASSERT_EQ(lines.size(), 2u);
         EXPECT_EQ(lines[0].firstPvMove, "e2e4");
@@ -424,15 +424,15 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(UciProtocolTest, ABoundIsKeptOnlyForAnIndexThatNeverHadAnExactScore) {
-        const eastl::vector<UciProtocol::Info> lines = Collect(3,
-                                                               {
-                                                                   "info depth 3 multipv 1 score cp 30 pv e2e4",
-                                                                   "info depth 4 multipv 1 score cp 80 lowerbound pv e2e4",  // later, but only a bound: the exact one stays
-                                                                   "info depth 3 multipv 2 score cp 20 upperbound pv d2d4",
-                                                                   "info depth 4 multipv 2 score cp 25 upperbound pv d2d4",  // no exact one for index 2: the latest bound
-                                                                   "info depth 3 multipv 3 score cp 10 pv g1f3",
-                                                               })
-                                                           .Lines();
+        const Vector<UciProtocol::Info> lines = Collect(3,
+                                                        {
+                                                            "info depth 3 multipv 1 score cp 30 pv e2e4",
+                                                            "info depth 4 multipv 1 score cp 80 lowerbound pv e2e4",  // later, but only a bound: the exact one stays
+                                                            "info depth 3 multipv 2 score cp 20 upperbound pv d2d4",
+                                                            "info depth 4 multipv 2 score cp 25 upperbound pv d2d4",  // no exact one for index 2: the latest bound
+                                                            "info depth 3 multipv 3 score cp 10 pv g1f3",
+                                                        })
+                                                    .Lines();
 
         ASSERT_EQ(lines.size(), 3u);
         EXPECT_EQ(lines[0].score, Cp(30));
@@ -444,14 +444,14 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(UciProtocolTest, ALaterExactScoreReplacesABoundAndAnEarlierExactOne) {
-        const eastl::vector<UciProtocol::Info> lines = Collect(2,
-                                                               {
-                                                                   "info depth 3 multipv 2 score cp 20 lowerbound pv d2d4",
-                                                                   "info depth 3 multipv 2 score cp 22 pv d2d4",
-                                                                   "info depth 4 multipv 2 score cp 24 pv d2d4",
-                                                                   "info depth 5 multipv 2 score cp 50 upperbound pv d2d4",
-                                                               })
-                                                           .Lines();
+        const Vector<UciProtocol::Info> lines = Collect(2,
+                                                        {
+                                                            "info depth 3 multipv 2 score cp 20 lowerbound pv d2d4",
+                                                            "info depth 3 multipv 2 score cp 22 pv d2d4",
+                                                            "info depth 4 multipv 2 score cp 24 pv d2d4",
+                                                            "info depth 5 multipv 2 score cp 50 upperbound pv d2d4",
+                                                        })
+                                                    .Lines();
 
         ASSERT_EQ(lines.size(), 1u) << "index 1 never came";
         EXPECT_EQ(lines[0].multiPv, 2);
@@ -461,19 +461,19 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(UciProtocolTest, TheCollectorIgnoresWhatIsNotAScoredInfoLine) {
-        const eastl::vector<UciProtocol::Info> lines = Collect(2,
-                                                               {
-                                                                   "info depth 4 multipv 1 score cp 30 pv e2e4",
-                                                                   "info depth 5 multipv 1 pv e2e4",               // no score
-                                                                   "info depth 5 multipv 1 score cp",              // a truncated one
-                                                                   "info string multipv 1 score cp 999 pv a2a3",   // text
-                                                                   "info depth 5 multipv 2 score mate 0 pv d2d4",  // no usable score
-                                                                   "info currmove d2d4 currmovenumber 2",          // no score
-                                                                   "bestmove e2e4 ponder e7e5",                    // not info
-                                                                   "readyok",
-                                                                   "",
-                                                               })
-                                                           .Lines();
+        const Vector<UciProtocol::Info> lines = Collect(2,
+                                                        {
+                                                            "info depth 4 multipv 1 score cp 30 pv e2e4",
+                                                            "info depth 5 multipv 1 pv e2e4",               // no score
+                                                            "info depth 5 multipv 1 score cp",              // a truncated one
+                                                            "info string multipv 1 score cp 999 pv a2a3",   // text
+                                                            "info depth 5 multipv 2 score mate 0 pv d2d4",  // no usable score
+                                                            "info currmove d2d4 currmovenumber 2",          // no score
+                                                            "bestmove e2e4 ponder e7e5",                    // not info
+                                                            "readyok",
+                                                            "",
+                                                        })
+                                                    .Lines();
 
         ASSERT_EQ(lines.size(), 1u);
         EXPECT_EQ(lines[0].depth, 4);
@@ -483,7 +483,7 @@ namespace BECore::Chess::Tests {
 
     TEST(UciProtocolTest, WhenTheLastDepthIsCutShortAnIndexKeepsTheDepthBefore) {
         // A search stopped by its time: depth 2 reached the first two lines only
-        const eastl::vector<UciProtocol::Info> lines = CollectTranscript(3, 6).Lines();
+        const Vector<UciProtocol::Info> lines = CollectTranscript(3, 6).Lines();
 
         ASSERT_EQ(lines.size(), 3u);
         EXPECT_EQ(lines[0].depth, 2);
@@ -494,12 +494,12 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(UciProtocolTest, AMissingIndexLeavesTheOthersInOrder) {
-        const eastl::vector<UciProtocol::Info> lines = Collect(3,
-                                                               {
-                                                                   "info depth 2 multipv 3 score cp 11 pv g1f3",
-                                                                   "info depth 2 multipv 1 score cp 32 pv e2e4",
-                                                               })
-                                                           .Lines();
+        const Vector<UciProtocol::Info> lines = Collect(3,
+                                                        {
+                                                            "info depth 2 multipv 3 score cp 11 pv g1f3",
+                                                            "info depth 2 multipv 1 score cp 32 pv e2e4",
+                                                        })
+                                                    .Lines();
 
         ASSERT_EQ(lines.size(), 2u);
         EXPECT_EQ(lines[0].multiPv, 1);
@@ -508,12 +508,12 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(UciProtocolTest, TheCollectorReadsLinesWithAnEndOfLineLeftOnThem) {
-        const eastl::vector<UciProtocol::Info> lines = Collect(2,
-                                                               {
-                                                                   "info depth 2 multipv 1 score cp 32 pv e2e4\r",
-                                                                   "info depth 2 multipv 2 score mate -2 pv d2d4\r\n",
-                                                               })
-                                                           .Lines();
+        const Vector<UciProtocol::Info> lines = Collect(2,
+                                                        {
+                                                            "info depth 2 multipv 1 score cp 32 pv e2e4\r",
+                                                            "info depth 2 multipv 2 score mate -2 pv d2d4\r\n",
+                                                        })
+                                                    .Lines();
 
         ASSERT_EQ(lines.size(), 2u);
         EXPECT_EQ(lines[0].firstPvMove, "e2e4");
@@ -523,7 +523,7 @@ namespace BECore::Chess::Tests {
 
     TEST(UciProtocolTest, AMultiPvIndexBelowOneIsReadAsTheMainLine) {
         // ParseInfo keeps the default 1 for a zero or negative index, so such a line is the main line
-        const eastl::vector<UciProtocol::Info> lines = Collect(2, {"info depth 2 multipv 0 score cp 7 pv e2e4"}).Lines();
+        const Vector<UciProtocol::Info> lines = Collect(2, {"info depth 2 multipv 0 score cp 7 pv e2e4"}).Lines();
 
         ASSERT_EQ(lines.size(), 1u);
         EXPECT_EQ(lines[0].multiPv, 1);

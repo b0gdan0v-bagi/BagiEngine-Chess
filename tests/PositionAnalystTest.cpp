@@ -635,7 +635,7 @@ namespace BECore::Chess::Tests {
 
         EXPECT_EQ(engine->LastRequest().lines, kAnalysisLines);
         EXPECT_EQ(kAnalysisLines, 2);
-        const eastl::vector<AnalysisLine> lines = analyst.GetLines(model);
+        const Vector<AnalysisLine> lines = analyst.GetLines(model);
         ASSERT_EQ(lines.size(), 2u);
         EXPECT_EQ(lines[0].move, Mv("e2e4"));
         EXPECT_EQ(lines[0].score, kScore);
@@ -723,7 +723,7 @@ namespace BECore::Chess::Tests {
         engine->Open();  // the old worker answers with two lines for the position before the move
         ASSERT_TRUE(UpdateUntil(analyst, model, OpponentEngine::Stockfish, [&] { return !analyst.GetLines(model).empty(); }));
 
-        const eastl::vector<AnalysisLine> lines = analyst.GetLines(model);
+        const Vector<AnalysisLine> lines = analyst.GetLines(model);
         ASSERT_EQ(lines.size(), 2u);
         for (const AnalysisLine& line : lines) {
             EXPECT_TRUE(MoveGenerator::ParseUci(model.GetPosition(), line.move.ToUci()).has_value()) << "moves of Black, from the new search: " << line.move.ToUci().c_str();
@@ -769,7 +769,7 @@ namespace BECore::Chess::Tests {
 
         ASSERT_TRUE(UpdateUntil(analyst, model, OpponentEngine::Own, [&] { return !analyst.GetLines(model).empty(); })) << DescribeError(analyst.GetError()).c_str();
 
-        const eastl::vector<AnalysisLine> lines = analyst.GetLines(model);
+        const Vector<AnalysisLine> lines = analyst.GetLines(model);
         ASSERT_EQ(lines.size(), 2u);
         EXPECT_EQ(lines[0].move, Mv("a1a8"));
         EXPECT_EQ(lines[0].score, (AnalysisScore{AnalysisScoreKind::Mate, 1}));
@@ -785,7 +785,7 @@ namespace BECore::Chess::Tests {
 
         ASSERT_TRUE(UpdateUntil(analyst, model, OpponentEngine::Stockfish, [&] { return !analyst.GetLines(model).empty() || analyst.GetError().has_value(); }));
 
-        const eastl::vector<AnalysisLine> lines = analyst.GetLines(model);
+        const Vector<AnalysisLine> lines = analyst.GetLines(model);
         ASSERT_EQ(lines.size(), 2u) << DescribeError(analyst.GetError()).c_str();
         EXPECT_NE(lines[0].move, lines[1].move);
         analyst.Shutdown();
@@ -860,7 +860,7 @@ namespace BECore::Chess::Tests {
         analyst.SetEvaluation(true);
         ASSERT_TRUE(UpdateUntil(analyst, model, OpponentEngine::Own, [&] { return !analyst.GetLines(model).empty() || analyst.GetError().has_value(); })) << DescribeError(analyst.GetError()).c_str();
 
-        const eastl::vector<AnalysisLine> lines = analyst.GetLines(model);
+        const Vector<AnalysisLine> lines = analyst.GetLines(model);
         ASSERT_EQ(lines.size(), expected->lines.size()) << DescribeError(analyst.GetError()).c_str();
         for (size_t i = 0; i < lines.size(); ++i) {
             EXPECT_EQ(lines[i].move, expected->lines[i].move) << "line " << i;

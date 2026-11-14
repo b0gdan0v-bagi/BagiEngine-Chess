@@ -340,7 +340,7 @@ namespace BECore::Chess::Tests {
         ChessGameModel model;
         // The own engine is there (gated, honors its token); Stockfish is not
         const auto own = eastl::make_shared<GatedEngine>(true, Mv("e7e5"));
-        eastl::vector<OpponentEngine> asked;
+        Vector<OpponentEngine> asked;
         OpponentController controller(model);
         controller.SetEngineFactory([&](OpponentEngine engine, const OpponentLevel&) -> MadeEngine {
             asked.push_back(engine);
@@ -393,7 +393,7 @@ namespace BECore::Chess::Tests {
     TEST_F(OpponentControllerTest, ARefusedChooseChangesNothingAtAll) {
         ChessGameModel model;
         const auto own = eastl::make_shared<InstantEngine>();
-        eastl::vector<OpponentEngine> asked;
+        Vector<OpponentEngine> asked;
         OpponentController controller(model);
         controller.SetEngineFactory([&](OpponentEngine engine, const OpponentLevel&) -> MadeEngine {
             asked.push_back(engine);
@@ -835,7 +835,7 @@ namespace BECore::Chess::Tests {
         const eastl::string first = Format("setoption name Skill Level value {}", before.skillLevel);
         const eastl::string second = Format("setoption name Skill Level value {}", after.skillLevel);
         EXPECT_TRUE(WaitForLogLine(directory.File(kLogName), second));
-        const eastl::vector<eastl::string> lines = ReadFileLines(directory.File(kLogName));
+        const Vector<eastl::string> lines = ReadFileLines(directory.File(kLogName));
         EXPECT_EQ(std::count(lines.begin(), lines.end(), first), 1);
         EXPECT_EQ(std::count(lines.begin(), lines.end(), second), 1);
     }
@@ -1010,7 +1010,7 @@ namespace BECore::Chess::Tests {
     TEST_F(OpponentControllerTest, AFailedStockfishPickIsNotSavedByTheOwnEngineOnItsOwnButByThePersonPickingIt) {
         ChessGameModel model;
         // Stockfish is not there, the own engine always is. The log says which kinds were asked for
-        eastl::vector<OpponentEngine> asked;
+        Vector<OpponentEngine> asked;
         const auto instant = eastl::make_shared<InstantEngine>();
         OpponentController controller(model);
         controller.SetEngineFactory([&](OpponentEngine engine, const OpponentLevel&) -> MadeEngine {

@@ -46,9 +46,9 @@ namespace BECore::Chess::Tests {
         }
 
         /// The ids that no table has: empty, the wrong case, a prefix, a trailing or a leading space, a word of another table
-        const eastl::vector<eastl::string>& BadIds() {
-            static const eastl::vector<eastl::string> ids = {"",         "White",     "BLACK",     "whit", "black ",     " white", "Two",  "two players",
-                                                             "Computer", "computer ", "Stockfish", "OWN",  "own engine", "med",    "Hard", "hard\n"};
+        const Vector<eastl::string>& BadIds() {
+            static const Vector<eastl::string> ids = {"",         "White",     "BLACK",     "whit", "black ",     " white", "Two",  "two players",
+                                                      "Computer", "computer ", "Stockfish", "OWN",  "own engine", "med",    "Hard", "hard\n"};
             return ids;
         }
 
@@ -236,7 +236,7 @@ namespace BECore::Chess::Tests {
         ChessGameModel model;
         OpponentController controller(model);
         OpponentChoice choice(controller);
-        eastl::vector<eastl::string> asked;
+        Vector<eastl::string> asked;
         controller.SetEngineFactory([&asked](OpponentEngine engine, const OpponentLevel&) -> std::expected<eastl::shared_ptr<IChessEngine>, EngineError> {
             asked.push_back(Text(OpponentEngineId(engine)));
             if (engine == OpponentEngine::Stockfish) {

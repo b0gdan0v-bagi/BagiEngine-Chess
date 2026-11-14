@@ -38,8 +38,8 @@ namespace BECore::Chess::Tests {
         }
 
         /// The requests of seeded random games (the whole game so far each time), as many as @p count; every game is a new seed
-        eastl::vector<SearchRequest> SeededRequests(size_t count) {
-            eastl::vector<SearchRequest> requests;
+        Vector<SearchRequest> SeededRequests(size_t count) {
+            Vector<SearchRequest> requests;
             for (uint64_t game = 0; requests.size() < count; ++game) {
                 SeededRandom random(kGameSeed + game * 7919);
                 ChessGameModel model;
@@ -95,7 +95,7 @@ namespace BECore::Chess::Tests {
     TEST(BlunderEngineTest, ZeroPercentNeverAltersTheAnswerAndAsksOncePerRequest) {
         const auto inner = eastl::make_shared<InstantEngine>();
         BlunderEngine engine(inner, 0);
-        const eastl::vector<SearchRequest> requests = SeededRequests(kGamePlies);
+        const Vector<SearchRequest> requests = SeededRequests(kGamePlies);
 
         for (size_t i = 0; i < requests.size(); ++i) {
             const int before = inner->Calls();
@@ -110,7 +110,7 @@ namespace BECore::Chess::Tests {
     TEST(BlunderEngineTest, AHundredPercentAlwaysAnswersALegalMoveAndNeverAsksTheWrappedEngine) {
         const auto inner = eastl::make_shared<InstantEngine>();
         BlunderEngine engine(inner, 100);
-        const eastl::vector<SearchRequest> requests = SeededRequests(kRatePositions);
+        const Vector<SearchRequest> requests = SeededRequests(kRatePositions);
         size_t differentFromFirst = 0;
 
         for (size_t i = 0; i < requests.size(); ++i) {
@@ -165,7 +165,7 @@ namespace BECore::Chess::Tests {
         BlunderEngine high(inner, 40);
         size_t lowBlunders = 0;
 
-        const eastl::vector<SearchRequest> requests = SeededRequests(kRatePositions);
+        const Vector<SearchRequest> requests = SeededRequests(kRatePositions);
         for (size_t i = 0; i < requests.size(); ++i) {
             const Decision atLow = Decide(low, *inner, requests[i]);
             const Decision atHigh = Decide(high, *inner, requests[i]);
@@ -183,7 +183,7 @@ namespace BECore::Chess::Tests {
     TEST(BlunderEngineTest, TheRateOverSeededGamesIsNearThePercent) {
         // The numbers are deterministic, so this is not flaky; the wide windows only guard against a broken mixer
         const auto inner = eastl::make_shared<InstantEngine>();
-        const eastl::vector<SearchRequest> requests = SeededRequests(kRatePositions);
+        const Vector<SearchRequest> requests = SeededRequests(kRatePositions);
         const auto rate = [&](int percent) {
             BlunderEngine engine(inner, percent);
             size_t blunders = 0;
@@ -260,13 +260,13 @@ namespace BECore::Chess::Tests {
     TEST(BlunderEngineTest, TwoThreadsMayAskTheSameObject) {
         const auto inner = eastl::make_shared<InstantEngine>();
         BlunderEngine engine(inner, 50);
-        const eastl::vector<SearchRequest> requests = SeededRequests(kGamePlies);
-        eastl::vector<Optional<Move>> alone;
+        const Vector<SearchRequest> requests = SeededRequests(kGamePlies);
+        Vector<Optional<Move>> alone;
         for (const SearchRequest& request : requests) {
             alone.push_back(Found(Ask(engine, request)));
         }
-        eastl::vector<Optional<Move>> a;
-        eastl::vector<Optional<Move>> b;
+        Vector<Optional<Move>> a;
+        Vector<Optional<Move>> b;
 
         std::thread other([&] {
             for (size_t i = requests.size(); i-- > 0;) {
@@ -290,14 +290,14 @@ namespace BECore::Chess::Tests {
         const auto selfPlay = [&](IChessEngine& engine) {
             ChessGameModel model;
             const Player player = EnginePlayer(engine, SearchLimits{0, 2});
-            const eastl::vector<eastl::string> moves = PlayGame(model, player, player, kSelfPlayPlies);
+            const Vector<eastl::string> moves = PlayGame(model, player, player, kSelfPlayPlies);
             EXPECT_TRUE(model.IsGameOver() || model.GetMoves().size() == kSelfPlayPlies) << "the game ended or reached the cap, no move was refused";
             return moves;
         };
 
-        const eastl::vector<eastl::string> plain = selfPlay(*own);
-        const eastl::vector<eastl::string> exact = selfPlay(neverBlunders);
-        const eastl::vector<eastl::string> random = selfPlay(alwaysBlunders);
+        const Vector<eastl::string> plain = selfPlay(*own);
+        const Vector<eastl::string> exact = selfPlay(neverBlunders);
+        const Vector<eastl::string> random = selfPlay(alwaysBlunders);
 
         EXPECT_GT(plain.size(), 20u);
         EXPECT_EQ(exact, plain) << "0 percent equals the plain engine, move for move";
@@ -390,7 +390,7 @@ namespace BECore::Chess::Tests {
 
     TEST(BlunderEngineTest, BlunderEngineAsyncKeepsTheBlunderRuleAndForwards) {
         // The doubles never suspend, so a task driven on the test thread runs to its end
-        const eastl::vector<SearchRequest> requests = SeededRequests(60);
+        const Vector<SearchRequest> requests = SeededRequests(60);
         for (const int percent : {0, 40, 100}) {
             const auto inner = eastl::make_shared<InstantEngine>();
             BlunderEngine engine(inner, percent);

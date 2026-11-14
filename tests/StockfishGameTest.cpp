@@ -133,7 +133,7 @@ namespace BECore::Chess::Tests {
 
         /// The process id on line @p index (from 0) of @p pidFile, once the script has written it
         Optional<int> ProcessIdAt(const std::filesystem::path& pidFile, size_t index) {
-            const eastl::vector<eastl::string> lines = ReadFileLines(pidFile);
+            const Vector<eastl::string> lines = ReadFileLines(pidFile);
             return index < lines.size() ? ParseInt(lines[index].c_str(), lines[index].size()) : std::nullopt;
         }
 
@@ -243,7 +243,7 @@ namespace BECore::Chess::Tests {
             const Player engine = EnginePlayer(stockfish, SearchLimits{kGameMoveTimeMs, 0});
             const Player mover = RandomPlayer(random);
 
-            const eastl::vector<eastl::string> moves = PlayGame(model, stockfishIsWhite ? engine : mover, stockfishIsWhite ? mover : engine, kRandomGamePlies);
+            const Vector<eastl::string> moves = PlayGame(model, stockfishIsWhite ? engine : mover, stockfishIsWhite ? mover : engine, kRandomGamePlies);
 
             // Every move was accepted (PlayGame); the one claim about the result is that the random side did not win
             EXPECT_TRUE(model.IsGameOver() || model.GetMoves().size() == kRandomGamePlies) << "game " << game;
@@ -265,7 +265,7 @@ namespace BECore::Chess::Tests {
             const Player ownPlayer = EnginePlayer(own, SearchLimits{0, kOwnDepth});
             const Player stockfishPlayer = EnginePlayer(stockfish, SearchLimits{kGameMoveTimeMs, 0});
 
-            const eastl::vector<eastl::string> moves = PlayGame(model, ownIsWhite ? ownPlayer : stockfishPlayer, ownIsWhite ? stockfishPlayer : ownPlayer, kOwnGamePlies);
+            const Vector<eastl::string> moves = PlayGame(model, ownIsWhite ? ownPlayer : stockfishPlayer, ownIsWhite ? stockfishPlayer : ownPlayer, kOwnGamePlies);
 
             // No refused move and no EngineError (the players report both); the result is recorded, not asserted: a time-limited Stockfish is not deterministic
             EXPECT_TRUE(model.IsGameOver() || model.GetMoves().size() == kOwnGamePlies) << "game " << game;

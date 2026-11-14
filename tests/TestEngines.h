@@ -329,7 +329,7 @@ namespace BECore::Chess::Tests {
         }
 
         /// The id of the engine ("stockfish", "own") of each call, in order
-        [[nodiscard]] const eastl::vector<eastl::string>& Engines() const {
+        [[nodiscard]] const Vector<eastl::string>& Engines() const {
             return _engineIds;
         }
 
@@ -344,9 +344,9 @@ namespace BECore::Chess::Tests {
             return _engines[eastl::min(call, _engines.size() - 1)];
         }
 
-        eastl::vector<eastl::shared_ptr<IChessEngine>> _engines;
+        Vector<eastl::shared_ptr<IChessEngine>> _engines;
         Optional<EngineError> _error;
-        eastl::vector<eastl::string> _engineIds;
+        Vector<eastl::string> _engineIds;
     };
 
     /**
@@ -373,12 +373,12 @@ namespace BECore::Chess::Tests {
         }
 
         /// The id of the level of each call, in order
-        [[nodiscard]] const eastl::vector<eastl::string>& Levels() const {
+        [[nodiscard]] const Vector<eastl::string>& Levels() const {
             return _levels;
         }
 
         /// The id of the engine ("stockfish", "own") of each call, in order
-        [[nodiscard]] const eastl::vector<eastl::string>& Engines() const {
+        [[nodiscard]] const Vector<eastl::string>& Engines() const {
             return _engineIds;
         }
 
@@ -394,10 +394,10 @@ namespace BECore::Chess::Tests {
             return _engines[eastl::min(call, _engines.size() - 1)];
         }
 
-        eastl::vector<eastl::shared_ptr<IChessEngine>> _engines;
+        Vector<eastl::shared_ptr<IChessEngine>> _engines;
         Optional<EngineError> _error;
-        eastl::vector<eastl::string> _levels;
-        eastl::vector<eastl::string> _engineIds;
+        Vector<eastl::string> _levels;
+        Vector<eastl::string> _engineIds;
     };
 
 }  // namespace BECore::Chess::Tests
