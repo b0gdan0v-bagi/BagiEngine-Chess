@@ -72,7 +72,6 @@ namespace BECore::Chess::Tests {
 
         const StringView kPerftFens[] = {Position::kStartFen, kKiwipeteFen, kPosition3Fen, kPosition4Fen, kPosition5Fen, kPosition6Fen};
 
-        /// Whether the side to move can mate at once
         bool HasMateInOne(Position& position) {
             for (const Move move : MoveGenerator::GenerateLegal(position)) {
                 position.DoMove(move);
@@ -154,7 +153,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(SearchTest, BlackFindsAMateInOne) {
-        // The same mate for Black: the rook on a8 goes to a1
+        // The same mate for Black
         Position position = PositionFromFen("r3k3/8/8/8/8/8/5PPP/6K1 b - - 0 1");
 
         const SearchResult result = SearchDepth(position, kMateInOneDepth);
@@ -390,10 +389,9 @@ namespace BECore::Chess::Tests {
 
     TEST(SearchTest, QuietOrderingSearchesFewerNodes) {
         // The killers and the history put the quiet moves that cut off before the ones that do not: the same depth in fewer nodes.
-        // Measured at depth 4 (ordered / plain): start 4228 / 25970, position 3 9204 / 16556, position 5 26448 / 26566, position 6
-        // 83208 / 83837. Kiwipete and position 4 are so tactical that a capture cuts almost every node (3 and 4 quiet cutoffs at
-        // depth 4, counted), too few to change the order of any later node: the two orders search them the same. So: never more
-        // nodes, fewer on the other four, fewer in the sum
+        // Kiwipete and position 4 are so tactical that a capture cuts almost every node (a handful of quiet cutoffs at depth 4), too
+        // few to change the order of any later node: the two orders search them the same. So: never more nodes, fewer on the other
+        // four, fewer in the sum
         uint64_t orderedTotal = 0;
         uint64_t plainTotal = 0;
         int better = 0;
@@ -436,11 +434,10 @@ namespace BECore::Chess::Tests {
     // -- the transposition table ---------------------------------------------------------------------------------------------
 
     TEST(SearchTest, TheTableSearchesFewerNodes) {
-        // The same position again, reached by another order of moves, is answered from the table. Measured (with the table / without,
-        // killers on in both), depth 4: Kiwipete 72179 / 90552, position 3 5125 / 9204, position 5 18652 / 26448, position 6 67226 / 83208;
-        // depth 5: Kiwipete 329010 / 545821, position 5 105814 / 188297. Not every position gains at every depth (the start position
-        // at depth 4: 4833 / 4228), so the cases are the ones that were measured. In these the score is the same too (not a guarantee of
-        // the table: a deeper entry can answer a shallower node of another ply, so a score can differ; it is what these positions show)
+        // The same position again, reached by another order of moves, is answered from the table. Not every position gains at every
+        // depth (the start position at depth 4 searches more nodes with the table), so the cases are the ones that gain. In these the
+        // score is the same too (not a guarantee of the table: a deeper entry can answer a shallower node of another ply, so a score
+        // can differ; it is what these positions show)
         struct Case {
             StringView fen;
             int depth;
@@ -478,7 +475,7 @@ namespace BECore::Chess::Tests {
         // A mate in three moves (five plies) found at depth 6 and deeper. An entry is written at one ply and read at another, so
         // the mate score of the table is counted from the node (ScoreToTable / ScoreFromTable, tested alone in TranspositionTableTest):
         // with the table, with none and with a tiny one the score is exactly the mate in five plies, never a ply more or less. The
-        // search does not make the read at another ply often (a wrong ply on the read does not change these answers, tried)
+        // search does not make the read at another ply often, so a wrong ply on the read does not change these answers: a guard, not a proof
         const StringView fens[] = {"k7/8/8/3K4/8/8/8/7R w - - 0 1", "k7/8/3K3R/8/8/8/8/8 w - - 0 1", "k7/8/8/2K5/8/8/8/1R6 w - - 0 1"};
         for (const StringView fen : fens) {
             for (const int depth : {kMateInThreeDepth, kMateInThreeDepth + 2}) {
@@ -615,7 +612,7 @@ namespace BECore::Chess::Tests {
         // Rule: a draw that depends on the history is not stored. White's queen and the black king have shuffled (Qd1-d2, Ka8-b8, Qd2-d1):
         // the position of the start is behind Black, who can go back to it by Kb8-a8 and draw. The table on, none and a tiny one
         // must agree on the move and the score at depth 6, where the repetition is met again and again below the root. This is a
-        // guard on one position, not a proof: a table that stored those draws too still gives this answer (tried), the case that
+        // guard on one position, not a proof: a table that stored those draws too still gives this answer, the case that
         // breaks it needs a repetition inside the tree that the same node, reached another way, does not have
         for (const size_t tableEntries : {size_t{0}, kDefaultTableEntries, kTinyTables[1]}) {
             Position position = PositionFromFen("k7/8/8/8/8/8/8/3QK3 w - - 0 1");
@@ -636,7 +633,7 @@ namespace BECore::Chess::Tests {
         // king is won, but at the clock of 96 every line reaches 100 plies within four plies, so whatever White does the position is a
         // draw. A search of the same position at the clock of 0 in a new call then finds it won: the draw of the first call is not in the second.
         // The clock is not part of the key, so this is the case the bound is for; the position cannot show it being broken (without
-        // the bound these answers do not change, tried: the draws are also counted and block the stores), the sweep below is the guard
+        // the bound these answers do not change: the draws are also counted and block the stores), the sweep below is the guard
         const StringView tired = "4k3/8/8/8/8/8/8/R3K3 w - - 96 80";
         const StringView fresh = "4k3/8/8/8/8/8/8/R3K3 w - - 0 1";
         for (const size_t tableEntries : {size_t{0}, kDefaultTableEntries}) {
@@ -653,7 +650,7 @@ namespace BECore::Chess::Tests {
     TEST(SearchTest, TheClockBoundHoldsAtEveryClock) {
         // The same rook ending at clocks from 0 to 99, depth 5: with and without the table the move and the score agree. The clock decides
         // where the bound lets the table in (a node with the clock c and d plies left is allowed when c + d + 32 is under 100), so the sweep
-        // crosses the bound in the middle of the tree. Measured equal at each of these clocks; a guard on one position, not a proof
+        // crosses the bound in the middle of the tree. A guard on one position, not a proof
         for (const int clock : {0, 40, 60, 64, 68, 72, 80, 90, 96, 99}) {
             const String fen = Format("4k3/8/8/8/8/8/8/R3K3 w - - {} 80", clock);
             Position withTable = PositionFromFen(fen.c_str());
@@ -686,9 +683,9 @@ namespace BECore::Chess::Tests {
 
     TEST(SearchTest, TheNumbersAreTheSameOnEveryPlatform) {
         // Pinned: the order of equal moves is the generator's and the table is a function of the keys and the depths alone, so these
-        // do not change with the compiler, the library or the machine. With the table off the numbers are the ones from before the table
-        // (the start position 1246 nodes, Kiwipete 32789 at depth 3). They are not a measure of strength; a change of the evaluation,
-        // of the ordering or of the table moves them, and then they are rewritten
+        // do not change with the compiler, the library or the machine. With the table off (tableEntries = 0) the same search gives the
+        // numbers of the next test. They are not a measure of strength; a change of the evaluation, of the ordering or of the table
+        // moves them, and then they are rewritten
         const SearchResult start = SearchFen(Position::kStartFen, kMinimaxDepth);
         const SearchResult kiwipete = SearchFen(kKiwipeteFen, kMinimaxDepth);
         const SearchResult startDeep = SearchFen(Position::kStartFen, kDeeperTableDepth);
@@ -709,7 +706,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(SearchTest, WithoutTheTableTheNumbersAreTheOldOnes) {
-        // tableEntries = 0 is the search of before the table: the same moves, scores and nodes as pinned then
+        // tableEntries = 0 is the search with no table: the moves and scores of the test above, with more nodes
         Position start = Position::Start();
         Position kiwipete = PositionFromFen(kKiwipeteFen);
 
