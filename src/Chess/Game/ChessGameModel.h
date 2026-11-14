@@ -107,11 +107,11 @@ namespace BECore::Chess {
         /// Drops the selection and a pending promotion, for an owner that takes over the turn (the computer opponent); the premove queue stays.
         void ClearSelection();
 
-        /// The next to play first
+        /// The queued premoves, in the order they play: the front one plays first.
         [[nodiscard]] const Vector<Premove>& GetPremoves() const noexcept {
             return _premoves;
         }
-        /// The person's color; empty while the queue is empty
+        /// The color that premoves (the side whose moves are queued); empty while the queue is empty.
         [[nodiscard]] Optional<PieceColor> GetPremoveColor() const noexcept {
             return _premoveColor;
         }
@@ -206,6 +206,7 @@ namespace BECore::Chess {
         /// A promoted pawn reports its new type; an empty piece if captured / unknown.
         [[nodiscard]] Piece GetPieceOf(PieceHandle handle) const;
 
+        /// Whether the piece is on the board: the handle is known and the piece was not captured.
         [[nodiscard]] bool IsActive(PieceHandle handle) const;
 
     private:
