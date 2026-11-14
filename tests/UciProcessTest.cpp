@@ -168,6 +168,7 @@ namespace BECore::Chess::Tests {
     TEST(UciProcessTest, AFileThatIsNoProgramIsLaunchFailed) {
         const TempDirectory directory;
         {
+            //-NoStd: file layer (engine-file-layer)
             std::ofstream text(directory.File("engine.exe"));
             text << "not a program\n";
         }
@@ -222,6 +223,7 @@ namespace BECore::Chess::Tests {
         const TempDirectory directory;
         const std::filesystem::path program = directory.File("engine.sh");
         {
+            //-NoStd: file layer (engine-file-layer)
             std::ofstream script(program);
             script << "#!/bin/sh\nexit 0\n";
         }
@@ -586,6 +588,7 @@ namespace BECore::Chess::Tests {
         const std::filesystem::path wrapper = directory.File("wrapper.cmd");
         const std::filesystem::path log = directory.File("fake.log");
         {
+            //-NoStd: file layer (engine-file-layer)
             std::ofstream out(wrapper);
             out << "@\"" << CHESS_TEST_PYTHON << "\" \"" << FakeEngineScript().string() << "\" --ignore-quit --ignore-term --log \"" << log.string() << "\"\r\n";
         }

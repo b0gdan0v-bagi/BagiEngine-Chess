@@ -56,6 +56,7 @@ namespace BECore::Chess::Tests {
         }
 
         Vector<uint8_t> BytesOfFile(const std::filesystem::path& path) {
+            //-NoStd: file layer (engine-file-layer)
             std::ifstream file(path, std::ios::binary);
             Vector<uint8_t> bytes;
             for (std::istreambuf_iterator<char> it(file), end; it != end; ++it) {

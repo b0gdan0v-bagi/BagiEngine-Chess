@@ -766,6 +766,7 @@ namespace BECore::Chess::Tests {
         std::filesystem::path WriteWrapper(const TempDirectory& directory, StringView flags) {
             const std::filesystem::path script = directory.File(kWrapperName);
             {
+                //-NoStd: file layer (engine-file-layer)
                 std::ofstream out(script);
 #if defined(_WIN32)
                 // No exec: cmd.exe stays the parent of the fake, and UciProcess's job ends both

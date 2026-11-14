@@ -202,6 +202,7 @@ namespace BECore::Chess::Tests {
         }
 
         /// The nodes to give the call number @p call of a job (0, 1, ...)
+        //-NoStd: no callable alias yet (callables-move-only)
         using SlicePolicy = std::function<uint64_t(size_t call)>;
 
         /// The same slice every time
@@ -1501,6 +1502,7 @@ namespace BECore::Chess::Tests {
         /// add a column by adding one of these
         struct BenchmarkColumn {
             const char* title;
+            //-NoStd: no callable alias yet (callables-move-only)
             std::function<uint64_t(StringView fen, int depth)> run;
         };
 

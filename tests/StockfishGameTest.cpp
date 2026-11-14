@@ -114,6 +114,7 @@ namespace BECore::Chess::Tests {
         std::filesystem::path WriteWrapper(const TempDirectory& directory, const String& stockfish, const char* pidFile, const char* stdinLog = nullptr) {
             const std::filesystem::path script = directory.File(kWrapperName);
             {
+                //-NoStd: file layer (engine-file-layer)
                 std::ofstream out(script);
                 out << "#!/bin/sh\n";
                 out << "echo started >> \"" << directory.File(kLaunchLogName).string() << "\"\n";

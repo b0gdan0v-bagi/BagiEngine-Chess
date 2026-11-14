@@ -161,6 +161,7 @@ namespace BECore::Chess::Tests {
             return game.Captured();
         }
 
+        //-NoStd: no callable alias yet (callables-move-only)
         void SaveAltered(const eastl::function<void(ChessSaveState&)>& alter) {
             ChessSaveState state = GoodState();
             alter(state);
