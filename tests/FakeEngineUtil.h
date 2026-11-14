@@ -1,9 +1,17 @@
 #pragma once
 
 #include <Chess/Engine/UciProcess.h>
+#include <Common/TempPath.h>
+#include <atomic>
 #include <chrono>
 #include <gtest/gtest.h>
 #include <thread>
+
+#if defined(_WIN32)
+#include <process.h>
+#else
+#include <unistd.h>
+#endif
 
 // The interpreter that runs tests/fake_uci_engine.py, given by the root CMakeLists.txt (an empty string when CMake found no Python)
 #if !defined(CHESS_TEST_PYTHON)
@@ -47,8 +55,9 @@ namespace BECore::Chess::Tests {
     /// A directory of the running test under the system's temporary one, removed with the object
     class TempDirectory {
     public:
-        // One directory per test, named after the suite too: ctest runs the tests in parallel processes, tests of two suites may share a name, and the constructor clears the directory
-        TempDirectory() : _path(std::filesystem::temp_directory_path() / DirectoryName().c_str()) {
+        // One directory per object: the name has the suite, the test, the process id (with TestTempPath's tag) and a counter. ctest runs every test in a process of its own, 8 or more at
+        // a time and beside other checkouts' ctests, and the constructor clears the directory, so a name made of the test alone lets two processes delete each other's files
+        TempDirectory() : _path(::BECore::Tests::TestTempPath(DirectoryName())) {
             std::filesystem::remove_all(_path);
             std::filesystem::create_directories(_path);
         }
@@ -72,7 +81,16 @@ namespace BECore::Chess::Tests {
     private:
         static String DirectoryName() {
             const ::testing::TestInfo* info = ::testing::UnitTest::GetInstance()->current_test_info();
-            return Format("BagiChessTests_{}_{}", info->test_suite_name(), info->name());
+            static std::atomic<int> counter{0};
+            return Format("BagiChessTests_{}_{}_p{}_{}", info->test_suite_name(), info->name(), ProcessId(), counter.fetch_add(1));
+        }
+
+        static int ProcessId() {
+#if defined(_WIN32)
+            return _getpid();
+#else
+            return static_cast<int>(getpid());
+#endif
         }
 
         std::filesystem::path _path;
