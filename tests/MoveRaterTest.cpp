@@ -6,7 +6,7 @@
 #include <Common/EngineEnvironment.h>
 #include <tests/TestEngines.h>
 
-/// MoveRater with the real TaskManager and engines made in the test (no process), then the real OwnEngine at depth 5 on positions found by running it. Every wait polls a condition with a time
+/// MoveRater with the real TaskManager and engines made in the test (no process), then the real OwnEngine at depth 5 on positions with pinned answers. Every wait polls a condition with a time
 /// limit; none is a fixed sleep
 namespace BECore::Chess::Tests {
 
@@ -180,7 +180,7 @@ namespace BECore::Chess::Tests {
     class MoveRaterTest : public ::testing::Test {
     protected:
         static void SetUpTestSuite() {
-            ::BECore::Tests::EngineEnvironment::EnsureCoreServices();  // TaskManager
+            ::BECore::Tests::EngineEnvironment::EnsureCoreServices();  // TaskManager, which the rater's search runs on
         }
     };
 
@@ -730,7 +730,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(WaitUntil([&] { return engine->Answered() == 1; })) << "the worker frees itself";
     }
 
-    // With the real OwnEngine at depth 5 (the default factory): no double, no process. The answers below were found by running the engine at depth 5 with two lines and are pinned, like the
+    // With the real OwnEngine at depth 5 (the default factory): no double, no process. The answers below are the engine's at depth 5 with two lines and are pinned, like the
     // positions of StockfishPositionTest; a change of the search or of the evaluation that moves one of them is a change of the ratings and must be looked at
     namespace {
 

@@ -180,7 +180,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(BlunderEngineTest, TheRateOverSeededGamesIsNearThePercent) {
-        // The numbers are deterministic, so this is not flaky; the wide windows only guard against a broken mixer
+        // The wide windows only guard against a broken mixer: the numbers themselves are deterministic
         const auto inner = MakeShared<InstantEngine>();
         const Vector<SearchRequest> requests = SeededRequests(kRatePositions);
         const auto rate = [&](int percent) {
