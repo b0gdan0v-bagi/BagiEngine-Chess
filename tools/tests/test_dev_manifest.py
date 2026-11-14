@@ -57,7 +57,7 @@ def test_every_command_expands_with_the_five_placeholders(manifest: dict):
 def test_the_paths_under_root_exist(manifest: dict):
     for command in all_commands(manifest):
         for part in command:
-            if part.startswith(ROOT_PREFIX) and part not in OUTPUT_PATHS and not part.endswith("tools/ui_shots.py"):  # WP 2 writes it
+            if part.startswith(ROOT_PREFIX) and part not in OUTPUT_PATHS:
                 assert (ROOT / part[len(ROOT_PREFIX):]).exists(), part
 
 

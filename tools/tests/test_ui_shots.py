@@ -26,6 +26,9 @@ from ui_shots import (
     ShotError,
 )
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "engine" / "tools" / "shots"))
+import shots  # noqa: E402  (the engine's tool that reads the set)
+
 FAKE_PNG = b"\x89PNG\r\n\x1a\nnot a real picture, the bytes only have to arrive"
 PICTURE_WIDTH = 192
 PICTURE_HEIGHT = 108
@@ -321,3 +324,33 @@ def test_a_failed_build_exits_1_with_its_output(tmp_path: Path, monkeypatch, cap
     monkeypatch.setattr(ui_shots, "run_build", failing_build)
     assert ui_shots.main(["--exe", str(preset_dir / "bin" / "BagiChess"), "--out", str(tmp_path / "out")], must_not_start) == 1
     assert "no such file" in capsys.readouterr().out
+
+
+# The set of .claude/rules/qa-project.md, read as the engine's shots.py reads it
+
+
+@pytest.fixture(scope="module")
+def shots_set() -> dict:
+    return shots.load_set(ui_shots.REPOSITORY_ROOT)
+
+
+def test_the_set_has_the_scenes_and_sentences_of_the_script(shots_set: dict):
+    assert shots_set["scenes"] == {name: about for name, (about, _) in SCENES.items()}
+
+
+def test_the_set_offers_the_window_of_the_script(shots_set: dict):
+    assert DEFAULT_WINDOW in shots_set["sizes"]
+    assert shots_set["defaultSize"] == DEFAULT_WINDOW
+
+
+def test_the_set_leaves_the_build_to_the_script(shots_set: dict):
+    assert shots_set["targets"] == []
+
+
+def test_the_command_of_the_set_expands_to_the_script_with_every_placeholder_filled(shots_set: dict):
+    values = {key: f"<{key}>" for key in ("root", "engine", "python", "bin", "exe", "label", "out", "scenes", "window")}
+    command = shots.expand(shots_set["command"], values)
+    assert "<python>" in command and "<root>/tools/ui_shots.py" in command
+    assert not any("{" in part for part in command)
+    parsed = ui_shots.make_parser().parse_args(command[command.index("<root>/tools/ui_shots.py") + 1 :])
+    assert parsed.exe == "<exe>" and parsed.window == "<window>" and parsed.scenes == "<scenes>"
