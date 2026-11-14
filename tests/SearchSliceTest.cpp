@@ -21,7 +21,7 @@ namespace BECore::Chess::Tests {
 
         using Clock = std::chrono::steady_clock;
 
-        /// The depths of the rows; the two deepest are ended by a node limit or a mate, never by their depth
+        /// The depths of the rows; the two deepest are ended by a node limit, a mate or a cancel, never by their depth
         constexpr int kGoldenShallowDepth = 3;
         constexpr int kGoldenDepth = 4;
         constexpr int kGoldenDeepDepth = 5;
@@ -358,7 +358,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(SearchSliceTest, TheSearchGivesTheGoldenResults) {
-        // The rows are the answers of the recursive search: a row that moves means the search gives another answer
+        // The rows were taken from the recursive search: a row that moves means the search gives another answer
         const Vector<GoldenCase> cases = BuildGoldenCases();
         ASSERT_EQ(std::size(kGoldenRows), cases.size());
 

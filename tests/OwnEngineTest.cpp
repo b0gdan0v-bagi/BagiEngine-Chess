@@ -394,7 +394,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(answer.has_value());
         EXPECT_EQ(answer->Best().score.kind, AnalysisScoreKind::Centipawns);
         EXPECT_EQ(answer->Best().depth, kFloorDepth);
-        // The value is written out: +50 at depth 3 (the piece-square tables favour the side to move a little). The window of 40
+        // +50 at depth 3 is the expected value (the piece-square tables favour the side to move a little). The window of 40
         // around it is the guard against a change of the evaluation that nobody meant
         EXPECT_GE(answer->Best().score.value, 10);
         EXPECT_LE(answer->Best().score.value, 90);

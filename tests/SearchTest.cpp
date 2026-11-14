@@ -706,7 +706,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(SearchTest, WithoutTheTableTheNumbersAreTheOldOnes) {
-        // tableEntries = 0 is the search with no table: the moves and scores of the test above, with more nodes
+        // tableEntries = 0 is the search with no table: the moves and scores of the test above, with other node counts
         Position start = Position::Start();
         Position kiwipete = PositionFromFen(kKiwipeteFen);
 
