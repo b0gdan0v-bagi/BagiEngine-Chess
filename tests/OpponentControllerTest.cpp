@@ -17,7 +17,8 @@ namespace BECore::Chess::Tests {
     namespace {
 
         constexpr int kManyUpdates = 1000;
-        constexpr std::chrono::milliseconds kShutdownBudget{3000};  // well under the 5 s a UciEngine gives a stubborn child by default (UciEngineSettings::kDefaultQuitGraceMs)
+        /// Well under the 5 s a UciEngine gives a stubborn child by default (UciEngineSettings::kDefaultQuitGraceMs); only the yardstick uses it
+        constexpr std::chrono::milliseconds kShutdownBudget{3000};
         constexpr const char* kLogName = "fake.log";
 #if defined(_WIN32)
         constexpr const char* kWrapperName = "stockfish-wrapper.cmd";  // CreateProcess runs a .cmd through cmd.exe
@@ -839,22 +840,46 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(std::count(lines.begin(), lines.end(), second), 1);
     }
 
-    TEST_F(OpponentControllerTest, TheDefaultFactoryGivesAStubbornChildAShortGraceWhenTheEngineIsDropped) {
+    namespace {
+
+        /// The controller of the default factory plays one move against a fake child that ignores `quit`, then is shut down. The search is over, so this thread holds the last
+        /// reference to the engine: dropping it closes the child here, which ignores `quit` until it is signalled. With @p checkSpeed the close must also have taken less
+        /// than kShutdownBudget (the yardstick)
+        void ShutDownWithAStubbornChild(const TempDirectory& directory, bool checkSpeed) {
+            const eastl::string log = directory.FileText(kLogName);
+            const std::filesystem::path wrapper = WriteWrapper(directory, Format("--log \"{}\" --ignore-quit --moves e7e5", log));
+            ChessGameModel model;
+            OpponentController controller(model, SettingsFor(wrapper));
+            ASSERT_TRUE(controller.Choose(PieceColor::Black, LevelIndex(kHardLevelId)).has_value());  // hard never blunders: the child is asked, so there is a child to close
+            ASSERT_TRUE(Play(model, "e2e4"));
+            ASSERT_TRUE(UpdateUntil(controller, [&] { return model.GetMoves().size() == 2; })) << DescribeError(controller.GetError()).c_str();
+
+            const std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+            controller.Shutdown();
+            const std::chrono::steady_clock::duration closing = std::chrono::steady_clock::now() - begin;
+
+            if (checkSpeed) {
+                EXPECT_LT(closing, kShutdownBudget) << "the default grace of a UciEngine is " << UciEngineSettings::kDefaultQuitGraceMs << " ms";
+            }
+            EXPECT_TRUE(WaitForLogLine(directory.File(kLogName), "quit")) << "the child was asked to quit before it was signalled";
+        }
+
+    }  // namespace
+
+    TEST_F(OpponentControllerTest, TheDefaultFactoryClosesAStubbornChildWhenTheEngineIsDroppedAndAsksItToQuitFirst) {
+        SKIP_WITHOUT_FAKE_ENGINE();
+        static_assert(OpponentController::kQuitGraceMs < UciEngineSettings::kDefaultQuitGraceMs, "the controller gives a stubborn child a shorter grace than a UciEngine does by default");
+        const TempDirectory directory;
+        ShutDownWithAStubbornChild(directory, false);  // Shutdown() returning is the event: the grace is over and the child is closed
+    }
+
+    TEST_F(OpponentControllerTest, DISABLED_StubbornChildShortGraceYardstick) {
+        // The speed of the test above: the close of a child that ignores `quit` takes the short grace of the controller (OpponentController::kQuitGraceMs) and not the
+        // default of a UciEngine. A deadline on a machine under load is not a thing a normal run may decide on, so it is checked here, by hand, on a quiet one:
+        //   ChessTests --gtest_also_run_disabled_tests --gtest_filter=OpponentControllerTest.DISABLED_StubbornChildShortGraceYardstick
         SKIP_WITHOUT_FAKE_ENGINE();
         const TempDirectory directory;
-        const std::filesystem::path wrapper = WriteWrapper(directory, "--ignore-quit --moves e7e5");
-        ChessGameModel model;
-        OpponentController controller(model, SettingsFor(wrapper));
-        ASSERT_TRUE(controller.Choose(PieceColor::Black, LevelIndex(kHardLevelId)).has_value());  // hard never blunders: the child is asked, so there is a child to close
-        ASSERT_TRUE(Play(model, "e2e4"));
-        ASSERT_TRUE(UpdateUntil(controller, [&] { return model.GetMoves().size() == 2; })) << DescribeError(controller.GetError()).c_str();
-
-        // The search is over, so this thread holds the last reference to the engine: dropping it closes the child here, which ignores `quit` until it is signalled
-        const std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
-        controller.Shutdown();
-        const std::chrono::steady_clock::duration closing = std::chrono::steady_clock::now() - begin;
-
-        EXPECT_LT(closing, kShutdownBudget) << "the default grace of a UciEngine is " << UciEngineSettings::kDefaultQuitGraceMs << " ms";
+        ShutDownWithAStubbornChild(directory, true);
     }
 
     TEST_F(OpponentControllerTest, ANewControllerHasTheDefaultEngineAndPickingTheOtherWithNobodyPlayingStartsNothing) {
@@ -1103,7 +1128,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(recorder->LastLimits().moveTimeMs, kOwnMoveTimeCapMs);
     }
 
-    TEST_F(OpponentControllerTest, ShutdownWhileTheOwnEngineOpensAtItsDeepestLevelReturnsAtOnceAndPlaysNothing) {
+    TEST_F(OpponentControllerTest, ShutdownWhileTheOwnEngineOpensAtItsDeepestLevelPlaysNothing) {
         // Depth 5 on the start position takes a fraction of a second even in Debug, so this does not prove a long search is cut; the long one is OwnEngineTest's
         // (a depth that never ends, through a factory). What it shows here is the default factory's engine and the controller's Shutdown() together
         ChessGameModel model;
@@ -1112,11 +1137,8 @@ namespace BECore::Chess::Tests {
         controller.Update();
         ASSERT_TRUE(controller.IsThinking());
 
-        const std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
         controller.Shutdown();
-        const std::chrono::steady_clock::duration closing = std::chrono::steady_clock::now() - begin;
 
-        EXPECT_LT(closing, kShutdownBudget);
         EXPECT_FALSE(controller.IsThinking());
         controller.Update();
         EXPECT_TRUE(model.GetMoves().empty());

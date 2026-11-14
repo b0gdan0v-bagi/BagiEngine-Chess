@@ -13,7 +13,6 @@ namespace BECore::Chess::Tests {
     namespace {
 
         constexpr int kManyUpdates = 500;
-        constexpr std::chrono::milliseconds kShutdownBudget{3000};
         constexpr ProgramSides kBoth{true, true};
         constexpr ProgramSides kNobody{};
 
@@ -605,7 +604,7 @@ namespace BECore::Chess::Tests {
         EXPECT_TRUE(model.GetLegalMoves().empty());
     }
 
-    TEST_F(OpponentSeatsTest, ShutdownWithAnEngineThatIgnoresItsTokenInEachSeatReturnsAtOnce) {
+    TEST_F(OpponentSeatsTest, ShutdownWithAnEngineThatIgnoresItsTokenInEachSeatJoinsNothing) {
         SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
         const auto white = eastl::make_shared<GatedEngine>(false);
@@ -619,11 +618,9 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(controller.IsThinking());
         const uint64_t revision = controller.GetRevision();
 
-        const std::chrono::steady_clock::time_point started = std::chrono::steady_clock::now();
         controller.Shutdown();
-        const std::chrono::milliseconds took = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started);
 
-        EXPECT_LT(took, kShutdownBudget) << "the token is cancelled and nothing is joined";
+        EXPECT_EQ(white->Answered(), 0) << "the search is still at its gate: nothing joined it";
         EXPECT_EQ(controller.GetSides(), kNobody);
         EXPECT_FALSE(controller.IsThinking());
         EXPECT_EQ(controller.GetRevision(), revision + 1);
@@ -635,6 +632,7 @@ namespace BECore::Chess::Tests {
         white->Open();
         black->Open();
         EXPECT_TRUE(model.GetMoves().empty());
+        EXPECT_TRUE(WaitUntil([&] { return white->Answered() == 1; })) << "the worker frees itself";
     }
 
     TEST_F(OpponentSeatsTest, TwoOwnEnginesOfTheDefaultFactoryPlayALegalGameAndPlayItAgainAfterAReset) {

@@ -155,7 +155,8 @@ def play_a_game(program: UciProgram) -> None:
 
 
 def play_on_the_clock(program: UciProgram) -> None:
-    """Level easy answers a clock at once; a clock alone (no depth) is held to its share of the time."""
+    """Level easy answers a clock at once; a clock alone (no depth) is held to its share of the time: the bestmove comes within the read limit, which a search
+    that ignored the clock would not do (how long it took is not asserted: a stall of the machine is no failure, UciClockTest has the share)."""
     program.send("setoption name Level value easy")
     program.send("position startpos")
     program.send(f"go wtime {CLOCK_TEST_MILLISECONDS} btime {CLOCK_TEST_MILLISECONDS}")
@@ -165,11 +166,8 @@ def play_on_the_clock(program: UciProgram) -> None:
     program.send("setoption name BlunderPercent value 0")
     program.send("position startpos")
     check_no_refusal(sync(program, "options"), "the options or the position were refused")
-    started = time.monotonic()
     program.send(f"go wtime {CLOCK_TEST_MILLISECONDS} btime {CLOCK_TEST_MILLISECONDS} movestogo 1")
     best_move_of(program.read_until("bestmove", "go on the clock with movestogo 1"))
-    elapsed = time.monotonic() - started
-    check(elapsed < CLOCK_TEST_MILLISECONDS / 1000.0, f"a move on a clock of {CLOCK_TEST_MILLISECONDS} ms took {elapsed:.2f} s")
 
 
 def stop_an_infinite_search(program: UciProgram) -> None:

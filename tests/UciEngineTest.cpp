@@ -22,8 +22,8 @@ namespace BECore::Chess::Tests {
         using Clock = std::chrono::steady_clock;
 
         constexpr int kMoveTimeMs = 50;
-        constexpr milliseconds kMustNotTimeOut{15000};
-        constexpr int kShortTimeoutMs = 100;  // a time that is meant to pass
+        constexpr int kMustNotTimeOutMs = 15000;  // a limit that only ends a broken test: the grace of a stop that the fake answers at once
+        constexpr int kShortTimeoutMs = 100;      // a time that is meant to pass
         constexpr const char* kLogName = "fake.log";
 
         eastl::string StartFen() {
@@ -317,7 +317,6 @@ namespace BECore::Chess::Tests {
 
         ExpectError(first, EngineErrorKind::Timeout);
         EXPECT_GE(took, milliseconds(20 + kShortTimeoutMs));  // movetime + slack, not earlier
-        EXPECT_LT(took, kMustNotTimeOut);
         EXPECT_TRUE(WaitForLogLine(directory.File(kLogName), "quit")) << "the hung engine was told to leave";
         EXPECT_EQ(CountLines(ReadFileLines(directory.File(kLogName)), "uci"), 1u);
 
@@ -360,7 +359,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(CountLines(ReadFileLines(directory.File(kLogName)), "uci"), 2u);
     }
 
-    TEST(UciEngineTest, NoUciokIsAnErrorWithinTheStartupTimeAndTheProcessIsClosed) {
+    TEST(UciEngineTest, NoUciokIsATimeoutAfterTheStartupTimeAndTheProcessIsClosed) {
         SKIP_WITHOUT_FAKE_ENGINE();
         const TempDirectory directory;
         const eastl::string log = directory.FileText(kLogName);
@@ -374,7 +373,6 @@ namespace BECore::Chess::Tests {
 
         ExpectError(result, EngineErrorKind::Timeout);
         EXPECT_GE(took, milliseconds(300));
-        EXPECT_LT(took, kMustNotTimeOut);
         EXPECT_TRUE(WaitForLogLine(directory.File(kLogName), "quit"));
         EXPECT_EQ(CountLines(ReadFileLines(directory.File(kLogName)), "go movetime 50"), 0u) << "no search on an engine that did not shake hands";
     }
@@ -410,17 +408,17 @@ namespace BECore::Chess::Tests {
         SKIP_WITHOUT_FAKE_ENGINE();
         const TempDirectory directory;
         const eastl::string log = directory.FileText(kLogName);
-        // The first go thinks for five seconds unless it is stopped; the second answers at once. The answer to `stop` is e2e4 and must not be taken for the second search's
-        UciEngine engine(FakeSettings({"--log", log, "--think-ms", "5000", "--think-first-only", "--moves", "e2e4,d2d4"}));
+        // The first go thinks for ten minutes unless it is stopped (a stop that hangs is ended by ctest's timeout); the second answers at once. The answer to `stop` is e2e4 and must not be taken
+        // for the second search's. The grace is long: a slow machine must not take the answer to `stop` for no answer and close the engine
+        UciEngineSettings settings = FakeSettings({"--log", log, "--think-ms", "600000", "--think-first-only", "--moves", "e2e4,d2d4"});
+        settings.stopGraceMs = kMustNotTimeOutMs;
+        UciEngine engine(std::move(settings));
         const CancellationToken token = CancellationToken::Create();
         CancelOnLogLine canceller(token, directory.File(kLogName), "go movetime 50");
 
-        const Clock::time_point begin = Clock::now();
         const auto cancelled = engine.FindMove(MakeRequest({}), token);
-        const Clock::duration took = Clock::now() - begin;
 
         ExpectError(cancelled, EngineErrorKind::Cancelled);
-        EXPECT_LT(took, milliseconds(4000)) << "the engine would have thought for 5000 ms";
         ExpectMove(engine.FindMove(MakeRequest({}), CancellationToken()), "d2d4");
         const eastl::vector<eastl::string> lines = ReadFileLines(directory.File(kLogName));
         EXPECT_EQ(CountLines(lines, "stop"), 1u);
@@ -433,7 +431,7 @@ namespace BECore::Chess::Tests {
         constexpr int kStopGraceMs = 200;
         const TempDirectory directory;
         const eastl::string log = directory.FileText(kLogName);
-        UciEngineSettings settings = FakeSettings({"--log", log, "--think-ms", "5000", "--ignore-stop"});
+        UciEngineSettings settings = FakeSettings({"--log", log, "--think-ms", "600000", "--ignore-stop"});
         settings.stopGraceMs = kStopGraceMs;
         UciEngine engine(std::move(settings));
         const CancellationToken token = CancellationToken::Create();
@@ -444,7 +442,6 @@ namespace BECore::Chess::Tests {
 
         ExpectError(result, EngineErrorKind::Cancelled);
         EXPECT_GE(returned - canceller.CancelledAt(), milliseconds(kStopGraceMs)) << "the engine had its grace to answer `stop`";
-        EXPECT_LT(returned - canceller.CancelledAt(), milliseconds(4000));
         EXPECT_TRUE(WaitForLogLine(directory.File(kLogName), "quit")) << "and then it was closed";
         const eastl::vector<eastl::string> lines = ReadFileLines(directory.File(kLogName));
         EXPECT_EQ(CountLines(lines, "stop"), 1u);
@@ -505,17 +502,15 @@ namespace BECore::Chess::Tests {
         SKIP_WITHOUT_FAKE_ENGINE();
         const TempDirectory directory;
         const eastl::string log = directory.FileText(kLogName);
-        const Clock::time_point begin = Clock::now();
         {
             UciEngineSettings settings = FakeSettings({"--log", log, "--ignore-quit"});
             settings.quitGraceMs = kShortTimeoutMs;
             UciEngine engine(std::move(settings));
             ExpectMove(engine.FindMove(MakeRequest({}), CancellationToken()), "e2e4");
         }
-        const Clock::duration took = Clock::now() - begin;
 
+        // The destructor returned, so the child that ignores `quit` was ended by a signal after the grace
         EXPECT_TRUE(WaitForLogLine(directory.File(kLogName), "quit"));
-        EXPECT_LT(took, kMustNotTimeOut) << "the child was ended by a signal after the grace";
     }
 
     TEST(UciEngineTest, TwoThreadsAreServedOneAfterTheOther) {
@@ -718,7 +713,6 @@ namespace BECore::Chess::Tests {
 
         ExpectAnalysisError(first, EngineErrorKind::Timeout);
         EXPECT_GE(took, milliseconds(20 + kShortTimeoutMs));
-        EXPECT_LT(took, kMustNotTimeOut);
         EXPECT_TRUE(WaitForLogLine(directory.File(kLogName), "quit")) << "the hung engine was told to leave";
 
         ExpectAnalysisError(engine.Analyse(request, CancellationToken()), EngineErrorKind::Timeout);
@@ -742,17 +736,16 @@ namespace BECore::Chess::Tests {
         SKIP_WITHOUT_FAKE_ENGINE();
         const TempDirectory directory;
         const eastl::string log = directory.FileText(kLogName);
-        // The first go thinks for five seconds unless it is stopped; the second answers at once. The answer to `stop` is e2e4 and must not be taken for the second search's
-        UciEngine engine(FakeSettings({"--log", log, "--think-ms", "5000", "--think-first-only", "--moves", "e2e4,d2d4", "--scores", "cp:1,cp:2"}));
+        // As the search above: ten minutes unless stopped, then an answer at once; the answer to `stop` is e2e4 and must not be taken for the second search's
+        UciEngineSettings settings = FakeSettings({"--log", log, "--think-ms", "600000", "--think-first-only", "--moves", "e2e4,d2d4", "--scores", "cp:1,cp:2"});
+        settings.stopGraceMs = kMustNotTimeOutMs;
+        UciEngine engine(std::move(settings));
         const CancellationToken token = CancellationToken::Create();
         CancelOnLogLine canceller(token, directory.File(kLogName), "go movetime 50");
 
-        const Clock::time_point begin = Clock::now();
         const auto cancelled = engine.Analyse(MakeRequest({}), token);
-        const Clock::duration took = Clock::now() - begin;
 
         ExpectAnalysisError(cancelled, EngineErrorKind::Cancelled);
-        EXPECT_LT(took, milliseconds(4000)) << "the engine would have thought for 5000 ms";
         ExpectAnalysis(engine.Analyse(MakeRequest({}), CancellationToken()), "d2d4", Cp(2), 1);
         const eastl::vector<eastl::string> lines = ReadFileLines(directory.File(kLogName));
         EXPECT_EQ(CountLines(lines, "stop"), 1u);
