@@ -53,10 +53,6 @@ namespace BECore::Chess::Uci {
             return tokens;
         }
 
-        String ToString(StringView text) {
-            return String(text.data(), text.size());
-        }
-
         /// The field a `go` keyword fills, nothing for a word that is not one
         Optional<int>* GoField(GoParams& params, StringView token) {
             if (token == kDepthToken) {
@@ -110,7 +106,7 @@ namespace BECore::Chess::Uci {
             }
             size_t next = 2;
             if (tokens[1] == kStartPosToken) {
-                params.startFen = ToString(Position::kStartFen);
+                params.startFen = String(Position::kStartFen);
             } else if (tokens[1] == kFenToken) {
                 for (; next < tokens.size() && tokens[next] != kMovesToken; ++next) {
                     if (!params.startFen.empty()) {
@@ -123,7 +119,7 @@ namespace BECore::Chess::Uci {
             }
             if (next < tokens.size() && tokens[next] == kMovesToken) {
                 for (++next; next < tokens.size(); ++next) {
-                    params.moves.push_back(ToString(tokens[next]));
+                    params.moves.push_back(String(tokens[next]));
                 }
             }
             return true;
