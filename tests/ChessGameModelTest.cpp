@@ -286,7 +286,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(ChessGameModelTest, EachChoiceOfThePickerPlaysItsPiece) {
-        const Array<std::pair<PieceType, const char*>, 4> choices{{
+        const Array<Pair<PieceType, const char*>, 4> choices{{
             {PieceType::Queen, "a7a8q"},
             {PieceType::Rook, "a7a8r"},
             {PieceType::Bishop, "a7a8b"},
@@ -319,7 +319,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(ChessGameModelTest, PromotingCaptureWaitsForAPieceToo) {
-        const Array<std::pair<PieceType, const char*>, 4> choices{{
+        const Array<Pair<PieceType, const char*>, 4> choices{{
             {PieceType::Queen, "a7b8q"},
             {PieceType::Rook, "a7b8r"},
             {PieceType::Bishop, "a7b8b"},

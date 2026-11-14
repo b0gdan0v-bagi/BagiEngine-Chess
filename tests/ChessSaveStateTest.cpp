@@ -66,7 +66,7 @@ namespace BECore::Chess::Tests {
         OpponentChoice choice;
         CountingFactory factory;
 
-        SavedGame() : controller(model), choice(controller), factory({eastl::make_shared<InstantEngine>()}) {
+        SavedGame() : controller(model), choice(controller), factory({MakeShared<InstantEngine>()}) {
             controller.SetEngineFactory(factory.AsFactory());
         }
 

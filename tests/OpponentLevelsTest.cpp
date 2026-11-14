@@ -123,7 +123,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(OpponentLevelsTest, WithHandicapKeepsTheEngineWhenThereIsNoBlunderPercent) {
-        const auto engine = eastl::make_shared<InstantEngine>();
+        const auto engine = MakeShared<InstantEngine>();
         const OpponentLevel plain{"plain", "Plain", 5, 100, 2, 0};
 
         EXPECT_EQ(WithHandicap(engine, plain), engine);
@@ -136,13 +136,13 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(OpponentLevelsTest, WithHandicapWrapsTheEngineInABlunderEngineOfTheLevelsPercent) {
-        const auto engine = eastl::make_shared<InstantEngine>();
+        const auto engine = MakeShared<InstantEngine>();
         const OpponentLevel custom{"custom", "Custom", 5, 100, 2, 50};
 
-        const eastl::shared_ptr<IChessEngine> wrapped = WithHandicap(engine, custom);
+        const SharedPtr<IChessEngine> wrapped = WithHandicap(engine, custom);
 
         ASSERT_NE(wrapped, nullptr);
-        EXPECT_NE(wrapped, eastl::shared_ptr<IChessEngine>(engine));
+        EXPECT_NE(wrapped, SharedPtr<IChessEngine>(engine));
         const auto blunder = eastl::dynamic_pointer_cast<BlunderEngine>(wrapped);
         ASSERT_NE(blunder, nullptr);
         EXPECT_EQ(blunder->Percent(), 50);

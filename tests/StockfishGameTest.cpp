@@ -383,7 +383,7 @@ namespace BECore::Chess::Tests {
                     kYardstickMoveTimeMs, games, kYardstickPlies);
         PrintYardstickHeader("depth");
         for (const OpponentLevel& level : GetOpponentLevels()) {
-            const eastl::shared_ptr<IChessEngine> own = WithHandicap(eastl::make_shared<OwnEngine>(), level);
+            const SharedPtr<IChessEngine> own = WithHandicap(MakeShared<OwnEngine>(), level);
             const YardstickResult result = PlayYardstick(*own, LimitsOf(OpponentEngine::Own, level), stockfish, SearchLimits{kYardstickMoveTimeMs, 0}, games);
             PrintYardstickRow(level, level.ownDepth, result);
             RecordProperty(Format("{}", level.id).c_str(), Format("wins {} draws {} losses {}", result.wins, result.draws, result.losses).c_str());
@@ -406,7 +406,7 @@ namespace BECore::Chess::Tests {
             UciEngineSettings settings = StockfishSettings(*path);
             settings.options = EngineOptionsOf(level);
             settings.quitGraceMs = kQuitGraceMs;
-            const eastl::shared_ptr<IChessEngine> subject = WithHandicap(eastl::make_shared<UciEngine>(settings), level);
+            const SharedPtr<IChessEngine> subject = WithHandicap(MakeShared<UciEngine>(settings), level);
             const YardstickResult result = PlayYardstick(*subject, LimitsOf(OpponentEngine::Stockfish, level), reference, referenceLimits, games);
             PrintYardstickRow(level, level.skillLevel, result);
             RecordProperty(Format("{}", level.id).c_str(), Format("wins {} draws {} losses {}", result.wins, result.draws, result.losses).c_str());

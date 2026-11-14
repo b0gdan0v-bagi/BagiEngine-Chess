@@ -734,7 +734,7 @@ namespace BECore::Chess::Tests {
         }
 
         /// The middle of an element as it was laid out in the last draw, in output pixels (the view is fitted into the output)
-        std::pair<float, float> ScreenCenter(const UIElement& element) const {
+        Pair<float, float> ScreenCenter(const UIElement& element) const {
             const ViewTransform fit = ViewTransform::Fit(kViewWidth, kViewHeight, _renderer->width, _renderer->height);
             const Rect cell = fit.ToOutput(element.rect.x, element.rect.y, element.rect.w, element.rect.h);
             return {cell.x + cell.w * 0.5f, cell.y + cell.h * 0.5f};
@@ -944,12 +944,12 @@ namespace BECore::Chess::Tests {
         }
 
         /// Where the transform of a piece node is, in view units: the cell the piece is drawn in (ChessPieceComponent writes it in an update)
-        std::pair<float, float> PieceOrigin(const char* nodeName) const {
+        Pair<float, float> PieceOrigin(const char* nodeName) const {
             for (const auto& node : GetScene().GetRootNode().GetChildren()) {
                 if (node->GetName() == PoolString::Intern(nodeName)) {
                     const auto transform = node->GetComponent<TransformComponent>();
                     EXPECT_TRUE(transform) << nodeName;
-                    return transform ? std::pair<float, float>{transform->_x, transform->_y} : std::pair<float, float>{};
+                    return transform ? Pair<float, float>{transform->_x, transform->_y} : Pair<float, float>{};
                 }
             }
             ADD_FAILURE() << "no piece node " << nodeName;
@@ -1017,13 +1017,13 @@ namespace BECore::Chess::Tests {
         }
 
         /// The output pixel of a point of the view in scene units, for the fit of the view into the current output
-        std::pair<float, float> PixelOf(float sceneX, float sceneY) const {
+        Pair<float, float> PixelOf(float sceneX, float sceneY) const {
             const Rect at = ViewTransform::Fit(kViewWidth, kViewHeight, _renderer->width, _renderer->height).ToOutput(sceneX, sceneY, 0.0f, 0.0f);
             return {at.x, at.y};
         }
 
         /// A drag between two points of the screen: the press, a held motion well past the threshold, a held motion at the target and the release there
-        void DragBetween(std::pair<float, float> from, std::pair<float, float> to) {
+        void DragBetween(Pair<float, float> from, Pair<float, float> to) {
             Draw();
             CoreManager::GetUIInput().DispatchMouseButtonDown(Button(from.first, from.second, true));
             MouseMove(from.first + kDragStepPixels, from.second, true);
@@ -1075,7 +1075,7 @@ namespace BECore::Chess::Tests {
         }
 
         /// The recorded fills of the hint in the last frame: the squares it leaves and goes to, in drawing order
-        [[nodiscard]] std::pair<Vector<const DrawCall*>, Vector<const DrawCall*>> HintFills() const {
+        [[nodiscard]] Pair<Vector<const DrawCall*>, Vector<const DrawCall*>> HintFills() const {
             return {RectCalls(kHintFromColor), RectCalls(kHintToColor)};
         }
 
@@ -1085,7 +1085,7 @@ namespace BECore::Chess::Tests {
         }
 
         /// The two rects the last move is meant to fill (the squares of the last move of the model, where they are drawn now): from, to
-        [[nodiscard]] std::pair<Rect, Rect> LastMoveRects() const {
+        [[nodiscard]] Pair<Rect, Rect> LastMoveRects() const {
             const Move last = Model().GetMoves().back();
             return {SquareRect(last.From()), SquareRect(last.To())};
         }
@@ -1114,13 +1114,13 @@ namespace BECore::Chess::Tests {
         }
 
         /// The middle, in output pixels, of the fill that a button was drawn with in the last frame; none when no fill of that color was drawn (a hidden button draws nothing)
-        Optional<std::pair<float, float>> DrawnCenter(const Color& fill) const {
+        Optional<Pair<float, float>> DrawnCenter(const Color& fill) const {
             const auto fills = RectCalls(fill);
             if (fills.empty()) {
                 return std::nullopt;
             }
             const Rect& rect = fills.back()->rect;
-            return std::pair{rect.x + rect.w * 0.5f, rect.y + rect.h * 0.5f};
+            return Pair<float, float>{rect.x + rect.w * 0.5f, rect.y + rect.h * 0.5f};
         }
 
         /// A click the way a mouse makes it, on the button that is drawn with this fill: a press and a release. False when no such button is on the screen or the HUD did not take both
@@ -1429,13 +1429,13 @@ namespace BECore::Chess::Tests {
         }
 
         /// The top left corner of a cell of the board in view units: @p column from the left, @p rowFromTop from the top
-        static std::pair<float, float> CellOrigin(int column, int rowFromTop) {
+        static Pair<float, float> CellOrigin(int column, int rowFromTop) {
             return {100.0f + static_cast<float>(column) * 80.0f, kBoardTop + static_cast<float>(rowFromTop) * 80.0f};
         }
 
         /// The cell a square is drawn in, written out here and not taken from BoardOrientation.h: White at the bottom has a1 at the bottom left, Black at the bottom has the grid turned by 180 degrees
-        static std::pair<int, int> CellOfSquare(const Square& s, bool blackAtTheBottom) {
-            return blackAtTheBottom ? std::pair<int, int>{7 - s.file, s.rank} : std::pair<int, int>{s.file, 7 - s.rank};
+        static Pair<int, int> CellOfSquare(const Square& s, bool blackAtTheBottom) {
+            return blackAtTheBottom ? Pair<int, int>{7 - s.file, s.rank} : Pair<int, int>{s.file, 7 - s.rank};
         }
 
         /// A cell of the board in output pixels, for the fit of the view into the current output
@@ -1456,7 +1456,7 @@ namespace BECore::Chess::Tests {
         }
 
         /// The middle of a square of the board in output pixels
-        std::pair<float, float> SquareCenter(const char* square) const {
+        Pair<float, float> SquareCenter(const char* square) const {
             const Rect cell = SquareRect(square);
             return {cell.x + cell.w * 0.5f, cell.y + cell.h * 0.5f};
         }
@@ -1564,7 +1564,8 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(canvas);
         _manager->UpdateAll();
 
-        for (const auto& size : {std::pair{1280.0f, 720.0f}, std::pair{720.0f, 1280.0f}, std::pair{1024.0f, 768.0f}, std::pair{800.0f, 800.0f}, std::pair{2560.0f, 1080.0f}}) {
+        for (const auto& size : {Pair<float, float>{1280.0f, 720.0f}, Pair<float, float>{720.0f, 1280.0f}, Pair<float, float>{1024.0f, 768.0f}, Pair<float, float>{800.0f, 800.0f},
+                                 Pair<float, float>{2560.0f, 1080.0f}}) {
             DrawAt(size.first, size.second);
             for (const char* name : {"Turn", "Menu", "Reset"}) {
                 const UIElement* element = canvas->GetRoot().FindByName(PoolString::Intern(name));
@@ -1580,7 +1581,8 @@ namespace BECore::Chess::Tests {
 
         // The panel is not a part of the margins (it covers the board while it is open) but its plate stays inside the view, in every one of the shapes
         ASSERT_TRUE(OpenThePanel());
-        for (const auto& size : {std::pair{1280.0f, 720.0f}, std::pair{720.0f, 1280.0f}, std::pair{1024.0f, 768.0f}, std::pair{800.0f, 800.0f}, std::pair{2560.0f, 1080.0f}}) {
+        for (const auto& size : {Pair<float, float>{1280.0f, 720.0f}, Pair<float, float>{720.0f, 1280.0f}, Pair<float, float>{1024.0f, 768.0f}, Pair<float, float>{800.0f, 800.0f},
+                                 Pair<float, float>{2560.0f, 1080.0f}}) {
             DrawAt(size.first, size.second);
             const UIElement& plate = PanelControl<UIStack>("Plate");
             ASSERT_FALSE(plate.rect.IsEmpty()) << "the plate is shown at " << size.first << "x" << size.second;
@@ -1761,7 +1763,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, EveryActionOfThePanelIsOneTheBoardAnswers) {
         // Press each action with the id of a segment through the board, as the segment would: the controller reads the pick back (the unknown action is ignored by the board)
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         const struct {
@@ -1939,7 +1941,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(Model().HasSelection());
 
         // The view is 840 x 800: 1280 x 720 and 720 x 1280 are not its shape, so the view transform is a scale and a move
-        for (const auto& size : {std::pair{1280.0f, 720.0f}, std::pair{720.0f, 1280.0f}, std::pair{2560.0f, 1080.0f}}) {
+        for (const auto& size : {Pair<float, float>{1280.0f, 720.0f}, Pair<float, float>{720.0f, 1280.0f}, Pair<float, float>{2560.0f, 1080.0f}}) {
             SCOPED_TRACE(Format("output {}x{}", size.first, size.second).c_str());
             DrawAt(size.first, size.second);
 
@@ -1970,7 +1972,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(Model().IsInCheck());
         _manager->UpdateAll();
 
-        for (const auto& size : {std::pair{1280.0f, 720.0f}, std::pair{720.0f, 1280.0f}}) {
+        for (const auto& size : {Pair<float, float>{1280.0f, 720.0f}, Pair<float, float>{720.0f, 1280.0f}}) {
             SCOPED_TRACE(Format("output {}x{}", size.first, size.second).c_str());
             DrawAt(size.first, size.second);
 
@@ -2003,18 +2005,18 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, WithTheProgramAsWhiteTheBoardAndThePiecesAreTurnedBy180Degrees) {
         SKIP_WITHOUT_WORKER_THREADS();
-        CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
+        CountingFactory factory({MakeShared<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
-        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (std::pair<float, float>{100.0f, 640.0f})) << "two people: a1 at the bottom left";
+        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (Pair<float, float>{100.0f, 640.0f})) << "two people: a1 at the bottom left";
 
         ControlPlays("white");
         _manager->UpdateAll();
         ASSERT_TRUE(BlackIsAtTheBottom());
 
-        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (std::pair<float, float>{660.0f, 80.0f})) << "a1 at the top right";
-        EXPECT_EQ(PieceOrigin("WhiteRook_h1"), (std::pair<float, float>{100.0f, 80.0f})) << "h1 at the top left";
-        EXPECT_EQ(PieceOrigin("BlackRook_a8"), (std::pair<float, float>{660.0f, 640.0f})) << "a8 at the bottom right";
+        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (Pair<float, float>{660.0f, 80.0f})) << "a1 at the top right";
+        EXPECT_EQ(PieceOrigin("WhiteRook_h1"), (Pair<float, float>{100.0f, 80.0f})) << "h1 at the top left";
+        EXPECT_EQ(PieceOrigin("BlackRook_a8"), (Pair<float, float>{660.0f, 640.0f})) << "a8 at the bottom right";
         ExpectPiecesAtTheCellsOf(true);
 
         // The squares of the board: the cell of a1 is the one of h8 in the other orientation, with the color of a1 (dark) in both
@@ -2040,7 +2042,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, AClickOnTheDrawnSquareSelectsThatSquareInTheTurnedBoard) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         ControlPlays("white");
         StartFrom(kBlackToMoveAfterE4);
@@ -2082,7 +2084,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, APersonsMoveByClicksInTheTurnedBoardIsPlayed) {
         SKIP_WITHOUT_WORKER_THREADS();
-        CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
+        CountingFactory factory({MakeShared<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         ControlPlays("white");
         StartFrom(kBlackToMoveAfterE4);
@@ -2098,7 +2100,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheFourCornersOfTheTurnedBoardAreTheSquaresTheyShow) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         ControlPlays("white");
         StartFrom(kFourRooks);
@@ -2121,7 +2123,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheCheckSitsOnTheKingsTurnedCell) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         ControlPlays("white");
         StartFrom(kBlackInCheck);
@@ -2151,7 +2153,7 @@ namespace BECore::Chess::Tests {
         _manager->UpdateAll();
         ASSERT_FALSE(PromotionShown());
 
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         ControlPlays("white");
         StartFrom(kBlackPromotesOnE1);
@@ -2180,7 +2182,7 @@ namespace BECore::Chess::Tests {
             return dim.empty() ? std::nullopt : Optional<Rect>(dim.front()->rect);
         };
 
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         ControlPlays("white");
         StartFrom(kBlackMatesOnA1);
@@ -2199,7 +2201,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, TheBoardTurnsBackWhenNobodyOrBlackIsTheProgram) {
         SKIP_WITHOUT_WORKER_THREADS();
-        CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
+        CountingFactory factory({MakeShared<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         ExpectPiecesAtTheCellsOf(false);
@@ -2207,39 +2209,39 @@ namespace BECore::Chess::Tests {
         ControlPlays("white");
         _manager->UpdateAll();
         ExpectPiecesAtTheCellsOf(true);
-        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (std::pair<float, float>{660.0f, 80.0f}));
+        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (Pair<float, float>{660.0f, 80.0f}));
 
         ControlPlays(nullptr);
         _manager->UpdateAll();
         ExpectPiecesAtTheCellsOf(false);
-        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (std::pair<float, float>{100.0f, 640.0f})) << "nobody plays: White at the bottom again";
+        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (Pair<float, float>{100.0f, 640.0f})) << "nobody plays: White at the bottom again";
 
         ControlPlays("black");
         _manager->UpdateAll();
         ExpectPiecesAtTheCellsOf(false);
-        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (std::pair<float, float>{100.0f, 640.0f})) << "the program plays Black: the person has White at the bottom";
+        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (Pair<float, float>{100.0f, 640.0f})) << "the program plays Black: the person has White at the bottom";
         EXPECT_FALSE(BlackIsAtTheBottom());
     }
 
     TEST_F(ChessUiTest, TheColorSegmentsAndTheModeTurnTheBoardAtTheNextFrame) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
 
         PressWith("ChessSetMode", "computer");  // the person has White, the program plays Black
         _manager->UpdateAll();
-        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (std::pair<float, float>{100.0f, 640.0f})) << "a1 at the bottom left";
+        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (Pair<float, float>{100.0f, 640.0f})) << "a1 at the bottom left";
 
         PressWith("ChessSetColor", "black");
         _manager->UpdateAll();
-        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (std::pair<float, float>{660.0f, 80.0f})) << "the person has Black: the board is turned";
+        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (Pair<float, float>{660.0f, 80.0f})) << "the person has Black: the board is turned";
         ASSERT_TRUE(FramesUntil([&] { return Model().GetMoves().size() == 1; })) << "and the program, now White, opens";
         _manager->UpdateAll();  // the pieces follow the move of this frame in the next one
         ExpectPiecesAtTheCellsOf(true);
 
         PressWith("ChessSetColor", "white");
         _manager->UpdateAll();
-        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (std::pair<float, float>{100.0f, 640.0f})) << "the person has White again";
+        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (Pair<float, float>{100.0f, 640.0f})) << "the person has White again";
         ASSERT_TRUE(FramesUntil([&] { return Model().GetMoves().size() == 2 && !Opponent().IsThinking(); })) << "the program, now Black, answers the opening";
         _manager->UpdateAll();
         ExpectPiecesAtTheCellsOf(false);  // every piece, the moved ones too
@@ -2247,22 +2249,22 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, ABlackPickedWhileTwoPlayDoesNotTurnTheBoardUntilComputerIsPicked) {
         SKIP_WITHOUT_WORKER_THREADS();
-        CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
+        CountingFactory factory({MakeShared<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
 
         PressWith("ChessSetColor", "black");
         _manager->UpdateAll();
         EXPECT_EQ(Var("opponentColor"), "black");
-        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (std::pair<float, float>{100.0f, 640.0f})) << "nobody plays yet: nothing turns";
+        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (Pair<float, float>{100.0f, 640.0f})) << "nobody plays yet: nothing turns";
 
         PressWith("ChessSetMode", "computer");
         _manager->UpdateAll();
-        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (std::pair<float, float>{660.0f, 80.0f})) << "now the program plays White";
+        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (Pair<float, float>{660.0f, 80.0f})) << "now the program plays White";
 
         PressWith("ChessSetMode", "two");
         _manager->UpdateAll();
-        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (std::pair<float, float>{100.0f, 640.0f})) << "two people: White at the bottom";
+        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (Pair<float, float>{100.0f, 640.0f})) << "two people: White at the bottom";
         EXPECT_EQ(Var("opponentColor"), "black") << "the color stays remembered";
     }
 
@@ -2275,7 +2277,7 @@ namespace BECore::Chess::Tests {
             if (engine == OpponentEngine::Stockfish) {
                 return std::unexpected(EngineError{EngineErrorKind::LaunchFailed, "no Stockfish in the test"});
             }
-            return eastl::make_shared<GatedEngine>(true);
+            return MakeShared<GatedEngine>(true);
         });
         _manager->UpdateAll();
         StartFromTheStockfishName();
@@ -2287,24 +2289,24 @@ namespace BECore::Chess::Tests {
         ASSERT_EQ(asked.size(), 1u);
         EXPECT_EQ(Var("opponentMode"), "two") << "the pick was refused";
         EXPECT_FALSE(BlackIsAtTheBottom());
-        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (std::pair<float, float>{100.0f, 640.0f}));
+        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (Pair<float, float>{100.0f, 640.0f}));
 
         // The way on is the own engine; the board turns with Computer. A refused Stockfish pick afterwards leaves it turned
         PressWith("ChessSetEngine", "own");
         PressWith("ChessSetMode", "computer");
         _manager->UpdateAll();
         ASSERT_TRUE(BlackIsAtTheBottom());
-        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (std::pair<float, float>{660.0f, 80.0f}));
+        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (Pair<float, float>{660.0f, 80.0f}));
         PressWith("ChessSetEngine", "stockfish");
         _manager->UpdateAll();
         EXPECT_EQ(Var("opponentEngine"), "own") << "refused";
         EXPECT_TRUE(BlackIsAtTheBottom());
-        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (std::pair<float, float>{660.0f, 80.0f}));
+        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (Pair<float, float>{660.0f, 80.0f}));
     }
 
     TEST_F(ChessUiTest, ResetAndSetStateKeepTheTurnedBoardAndDealThePiecesToItsCells) {
         SKIP_WITHOUT_WORKER_THREADS();
-        CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
+        CountingFactory factory({MakeShared<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         ControlPlays("white");
         _manager->UpdateAll();
@@ -2313,7 +2315,7 @@ namespace BECore::Chess::Tests {
         Press("ChessReset");
         _manager->UpdateAll();
         ASSERT_TRUE(BlackIsAtTheBottom()) << "a reset keeps the opponent, so the orientation";
-        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (std::pair<float, float>{660.0f, 80.0f}));
+        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (Pair<float, float>{660.0f, 80.0f}));
         ExpectPiecesAtTheCellsOf(true);
 
         Model().Reset();
@@ -2336,7 +2338,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, WithTheProgramAsWhiteTheCoordinateVariablesReadFromBlacksSide) {
         SKIP_WITHOUT_WORKER_THREADS();
-        CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
+        CountingFactory factory({MakeShared<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         ControlPlays("white");
         _manager->UpdateAll();
@@ -2347,7 +2349,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, TheCoordinateVariablesTurnBackWithTwoPeopleAndWithTheProgramAsBlack) {
         SKIP_WITHOUT_WORKER_THREADS();
-        CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
+        CountingFactory factory({MakeShared<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         ControlPlays("white");
         _manager->UpdateAll();
@@ -2369,7 +2371,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, TheCoordinateVariablesFollowTheColorSegmentsAndTheModeOfThePanel) {
         SKIP_WITHOUT_WORKER_THREADS();
-        CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
+        CountingFactory factory({MakeShared<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
 
@@ -2387,7 +2389,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, AResetAndASetStateKeepTheCoordinatesOfTheBoardThatIsTurned) {
         SKIP_WITHOUT_WORKER_THREADS();
-        CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
+        CountingFactory factory({MakeShared<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         ControlPlays("white");
         _manager->UpdateAll();
@@ -2509,7 +2511,7 @@ namespace BECore::Chess::Tests {
         const auto blackA8 = GiveAtlasCell("BlackRook_a8");
         const auto blackH8 = GiveAtlasCell("BlackRook_h8");
         const ITexture* const rooks[] = {whiteA1.Get(), whiteH1.Get(), blackA8.Get(), blackH8.Get()};
-        CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
+        CountingFactory factory({MakeShared<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
 
         for (const bool turned : {false, true}) {
@@ -2551,7 +2553,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, TheCoordinateColorsReadOnTheSquaresThatAreDrawnInBothOrientations) {
         SKIP_WITHOUT_WORKER_THREADS();
-        CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
+        CountingFactory factory({MakeShared<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
 
         for (const bool turned : {false, true}) {
@@ -2671,7 +2673,7 @@ namespace BECore::Chess::Tests {
             EXPECT_EQ(canvas->GetLayout().HitTest(rect.x + rect.w * 0.5f, rect.y + rect.h * 0.5f), nullptr) << spec.name.c_str() << " is not found by a hit test";
         }
 
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         StartFrom(kFourRooks);  // a rook of Black in each corner, Black to move
         ASSERT_EQ(Model().GetTurn(), PieceColor::Black);
@@ -2699,7 +2701,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, TheCoordinateLabelsTurnTheirTextAndKeepTheirPlaceOnTheScreen) {
         SKIP_WITHOUT_WORKER_THREADS();
-        CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
+        CountingFactory factory({MakeShared<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         const auto read = [&](bool files) {
             Draw();
@@ -2744,7 +2746,7 @@ namespace BECore::Chess::Tests {
     TEST_F(ChessUiTest, TheCoordinateColorsAreTheSameWhenTheBoardIsTurned) {
         SKIP_WITHOUT_WORKER_THREADS();
         // The turn by 180 degrees keeps the color of every cell, which is why the colors of the labels are fixed in the XML
-        CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
+        CountingFactory factory({MakeShared<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         Draw();
         Vector<Color> before;
@@ -2825,7 +2827,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, TheStateOfTheControlApiIsTheSameWhateverSideIsAtTheBottom) {
         SKIP_WITHOUT_WORKER_THREADS();
-        CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
+        CountingFactory factory({MakeShared<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         ControlPlays("white");
         _manager->UpdateAll();
@@ -2892,7 +2894,7 @@ namespace BECore::Chess::Tests {
     // this machine is never looked for. The scene is the shipped one, so a click is a click on the board and a frame is the update of every component
 
     TEST_F(ChessUiTest, WithNobodyAsTheOpponentTheGamePlaysAsTwoPeople) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
 
@@ -2912,7 +2914,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheProgramAnswersAPersonsMoveWithinAFewFrames) {
-        const auto engine = eastl::make_shared<InstantEngine>();
+        const auto engine = MakeShared<InstantEngine>();
         CountingFactory factory({engine});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -2937,7 +2939,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, WhileTheProgramThinksAClickOnTheBoardNeverMovesTheGameOrCancelsItsSearch) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto engine = eastl::make_shared<GatedEngine>(true);
+        const auto engine = MakeShared<GatedEngine>(true);
         CountingFactory factory({engine});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -2971,7 +2973,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, WhileTheProgramThinksAClickOnAnOwnPieceSelectsItAndAClickOnItsTargetQueuesAPremove) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto engine = eastl::make_shared<GatedEngine>(true);
+        const auto engine = MakeShared<GatedEngine>(true);
         CountingFactory factory({engine});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -3012,7 +3014,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, ASecondPremoveMovesThePieceTheFirstOneMovedAndAnotherOwnPieceReselects) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto engine = eastl::make_shared<GatedEngine>(true);
+        const auto engine = MakeShared<GatedEngine>(true);
         CountingFactory factory({engine});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -3037,7 +3039,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, WhileTheProgramThinksAClickOnAnEmptyOrAnEnemySquareCancelsTheWholeQueue) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto engine = eastl::make_shared<GatedEngine>(true);
+        const auto engine = MakeShared<GatedEngine>(true);
         CountingFactory factory({engine});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -3072,7 +3074,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, APremoveToThePromotionRankAsksNoPieceAndPlaysAsAQueen) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto engine = eastl::make_shared<GatedEngine>(true);
+        const auto engine = MakeShared<GatedEngine>(true);
         CountingFactory factory({engine});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -3107,7 +3109,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, WithTheProgramAsWhiteAPremoveOfBlackIsClickedOnTheTurnedBoard) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto engine = eastl::make_shared<GatedEngine>(true);
+        const auto engine = MakeShared<GatedEngine>(true);
         CountingFactory factory({engine});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -3136,7 +3138,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, TheResetButtonDropsTheQueue) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto engine = eastl::make_shared<GatedEngine>(true);
+        const auto engine = MakeShared<GatedEngine>(true);
         CountingFactory factory({engine});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -3159,7 +3161,7 @@ namespace BECore::Chess::Tests {
         SKIP_WITHOUT_WORKER_THREADS();
         const auto mate = MoveGenerator::ParseUci(PositionFromFen(kBlackMatesOnA1), "a8a1");
         ASSERT_TRUE(mate.has_value());
-        const auto engine = eastl::make_shared<GatedEngine>(true, *mate);
+        const auto engine = MakeShared<GatedEngine>(true, *mate);
         CountingFactory factory({engine});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -3180,7 +3182,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, AfterTheProgramsMateAClickStartsANewGameAndTheProgramMovesAgain) {
-        CountingFactory factory({eastl::make_shared<MatingEngine>()});
+        CountingFactory factory({MakeShared<MatingEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         Model().SetPosition(PositionFromFen("6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1"));
@@ -3209,7 +3211,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, AResetWhileTheProgramThinksDropsItsAnswerAndANewSearchFollowsOnItsTurn) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto engine = eastl::make_shared<GatedEngine>(false);  // ignores its token: its answer comes late and must still be thrown away
+        const auto engine = MakeShared<GatedEngine>(false);  // ignores its token: its answer comes late and must still be thrown away
         CountingFactory factory({engine});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -3254,7 +3256,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, AnEngineThatFailedLocksTheProgramsSideButNotTheGameAndNothingIsRetried) {
-        const auto engine = eastl::make_shared<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
+        const auto engine = MakeShared<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
         CountingFactory factory({engine});
         ASSERT_NO_FATAL_FAILURE(ProvokeAnEngineError(factory));
 
@@ -3271,7 +3273,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheResetButtonLetsThePersonOutOfAnEngineError) {
-        const auto engine = eastl::make_shared<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
+        const auto engine = MakeShared<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
         CountingFactory factory({engine});
         ASSERT_NO_FATAL_FAILURE(ProvokeAnEngineError(factory));
 
@@ -3287,7 +3289,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, ChangingTheSideLetsThePersonOutOfAnEngineErrorAndNobodyIsTheWayOutForGood) {
-        const auto engine = eastl::make_shared<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
+        const auto engine = MakeShared<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
         CountingFactory factory({engine});
         ASSERT_NO_FATAL_FAILURE(ProvokeAnEngineError(factory));
         const uint64_t revision = Opponent().GetRevision();
@@ -3315,7 +3317,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, ChangingTheLevelLetsThePersonOutOfAnEngineErrorAndAsksTheNewEngineOnce) {
-        const auto engine = eastl::make_shared<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
+        const auto engine = MakeShared<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
         CountingFactory factory({engine});
         ASSERT_NO_FATAL_FAILURE(ProvokeAnEngineError(factory));
 
@@ -3331,7 +3333,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, StoppingTheGameDestroysTheOpponentAndCancelsItsSearch) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto engine = eastl::make_shared<GatedEngine>(true);
+        const auto engine = MakeShared<GatedEngine>(true);
         CountingFactory factory({engine});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -3351,7 +3353,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, ShuttingTheGameDownWithASearchInFlightJoinsNothing) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto engine = eastl::make_shared<GatedEngine>(false);  // never looks at its token: only the gate can end its search
+        const auto engine = MakeShared<GatedEngine>(false);  // never looks at its token: only the gate can end its search
         CountingFactory factory({engine});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -3395,7 +3397,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, ModeAndColorThroughThePanelPickTheSideTheProgramPlays) {
         // Was TheSideActionWalksThreeWordsAndBackAndTheProgramPlaysTheSideTheWordSays (the cycle is gone with the Side button): the mode and the color are two choices now
-        const auto engine = eastl::make_shared<InstantEngine>();
+        const auto engine = MakeShared<InstantEngine>();
         CountingFactory factory({engine});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -3441,7 +3443,7 @@ namespace BECore::Chess::Tests {
     TEST_F(ChessUiTest, TheLevelActionPicksEveryLevelAndTheFactoryIsAskedOnlyWhenTheProgramPlays) {
         // Was TheLevelActionWalksTheLevelsAndWraps (the cycle is gone with the Level button): every level segment of the panel emits ChessSetLevel with its id
         const auto levels = GetOpponentLevels();
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
 
@@ -3464,7 +3466,7 @@ namespace BECore::Chess::Tests {
     TEST_F(ChessUiTest, TheEngineSegmentsPickBothEnginesAndTheDefaultIsStockfish) {
         // Was TheEngineWordStartsAsStockfishAndTheActionWalksTheEnginesAndWraps (the cycle and the `engine` word are gone with the Engine button)
         SKIP_WITHOUT_STOCKFISH_SEGMENT();
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         StartFromTheStockfishName();
@@ -3495,7 +3497,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, WhileTheProgramThinksTheTurnSaysSoAndTheAnswerBringsTheUsualWordsBack) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto engine = eastl::make_shared<GatedEngine>(true);
+        const auto engine = MakeShared<GatedEngine>(true);
         CountingFactory factory({engine});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -3537,7 +3539,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheSentenceOfASearchErrorIsInTheStatusUntilSomeoneMovesTheGame) {
-        const auto engine = eastl::make_shared<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
+        const auto engine = MakeShared<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
         CountingFactory factory({engine});
         ASSERT_NO_FATAL_FAILURE(ProvokeAnEngineError(factory));
 
@@ -3554,7 +3556,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheSentenceOfASearchErrorWinsOverCheckAndTheResetButtonTakesItAway) {
-        const auto engine = eastl::make_shared<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
+        const auto engine = MakeShared<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
         CountingFactory factory({engine});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -3575,7 +3577,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, TheEngineGroupTakesClicksWhetherOrNotTheProgramPlays) {
         // Was TheEngineButtonIsShownWhetherOrNotTheProgramPlays: the Engine button was never hidden; no group of the panel is greyed, and the EngineGroup works in every state
-        CountingFactory working({eastl::make_shared<InstantEngine>()});
+        CountingFactory working({MakeShared<InstantEngine>()});
         Opponent().SetEngineFactory(working.AsFactory());
         _manager->UpdateAll();
         ASSERT_TRUE(OpenThePanel());
@@ -3612,7 +3614,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, ClickingTheModeAndColorSegmentsOnTheScreenPicksTheSideAndAPressAloneDoesNothing) {
         // Was ClickingTheSideButtonOnTheScreenCyclesTheSide
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         ASSERT_TRUE(OpenThePanel());
@@ -3636,7 +3638,7 @@ namespace BECore::Chess::Tests {
     TEST_F(ChessUiTest, ClickingAnEngineSegmentOnTheScreenPicksTheEngineAndAPressAloneDoesNothing) {
         // Was ClickingTheEngineButtonOnTheScreenCyclesTheEngineAndAPressAloneDoesNothing
         SKIP_WITHOUT_STOCKFISH_SEGMENT();
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         StartFromTheStockfishName();
@@ -3667,7 +3669,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, APressOnASegmentDoesNotChangeTheBoardSelection) {
         // Was APressOnTheEngineButtonDoesNotChangeTheSelection
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         Click("e2");
@@ -3711,7 +3713,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheResetButtonKeepsTheEngine) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         ASSERT_TRUE(OpenThePanel());
@@ -3731,7 +3733,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, TheResetButtonStillResetsWithTheMenuButtonAround) {
         // Reset keeps the opponent chosen in the panel; the Menu button beside it does not change that
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         ASSERT_TRUE(OpenThePanel());
@@ -3749,7 +3751,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, ThePressOfAHudButtonDoesNotReachTheBoardAndTheBoardStillGetsItsOwnClicks) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         ASSERT_TRUE(OpenThePanel());
@@ -3783,7 +3785,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, EachActionOfThePanelPicksWhatTheControlApiWouldRead) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         const size_t hard = *FindOpponentLevel("hard");
@@ -3832,7 +3834,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, ComputerAndThenBlackMakesTheProgramOpenAsWhite) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
 
@@ -3849,7 +3851,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, ThePersonsColorSurvivesTwoPlayersAndComesBack) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
 
@@ -3877,7 +3879,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, AnActionOfThePanelWithABadValueChangesNothing) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         StartFromTheStockfishName();
@@ -3914,7 +3916,7 @@ namespace BECore::Chess::Tests {
             if (engine == OpponentEngine::Stockfish) {
                 return std::unexpected(EngineError{EngineErrorKind::LaunchFailed, "no Stockfish in the test"});
             }
-            return eastl::make_shared<InstantEngine>();
+            return MakeShared<InstantEngine>();
         });
         _manager->UpdateAll();
         StartFromTheStockfishName();
@@ -3947,7 +3949,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, AFailedSearchIsInTheErrorVariableToo) {
-        const auto engine = eastl::make_shared<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
+        const auto engine = MakeShared<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
         CountingFactory factory({engine});
         ASSERT_NO_FATAL_FAILURE(ProvokeAnEngineError(factory));
 
@@ -3961,7 +3963,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheIdsAgreeWithWhatTheControlApiReportsAfterASetState) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         const auto agree = [&](const char* mode, const char* personColor, const char* plays) {
@@ -4078,8 +4080,8 @@ namespace BECore::Chess::Tests {
         Draw();
 
         // On a segment, on the plate (its title), on the dim over the board (a1, below the plate) and over the Reset button: all of them are the panel's
-        const std::pair<float, float> points[] = {ScreenCenter(PanelButton("EngineOwn")), ScreenCenter(PanelElement("Title")), SquareCenter("a1"), SquareCenter("h8"),
-                                                  ScreenCenter(*HudElement("Reset")),     ScreenCenter(*HudElement("Turn"))};
+        const Pair<float, float> points[] = {ScreenCenter(PanelButton("EngineOwn")), ScreenCenter(PanelElement("Title")), SquareCenter("a1"), SquareCenter("h8"),
+                                             ScreenCenter(*HudElement("Reset")),     ScreenCenter(*HudElement("Turn"))};
         for (const auto& [x, y] : points) {
             const Taken taken = ClickAtPixel(x, y);
             EXPECT_TRUE(taken.Both()) << x << "," << y;
@@ -4092,7 +4094,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, EverySegmentEmitsItsActionAndValueAndTheSelectionFollowsTheController) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         ASSERT_TRUE(OpenThePanel());
@@ -4165,7 +4167,7 @@ namespace BECore::Chess::Tests {
     TEST_F(ChessUiTest, NoGroupOfThePanelIsGreyedAndALevelAndAColorPickedForTwoPeopleApplyAtComputer) {
         // Replaces TheColorAndLevelGroupsAreDisabledWhileTwoPeoplePlayAndTheEngineGroupNever (and Was TheLevelButtonIsShownOnlyWhileTheProgramPlays): a greyed group read as a dead
         // button, so every group takes clicks in every mode and the pick is remembered until Computer is picked
-        CountingFactory working({eastl::make_shared<InstantEngine>()});
+        CountingFactory working({MakeShared<InstantEngine>()});
         Opponent().SetEngineFactory(working.AsFactory());
         _manager->UpdateAll();
         ASSERT_TRUE(OpenThePanel());
@@ -4232,7 +4234,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, NoGroupOfThePanelIsGreyedWhateverTheControlApiSets) {
         // Replaces TheDisabledFlagFollowsAnOpponentSetFromOutside: the control API picks the program's side without the panel and the groups stay whole while the choice follows it
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         ASSERT_TRUE(OpenThePanel());  // a hidden canvas is not drawn, so its segments take the choice only once it is shown
@@ -4274,7 +4276,7 @@ namespace BECore::Chess::Tests {
             if (engine == OpponentEngine::Stockfish) {
                 return std::unexpected(EngineError{EngineErrorKind::LaunchFailed, "no Stockfish in the test"});
             }
-            return eastl::make_shared<InstantEngine>();
+            return MakeShared<InstantEngine>();
         });
         _manager->UpdateAll();
         ASSERT_TRUE(OpenThePanel());
@@ -4389,7 +4391,7 @@ namespace BECore::Chess::Tests {
 #endif
 
     TEST_F(ChessUiTest, TheMenuButtonSaysMenuWhateverIsPickedAndThePanelNamesTheColors) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         ASSERT_TRUE(OpenThePanel());
@@ -4423,7 +4425,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, ThePersonPlaysTheColorThePanelNamesAndTheProgramTheOther) {
         // The person plays the color the PANEL names (the Menu button names nothing)
-        const auto engine = eastl::make_shared<InstantEngine>();
+        const auto engine = MakeShared<InstantEngine>();
         CountingFactory factory({engine});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -4452,7 +4454,7 @@ namespace BECore::Chess::Tests {
             if (engine == OpponentEngine::Stockfish) {
                 return std::unexpected(EngineError{EngineErrorKind::LaunchFailed, "no Stockfish in the test"});
             }
-            return eastl::make_shared<InstantEngine>();
+            return MakeShared<InstantEngine>();
         });
         _manager->UpdateAll();
         StartFromTheStockfishName();
@@ -4495,7 +4497,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, ASearchErrorIsOnTheErrorLineAndAnyPickOfThePanelLetsThePersonOut) {
         // Twin of ChangingTheSideLetsThePersonOut... and ChangingTheLevelLetsThePersonOut... through the segments: the error line empties and the new engine is asked once
-        const auto engine = eastl::make_shared<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
+        const auto engine = MakeShared<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
         CountingFactory factory({engine});
         ASSERT_NO_FATAL_FAILURE(ProvokeAnEngineError(factory));
         ASSERT_TRUE(OpenThePanel());
@@ -4519,7 +4521,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, TheSentencesOfTheErrorLineAreTheOnesOfTheOpponentText) {
         // The line shows OpponentText::Error of the error that stands, and nothing else
-        const auto engine = eastl::make_shared<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
+        const auto engine = MakeShared<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
         CountingFactory factory({engine});
         ASSERT_NO_FATAL_FAILURE(ProvokeAnEngineError(factory));
         ASSERT_TRUE(OpenThePanel());
@@ -4698,7 +4700,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheLetterOfEachPromotionIsTheOneOfItsButton) {
-        const std::pair<PieceType, const char*> letters[] = {{PieceType::Queen, "a7a8q"}, {PieceType::Rook, "a7a8r"}, {PieceType::Bishop, "a7a8b"}, {PieceType::Knight, "a7a8n"}};
+        const Pair<PieceType, const char*> letters[] = {{PieceType::Queen, "a7a8q"}, {PieceType::Rook, "a7a8r"}, {PieceType::Bishop, "a7a8b"}, {PieceType::Knight, "a7a8n"}};
         for (const auto& [piece, uci] : letters) {
             SCOPED_TRACE(uci);
             StartFrom(kPromotionFen);
@@ -4743,7 +4745,7 @@ namespace BECore::Chess::Tests {
         const uint64_t version = Model().GetVersion();
 
         // The board (two corners and the target), the dim, the Reset and the Menu button of the HUD: the panel takes all of them
-        const std::pair<float, float> points[] = {
+        const Pair<float, float> points[] = {
             SquareCenter("a1"), SquareCenter("h8"), SquareCenter("a8"), ScreenCenter(*HudElement("Reset")), ScreenCenter(*HudElement("Menu")), ScreenCenter(PromotionElement("PromotionTitle"))};
         for (const auto& [x, y] : points) {
             EXPECT_TRUE(ClickAtPixel(x, y).Both()) << x << "," << y;
@@ -4847,7 +4849,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, WhileTheProgramPlaysTheOtherColorThePersonsPromotionWorksAndTheProgramAnswersIt) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         ASSERT_TRUE(Opponent().SetSide(PieceColor::Black).has_value());
@@ -4867,7 +4869,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, TheProgramTakingTheTurnClosesThePanel) {
         // The person selected the pawn and asked for the promotion; the program (switched on in the meantime) takes the turn and drops the half-made move
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         StartFrom(kPromotionFen);
@@ -4967,7 +4969,8 @@ namespace BECore::Chess::Tests {
         ClickMove("a7", "a8");
         ASSERT_TRUE(PromotionShown());
 
-        for (const auto& size : {std::pair{1280.0f, 720.0f}, std::pair{720.0f, 1280.0f}, std::pair{1024.0f, 768.0f}, std::pair{800.0f, 800.0f}, std::pair{2560.0f, 1080.0f}}) {
+        for (const auto& size : {Pair<float, float>{1280.0f, 720.0f}, Pair<float, float>{720.0f, 1280.0f}, Pair<float, float>{1024.0f, 768.0f}, Pair<float, float>{800.0f, 800.0f},
+                                 Pair<float, float>{2560.0f, 1080.0f}}) {
             SCOPED_TRACE(Format("{}x{}", size.first, size.second).c_str());
             DrawAt(size.first, size.second);
             const UIElement& plate = PromotionElement(kPromotionPlate);
@@ -5329,7 +5332,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, WithTheProgramAsWhiteTheGroupsSwapWithTheBoard) {
-        CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
+        CountingFactory factory({MakeShared<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         StartFrom(kWhiteTookAPawn);
@@ -5357,7 +5360,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, WithTheProgramAsBlackAndWithTwoPeopleWhiteStaysAtTheBottomOfTheDisplayToo) {
-        CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
+        CountingFactory factory({MakeShared<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         StartFrom(kBlackTookTheQueen);
@@ -5371,7 +5374,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, ThePanelTurnsTheDisplayWithTheBoard) {
         SKIP_WITHOUT_WORKER_THREADS();
-        CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
+        CountingFactory factory({MakeShared<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         StartFrom(kBlackTookTheQueen);
@@ -5439,7 +5442,7 @@ namespace BECore::Chess::Tests {
         ASSERT_EQ(ShownMaterialRows(), "");
         const auto take = MoveGenerator::ParseUci(Model().GetPosition(), "d5e4");
         ASSERT_TRUE(take.has_value());
-        const auto engine = eastl::make_shared<GatedEngine>(true, *take);
+        const auto engine = MakeShared<GatedEngine>(true, *take);
         CountingFactory factory({engine});
         Opponent().SetEngineFactory(factory.AsFactory());
         ASSERT_TRUE(Opponent().SetSide(PieceColor::Black).has_value());
@@ -5822,7 +5825,8 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, TheShownMaterialStaysInTheMarginAndClearOfTheHudAndTheCoordinatesInFiveWindowShapes) {
         StartFrom("4k3/8/8/8/8/8/8/4K3 w - - 0 1");
-        for (const auto& size : {std::pair{1280.0f, 720.0f}, std::pair{720.0f, 1280.0f}, std::pair{1024.0f, 768.0f}, std::pair{800.0f, 800.0f}, std::pair{2560.0f, 1080.0f}}) {
+        for (const auto& size : {Pair<float, float>{1280.0f, 720.0f}, Pair<float, float>{720.0f, 1280.0f}, Pair<float, float>{1024.0f, 768.0f}, Pair<float, float>{800.0f, 800.0f},
+                                 Pair<float, float>{2560.0f, 1080.0f}}) {
             SCOPED_TRACE(Format("{}x{}", size.first, size.second).c_str());
             DrawAt(size.first, size.second);
             DrawAt(size.first, size.second);  // the rows wait for the first layout
@@ -5854,7 +5858,7 @@ namespace BECore::Chess::Tests {
             }
         }
 
-        for (const auto& size : {std::pair{1280.0f, 720.0f}, std::pair{720.0f, 1280.0f}}) {
+        for (const auto& size : {Pair<float, float>{1280.0f, 720.0f}, Pair<float, float>{720.0f, 1280.0f}}) {
             SCOPED_TRACE(Format("{}x{}", size.first, size.second).c_str());
             DrawAt(size.first, size.second);
             _renderer->calls.clear();
@@ -5946,7 +5950,7 @@ namespace BECore::Chess::Tests {
     // scripted move e2e4 through the analyst's factory, and the frames are real ones
 
     TEST_F(ChessUiTest, WithNoHintAskedForNoExtraSquareIsFilled) {
-        CountingAnalysisFactory factory({eastl::make_shared<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"))});
+        CountingAnalysisFactory factory({MakeShared<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"))});
         Analyst().SetEngineFactory(factory.AsFactory());
         Settle();
         EXPECT_TRUE(HintFills().first.empty());
@@ -5960,12 +5964,12 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, AReadyHintFillsTheTwoSquaresOfItsMoveInTheirOwnColorsWithWhiteAtTheBottom) {
-        CountingAnalysisFactory factory({eastl::make_shared<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"))});
+        CountingAnalysisFactory factory({MakeShared<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"))});
         Analyst().SetEngineFactory(factory.AsFactory());
         ASSERT_TRUE(ShowTheHint());
         ASSERT_FALSE(BlackIsAtTheBottom());
 
-        for (const auto& size : {std::pair{1280.0f, 720.0f}, std::pair{720.0f, 1280.0f}}) {
+        for (const auto& size : {Pair<float, float>{1280.0f, 720.0f}, Pair<float, float>{720.0f, 1280.0f}}) {
             SCOPED_TRACE(Format("output {}x{}", size.first, size.second).c_str());
             DrawAt(size.first, size.second);
             const auto [from, to] = HintFills();
@@ -5978,9 +5982,9 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, AReadyHintFillsTheTurnedCellsWhenTheProgramPlaysWhite) {
         SKIP_WITHOUT_WORKER_THREADS();
-        CountingFactory opponentFactory({eastl::make_shared<GatedEngine>(true)});  // the program opens and holds its answer: the board stays as it is
+        CountingFactory opponentFactory({MakeShared<GatedEngine>(true)});  // the program opens and holds its answer: the board stays as it is
         Opponent().SetEngineFactory(opponentFactory.AsFactory());
-        CountingAnalysisFactory factory({eastl::make_shared<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"))});
+        CountingAnalysisFactory factory({MakeShared<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"))});
         Analyst().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         ControlPlays("white");
@@ -6001,7 +6005,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, TheHintIsDrawnOverTheSquaresAndUnderThePiecesAndASelectionStaysOnTopOfIt) {
         const auto pawn = GiveAtlasCell("WhitePawn_e2");
-        CountingAnalysisFactory factory({eastl::make_shared<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"))});
+        CountingAnalysisFactory factory({MakeShared<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"))});
         Analyst().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         ASSERT_TRUE(ShowTheHint());
@@ -6047,7 +6051,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, AMoveByClicksAResetASetPositionAndTheControlApiTakeTheHintOffAtTheNextFrame) {
-        CountingAnalysisFactory factory({eastl::make_shared<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"))});
+        CountingAnalysisFactory factory({MakeShared<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"))});
         Analyst().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         const auto expectHint = [&](bool shown) {
@@ -6088,7 +6092,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, AFinishedGameShowsNoHint) {
-        CountingAnalysisFactory factory({eastl::make_shared<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Mate, 1}, Mv("a8a1"))});
+        CountingAnalysisFactory factory({MakeShared<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Mate, 1}, Mv("a8a1"))});
         Analyst().SetEngineFactory(factory.AsFactory());
         StartFrom(kBlackMatesOnA1);
         ASSERT_TRUE(ShowTheHint());
@@ -6114,7 +6118,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, WhileTheEngineStillThinksNothingIsDrawnAndTheAnswerBringsTheHint) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto engine = eastl::make_shared<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"));
+        const auto engine = MakeShared<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"));
         engine->Gate(true);
         CountingAnalysisFactory factory({engine});
         Analyst().SetEngineFactory(factory.AsFactory());
@@ -6136,7 +6140,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheHintPlaysNothingAndLeavesThePiecesAndTheStateOfTheGameAsTheyAre) {
-        CountingAnalysisFactory factory({eastl::make_shared<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"))});
+        CountingAnalysisFactory factory({MakeShared<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"))});
         Analyst().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         const auto boardOf = [&] {
@@ -6158,11 +6162,11 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(Model().GetVersion(), modelVersion) << "the model is not touched";
         EXPECT_TRUE(Model().GetMoves().empty());
         ExpectPiecesAtTheCellsOf(false);
-        EXPECT_EQ(PieceOrigin("WhitePawn_e2"), (std::pair<float, float>{420.0f, 560.0f}));
+        EXPECT_EQ(PieceOrigin("WhitePawn_e2"), (Pair<float, float>{420.0f, 560.0f}));
     }
 
     TEST_F(ChessUiTest, WithNoGameActiveTheBoardDrawsNoHint) {
-        CountingAnalysisFactory factory({eastl::make_shared<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"))});
+        CountingAnalysisFactory factory({MakeShared<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"))});
         Analyst().SetEngineFactory(factory.AsFactory());
         ASSERT_TRUE(ShowTheHint());
         Draw();
@@ -6186,7 +6190,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, AMoveByClicksMarksItsTwoSquaresAndTheNextMoveReplacesThem) {
-        for (const auto& size : {std::pair{1280.0f, 720.0f}, std::pair{720.0f, 1280.0f}}) {
+        for (const auto& size : {Pair<float, float>{1280.0f, 720.0f}, Pair<float, float>{720.0f, 1280.0f}}) {
             SCOPED_TRACE(Format("output {}x{}", size.first, size.second).c_str());
             Model().Reset();
             ClickMove("e2", "e4");
@@ -6228,7 +6232,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheProgramsAnswerMarksItsSquares) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         ASSERT_TRUE(Opponent().SetSide(PieceColor::Black).has_value());
@@ -6308,7 +6312,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, TheTurnedBoardMarksTheTurnedCells) {
         SKIP_WITHOUT_WORKER_THREADS();
-        CountingFactory opponentFactory({eastl::make_shared<GatedEngine>(true)});  // the program opens and holds its answer: the board stays as it is
+        CountingFactory opponentFactory({MakeShared<GatedEngine>(true)});  // the program opens and holds its answer: the board stays as it is
         Opponent().SetEngineFactory(opponentFactory.AsFactory());
         _manager->UpdateAll();
         ControlPlays("white");
@@ -6326,7 +6330,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheLastMoveIsDrawnOverTheSquaresAndUnderTheCheckTheHintTheSelectionAndTheLegalMoves) {
-        CountingAnalysisFactory factory({eastl::make_shared<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e8d8"))});
+        CountingAnalysisFactory factory({MakeShared<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e8d8"))});
         Analyst().SetEngineFactory(factory.AsFactory());
         StartFrom("4k3/8/8/8/8/8/8/3R1K2 w - - 0 1");
         ASSERT_TRUE(Play(Model(), "d1e1"));  // check: the rook's squares are marked and the king's square is red
@@ -6409,8 +6413,8 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, WatchTheBoardTakesNoClickOnWhitesTurnAndKeepsTheSearchAlone) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto white = eastl::make_shared<GatedEngine>(true);
-        const auto black = eastl::make_shared<GatedEngine>(true);
+        const auto white = MakeShared<GatedEngine>(true);
+        const auto black = MakeShared<GatedEngine>(true);
         CountingFactory factory({white, black});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -6437,8 +6441,8 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, WatchTheBoardTakesNoClickOnBlacksTurnEither) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto white = eastl::make_shared<GatedEngine>(true);
-        const auto black = eastl::make_shared<GatedEngine>(true);
+        const auto white = MakeShared<GatedEngine>(true);
+        const auto black = MakeShared<GatedEngine>(true);
         CountingFactory factory({white, black});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -6463,8 +6467,8 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, WatchNoClickQueuesAPremove) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto white = eastl::make_shared<GatedEngine>(true);
-        const auto black = eastl::make_shared<GatedEngine>(true);
+        const auto white = MakeShared<GatedEngine>(true);
+        const auto black = MakeShared<GatedEngine>(true);
         CountingFactory factory({white, black});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -6483,8 +6487,8 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, WatchNoClickStartsAPromotion) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto white = eastl::make_shared<GatedEngine>(true);
-        const auto black = eastl::make_shared<GatedEngine>(true);
+        const auto white = MakeShared<GatedEngine>(true);
+        const auto black = MakeShared<GatedEngine>(true);
         CountingFactory factory({white, black});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -6505,8 +6509,8 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, WatchStartingDropsTheSelectionOfThePersonWhoseTurnItIs) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto white = eastl::make_shared<GatedEngine>(true);
-        const auto black = eastl::make_shared<GatedEngine>(true);
+        const auto white = MakeShared<GatedEngine>(true);
+        const auto black = MakeShared<GatedEngine>(true);
         CountingFactory factory({white, black});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -6523,7 +6527,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, WatchWhiteStaysAtTheBottomAndTheMaterialGroupsAreNotSwapped) {
         SKIP_WITHOUT_WORKER_THREADS();
-        CountingFactory factory({eastl::make_shared<GatedEngine>(true), eastl::make_shared<GatedEngine>(true)});
+        CountingFactory factory({MakeShared<GatedEngine>(true), MakeShared<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         StartFrom(kWhiteTookAPawn);
@@ -6538,7 +6542,7 @@ namespace BECore::Chess::Tests {
         EXPECT_FALSE(Opponent().GetPlays().has_value());
         EXPECT_FALSE(BlackIsAtTheBottom());
         ExpectPiecesAtTheCellsOf(false);
-        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (std::pair<float, float>{100.0f, 640.0f}));
+        EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (Pair<float, float>{100.0f, 640.0f}));
         EXPECT_EQ(Coordinates(true), "abcdefgh");
         EXPECT_EQ(Coordinates(false), "87654321");
         EXPECT_EQ(ShownMaterialRows(), "BottomPawn") << "White's captures stay in the lower group";
@@ -6549,8 +6553,8 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, WatchAClickAfterTheEndStartsANewGameAndTheProgramsOpenIt) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto white = eastl::make_shared<GatedEngine>(true);
-        const auto black = eastl::make_shared<GatedEngine>(true);
+        const auto white = MakeShared<GatedEngine>(true);
+        const auto black = MakeShared<GatedEngine>(true);
         CountingFactory factory({white, black});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -6577,8 +6581,8 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, WatchTheResetButtonStartsAgainAndTheBoardStaysLocked) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto white = eastl::make_shared<GatedEngine>(true);
-        const auto black = eastl::make_shared<GatedEngine>(true);
+        const auto white = MakeShared<GatedEngine>(true);
+        const auto black = MakeShared<GatedEngine>(true);
         CountingFactory factory({white, black});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -6599,8 +6603,8 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, WatchTwoPlayersInThePanelGivesTheBoardBackToClicks) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto white = eastl::make_shared<GatedEngine>(true);
-        const auto black = eastl::make_shared<GatedEngine>(true);
+        const auto white = MakeShared<GatedEngine>(true);
+        const auto black = MakeShared<GatedEngine>(true);
         CountingFactory factory({white, black});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -6625,7 +6629,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, WatchNobodyThroughTheControlApiGivesTheBoardBackToClicks) {
         SKIP_WITHOUT_WORKER_THREADS();
-        CountingFactory factory({eastl::make_shared<GatedEngine>(true), eastl::make_shared<GatedEngine>(true)});
+        CountingFactory factory({MakeShared<GatedEngine>(true), MakeShared<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         ControlPlays("both");
@@ -6644,8 +6648,8 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, WatchATakeoverLeavesTheClicksToThePersonsColorOnly) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto white = eastl::make_shared<GatedEngine>(true);
-        const auto black = eastl::make_shared<GatedEngine>(true);
+        const auto white = MakeShared<GatedEngine>(true);
+        const auto black = MakeShared<GatedEngine>(true);
         CountingFactory factory({white, black});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -6673,8 +6677,8 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, WatchAnErrorOfOneSeatDoesNotUnlockTheBoard) {
-        const auto white = eastl::make_shared<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "no engine in the test"});
-        const auto black = eastl::make_shared<GatedEngine>(true);
+        const auto white = MakeShared<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "no engine in the test"});
+        const auto black = MakeShared<GatedEngine>(true);
         CountingFactory factory({white, black});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -6740,7 +6744,7 @@ namespace BECore::Chess::Tests {
     TEST_F(ChessUiTest, ADragOffTheBoardPlaysNothingKeepsTheSelectionAndAClickFinishesTheMove) {
         Draw();
         const uint64_t version = Model().GetVersion();
-        const std::pair<float, float> places[] = {
+        const Pair<float, float> places[] = {
             PixelOf(50.0f, 400.0f),   // the left margin, where the material chips are
             PixelOf(420.0f, 770.0f),  // under the board
             PixelOf(420.0f, 40.0f),   // above it
@@ -6816,7 +6820,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, TheProgramsTurnTakesNoDragAndDoesNotCancelItsSearch) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto engine = eastl::make_shared<GatedEngine>(true);
+        const auto engine = MakeShared<GatedEngine>(true);
         CountingFactory factory({engine});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -6841,8 +6845,8 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, WatchTheBoardTakesNoDragOnEitherTurn) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto white = eastl::make_shared<GatedEngine>(true);
-        const auto black = eastl::make_shared<GatedEngine>(true);
+        const auto white = MakeShared<GatedEngine>(true);
+        const auto black = MakeShared<GatedEngine>(true);
         CountingFactory factory({white, black});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -6933,7 +6937,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, ADragInTheTurnedBoardGoesByTheDrawnCells) {
-        CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
+        CountingFactory factory({MakeShared<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         ControlPlays("white");
         StartFrom(kBlackToMoveAfterE4);
@@ -7007,7 +7011,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheLiftedPieceIsTheSquareItCameFromAndTheTopLeftIsThePointerMinusHalfASquare) {
-        CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
+        CountingFactory factory({MakeShared<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         for (const bool turned : {false, true}) {
             SCOPED_TRACE(turned ? "turned" : "White at the bottom");
@@ -7058,7 +7062,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, ADraggedPieceIsCenteredUnderThePointerOnTheDragLayerAndGoesBackOrLandsOnTheTargetOnLetGo) {
         SKIP_WITHOUT_WORKER_THREADS();
-        CountingFactory factory({eastl::make_shared<GatedEngine>(true)});
+        CountingFactory factory({MakeShared<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         for (const bool turned : {false, true}) {
             SCOPED_TRACE(turned ? "turned" : "White at the bottom");

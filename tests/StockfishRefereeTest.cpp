@@ -28,7 +28,7 @@ namespace BECore::Chess::Tests {
 
         /// What `go perft N` printed: the leaves under each root move (in the order Stockfish gave them) and the total
         struct PerftResult {
-            Vector<eastl::pair<String, uint64_t>> divide;
+            Vector<Pair<String, uint64_t>> divide;
             uint64_t nodes = 0;
         };
 

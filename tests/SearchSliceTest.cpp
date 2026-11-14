@@ -815,7 +815,7 @@ namespace BECore::Chess::Tests {
             uint64_t slices = 0;
         };
 
-        Task<void> DriveOnThePool(OwnEngine engine, SearchRequest request, CancellationToken token, eastl::shared_ptr<CoroutineAnswer> out) {
+        Task<void> DriveOnThePool(OwnEngine engine, SearchRequest request, CancellationToken token, SharedPtr<CoroutineAnswer> out) {
             auto search = engine.BeginFindMove(request, token);
             if (!search) {
                 out->answer = std::unexpected(std::move(search.error()));
@@ -850,7 +850,7 @@ namespace BECore::Chess::Tests {
         const NamedPolicy sizes[] = {{"1 node", Fixed(kSliceOfOneNode)}, {"7 nodes", Fixed(kSliceOfSevenNodes)}, {"256 nodes", Fixed(kSearchSliceNodes)}, {"varying", Varying}};
 
         for (const int depth : kEngineDepths) {
-            Vector<std::pair<String, SearchRequest>> requests;
+            Vector<Pair<String, SearchRequest>> requests;
             for (const NamedFen& position : kPerftPositions) {
                 requests.emplace_back(position.name, RequestFor(position.fen, depth));
             }
@@ -1110,7 +1110,7 @@ namespace BECore::Chess::Tests {
         const auto expected = engine.FindMove(request, CancellationToken::Create());
         ASSERT_TRUE(expected.has_value());
 
-        auto out = eastl::make_shared<CoroutineAnswer>();
+        auto out = MakeShared<CoroutineAnswer>();
         TaskManager::GetInstance().Run(DriveOnThePool(engine, request, CancellationToken::Create(), out));
 
         ASSERT_TRUE(WaitFor(*out)) << "the coroutine did not finish";
@@ -1126,7 +1126,7 @@ namespace BECore::Chess::Tests {
 #else
         OwnEngine engine;
         CancellationToken token = CancellationToken::Create();
-        auto out = eastl::make_shared<CoroutineAnswer>();
+        auto out = MakeShared<CoroutineAnswer>();
         TaskManager::GetInstance().Run(DriveOnThePool(engine, RequestFor(kKiwipeteFen, kGoldenForeverDepth), token, out));
 
         std::this_thread::sleep_for(kRunBeforeCancel);
@@ -1151,7 +1151,7 @@ namespace BECore::Chess::Tests {
 
         /// Awaits @p call on the pool (the way EngineOpponent's task body does) and stores what it gave
         template <typename T>
-        Task<void> AwaitOnThePool(Task<std::expected<T, EngineError>> call, eastl::shared_ptr<AsyncAnswer<T>> out) {
+        Task<void> AwaitOnThePool(Task<std::expected<T, EngineError>> call, SharedPtr<AsyncAnswer<T>> out) {
             out->answer = AnswerOfTask(co_await std::move(call));
             out->done.store(true, std::memory_order_release);
             co_return;
@@ -1171,8 +1171,8 @@ namespace BECore::Chess::Tests {
 
         /// Runs @p call as a task on the pool and waits for it by a poll with a time limit; the answer is in @p out
         template <typename T>
-        eastl::shared_ptr<AsyncAnswer<T>> RunOnThePool(Task<std::expected<T, EngineError>> call) {
-            auto out = eastl::make_shared<AsyncAnswer<T>>();
+        SharedPtr<AsyncAnswer<T>> RunOnThePool(Task<std::expected<T, EngineError>> call) {
+            auto out = MakeShared<AsyncAnswer<T>>();
             TaskManager::GetInstance().Run(AwaitOnThePool<T>(std::move(call), out));
             return out;
         }
@@ -1406,7 +1406,7 @@ namespace BECore::Chess::Tests {
         const auto expected = OwnEngine().FindMove(SearchRequest::FromModel(model, limits), CancellationToken::Create());
         ASSERT_TRUE(expected.has_value());
 
-        EngineOpponent opponent(eastl::make_shared<OwnEngine>(), PieceColor::White, limits);
+        EngineOpponent opponent(MakeShared<OwnEngine>(), PieceColor::White, limits);
         [[maybe_unused]] const size_t frames = PlayFrames(opponent, model);
 
         ASSERT_EQ(model.GetMoves().size(), 1u) << "the opponent did not play within the time limit";
@@ -1420,7 +1420,7 @@ namespace BECore::Chess::Tests {
     /// ChessTests --gtest_also_run_disabled_tests --gtest_filter=OpponentOverFramesTest.DISABLED_FrameLengthYardstick
     TEST_F(OpponentOverFramesTest, DISABLED_FrameLengthYardstick) {
         ChessGameModel model;
-        EngineOpponent opponent(eastl::make_shared<OwnEngine>(), PieceColor::White, SearchLimits{0, kFramesDepth});
+        EngineOpponent opponent(MakeShared<OwnEngine>(), PieceColor::White, SearchLimits{0, kFramesDepth});
         std::chrono::milliseconds longestFrame{0};
         [[maybe_unused]] const size_t frames = PlayFrames(opponent, model, &longestFrame);
 
@@ -1430,7 +1430,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OpponentOverFramesTest, ACancelInTheMiddleOfAMultiFrameSearchPlaysNothing) {
         ChessGameModel model;
-        EngineOpponent opponent(eastl::make_shared<OwnEngine>(), PieceColor::White, SearchLimits{0, kGoldenForeverDepth});
+        EngineOpponent opponent(MakeShared<OwnEngine>(), PieceColor::White, SearchLimits{0, kGoldenForeverDepth});
 
         for (int frame = 0; frame < kFramesBeforeCancel; ++frame) {
             PumpTaskFrame();
@@ -1454,7 +1454,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OpponentOverFramesTest, AMovedVersionInTheMiddleOfAMultiFrameSearchDropsTheAnswer) {
         ChessGameModel model;
-        EngineOpponent opponent(eastl::make_shared<OwnEngine>(), PieceColor::White, SearchLimits{0, kGoldenForeverDepth});
+        EngineOpponent opponent(MakeShared<OwnEngine>(), PieceColor::White, SearchLimits{0, kGoldenForeverDepth});
         for (int frame = 0; frame < kFramesBeforeCancel; ++frame) {
             PumpTaskFrame();
             opponent.Update(model);

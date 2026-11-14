@@ -170,8 +170,8 @@ namespace BECore::Chess::Tests {
             std::atomic<int> _answered{0};
         };
 
-        eastl::shared_ptr<PlyEngine> MakeEngine(Vector<Move> best = {}, int gap = 25) {
-            return eastl::make_shared<PlyEngine>(std::move(best), gap);
+        SharedPtr<PlyEngine> MakeEngine(Vector<Move> best = {}, int gap = 25) {
+            return MakeShared<PlyEngine>(std::move(best), gap);
         }
 
         const EngineError kBroken{EngineErrorKind::ProcessDied, "the engine fell over"};
@@ -287,7 +287,8 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(MoveRaterTest, AWideGapMakesTheBestMoveObviousAndTheMarginDecidesIt) {
-        for (const auto& [gap, expected] : {std::pair{199, MoveRatingReason::Brilliant}, std::pair{200, MoveRatingReason::Obvious}, std::pair{900, MoveRatingReason::Obvious}}) {
+        for (const auto& [gap, expected] : {Pair<int, MoveRatingReason>{199, MoveRatingReason::Brilliant}, Pair<int, MoveRatingReason>{200, MoveRatingReason::Obvious},
+                                            Pair<int, MoveRatingReason>{900, MoveRatingReason::Obvious}}) {
             const auto engine = MakeEngine({Mv("e2e4")}, gap);
             CountingAnalysisFactory factory{engine};
             ChessGameModel model;
@@ -628,7 +629,7 @@ namespace BECore::Chess::Tests {
                 return FirstLegalMove(request);
             }
         };
-        const eastl::shared_ptr<IChessEngine> engine = eastl::make_shared<PlayingEngine>();
+        const SharedPtr<IChessEngine> engine = MakeShared<PlayingEngine>();
         CountingAnalysisFactory factory{engine};
         ChessGameModel model;
         ASSERT_TRUE(Play(model, "e2e4"));
@@ -718,7 +719,7 @@ namespace BECore::Chess::Tests {
         CountingAnalysisFactory factory{engine};
         ChessGameModel model;
         ASSERT_TRUE(Play(model, "e2e4"));
-        auto rater = std::make_unique<MoveRater>();
+        auto rater = MakeUnique<MoveRater>();
         rater->SetEngineFactory(factory.AsFactory());
         rater->SetOn(true);
         ASSERT_TRUE(UpdateUntil(*rater, model, [&] { return engine->Calls() == 1; }));

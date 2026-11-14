@@ -71,7 +71,7 @@ namespace BECore::Chess::Tests {
     }  // namespace
 
     TEST(BlunderEngineTest, ThePercentIsClampedToZeroAndAHundred) {
-        const auto inner = eastl::make_shared<InstantEngine>();
+        const auto inner = MakeShared<InstantEngine>();
 
         EXPECT_EQ(BlunderEngine(inner, 150).Percent(), 100);
         EXPECT_EQ(BlunderEngine(inner, -5).Percent(), 0);
@@ -80,8 +80,8 @@ namespace BECore::Chess::Tests {
 
     TEST(BlunderEngineTest, AClampedPercentBehavesAsTheLimit) {
         const SearchRequest request = SearchRequest::FromPosition(Position::Start(), kLimits);
-        const auto over = eastl::make_shared<InstantEngine>();
-        const auto under = eastl::make_shared<InstantEngine>();
+        const auto over = MakeShared<InstantEngine>();
+        const auto under = MakeShared<InstantEngine>();
         BlunderEngine overEngine(over, 150);
         BlunderEngine underEngine(under, -5);
 
@@ -93,7 +93,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(BlunderEngineTest, ZeroPercentNeverAltersTheAnswerAndAsksOncePerRequest) {
-        const auto inner = eastl::make_shared<InstantEngine>();
+        const auto inner = MakeShared<InstantEngine>();
         BlunderEngine engine(inner, 0);
         const Vector<SearchRequest> requests = SeededRequests(kGamePlies);
 
@@ -108,7 +108,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(BlunderEngineTest, AHundredPercentAlwaysAnswersALegalMoveAndNeverAsksTheWrappedEngine) {
-        const auto inner = eastl::make_shared<InstantEngine>();
+        const auto inner = MakeShared<InstantEngine>();
         BlunderEngine engine(inner, 100);
         const Vector<SearchRequest> requests = SeededRequests(kRatePositions);
         size_t differentFromFirst = 0;
@@ -127,8 +127,8 @@ namespace BECore::Chess::Tests {
 
     TEST(BlunderEngineTest, TheSameRequestGivesTheSameAnswerFromAnyObject) {
         const SearchRequest request = SearchRequest::FromPosition(PositionFromFen(kKiwipeteFen), kLimits);
-        BlunderEngine first(eastl::make_shared<InstantEngine>(), 100);
-        BlunderEngine second(eastl::make_shared<InstantEngine>(), 100);
+        BlunderEngine first(MakeShared<InstantEngine>(), 100);
+        BlunderEngine second(MakeShared<InstantEngine>(), 100);
 
         const auto a = Ask(first, request);
         const auto b = Ask(first, request);
@@ -142,7 +142,7 @@ namespace BECore::Chess::Tests {
     TEST(BlunderEngineTest, TheDecisionsForTheStartPositionAndKiwipeteArePinned) {
         // A golden list: the mixer is plain uint64_t arithmetic, so these hold on every platform. A number that moves means the mixer or the rule changed.
         // Each position is asked at a few percents ("blunder" when the wrapped engine was not asked, "delegated" otherwise); the move of a blunder is the one of 100 percent
-        const auto inner = eastl::make_shared<InstantEngine>();
+        const auto inner = MakeShared<InstantEngine>();
         const SearchRequest start = SearchRequest::FromPosition(Position::Start(), kLimits);
         const SearchRequest kiwipete = SearchRequest::FromPosition(PositionFromFen(kKiwipeteFen), kLimits);
         const auto row = [&](const SearchRequest& request) {
@@ -160,7 +160,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(BlunderEngineTest, APositionThatBlundersAt15PercentBlundersAt40) {
-        const auto inner = eastl::make_shared<InstantEngine>();
+        const auto inner = MakeShared<InstantEngine>();
         BlunderEngine low(inner, 15);
         BlunderEngine high(inner, 40);
         size_t lowBlunders = 0;
@@ -182,7 +182,7 @@ namespace BECore::Chess::Tests {
 
     TEST(BlunderEngineTest, TheRateOverSeededGamesIsNearThePercent) {
         // The numbers are deterministic, so this is not flaky; the wide windows only guard against a broken mixer
-        const auto inner = eastl::make_shared<InstantEngine>();
+        const auto inner = MakeShared<InstantEngine>();
         const Vector<SearchRequest> requests = SeededRequests(kRatePositions);
         const auto rate = [&](int percent) {
             BlunderEngine engine(inner, percent);
@@ -203,7 +203,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(BlunderEngineTest, ABrokenRequestIsBadRequestAlsoAtAHundredPercent) {
-        const auto inner = eastl::make_shared<InstantEngine>();
+        const auto inner = MakeShared<InstantEngine>();
         BlunderEngine engine(inner, 100);
         SearchRequest brokenFen = SearchRequest::FromPosition(Position::Start(), kLimits);
         brokenFen.startFen = "this is not a fen";
@@ -220,7 +220,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(BlunderEngineTest, NoMoveInAMateAndInAStalemateAlsoAtAHundredPercent) {
-        const auto inner = eastl::make_shared<InstantEngine>();
+        const auto inner = MakeShared<InstantEngine>();
         BlunderEngine engine(inner, 100);
 
         for (const char* fen : {kMated, kStalemated}) {
@@ -233,7 +233,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(BlunderEngineTest, ATokenCancelledBeforeTheCallIsCancelledAtAHundredPercent) {
-        const auto inner = eastl::make_shared<InstantEngine>();
+        const auto inner = MakeShared<InstantEngine>();
         BlunderEngine engine(inner, 100);
         CancellationToken token = CancellationToken::Create();
         token.Cancel();
@@ -246,7 +246,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(BlunderEngineTest, AWrappedEngineThatFailsIsNotHiddenAtZeroPercent) {
-        const auto inner = eastl::make_shared<FailingEngine>(EngineError{EngineErrorKind::Timeout, "no answer in time"});
+        const auto inner = MakeShared<FailingEngine>(EngineError{EngineErrorKind::Timeout, "no answer in time"});
         BlunderEngine engine(inner, 0);
 
         const auto answer = Ask(engine, SearchRequest::FromPosition(Position::Start(), kLimits));
@@ -258,7 +258,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(BlunderEngineTest, TwoThreadsMayAskTheSameObject) {
-        const auto inner = eastl::make_shared<InstantEngine>();
+        const auto inner = MakeShared<InstantEngine>();
         BlunderEngine engine(inner, 50);
         const Vector<SearchRequest> requests = SeededRequests(kGamePlies);
         Vector<Optional<Move>> alone;
@@ -284,7 +284,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(BlunderEngineTest, TheOwnEngineInsideBlundersAtAHundredAndIsExactAtZero) {
-        const auto own = eastl::make_shared<OwnEngine>();
+        const auto own = MakeShared<OwnEngine>();
         BlunderEngine alwaysBlunders(own, 100);
         BlunderEngine neverBlunders(own, 0);
         const auto selfPlay = [&](IChessEngine& engine) {
@@ -306,7 +306,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(BlunderEngineTest, AnalyseIsForwardedUnchangedAtEveryPercent) {
-        const auto own = eastl::make_shared<OwnEngine>();
+        const auto own = MakeShared<OwnEngine>();
         const SearchRequest request = SearchRequest::FromPosition(PositionFromFen("6k1/5ppp/8/8/8/8/8/R3K3 w - - 0 1"), SearchLimits{0, 2});
         const auto plain = own->Analyse(request, CancellationToken::Create());
         ASSERT_TRUE(plain.has_value());
@@ -323,7 +323,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(BlunderEngineTest, SeveralLinesAreForwardedUnchangedAtEveryPercent) {
-        const auto own = eastl::make_shared<OwnEngine>();
+        const auto own = MakeShared<OwnEngine>();
         SearchRequest request = SearchRequest::FromPosition(PositionFromFen(kKiwipeteFen), SearchLimits{0, 2});
         request.lines = 3;
         const auto plain = own->Analyse(request, CancellationToken::Create());
@@ -349,7 +349,7 @@ namespace BECore::Chess::Tests {
         request.lines = 3;
 
         for (const int percent : {0, 50, 100}) {
-            const auto inner = eastl::make_shared<AnalysingEngine>();
+            const auto inner = MakeShared<AnalysingEngine>();
             BlunderEngine engine(inner, percent);
 
             const auto answer = engine.Analyse(request, CancellationToken::Create());
@@ -362,7 +362,7 @@ namespace BECore::Chess::Tests {
 
     TEST(BlunderEngineTest, AnalyseIsNeverHandicappedOverAPositionWhereTheBlunderWouldDiffer) {
         // At 100 percent FindMove answers a random move, and Analyse the best one: the hint is not spoilt by the handicap
-        const auto own = eastl::make_shared<OwnEngine>();
+        const auto own = MakeShared<OwnEngine>();
         BlunderEngine alwaysBlunders(own, 100);
         const SearchRequest request = SearchRequest::FromPosition(PositionFromFen("6k1/5ppp/8/8/8/8/8/R3K3 w - - 0 1"), SearchLimits{0, 2});
 
@@ -376,7 +376,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(BlunderEngineTest, AnalyseOverAnEngineThatDoesNotAnalyseIsUnsupported) {
-        const auto inner = eastl::make_shared<InstantEngine>();
+        const auto inner = MakeShared<InstantEngine>();
         for (const int percent : {0, 100}) {
             BlunderEngine engine(inner, percent);
 
@@ -392,7 +392,7 @@ namespace BECore::Chess::Tests {
         // The doubles never suspend, so a task driven on the test thread runs to its end
         const Vector<SearchRequest> requests = SeededRequests(60);
         for (const int percent : {0, 40, 100}) {
-            const auto inner = eastl::make_shared<InstantEngine>();
+            const auto inner = MakeShared<InstantEngine>();
             BlunderEngine engine(inner, percent);
             size_t blunders = 0;
 
@@ -418,7 +418,7 @@ namespace BECore::Chess::Tests {
 
         // The errors of the blocking call, at 0 and at 100 percent
         for (const int percent : {0, 100}) {
-            BlunderEngine engine(eastl::make_shared<InstantEngine>(), percent);
+            BlunderEngine engine(MakeShared<InstantEngine>(), percent);
             auto mated = engine.FindMoveAsync(SearchRequest::FromPosition(PositionFromFen(kMated), kLimits), CancellationToken::Create());
             const auto mateResult = mated.GetResult();
             ASSERT_TRUE(mateResult.has_value());
@@ -426,7 +426,7 @@ namespace BECore::Chess::Tests {
             EXPECT_EQ(mateResult->error().kind, EngineErrorKind::NoMove) << percent;
         }
         {
-            BlunderEngine engine(eastl::make_shared<InstantEngine>(), 100);
+            BlunderEngine engine(MakeShared<InstantEngine>(), 100);
             CancellationToken cancelled = CancellationToken::Create();
             cancelled.Cancel();
             auto task = engine.FindMoveAsync(SearchRequest::FromPosition(Position::Start(), kLimits), cancelled);
@@ -440,7 +440,7 @@ namespace BECore::Chess::Tests {
         SearchRequest request = SearchRequest::FromPosition(Position::Start(), kLimits);
         request.lines = 3;
         for (const int percent : {0, 50, 100}) {
-            const auto inner = eastl::make_shared<AnalysingEngine>();
+            const auto inner = MakeShared<AnalysingEngine>();
             BlunderEngine engine(inner, percent);
             const auto direct = inner->Analyse(request, CancellationToken::Create());
             ASSERT_TRUE(direct.has_value());

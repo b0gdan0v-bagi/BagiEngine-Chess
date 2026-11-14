@@ -27,7 +27,7 @@ namespace BECore::Chess::Tests {
 
         /// A controller, its factory and the choice over them; the factory hands out an InstantEngine
         struct Seat {
-            Seat() : factory({eastl::make_shared<InstantEngine>()}), controller(model), choice(controller) {
+            Seat() : factory({MakeShared<InstantEngine>()}), controller(model), choice(controller) {
                 controller.SetEngineFactory(factory.AsFactory());
             }
 
@@ -237,12 +237,12 @@ namespace BECore::Chess::Tests {
         OpponentController controller(model);
         OpponentChoice choice(controller);
         Vector<String> asked;
-        controller.SetEngineFactory([&asked](OpponentEngine engine, const OpponentLevel&) -> std::expected<eastl::shared_ptr<IChessEngine>, EngineError> {
+        controller.SetEngineFactory([&asked](OpponentEngine engine, const OpponentLevel&) -> std::expected<SharedPtr<IChessEngine>, EngineError> {
             asked.push_back(Text(OpponentEngineId(engine)));
             if (engine == OpponentEngine::Stockfish) {
                 return std::unexpected(NoStockfish());
             }
-            return eastl::make_shared<InstantEngine>();
+            return MakeShared<InstantEngine>();
         });
         ASSERT_TRUE(choice.SetEngine("stockfish").has_value());  // already the engine of a new game where Stockfish is available; nobody plays: no factory call
 
@@ -303,9 +303,9 @@ namespace BECore::Chess::Tests {
         ChessGameModel model;
         OpponentController controller(model);
         OpponentChoice choice(controller);
-        CountingFactory ok({eastl::make_shared<InstantEngine>()});
+        CountingFactory ok({MakeShared<InstantEngine>()});
         bool failNext = false;
-        controller.SetEngineFactory([&](OpponentEngine engine, const OpponentLevel& level) -> std::expected<eastl::shared_ptr<IChessEngine>, EngineError> {
+        controller.SetEngineFactory([&](OpponentEngine engine, const OpponentLevel& level) -> std::expected<SharedPtr<IChessEngine>, EngineError> {
             if (failNext) {
                 return std::unexpected(NoStockfish());
             }

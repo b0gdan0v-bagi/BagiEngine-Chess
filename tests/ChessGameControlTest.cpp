@@ -79,7 +79,7 @@ namespace BECore::Chess::Tests {
                 // The cases below are a world of doubles in which "stockfish" is only a name that a test factory answers (the opponent starts with it, as it does on the desktop). A build without
                 // Stockfish starts with the own engine, so the fixture picks the name first, through a factory that makes any double. What a real game of that
                 // build does is the cases that say `WithoutStockfish`
-                opponent.SetEngineFactory([](OpponentEngine, const OpponentLevel&) -> MadeEngine { return eastl::make_shared<InstantEngine>(); });
+                opponent.SetEngineFactory([](OpponentEngine, const OpponentLevel&) -> MadeEngine { return MakeShared<InstantEngine>(); });
                 [[maybe_unused]] const auto picked = opponent.SetEngine(OpponentEngine::Stockfish);
                 // The factory stays: the default one would refuse the name Stockfish at every pick that names it, also one that changes nothing. A case that needs another sets its own
 #endif
@@ -737,7 +737,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, ASideAndALevelAreSetAndReadBack) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(factory.AsFactory());
 
         SetOpponent(OpponentRequest("black", "easy"));
@@ -752,7 +752,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, AnEngineAloneIsReadBackAsksNoFactoryAndMovesTheVersion) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(factory.AsFactory());
         const uint64_t version = control.GetStateVersion();
 
@@ -767,7 +767,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, ASideAndTheOwnEngineMakeOneEngineForTheOwnEngine) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(factory.AsFactory());
 
         SetOpponent(OpponentRequest("black", "easy", "own"));
@@ -782,7 +782,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, ALevelOrASideKeepsTheEngine) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(factory.AsFactory());
         SetOpponent(EngineRequest(Json("own")));
 
@@ -805,7 +805,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, ABadEngineIsRefusedAndChangesNothing) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(factory.AsFactory());
         SetOpponent(OpponentRequest("black", "easy", "own"));
         Perform("e2e4");
@@ -841,7 +841,7 @@ namespace BECore::Chess::Tests {
             if (engine == OpponentEngine::Stockfish) {
                 return std::unexpected(EngineError{EngineErrorKind::LaunchFailed, "no Stockfish in the test"});
             }
-            return eastl::make_shared<InstantEngine>();
+            return MakeShared<InstantEngine>();
         });
         Perform("e2e4");
         const String fenBefore = StringMember(State(), "fen");
@@ -877,7 +877,7 @@ namespace BECore::Chess::Tests {
             if (engine == OpponentEngine::Stockfish) {
                 return std::unexpected(EngineError{EngineErrorKind::LaunchFailed, "no Stockfish in the test"});
             }
-            return eastl::make_shared<InstantEngine>();
+            return MakeShared<InstantEngine>();
         });
         SetOpponent(OpponentRequest("black", "easy", "own"));
         ASSERT_EQ(StringMember(OpponentOfState(), "plays"), "black");
@@ -899,7 +899,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, TheSameEnginePickAgainDoesNothing) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(factory.AsFactory());
         SetOpponent(OpponentRequest("black", "easy", "own"));
         const uint64_t version = control.GetStateVersion();
@@ -921,7 +921,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, ResetKeepsTheEngine) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(factory.AsFactory());
         SetOpponent(OpponentRequest("white", "hard", "own"));
         Perform("e2e4");
@@ -933,7 +933,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, NullPutsTwoPeopleBack) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(factory.AsFactory());
         SetOpponent(OpponentRequest("white", "hard"));
         ASSERT_EQ(StringMember(OpponentOfState(), "plays"), "white");
@@ -947,7 +947,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, OnlyALevelKeepsTheSide) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(factory.AsFactory());
 
         Json onlyLevel = Json::object();
@@ -978,7 +978,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, AFenAndAnOpponentTogether) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(factory.AsFactory());
         Perform("e2e4");
 
@@ -995,7 +995,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, SetStateNeedsAFenOrAnOpponent) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(factory.AsFactory());
         const Json before = State();
         const uint64_t version = control.GetStateVersion();
@@ -1012,7 +1012,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, ABadOpponentIsRefusedAndChangesNothing) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(factory.AsFactory());
         SetOpponent(OpponentRequest("black", "easy"));
         Perform("e2e4");
@@ -1113,7 +1113,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, AnUnchangedOpponentDoesNothing) {
-        const auto engine = eastl::make_shared<InstantEngine>();
+        const auto engine = MakeShared<InstantEngine>();
         CountingFactory factory({engine});
         opponent.SetEngineFactory(factory.AsFactory());
         SetOpponent(OpponentRequest("black", "easy"));
@@ -1131,7 +1131,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessGameControlTest, ThinkingIsTrueWhileTheEngineSearches) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto engine = eastl::make_shared<GatedEngine>(true);
+        const auto engine = MakeShared<GatedEngine>(true);
         CountingFactory factory({engine});
         opponent.SetEngineFactory(factory.AsFactory());
         SetOpponent(OpponentRequest("black"));
@@ -1149,7 +1149,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, ASearchThatFailsShowsInTheStateAndMovesTheVersion) {
-        CountingFactory factory({eastl::make_shared<FailingEngine>(EngineError{EngineErrorKind::Timeout, "no answer in the test"})});
+        CountingFactory factory({MakeShared<FailingEngine>(EngineError{EngineErrorKind::Timeout, "no answer in the test"})});
         opponent.SetEngineFactory(factory.AsFactory());
         SetOpponent(OpponentRequest("black"));
         Perform("e2e4");
@@ -1171,7 +1171,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, TheErrorNamesAreOnTheWireInSnakeCase) {
-        const std::pair<EngineErrorKind, const char*> kinds[] = {
+        const Pair<EngineErrorKind, const char*> kinds[] = {
             {EngineErrorKind::BadRequest, "bad_request"},   {EngineErrorKind::LaunchFailed, "launch_failed"},   {EngineErrorKind::Timeout, "timeout"},
             {EngineErrorKind::ProcessDied, "process_died"}, {EngineErrorKind::ProtocolError, "protocol_error"}, {EngineErrorKind::NoMove, "no_move"},
             {EngineErrorKind::IllegalMove, "illegal_move"}, {EngineErrorKind::Cancelled, "cancelled"},          {EngineErrorKind::Unsupported, "unsupported"}};
@@ -1185,7 +1185,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, TheVersionGrowsWithAPickAndNeverGoesBack) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(factory.AsFactory());
         uint64_t version = control.GetStateVersion();
 
@@ -1220,7 +1220,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, ResetKeepsTheOpponent) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(factory.AsFactory());
         SetOpponent(OpponentRequest("white", "hard"));
         Perform("e2e4");
@@ -1235,7 +1235,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessGameControlTest, AControllerMayMoveForTheProgramsSide) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto engine = eastl::make_shared<GatedEngine>(true);
+        const auto engine = MakeShared<GatedEngine>(true);
         CountingFactory factory({engine});
         opponent.SetEngineFactory(factory.AsFactory());
         SetOpponent(OpponentRequest("black"));
@@ -1255,7 +1255,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessGameControlTest, ASetPositionWhileTheProgramThinksDropsTheAnswer) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto engine = eastl::make_shared<GatedEngine>(false);
+        const auto engine = MakeShared<GatedEngine>(false);
         CountingFactory factory({engine});
         opponent.SetEngineFactory(factory.AsFactory());
         SetOpponent(OpponentRequest("black"));
@@ -1277,8 +1277,8 @@ namespace BECore::Chess::Tests {
 
         constexpr AnalysisScore kPawnUp{AnalysisScoreKind::Centipawns, 35};
 
-        eastl::shared_ptr<AnalysingEngine> Analyser(AnalysisScore score = kPawnUp, Optional<Move> move = std::nullopt) {
-            return eastl::make_shared<AnalysingEngine>(score, move);
+        SharedPtr<AnalysingEngine> Analyser(AnalysisScore score = kPawnUp, Optional<Move> move = std::nullopt) {
+            return MakeShared<AnalysingEngine>(score, move);
         }
 
     }  // namespace
@@ -1548,7 +1548,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, AHintOnTheProgramsTurnIsNotYourTurnAndChangesNothing) {
-        CountingFactory opponents({eastl::make_shared<InstantEngine>()});
+        CountingFactory opponents({MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(opponents.AsFactory());
         const auto engine = Analyser();
         CountingAnalysisFactory factory{engine};
@@ -1582,7 +1582,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, AHintForThePersonsTurnIsAnsweredWhileTheProgramPlaysTheOtherSide) {
-        CountingFactory opponents({eastl::make_shared<InstantEngine>()});
+        CountingFactory opponents({MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(opponents.AsFactory());
         const auto engine = Analyser(kPawnUp, Mv("d2d4"));
         CountingAnalysisFactory factory{engine};
@@ -1682,7 +1682,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessGameControlTest, TheAnalysisIsThinkingWhileItsEngineSearches) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto engine = eastl::make_shared<AnalysingEngine>(kPawnUp, std::nullopt, 7);
+        const auto engine = MakeShared<AnalysingEngine>(kPawnUp, std::nullopt, 7);
         engine->Gate(true);
         CountingAnalysisFactory factory{engine};
         analyst.SetEngineFactory(factory.AsFactory());
@@ -1837,7 +1837,7 @@ namespace BECore::Chess::Tests {
 
         /// A factory that makes @p engine for the own engine and cannot make Stockfish (as a machine with none)
         struct OwnOnlyFactory {
-            eastl::shared_ptr<IChessEngine> engine;
+            SharedPtr<IChessEngine> engine;
             Vector<String> asked;  ///< "engine/level" of each call
 
             EngineFactory AsFactory() {
@@ -1855,7 +1855,7 @@ namespace BECore::Chess::Tests {
     }  // namespace
 
     TEST_F(ChessGameControlTest, BothSeatsAreSetAndReadBackWithAnEngineAndALevelEach) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>(), eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>(), MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(factory.AsFactory());
         const uint64_t version = control.GetStateVersion();
 
@@ -1901,7 +1901,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, TheOldShapesKeepTheirMeaningWithSeats) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(factory.AsFactory());
 
         SetOpponent(OpponentRequest(nullptr, "hard"));  // a level alone while nobody plays: both seats
@@ -1945,7 +1945,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, AMissingMemberIsUnchangedPerSeat) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>(), eastl::make_shared<InstantEngine>(), eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>(), MakeShared<InstantEngine>(), MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(factory.AsFactory());
         SetOpponent(SeatsRequest(Json("both"), SeatObject("own", "easy"), SeatObject("own", "medium")));
         ASSERT_EQ(factory.Calls(), 2);
@@ -1966,7 +1966,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, ABothPickThenOneSideIsATakeoverAndNullEndsIt) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>(), eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>(), MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(factory.AsFactory());
         SetOpponent(OpponentRequest("both"));
         ASSERT_EQ(factory.Calls(), 2);
@@ -1989,7 +1989,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, ABadSeatPickIsInvalidParamsAndChangesNothing) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>(), eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>(), MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(factory.AsFactory());
         SetOpponent(SeatsRequest(Json("both"), SeatObject("own", "easy"), SeatObject("own", "hard")));
         const Json before = State();
@@ -2040,7 +2040,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, ASeatWhoseEngineIsMissingRefusesTheWholePickEvenWhenTheOtherSeatIsFine) {
-        OwnOnlyFactory factory{eastl::make_shared<InstantEngine>(), {}};
+        OwnOnlyFactory factory{MakeShared<InstantEngine>(), {}};
         opponent.SetEngineFactory(factory.AsFactory());
         Perform("e2e4");
         const String fenBefore = StringMember(State(), "fen");
@@ -2065,7 +2065,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessGameControlTest, ARefusedSeatKeepsTheRunningSearchAndTheSides) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto gate = eastl::make_shared<GatedEngine>(true);
+        const auto gate = MakeShared<GatedEngine>(true);
         OwnOnlyFactory factory{gate, {}};
         opponent.SetEngineFactory(factory.AsFactory());
         SetOpponent(OpponentRequest("black", nullptr, "own"));
@@ -2093,7 +2093,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, AFenAndBothInOneCallApplyTheOpponentFirst) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>(), eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>(), MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(factory.AsFactory());
 
         Json request = SeatsRequest(Json("both"));
@@ -2106,7 +2106,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, ResetKeepsBothSeats) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>(), eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>(), MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(factory.AsFactory());
         SetOpponent(SeatsRequest(Json("both"), SeatObject("own", "easy"), SeatObject("stockfish", "max")));
         const Json seatsBefore = *FindJsonMember(OpponentOfState(), "seats");
@@ -2119,7 +2119,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, TwoProgramsPlayEachOtherAndTheMovesAlternate) {
-        CountingFactory factory({eastl::make_shared<InstantEngine>(), eastl::make_shared<InstantEngine>()});
+        CountingFactory factory({MakeShared<InstantEngine>(), MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(factory.AsFactory());
         SetOpponent(OpponentRequest("both"));
 
@@ -2139,8 +2139,8 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessGameControlTest, ThinkingIsTrueWhileEitherSeatSearches) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto whiteGate = eastl::make_shared<GatedEngine>(true);
-        const auto blackGate = eastl::make_shared<GatedEngine>(true);
+        const auto whiteGate = MakeShared<GatedEngine>(true);
+        const auto blackGate = MakeShared<GatedEngine>(true);
         CountingFactory factory({whiteGate, blackGate});
         opponent.SetEngineFactory(factory.AsFactory());
         SetOpponent(OpponentRequest("both"));
@@ -2155,8 +2155,8 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessGameControlTest, PerformActionIsNotBlockedWhileTwoProgramsPlay) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto whiteGate = eastl::make_shared<GatedEngine>(false);  // ignores its token: only the version tells that its answer is stale
-        const auto blackGate = eastl::make_shared<GatedEngine>(true);
+        const auto whiteGate = MakeShared<GatedEngine>(false);  // ignores its token: only the version tells that its answer is stale
+        const auto blackGate = MakeShared<GatedEngine>(true);
         CountingFactory factory({whiteGate, blackGate});
         opponent.SetEngineFactory(factory.AsFactory());
         SetOpponent(OpponentRequest("both"));
@@ -2179,7 +2179,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, AHintWhileTwoProgramsPlayIsNotYourTurnOnEitherTurnAndChangesNothing) {
-        CountingFactory opponents({eastl::make_shared<InstantEngine>(), eastl::make_shared<InstantEngine>()});
+        CountingFactory opponents({MakeShared<InstantEngine>(), MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(opponents.AsFactory());
         const auto engine = Analyser();
         CountingAnalysisFactory factory{engine};
@@ -2206,7 +2206,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, ATakeoverGivesTheHintBackOnThePersonsTurn) {
-        CountingFactory opponents({eastl::make_shared<InstantEngine>(), eastl::make_shared<InstantEngine>()});
+        CountingFactory opponents({MakeShared<InstantEngine>(), MakeShared<InstantEngine>()});
         opponent.SetEngineFactory(opponents.AsFactory());
         const auto engine = Analyser(kPawnUp, Mv("e7e5"));
         CountingAnalysisFactory factory{engine};
@@ -2393,7 +2393,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessGameControlTest, RatingsWithTheRealOwnEngineAreTheSameWhenTheGameIsPlayedTwice) {
         // The real OwnEngine at depth 5 (no process) behind a counting wrapper; pinned in MoveRaterTest: not_best, brilliant, not_best, brilliant
-        const auto engine = eastl::make_shared<CountingOwnEngine>();
+        const auto engine = MakeShared<CountingOwnEngine>();
         CountingAnalysisFactory factory{engine};
         analyst.SetEngineFactory(factory.AsFactory());
         ASSERT_TRUE(control.SetState(RatingsRequest(true)).has_value());

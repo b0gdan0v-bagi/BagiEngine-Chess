@@ -271,7 +271,7 @@ namespace BECore::Tests {
         const UIScreenContent shipped = ReadXml(shippedXml);
         LaidOut web(compiled->content);
         LaidOut xml(shipped);
-        for (const auto& [width, height] : {std::pair{1280.0f, 720.0f}, {480.0f, 480.0f}, {720.0f, 1280.0f}, {2560.0f, 1080.0f}}) {
+        for (const auto& [width, height] : {Pair<float, float>{1280.0f, 720.0f}, {480.0f, 480.0f}, {720.0f, 1280.0f}, {2560.0f, 1080.0f}}) {
             web.At(width, height);
             xml.At(width, height);
             for (const char* name : {"Turn", "Menu", "Reset", "Status"}) {
@@ -319,7 +319,7 @@ namespace BECore::Tests {
             const char* group;
             const char* bind;
             const char* action;
-            Vector<std::pair<const char*, const char*>> segments;
+            Vector<Pair<const char*, const char*>> segments;
         } groups[] = {{"ModeGroup", "opponentMode", "ChessSetMode", {{"ModeTwo", "two"}, {"ModeComputer", "computer"}}},
                       {"ColorGroup", "opponentColor", "ChessSetColor", {{"ColorWhite", "white"}, {"ColorBlack", "black"}}},
                       {"EngineGroup", "opponentEngine", "ChessSetEngine", {{"EngineStockfish", "stockfish"}, {"EngineOwn", "own"}}},
@@ -348,7 +348,7 @@ namespace BECore::Tests {
         const UIScreenContent shipped = ReadXml(shippedXml);
         LaidOut web(compiled->content);
         LaidOut xml(shipped);
-        for (const auto& [width, height] : {std::pair{1280.0f, 720.0f}, {640.0f, 360.0f}, {480.0f, 480.0f}, {720.0f, 1280.0f}, {2560.0f, 1080.0f}}) {
+        for (const auto& [width, height] : {Pair<float, float>{1280.0f, 720.0f}, {640.0f, 360.0f}, {480.0f, 480.0f}, {720.0f, 1280.0f}, {2560.0f, 1080.0f}}) {
             web.At(width, height);
             xml.At(width, height);
             for (const char* name : kPanelNames) {

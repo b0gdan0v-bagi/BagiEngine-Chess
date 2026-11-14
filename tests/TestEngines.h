@@ -14,7 +14,7 @@
 /// so the tests do not depend on a machine that has one on PATH. A test that needs a child process uses the fake UCI engine (FakeEngineUtil.h)
 namespace BECore::Chess::Tests {
 
-    using MadeEngine = std::expected<eastl::shared_ptr<IChessEngine>, EngineError>;
+    using MadeEngine = std::expected<SharedPtr<IChessEngine>, EngineError>;
 
     inline constexpr std::chrono::milliseconds kEngineWaitLimit{30000};  ///< the give-up limit of a wait for something that must happen: it only ends a broken test, so it is generous under load
     inline constexpr std::chrono::milliseconds kEnginePollInterval{1};
@@ -314,7 +314,7 @@ namespace BECore::Chess::Tests {
      */
     class CountingAnalysisFactory {
     public:
-        CountingAnalysisFactory(std::initializer_list<eastl::shared_ptr<IChessEngine>> engines) : _engines(engines) {}
+        CountingAnalysisFactory(std::initializer_list<SharedPtr<IChessEngine>> engines) : _engines(engines) {}
         explicit CountingAnalysisFactory(EngineError error) : _error(std::move(error)) {}
         CountingAnalysisFactory(const CountingAnalysisFactory&) = delete;
         CountingAnalysisFactory& operator=(const CountingAnalysisFactory&) = delete;
@@ -344,7 +344,7 @@ namespace BECore::Chess::Tests {
             return _engines[eastl::min(call, _engines.size() - 1)];
         }
 
-        Vector<eastl::shared_ptr<IChessEngine>> _engines;
+        Vector<SharedPtr<IChessEngine>> _engines;
         Optional<EngineError> _error;
         Vector<String> _engineIds;
     };
@@ -358,7 +358,7 @@ namespace BECore::Chess::Tests {
      */
     class CountingFactory {
     public:
-        explicit CountingFactory(std::initializer_list<eastl::shared_ptr<IChessEngine>> engines) : _engines(engines) {}
+        explicit CountingFactory(std::initializer_list<SharedPtr<IChessEngine>> engines) : _engines(engines) {}
         explicit CountingFactory(EngineError error) : _error(std::move(error)) {}
         CountingFactory(const CountingFactory&) = delete;
         CountingFactory& operator=(const CountingFactory&) = delete;
@@ -394,7 +394,7 @@ namespace BECore::Chess::Tests {
             return _engines[eastl::min(call, _engines.size() - 1)];
         }
 
-        Vector<eastl::shared_ptr<IChessEngine>> _engines;
+        Vector<SharedPtr<IChessEngine>> _engines;
         Optional<EngineError> _error;
         Vector<String> _levels;
         Vector<String> _engineIds;
