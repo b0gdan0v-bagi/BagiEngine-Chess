@@ -17,7 +17,7 @@
 {"method": "get_state", "expect": {"pointers": {"/state/moves": ["e2e4", "e7e5", "g1f3", "b8c6"]}, "versionStep": 0}}
 {"method": "set_state", "params": {"fen": "6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1"}, "expect": {"versionStep": 1}}
 {"method": "perform_action", "params": {"type": "move", "uci": "a1a8"}, "expect": {"pointers": {"/outcome/status": "checkmate", "/outcome/winner": "white", "/outcome/inCheck": true}, "versionStep": 1}}
-{"method": "get_state", "expect": {"pointers": {"/state/status": "checkmate", "/state/winner": "white", "/state/legalMoveCount": 0}, "versionStep": 0}}
+{"method": "get_state", "expect": {"pointers": {"/state/status": "checkmate", "/state/winner": "white", "/state/legalMoveCount": 0, "/state/startFen": "6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1"}, "versionStep": 0}}
 {"method": "list_actions", "expect": {"pointers": {"/actions": []}, "versionStep": 0}}
 {"method": "perform_action", "params": {"type": "move", "uci": "g8f8"}, "expect": {"error": "game_over"}}
 {"method": "reset", "expect": {"versionStep": 1}}

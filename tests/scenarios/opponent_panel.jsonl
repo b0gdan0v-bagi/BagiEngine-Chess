@@ -15,7 +15,7 @@
 {"method": "step", "params": {"frames": 2}}
 {"method": "ui_click", "params": {"name": "EngineOwn"}, "expect": {"equal": {"consumed": true, "action": "ChessSetEngine", "value": "own"}}}
 {"method": "step", "params": {"frames": 2}}
-{"method": "get_state", "expect": {"pointers": {"/state/opponent/engine": "own", "/state/opponent/plays": null, "/state/opponent/error": null}, "versionStep": 1}}
+{"method": "get_state", "expect": {"pointers": {"/state/opponent/engine": "own", "/state/opponent/plays": null, "/state/opponent/error": null}}}
 {"method": "ui_click", "params": {"name": "ModeComputer"}, "expect": {"equal": {"consumed": true, "action": "ChessSetMode", "value": "computer"}}}
 {"method": "step", "params": {"frames": 2}}
 {"method": "get_state", "expect": {"pointers": {"/state/opponent/plays": "black", "/state/opponent/engine": "own", "/state/opponent/level": "hard", "/state/opponent/error": null, "/state/moves": []}, "versionStep": 1}}

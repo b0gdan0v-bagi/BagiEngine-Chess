@@ -83,7 +83,7 @@ if(ENGINE_BUILD_TESTS)
         target_compile_definitions(ChessTests PRIVATE "CHESS_TEST_PYTHON=\"\"")
     endif()
 
-    # Starts BagiChess with the control API and plays a few moves, a mate and a promotion over WebSocket
+    # Starts BagiChess with the control API and drives the opponent, analysis and rating scenarios over WebSocket
     be_add_game_control_tests(BagiChess SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/tests/control_smoke.py)
     # One ctest entry per recorded control scenario of tests/scenarios/ (BagiChessScenario.<file>), played on the manual clock
     be_add_game_scenario_tests(BagiChess DIR tests/scenarios)
