@@ -76,7 +76,6 @@ namespace BECore::Chess {
         return _inner->Analyse(request, token);
     }
 
-    // The blunder path answers at once, without a suspension; the engine object must outlive the task, as the wrapped one does
     Task<std::expected<Move, EngineError>> BlunderEngine::FindMoveAsync(SearchRequest request, CancellationToken token) {
         auto blunder = BlunderMove(request, token);
         if (!blunder) {

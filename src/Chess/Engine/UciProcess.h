@@ -66,7 +66,7 @@ namespace BECore::Chess {
         UciProcess& operator=(UciProcess&&) = delete;
 
         /// Sends @p text and an end of line, unbuffered (nothing waits in the process for a flush). ProcessDied when the child has gone (a broken pipe),
-        /// BadRequest when @p text holds an end of line (it would be two commands). A child that does not read blocks the call once the pipe (64 KiB) is full
+        /// BadRequest when @p text holds an end of line (it would be two commands). A child that does not read blocks the call once the pipe is full
         [[nodiscard]] std::expected<void, EngineError> WriteLine(StringView text);
 
         /// The next line the child wrote, without its end of line (`\n` or `\r\n`), waiting at most @p timeout. Timeout when none came whole in that time:

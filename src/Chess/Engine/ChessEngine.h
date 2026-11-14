@@ -43,8 +43,8 @@ namespace BECore::Chess {
      * FindMove() and Analyse() are synchronous and blocking: they return when the engine has answered, was cancelled or failed, so a caller that must not
      * wait (the main thread) runs them on a worker. FindMoveAsync() and AnalyseAsync() are the same calls as coroutines: an engine with a resumable search
      * (OwnEngine) gives the thread back between slices of its search, the others block for the whole call (the default). The game's tasks await the async form.
-     * It takes a SearchRequest (the start FEN and the moves played), not a Position,
-     * because UCI engines see repetitions only through the moves. The request type is in Chess/Engine/SearchRequest.h, which includes this file.
+     * It takes a SearchRequest (the start FEN and the moves played), not a Position, because UCI engines see repetitions only through the moves;
+     * the type is in Chess/Engine/SearchRequest.h, which includes this file.
      */
     class IChessEngine {
     public:
@@ -64,8 +64,8 @@ namespace BECore::Chess {
          * The contract of FindMove(): the request is validated (BadRequest), a finished game is NoMove before any search or process, a cancelled
          * @p token is Cancelled, and a returned move is legal in the position (IllegalMove otherwise). The score is from the side to move.
          * SearchRequest::lines asks for several lines (the best moves, best first, see Analysis): one by default; FindMove() gives one move whatever it says, but still validates it.
-         * Not pure: an engine that does not analyse keeps this default, which answers Unsupported, so the doubles of the tests and every other
-         * implementation stay as they are. An engine that wraps another one forwards the call.
+         * Not pure: the default answers Unsupported, so an engine that does not analyse (the doubles of the tests too) need not override it.
+         * An engine that wraps another one forwards the call.
          */
         [[nodiscard]] virtual std::expected<Analysis, EngineError> Analyse([[maybe_unused]] const SearchRequest& request, [[maybe_unused]] const CancellationToken& token) {
             return std::unexpected(EngineError{EngineErrorKind::Unsupported, "this engine does not analyse"});
