@@ -10,7 +10,9 @@ feeds the lines of stdout to a queue, so a program that hangs fails the test by 
 
   1. one process: the handshake, a game of six plies fed back move by move, a level, a search on the clock, `go infinite` + `stop` (exactly one bestmove);
   2. `go infinite` + `quit`: the program ends with code 0;
-  3. `go infinite` + the end of the input: the program ends with code 0.
+  3. `go infinite` + the end of the input: the program ends with code 0;
+  4. lines of unknown text around and far over the read chunk of the program (4096 bytes): each is ignored whole, the next `isready` is answered;
+  5. a last line with no end of line (`isready`) at the end of the input is still handled.
 
 Every line the program writes to stdout starts with a UCI keyword (a stray log line would break a tournament tool). The child is always killed at
 the end. Exit code: 0 passed, 1 failed, 77 skipped (the executable does not exist).
@@ -32,6 +34,7 @@ CLOCK_TEST_MILLISECONDS = 2000
 STOP_AFTER_SECONDS = 0.3
 GAME_PLIES = 6
 SEARCH_DEPTH = 2
+LONG_LINE_LENGTHS = (4094, 4095, 4096, 4097, 10000)  # around the 4096-byte chunk the program reads with, and far over it
 
 UCI_KEYWORDS = ("id", "option", "uciok", "readyok", "bestmove", "info")
 MOVE_PATTERN = re.compile(r"^[a-h][1-8][a-h][1-8][qrbn]?$")
@@ -221,10 +224,35 @@ def scenario_end_of_input(exe: Path, programs: list) -> None:
     program.drain()
 
 
+def scenario_long_lines(exe: Path, programs: list) -> None:
+    program = run_one_program(exe, programs)
+    for length in LONG_LINE_LENGTHS:
+        program.send("x" * length)  # an unknown command: ignored, and the line must not leak into the next one
+        check(sync(program, f"after a line of {length} bytes") == ["readyok"], f"a line of {length} bytes was not ignored whole: {program.lines}")
+    program.send("quit")
+    check(program.wait_exit("quit after long lines") == 0, f"the program ended with code {program.process.returncode} after long lines")
+    program.drain()
+
+
+def scenario_last_line_without_end_of_line(exe: Path, programs: list) -> None:
+    program = run_one_program(exe, programs)
+    try:
+        program.process.stdin.write("isready")  # no end of line
+        program.process.stdin.flush()
+    except OSError as error:
+        raise SmokeFailure(f"cannot write to the program: {error}")
+    program.close_input()
+    check(program.wait_exit("end of the input after a last line") == 0, f"the program ended with code {program.process.returncode} at the end of its input")
+    program.drain()
+    check(program.lines == ["readyok"], f"the last line without an end of line was not handled: {program.lines}")
+
+
 SCENARIOS = [
     ("session: handshake, a game, a level, a clock, go infinite and stop", scenario_session),
     ("go infinite and quit", scenario_quit_during_a_search),
     ("go infinite and the end of the input", scenario_end_of_input),
+    ("lines around and over the read chunk", scenario_long_lines),
+    ("a last line without an end of line", scenario_last_line_without_end_of_line),
 ]
 
 

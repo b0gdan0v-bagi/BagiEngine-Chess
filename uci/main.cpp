@@ -4,19 +4,50 @@
 
 #include <Chess/Engine/OwnEngine.h>
 #include <Chess/Uci/UciServer.h>
-#include <iostream>
+#include <cstdio>
+#include <cstring>
+
+namespace {
+
+    constexpr size_t kChunkBytes = 4096;
+
+    /// The next line of stdin in @p line, without its end of line (a trailing '\r' is left to the server, which ignores it). A line of any length arrives whole; the last
+    /// line of the input needs no end of line. False at the end of the input when not a character came
+    bool ReadLine(BECore::String& line) {
+        line.clear();
+        char chunk[kChunkBytes];
+        bool anything = false;
+        while (std::fgets(chunk, sizeof(chunk), stdin) != nullptr) {
+            anything = true;
+            size_t length = std::strlen(chunk);
+            const bool endsLine = length > 0 && chunk[length - 1] == '\n';
+            if (endsLine) {
+                --length;
+            }
+            line.append(chunk, length);
+            if (endsLine) {
+                break;
+            }
+        }
+        return anything;
+    }
+
+    void WriteLine(BECore::StringView line) {
+        std::fwrite(line.data(), 1, line.size(), stdout);
+        std::fwrite("\n", 1, 1, stdout);
+        std::fflush(stdout);
+    }
+
+}  // namespace
 
 int main() {
     using namespace BECore;
 
-    Chess::Uci::UciServer server(MakeShared<Chess::OwnEngine>(), [](StringView line) {
-        std::cout.write(line.data(), static_cast<std::streamsize>(line.size()));
-        std::cout << '\n' << std::flush;
-    });
+    Chess::Uci::UciServer server(MakeShared<Chess::OwnEngine>(), WriteLine);
 
-    std::string line;  //-NoStd: std::getline reads into a std::string
-    while (!server.WantsQuit() && std::getline(std::cin, line)) {
-        server.HandleLine(FromStd(line));
+    String line;  // reused over the loop: its capacity stays
+    while (!server.WantsQuit() && ReadLine(line)) {
+        server.HandleLine(line);
     }
     // The end of the input is a quit: a search that is still running is cancelled and the program ends at once
     if (!server.WantsQuit()) {
