@@ -275,7 +275,7 @@ namespace BECore::Chess {
         Vector<Premove> _premoves;
         Optional<PieceColor> _premoveColor;
 
-        eastl::hash_map<PieceHandle, PieceTrack> _pieces;
+        HashMap<PieceHandle, PieceTrack> _pieces;
     };
 
 }  // namespace BECore::Chess

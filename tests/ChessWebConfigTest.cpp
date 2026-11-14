@@ -1,7 +1,5 @@
 #include <Common/Printers.h>
 #include <gtest/gtest.h>
-#include <map>
-#include <set>
 
 /// The web build's overlay (engine/web/config/) replaces a config file of the game whole, so a game file with the name of an overlay file
 /// must say what the overlay says, or the browser plays another game. Plain files read from the source tree: no engine services, no scene
@@ -41,7 +39,7 @@ namespace BECore::Chess::Tests {
             return files;
         }
 
-        using Attributes = std::map<std::string, std::string>;
+        using Attributes = Map<String, String>;
 
         /// The attributes of the root element, name to value (empty when the file does not load)
         Attributes RootAttributes(const std::filesystem::path& file) {
@@ -51,29 +49,29 @@ namespace BECore::Chess::Tests {
                 return attributes;
             }
             for (const pugi::xml_attribute attribute : document.document_element().attributes()) {
-                attributes[attribute.name()] = attribute.value();
+                attributes[String(attribute.name())] = String(attribute.value());
             }
             return attributes;
         }
 
         /// One line per attribute that is missing on a side or has another value; the renderer is left out
-        std::string DifferenceExceptRenderer(const Attributes& game, const Attributes& overlay) {
-            std::set<std::string> names;
+        String DifferenceExceptRenderer(const Attributes& game, const Attributes& overlay) {
+            Set<String> names;
             for (const auto& [name, value] : game) {
                 names.insert(name);
             }
             for (const auto& [name, value] : overlay) {
                 names.insert(name);
             }
-            std::string difference;
-            for (const std::string& name : names) {
+            String difference;
+            for (const String& name : names) {
                 if (name == kRendererAttribute) {
                     continue;
                 }
                 const auto inGame = game.find(name);
                 const auto inOverlay = overlay.find(name);
-                const std::string gameValue = inGame != game.end() ? "\"" + inGame->second + "\"" : "(missing)";
-                const std::string overlayValue = inOverlay != overlay.end() ? "\"" + inOverlay->second + "\"" : "(missing)";
+                const String gameValue = inGame != game.end() ? "\"" + inGame->second + "\"" : "(missing)";
+                const String overlayValue = inOverlay != overlay.end() ? "\"" + inOverlay->second + "\"" : "(missing)";
                 if (gameValue != overlayValue) {
                     difference += "  " + name + ": Chess " + gameValue + ", overlay " + overlayValue + "\n";
                 }
@@ -106,8 +104,8 @@ namespace BECore::Chess::Tests {
             const Attributes overlay = RootAttributes(overlayFile);
             ASSERT_FALSE(game.empty()) << gameFile.string();
             ASSERT_FALSE(overlay.empty()) << overlayFile.string();
-            const std::string difference = DifferenceExceptRenderer(game, overlay);
-            EXPECT_TRUE(difference.empty()) << "config/" << name << " differs from engine/web/config/" << name << " in the root attributes:\n" << difference << kWhy;
+            const String difference = DifferenceExceptRenderer(game, overlay);
+            EXPECT_TRUE(difference.empty()) << "config/" << name << " differs from engine/web/config/" << name << " in the root attributes:\n" << difference.c_str() << kWhy;
         }
     }
 
@@ -117,8 +115,8 @@ namespace BECore::Chess::Tests {
         const Attributes overlay = RootAttributes(OverlayConfigFolder() / kApplicationConfigName);
         ASSERT_TRUE(game.contains(kRendererAttribute));
         ASSERT_TRUE(overlay.contains(kRendererAttribute));
-        EXPECT_EQ(game.at(kRendererAttribute), kDesktopRenderer) << kWhy;
-        EXPECT_EQ(overlay.at(kRendererAttribute), kWebRenderer) << kWhy;
+        EXPECT_EQ(game.at(kRendererAttribute), String(kDesktopRenderer)) << kWhy;
+        EXPECT_EQ(overlay.at(kRendererAttribute), String(kWebRenderer)) << kWhy;
     }
 
     TEST(ChessWebConfigTest, TheComparisonSeesADifferentAttribute) {

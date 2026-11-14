@@ -124,7 +124,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(AttacksTest, ZobristKeysAreDistinctAndNonZero) {
-        eastl::hash_set<ZobristKey> seen;
+        HashSet<ZobristKey> seen;
         size_t count = 0;
         const auto add = [&](ZobristKey key) {
             EXPECT_NE(key, 0ULL);
