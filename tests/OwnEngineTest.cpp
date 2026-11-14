@@ -31,9 +31,11 @@ namespace BECore::Chess::Tests {
         constexpr int kFloorDepth = 3;
         constexpr int kDepthThatNeverEnds = 64;
         constexpr int kMoveTimeMs = 100;
-        /// The most a search with a move time of kMoveTimeMs may take: the poll is a thousand nodes, the rest is a slow machine
+        /// The most a search with a move time of kMoveTimeMs may take: the poll is a thousand nodes, the rest is a slow machine. Only the
+        /// DISABLED_ yardsticks use it: a normal test never compares a duration to an upper bound (tests/CLAUDE.md)
         constexpr auto kTimeTolerance = std::chrono::milliseconds(1500);
         constexpr auto kCancelAfter = std::chrono::milliseconds(50);
+        /// The time a cancelled search and Shutdown() have to return in. Only the DISABLED_ yardsticks use it
         constexpr auto kStopBudget = std::chrono::milliseconds(1000);
         /// A game of the tests is stopped after this many plies, if it has not ended
         constexpr size_t kPlyCap = kDefaultPlyCap;
@@ -84,6 +86,21 @@ namespace BECore::Chess::Tests {
         bool IsLegalIn(const Position& position, Move move) {
             const MoveList moves = MoveGenerator::GenerateLegal(position);
             return eastl::find(moves.begin(), moves.end(), move) != moves.end();
+        }
+
+        /// How long @p search takes when its token is cancelled kCancelAfter after it began (for the yardsticks)
+        template <class SearchCall>
+        std::chrono::steady_clock::duration TimeCancelledSearch(SearchCall&& search) {
+            CancellationToken token = CancellationToken::Create();
+            std::thread canceller([token]() mutable {
+                std::this_thread::sleep_for(kCancelAfter);
+                token.Cancel();
+            });
+            const auto started = std::chrono::steady_clock::now();
+            search(token);
+            const auto took = std::chrono::steady_clock::now() - started;
+            canceller.join();
+            return took;
         }
 
         /// An engine that asks another with limits of its own and counts the searches that have ended: the levels of the game give a move time, and these tests want a depth
@@ -169,21 +186,19 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(answer.error().kind, EngineErrorKind::Cancelled);
     }
 
-    TEST_F(OwnEngineTest, ASearchCancelledFromAnotherThreadReturnsCancelledSoon) {
+    TEST_F(OwnEngineTest, ASearchCancelledFromAnotherThreadIsCancelled) {
         CancellationToken token = CancellationToken::Create();
         std::thread canceller([token]() mutable {
             std::this_thread::sleep_for(kCancelAfter);
             token.Cancel();
         });
 
-        const auto started = std::chrono::steady_clock::now();
+        // A depth that never ends: the call returning at all is the proof that the token stopped it
         const auto answer = Ask(_engine, SearchRequest::FromPosition(PositionFromFen(kKiwipeteFen), Depth(kDepthThatNeverEnds)), token);
-        const auto took = std::chrono::steady_clock::now() - started;
         canceller.join();
 
         ASSERT_FALSE(answer.has_value());
         EXPECT_EQ(answer.error().kind, EngineErrorKind::Cancelled);
-        EXPECT_LT(took, kStopBudget);
     }
 
     TEST_F(OwnEngineTest, ItFindsAMateInOneForEitherColor) {
@@ -207,7 +222,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(Found(answer), Mv("f3h4"));
     }
 
-    TEST_F(OwnEngineTest, AMoveTimeAloneGivesALegalMoveInTime) {
+    TEST_F(OwnEngineTest, AMoveTimeAloneGivesALegalMove) {
         const SearchRequest request = SearchRequest::FromPosition(PositionFromFen(kKiwipeteFen), SearchLimits{kMoveTimeMs, 0});
 
         const auto started = std::chrono::steady_clock::now();
@@ -217,23 +232,18 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(answer.has_value()) << DescribeError(answer ? std::nullopt : std::optional<EngineError>(answer.error())).c_str();
         EXPECT_TRUE(IsLegalIn(*request.FinalPosition(), *answer));
         EXPECT_GE(took, std::chrono::milliseconds(kMoveTimeMs) / 2) << "a search that has the time uses it";
-        EXPECT_LT(took, std::chrono::milliseconds(kMoveTimeMs) + kTimeTolerance);
     }
 
     TEST_F(OwnEngineTest, DepthAndTimeStopAtTheEarlier) {
-        // The depth ends first: a shallow search is far shorter than the long time it was given
-        const auto shallowStart = std::chrono::steady_clock::now();
-        const auto shallow = Ask(_engine, SearchRequest::FromPosition(Position::Start(), SearchLimits{60000, kShallow}));
-        const auto shallowTook = std::chrono::steady_clock::now() - shallowStart;
-        // The time ends first: the depth could take for ever
-        const auto timedStart = std::chrono::steady_clock::now();
-        const auto timed = Ask(_engine, SearchRequest::FromPosition(PositionFromFen(kKiwipeteFen), SearchLimits{kMoveTimeMs, kDepthThatNeverEnds}));
-        const auto timedTook = std::chrono::steady_clock::now() - timedStart;
+        // The depth ends first: the search reached the depth it was given, a minute is far more than it needs
+        const auto shallow = AnalyseFen(_engine, Position::kStartFen, SearchLimits{60000, kShallow});
+        // The time ends first: the depth could take for ever, so a search that returned stopped on the time
+        const auto timed = AnalyseFen(_engine, kKiwipeteFen, SearchLimits{kMoveTimeMs, kDepthThatNeverEnds});
 
-        EXPECT_TRUE(shallow.has_value());
-        EXPECT_LT(shallowTook, kTimeTolerance);
-        EXPECT_TRUE(timed.has_value());
-        EXPECT_LT(timedTook, std::chrono::milliseconds(kMoveTimeMs) + kTimeTolerance);
+        ASSERT_TRUE(shallow.has_value());
+        EXPECT_EQ(shallow->Best().depth, kShallow);
+        ASSERT_TRUE(timed.has_value());
+        EXPECT_LT(timed->Best().depth, kDepthThatNeverEnds);
     }
 
     TEST_F(OwnEngineTest, ADepthAloneIsDeterministic) {
@@ -320,7 +330,7 @@ namespace BECore::Chess::Tests {
         EXPECT_FALSE(controller.IsThinking());
     }
 
-    TEST_F(OwnEngineTest, ShutdownDuringADeepSearchReturnsAtOnceAndTheSearchEndsSoon) {
+    TEST_F(OwnEngineTest, ShutdownDuringADeepSearchCancelsItAndALateAnswerIsNeverPlayed) {
         SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
         ASSERT_TRUE(Play(model, "e2e4"));
@@ -332,12 +342,9 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(WaitUntil([&] { return engine->Calls() == 1; })) << "the search runs on the pool";
         ASSERT_TRUE(controller.IsThinking());
 
-        const auto started = std::chrono::steady_clock::now();
         controller.Shutdown();
-        const auto took = std::chrono::steady_clock::now() - started;
 
-        EXPECT_LT(took, kStopBudget);
-        EXPECT_TRUE(WaitUntil([&] { return engine->Answered() == 1; }, kStopBudget)) << "the token was cancelled and the search left its loop";
+        EXPECT_TRUE(WaitUntil([&] { return engine->Answered() == 1; })) << "the token was cancelled and the search left its loop";
         EXPECT_EQ(model.GetMoves().size(), 1u) << "a late answer is never played";
     }
 
@@ -450,33 +457,27 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(KindOf(Analyse(_engine, SearchRequest::FromPosition(Position::Start(), Depth(kShallow)), token)), EngineErrorKind::Cancelled);
     }
 
-    TEST_F(OwnEngineTest, AnalyseCancelledFromAnotherThreadReturnsCancelledSoon) {
+    TEST_F(OwnEngineTest, AnalyseCancelledFromAnotherThreadIsCancelled) {
         CancellationToken token = CancellationToken::Create();
         std::thread canceller([token]() mutable {
             std::this_thread::sleep_for(kCancelAfter);
             token.Cancel();
         });
 
-        const auto started = std::chrono::steady_clock::now();
         const auto answer = Analyse(_engine, SearchRequest::FromPosition(PositionFromFen(kKiwipeteFen), Depth(kDepthThatNeverEnds)), token);
-        const auto took = std::chrono::steady_clock::now() - started;
         canceller.join();
 
         EXPECT_EQ(KindOf(answer), EngineErrorKind::Cancelled);
-        EXPECT_LT(took, kStopBudget);
     }
 
-    TEST_F(OwnEngineTest, AnalyseAMoveTimeAloneGivesALegalMoveInTime) {
+    TEST_F(OwnEngineTest, AnalyseAMoveTimeAloneGivesALegalMove) {
         const SearchRequest request = SearchRequest::FromPosition(PositionFromFen(kKiwipeteFen), SearchLimits{kMoveTimeMs, 0});
 
-        const auto started = std::chrono::steady_clock::now();
         const auto answer = Analyse(_engine, request);
-        const auto took = std::chrono::steady_clock::now() - started;
 
         ASSERT_TRUE(answer.has_value());
         EXPECT_TRUE(IsLegalIn(*request.FinalPosition(), answer->Best().move));
         EXPECT_GE(answer->Best().depth, 1);
-        EXPECT_LT(took, std::chrono::milliseconds(kMoveTimeMs) + kTimeTolerance);
     }
 
     TEST_F(OwnEngineTest, TwoThreadsMayAnalyseWithTheSameObject) {
@@ -651,28 +652,23 @@ namespace BECore::Chess::Tests {
         }
     }
 
-    TEST_F(OwnEngineTest, SeveralLinesCancelledFromAnotherThreadReturnCancelledSoon) {
+    TEST_F(OwnEngineTest, SeveralLinesCancelledFromAnotherThreadAreCancelled) {
         CancellationToken token = CancellationToken::Create();
         std::thread canceller([token]() mutable {
             std::this_thread::sleep_for(kCancelAfter);
             token.Cancel();
         });
 
-        const auto started = std::chrono::steady_clock::now();
         const auto answer = Analyse(_engine, WithLines(SearchRequest::FromPosition(PositionFromFen(kKiwipeteFen), Depth(kDepthThatNeverEnds)), 3), token);
-        const auto took = std::chrono::steady_clock::now() - started;
         canceller.join();
 
         EXPECT_EQ(KindOf(answer), EngineErrorKind::Cancelled);
-        EXPECT_LT(took, kStopBudget);
     }
 
-    TEST_F(OwnEngineTest, SeveralLinesWithAMoveTimeAloneAreLegalAndInTime) {
+    TEST_F(OwnEngineTest, SeveralLinesWithAMoveTimeAloneAreLegal) {
         const SearchRequest request = WithLines(SearchRequest::FromPosition(PositionFromFen(kKiwipeteFen), SearchLimits{kMoveTimeMs, 0}), 3);
 
-        const auto started = std::chrono::steady_clock::now();
         const auto answer = Analyse(_engine, request);
-        const auto took = std::chrono::steady_clock::now() - started;
 
         ASSERT_TRUE(answer.has_value());
         ASSERT_EQ(answer->LineCount(), 3u);
@@ -683,7 +679,6 @@ namespace BECore::Chess::Tests {
         EXPECT_NE(answer->lines[0].move, answer->lines[1].move);
         EXPECT_NE(answer->lines[1].move, answer->lines[2].move);
         EXPECT_NE(answer->lines[0].move, answer->lines[2].move);
-        EXPECT_LT(took, std::chrono::milliseconds(kMoveTimeMs) + kTimeTolerance);
     }
 
     TEST_F(OwnEngineTest, ANumberOfLinesOutsideOneToEightIsABadRequest) {
@@ -710,6 +705,48 @@ namespace BECore::Chess::Tests {
         many.lines = 5;
 
         EXPECT_EQ(Found(Ask(_engine, many)), Found(Ask(_engine, request)));
+    }
+
+    // -- By-hand yardsticks: the speed claims no normal test makes, because they depend on the load of the machine --------------------
+    // ChessTests --gtest_also_run_disabled_tests --gtest_filter='OwnEngineTest.DISABLED_*' on a quiet machine; SearchTest has the one of the search itself
+
+    TEST_F(OwnEngineTest, DISABLED_MoveTimeYardstick) {
+        const std::chrono::steady_clock::duration moveTimeLimit = std::chrono::milliseconds(kMoveTimeMs) + kTimeTolerance;
+        const auto timeOf = [](auto&& search) {
+            const auto started = std::chrono::steady_clock::now();
+            search();
+            return std::chrono::steady_clock::now() - started;
+        };
+        const SearchRequest moveTime = SearchRequest::FromPosition(PositionFromFen(kKiwipeteFen), SearchLimits{kMoveTimeMs, 0});
+        const SearchRequest shallow = SearchRequest::FromPosition(Position::Start(), SearchLimits{60000, kShallow});
+        const SearchRequest timed = SearchRequest::FromPosition(PositionFromFen(kKiwipeteFen), SearchLimits{kMoveTimeMs, kDepthThatNeverEnds});
+
+        EXPECT_LT(timeOf([&] { Ask(_engine, moveTime); }), moveTimeLimit) << "FindMove honours the move time";
+        EXPECT_LT(timeOf([&] { Analyse(_engine, moveTime); }), moveTimeLimit) << "Analyse honours the move time";
+        EXPECT_LT(timeOf([&] { Analyse(_engine, WithLines(moveTime, 3)); }), moveTimeLimit) << "three lines honour the move time";
+        EXPECT_LT(timeOf([&] { Ask(_engine, shallow); }), kTimeTolerance) << "the depth ends a shallow search long before the minute";
+        EXPECT_LT(timeOf([&] { Ask(_engine, timed); }), moveTimeLimit) << "the time ends a search whose depth never would";
+    }
+
+    TEST_F(OwnEngineTest, DISABLED_StopLatencyYardstick) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        const SearchRequest deep = SearchRequest::FromPosition(PositionFromFen(kKiwipeteFen), Depth(kDepthThatNeverEnds));
+
+        EXPECT_LT(TimeCancelledSearch([&](const CancellationToken& token) { Ask(_engine, deep, token); }), kStopBudget) << "a cancelled FindMove";
+        EXPECT_LT(TimeCancelledSearch([&](const CancellationToken& token) { Analyse(_engine, deep, token); }), kStopBudget) << "a cancelled Analyse";
+        EXPECT_LT(TimeCancelledSearch([&](const CancellationToken& token) { Analyse(_engine, WithLines(deep, 3), token); }), kStopBudget) << "a cancelled search of three lines";
+
+        ChessGameModel model;
+        ASSERT_TRUE(Play(model, "e2e4"));
+        const auto engine = eastl::make_shared<LimitedEngine>(eastl::make_shared<OwnEngine>(), Depth(kDepthThatNeverEnds));
+        OpponentController controller(model);
+        controller.SetEngineFactory([engine](OpponentEngine, const OpponentLevel&) -> MadeEngine { return engine; });
+        ASSERT_TRUE(controller.SetSide(PieceColor::Black).has_value());
+        controller.Update();
+        ASSERT_TRUE(WaitUntil([&] { return engine->Calls() == 1; })) << "the search runs on the pool";
+        const auto started = std::chrono::steady_clock::now();
+        controller.Shutdown();
+        EXPECT_LT(std::chrono::steady_clock::now() - started, kStopBudget) << "Shutdown with a deep search in flight";
     }
 
 }  // namespace BECore::Chess::Tests
