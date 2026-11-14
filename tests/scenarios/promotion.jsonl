@@ -1,0 +1,14 @@
+{"scenario": 1, "game": "Chess", "flags": ["--headless", "--manual-clock"], "title": "Chess: a pawn on the seventh rank needs a piece, queen and knight"}
+{"method": "step", "params": {"frames": 2}}
+{"method": "reset"}
+{"method": "set_state", "params": {"fen": "8/P6k/8/8/8/8/8/K7 w - - 0 1"}, "expect": {"versionStep": 1}}
+{"method": "perform_action", "params": {"type": "move", "uci": "a7a8"}, "expect": {"error": "promotion_required"}}
+{"method": "get_state", "expect": {"pointers": {"/state/fen": "8/P6k/8/8/8/8/8/K7 w - - 0 1", "/state/moves": []}, "versionStep": 0}}
+{"method": "list_actions", "expect": {"pointers": {"/actions/0/uci": "a7a8q", "/actions/1/uci": "a7a8r", "/actions/2/uci": "a7a8b", "/actions/3/uci": "a7a8n"}, "versionStep": 0}}
+{"method": "perform_action", "params": {"type": "move", "uci": "a7a8q"}, "expect": {"pointers": {"/outcome/move": "a7a8q"}, "versionStep": 1}}
+{"method": "get_state", "expect": {"pointers": {"/state/board/0": "Q.......", "/state/board/1": ".......k", "/state/moves": ["a7a8q"]}, "versionStep": 0}}
+{"method": "set_state", "params": {"fen": "8/P6k/8/8/8/8/8/K7 w - - 0 1"}, "expect": {"versionStep": 1}}
+{"method": "perform_action", "params": {"type": "move", "uci": "a7a8n"}, "expect": {"pointers": {"/outcome/move": "a7a8n"}, "versionStep": 1}}
+{"method": "get_state", "expect": {"pointers": {"/state/board/0": "N.......", "/state/board/1": ".......k", "/state/moves": ["a7a8n"]}, "versionStep": 0}}
+{"method": "reset", "expect": {"versionStep": 1}}
+{"method": "get_state", "expect": {"pointers": {"/state/moves": [], "/state/board/0": "rnbqkbnr"}, "versionStep": 0, "logClean": true}}

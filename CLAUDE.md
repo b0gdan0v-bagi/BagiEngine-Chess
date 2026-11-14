@@ -66,4 +66,4 @@ New rule code goes into `Game/` with a gtest case; do not patch around the gener
 
 ## Tests
 
-`tests/`, executable `ChessTests`, plus the control smoke `BagiChessControlSmoke` (`tests/control_smoke.py`) under ctest. What each test file covers, the fake UCI engine and the helpers are in `tests/CLAUDE.md`: read it before adding or changing a test. Tests that need Stockfish skip themselves without one.
+`tests/`, executable `ChessTests`, plus the control smoke `BagiChessControlSmoke` (`tests/control_smoke.py`) and the recorded scenarios `BagiChessScenario.*` (`tests/scenarios/`) under ctest. What each test file covers, the fake UCI engine and the helpers are in `tests/CLAUDE.md`: read it before adding or changing a test. Tests that need Stockfish skip themselves without one.

@@ -1,0 +1,13 @@
+{"scenario": 1, "game": "Chess", "flags": ["--headless", "--manual-clock"], "title": "Chess: the captured material of get_state after a capture, a position set from outside and a reset"}
+{"method": "step", "params": {"frames": 2}}
+{"method": "reset"}
+{"method": "set_state", "params": {"opponent": {"plays": null}}}
+{"method": "get_state", "expect": {"pointers": {"/state/material/balance": 0, "/state/material/capturedByWhite/pawn": 0, "/state/material/capturedByBlack/pawn": 0}, "versionStep": 0}}
+{"method": "perform_action", "params": {"type": "move", "uci": "e2e4"}, "expect": {"versionStep": 1}}
+{"method": "perform_action", "params": {"type": "move", "uci": "d7d5"}, "expect": {"versionStep": 1}}
+{"method": "perform_action", "params": {"type": "move", "uci": "e4d5"}, "expect": {"versionStep": 1}}
+{"method": "get_state", "expect": {"pointers": {"/state/material/balance": 1, "/state/material/capturedByWhite/pawn": 1, "/state/material/capturedByBlack/pawn": 0}, "versionStep": 0}}
+{"method": "set_state", "params": {"fen": "4k3/8/8/8/8/8/8/R3K3 w - - 0 1"}, "expect": {"versionStep": 1}}
+{"method": "get_state", "expect": {"pointers": {"/state/material/balance": 5, "/state/material/capturedByWhite/queen": 1, "/state/material/capturedByWhite/rook": 2, "/state/material/capturedByWhite/bishop": 2, "/state/material/capturedByWhite/knight": 2, "/state/material/capturedByWhite/pawn": 8, "/state/material/capturedByBlack/queen": 1, "/state/material/capturedByBlack/rook": 1, "/state/material/capturedByBlack/bishop": 2, "/state/material/capturedByBlack/knight": 2, "/state/material/capturedByBlack/pawn": 8}, "versionStep": 0}}
+{"method": "reset", "expect": {"versionStep": 1}}
+{"method": "get_state", "expect": {"pointers": {"/state/material/balance": 0, "/state/material/capturedByWhite/pawn": 0, "/state/material/capturedByBlack/pawn": 0}, "versionStep": 0, "logClean": true}}

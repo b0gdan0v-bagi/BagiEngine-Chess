@@ -12,10 +12,10 @@ play each other (`set_state` with `"plays": "both"` and a seat each), reads the 
 that a reset keeps both seats (and, on the manual clock, plays the same game again), that `"plays": "white"` is a takeover that leaves Black to the person, and that null ends it. The analysis ("analysis" scenarios, base ones too) switches the evaluation of the own engine on, reads it from White's view on a mate in one, asks for a hint and reads it, and
 leaves the game with the analyst running; it also switches the ratings of the moves on (the own engine, in the background), plays a short game, waits until every entry of
 `analysis.ratings` is set and checks its shape and the pinned reasons of the game, and, after a reset and a frame (so that the old ratings are dropped), plays the same game again for the same ratings. The opponent panel ("opponent panel" scenarios, base
-ones too) is driven only by `ui_click` on the buttons and segments found by name, as a person would: open it with the Menu button, pick the own engine,
-Computer, a level and a color, read the pick back from `get_state` and from `ui_tree`, play, close it with OK. The captured material ("captured material"
-scenarios, base ones too, no engine) reads `get_state.material` after a capture, after a position set from outside and after a reset, and, on the headless
-run, compares the left margin of a screenshot (the display of the captured pieces) before and after a capture and after the reset. Stockfish ("opponent" scenarios) is replaced by
+ones too) reads the tree by element name where the build decides (the Stockfish segment, what is selected at the start) and, by `ui_click` on the buttons as a person
+would, picks the own engine and Computer, plays, lets the program open as White and closes with OK; the clicks and their read-back are `tests/scenarios/opponent_panel.jsonl`.
+The captured material ("captured material" scenarios, base ones too, no engine) is a picture check: on the headless run it compares the left margin of a screenshot
+(the display of the captured pieces) before and after a capture and after the reset; the numbers of `get_state.material` are `tests/scenarios/captured_material.jsonl`. Stockfish ("opponent" scenarios) is replaced by
 tests/fake_uci_engine.py: main() writes a wrapper script that starts it into a temporary directory and puts the script in STOCKFISH of the environment,
 which the game inherits. STOCKFISH comes before PATH in the game's search for an engine and the committed config has no path, so a Stockfish installed on
 this machine is never used. A config/ChessSettings.local.xml (a person's own path, which would win over STOCKFISH) leaves the Stockfish scenarios out, as
@@ -24,6 +24,10 @@ recognised by the script itself, with no environment variable: the first get_sta
 need the fake Stockfish end at once, and the base scenario "without Stockfish" checks what that build does instead (the default engine is own, `stockfish` is `engine_unavailable`
 in `engine`, in a seat object and with a side, with the opponent unchanged, the panel has no visible Stockfish segment and Own engine is selected, and the own engine plays);
 in a build with Stockfish that scenario ends at once. Exit code: 0 passed, 1 failed, 77 skipped (the executable does not exist).
+
+What a recorded scenario can state moved out of this script into `tests/scenarios/*.jsonl` (ctest `BagiChessScenario.<file>`, the manual clock, played by the engine's
+bagi_play.py): the refusals, the mate and the game over, the reset, promotion, the captured material numbers and the clicks of the opponent panel. What stays here needs a wait
+for the program, a picture, the real clock or an answer that depends on the build; the real clock keeps the start position, the opening, the push and the screenshots.
 """
 
 import os
@@ -112,49 +116,6 @@ def play_opening(client: BagiControlClient) -> dict:
     return reply
 
 
-def check_refusals(client: BagiControlClient) -> None:
-    """What is refused changes nothing: not a legal move, not a move at all, not a position."""
-    before = client.call("get_state")
-
-    expect_error("illegal_action", lambda: client.call("perform_action", move("e7e5")), "a move of the side that is not to move")
-    expect_error("illegal_action", lambda: client.call("perform_action", move("a1a8")), "a rook through its own pawn")
-    expect_error("invalid_params", lambda: client.call("perform_action", move("banana")), "a move that is not UCI")
-    expect_error("invalid_params", lambda: client.call("perform_action", {"type": "resign"}), "an action that is not a move")
-    expect_error("invalid_params", lambda: client.call("set_state", {"fen": "not a fen"}), "a position that is not a FEN")
-    expect_error("invalid_params", lambda: client.call("set_state", {}), "a state without a FEN")
-
-    after = client.call("get_state")
-    check(after == before, "a refused call changed the state")
-
-
-def check_mate(client: BagiControlClient) -> None:
-    """A position set from outside, mate in one, and a game that takes no more moves once it is over."""
-    loaded = client.call("set_state", {"fen": MATE_IN_ONE_FEN})
-    state = client.call("get_state")
-    check(state["version"] == loaded["version"], "set_state and get_state disagree about the version")
-    check(state["state"]["startFen"] == MATE_IN_ONE_FEN and state["state"]["moves"] == [], f"the loaded position is not the start of a game: {state['state']}")
-    check(move("a1a8") in client.call("list_actions")["actions"], "the mating move is not listed")
-
-    outcome = client.call("perform_action", move("a1a8"))["outcome"]
-    check(outcome["status"] == "checkmate" and outcome["winner"] == "white" and outcome["inCheck"] is True, f"the mate was answered with {outcome}")
-
-    state = client.call("get_state")["state"]
-    check(state["status"] == "checkmate" and state["winner"] == "white" and state["legalMoveCount"] == 0, f"unexpected standing after the mate: {state}")
-    check(client.call("list_actions")["actions"] == [], "a finished game still lists actions")
-    expect_error("game_over", lambda: client.call("perform_action", move("g8f8")), "a move after the mate")
-
-    client.call("reset")
-    check_start_position(client)
-
-
-def check_promotion(client: BagiControlClient) -> None:
-    client.call("set_state", {"fen": PROMOTION_FEN})
-    expect_error("promotion_required", lambda: client.call("perform_action", move("a7a8")), "a promotion without a piece")
-    client.call("perform_action", move("a7a8q"))
-    board = client.call("get_state")["state"]["board"]
-    check(board[0].startswith("Q"), f"the queen is not on a8: {board}")
-
-
 def check_screenshots(client: BagiControlClient) -> None:
     """The picture follows the model: a move changes it, a reset brings it back."""
     client.call("reset")
@@ -195,10 +156,6 @@ def run_chess_scenario(client: BagiControlClient, headless: bool) -> None:
     if status["manualClock"]:
         client.call("step")
     check_state_push(client, last)
-
-    check_refusals(client)
-    check_mate(client)
-    check_promotion(client)
 
     if headless:
         check_screenshots(client)
@@ -795,11 +752,6 @@ MARGIN_WIDTH = 100
 MARGIN_INSET = 2  # columns and rows kept away from the edges of the margin, against rounding
 CAPTURE_MOVES = ["e2e4", "d7d5", "e4d5"]  # White takes a pawn of Black
 CHIP_COLOR = (232, 210, 170)  # the fill of a row of the display
-MATERIAL_PIECES = ["queen", "rook", "bishop", "knight", "pawn"]
-
-
-def get_material(client: BagiControlClient) -> dict:
-    return client.call("get_state")["state"]["material"]
 
 
 def margin_band(image) -> list:
@@ -821,55 +773,35 @@ def band_has_color(band: list, channels: int, color: tuple) -> bool:
     return False
 
 
-def check_material(material: dict, balance: int, by_white: dict, by_black: dict, when: str) -> None:
-    check(set(material) == {"balance", "capturedByWhite", "capturedByBlack"}, f"{when}: unexpected members of material: {sorted(material)}")
-    for side, expected in (("capturedByWhite", by_white), ("capturedByBlack", by_black)):
-        check(sorted(material[side]) == sorted(MATERIAL_PIECES), f"{when}: {side} has the pieces {sorted(material[side])}")
-        check(material[side] == {piece: expected.get(piece, 0) for piece in MATERIAL_PIECES}, f"{when}: {side} is {material[side]}, expected {expected}")
-    check(material["balance"] == balance, f"{when}: the balance is {material['balance']}, expected {balance}")
-
-
 def run_material_scenario(client: BagiControlClient, headless: bool) -> None:
-    """The captured material: get_state reports it from the position, and on the headless run the left margin of the picture shows it.
+    """The captured material in the picture: on the headless run the left margin shows it (the numbers of `get_state.material` are `tests/scenarios/captured_material.jsonl`).
 
-    Two people play e2e4 d7d5 e4d5, so White has taken a pawn: the balance is +1 for White and `capturedByWhite` has one pawn. The margin band of a screenshot
-    (the rows of the board, the columns left of it) is compared, not the whole picture: the HUD says other words in each picture. A reset brings back the band and
-    the zeros."""
+    Two people play e2e4 d7d5 e4d5, so White has taken a pawn. The margin band of a screenshot (the rows of the board, the columns left of it) is compared, not the
+    whole picture: the HUD says other words in each picture. A position set from outside and a reset in between bring the band back to the one of the start."""
     if client.call("status")["manualClock"]:
         client.call("step")  # the scene registers its pieces in the first frame
     client.call("reset")
     client.call("set_state", {"opponent": {"plays": None}})
-    check_material(get_material(client), 0, {}, {}, "the start position")
-    start_band = None
-    if headless:
-        let_frames_pass(client, 2)  # the display waits for the first layout of its canvas
-        start_band = margin_band(take_screenshot(client))
+    if not headless:
+        return
+    let_frames_pass(client, 2)  # the display waits for the first layout of its canvas
+    start_band = margin_band(take_screenshot(client))
 
     for uci in CAPTURE_MOVES:
         client.call("perform_action", move(uci))
-    check_material(get_material(client), 1, {"pawn": 1}, {}, "after e2e4 d7d5 e4d5")
-    check(client.call("get_state")["version"] >= 3, "the version did not grow with the moves")
-
-    # The material is derived from the position, so a position set from outside has it too: two kings and a white rook
-    client.call("set_state", {"fen": "4k3/8/8/8/8/8/8/R3K3 w - - 0 1"})
-    check_material(get_material(client), 5, {"queen": 1, "bishop": 2, "knight": 2, "pawn": 8, "rook": 2}, {"queen": 1, "rook": 1, "bishop": 2, "knight": 2, "pawn": 8}, "two kings and a rook")
+    client.call("set_state", {"fen": "4k3/8/8/8/8/8/8/R3K3 w - - 0 1"})  # the display follows a position set from outside
+    client.call("reset")
+    for uci in CAPTURE_MOVES:
+        client.call("perform_action", move(uci))
+    let_frames_pass(client, 2)
+    captured = take_screenshot(client)
+    captured_band = margin_band(captured)
+    check(captured_band != start_band, "the left margin did not change after White took a pawn")
+    check(band_has_color(captured_band, captured.channels, CHIP_COLOR), "no row of the display is drawn in the left margin after the capture")
 
     client.call("reset")
-    client.call("perform_action", move("e2e4"))
-    client.call("perform_action", move("d7d5"))
-    client.call("perform_action", move("e4d5"))
-    if headless:
-        let_frames_pass(client, 2)
-        captured = take_screenshot(client)
-        captured_band = margin_band(captured)
-        check(captured_band != start_band, "the left margin did not change after White took a pawn")
-        check(band_has_color(captured_band, captured.channels, CHIP_COLOR), "no row of the display is drawn in the left margin after the capture")
-
-    client.call("reset")
-    check_material(get_material(client), 0, {}, {}, "after a reset")
-    if headless:
-        let_frames_pass(client, 2)
-        check(margin_band(take_screenshot(client)) == start_band, "the left margin after a reset is not the one of the start position")
+    let_frames_pass(client, 2)
+    check(margin_band(take_screenshot(client)) == start_band, "the left margin after a reset is not the one of the start position")
 
 
 def find_ui_canvas(tree: dict, node: str) -> dict:
@@ -911,8 +843,12 @@ def check_no_group_disabled(tree: dict) -> None:
 
 
 def run_opponent_panel_scenario(client: BagiControlClient, headless: bool) -> None:
-    """The person's way to an opponent, through the buttons of the screen only (ui_click): open the panel, pick the own engine, Computer, a level and a color, play, close.
-    The own engine runs in the game, so this needs nothing from the environment."""
+    """What the opponent panel shows in this build and the program's play behind its buttons (ui_click, the own engine, which needs nothing from the environment).
+
+    The clicks themselves and what the game reads back from them (level, side, engine, mode, OK, the closed panel refusing a click) are
+    `tests/scenarios/opponent_panel.jsonl`. Here stay what a scenario cannot say: the tree read by element name where the build decides (the Stockfish segment, the one that is
+    selected at the start), and the replies of the program, which come on a worker thread: the answer to the person's move, the opening move of the program as White, and a game
+    of two people in which the program stays out."""
     if client.call("status")["manualClock"]:
         client.call("step")
     client.call("reset")
@@ -924,7 +860,6 @@ def run_opponent_panel_scenario(client: BagiControlClient, headless: bool) -> No
     check(panel["visible"] is False and panel["modal"] is True, f"the opponent panel should start hidden and modal: {panel}")
     menu_button = find_ui_element({"canvases": [canvas for canvas in tree["canvases"] if canvas["node"] == "Hud"]}, "Menu")
     check(menu_button is not None and menu_button["text"] == "Menu" and menu_button["action"] == "ChessOpenOpponent", f"the Menu button: {menu_button}")
-    check(get_opponent(client)["plays"] is None, f"unexpected opponent at the start: {get_opponent(client)}")
 
     # One press on the HUD button opens the panel, which shows what the game has: two people, White, Stockfish (the own engine in a build without Stockfish, which hides the
     # Stockfish segment so that Own engine fills the group), medium
@@ -940,41 +875,13 @@ def run_opponent_panel_scenario(client: BagiControlClient, headless: bool) -> No
     check_no_group_disabled(tree)
     check(panel_element(tree, "OpponentError")["text"] == "", f"the error line is not empty: {panel_element(tree, 'OpponentError')}")
 
-    # Two people play and the Level and Play as groups take clicks all the same: the pick is remembered and read back (it applies when Computer is picked)
-    tree = press_in_the_panel(client, "LevelHard", "ChessSetLevel", "hard")
-    check_selected(tree, ["LevelHard"], ["LevelMedium"])
-    check_no_group_disabled(tree)
-    opponent = get_opponent(client)
-    check(opponent["level"] == "hard" and opponent["plays"] is None, f"a level picked for two people was not read back: {opponent}")
-    tree = press_in_the_panel(client, "ColorBlack", "ChessSetColor", "black")
-    check_selected(tree, ["ColorBlack"], ["ColorWhite"])
-    check(get_opponent(client)["plays"] is None, f"a color picked for two people made the program play: {get_opponent(client)}")
-    tree = press_in_the_panel(client, "ColorWhite", "ChessSetColor", "white")
-    check_selected(tree, ["ColorWhite", "LevelHard"], ["ColorBlack"])
-
-    # The engine, then the mode: nothing is asked of Stockfish, the own engine is made when the program is picked
+    # The own engine and Computer, with the person as White: the person's move is answered
     tree = press_in_the_panel(client, "EngineOwn", "ChessSetEngine", "own")
     check_selected(tree, ["EngineOwn"], ["EngineStockfish"] if stockfish else [])
-    opponent = get_opponent(client)
-    check(opponent["engine"] == "own" and opponent["plays"] is None and opponent["error"] is None, f"the engine was not read back: {opponent}")
-
+    press_in_the_panel(client, "LevelEasy", "ChessSetLevel", "easy")
     tree = press_in_the_panel(client, "ModeComputer", "ChessSetMode", "computer")
-    check_selected(tree, ["ModeComputer", "LevelHard"], ["ModeTwo"])
+    check_selected(tree, ["ModeComputer", "LevelEasy", "ColorWhite"], ["ModeTwo"])
     check_no_group_disabled(tree)
-    opponent = get_opponent(client)
-    check(opponent["plays"] == "black" and opponent["engine"] == "own" and opponent["level"] == "hard" and opponent["error"] is None,
-          f"Computer with White for the person and the level picked before is not read back: {opponent}")
-    hud_button = find_ui_element({"canvases": [canvas for canvas in tree["canvases"] if canvas["node"] == "Hud"]}, "Menu")
-    check(hud_button["text"] == "Menu", f"the Menu button is not a fixed word: {hud_button['text']}")
-
-    tree = press_in_the_panel(client, "LevelEasy", "ChessSetLevel", "easy")
-    check_selected(tree, ["LevelEasy"], ["LevelMedium"])
-    check(get_opponent(client)["level"] == "easy", f"the level was not read back: {get_opponent(client)}")
-
-    # The person has White (the program Black): a click on White again changes nothing, and the person's move is answered
-    tree = press_in_the_panel(client, "ColorWhite", "ChessSetColor", "white")
-    check_selected(tree, ["ColorWhite"], ["ColorBlack"])
-    check(get_opponent(client)["plays"] == "black", f"White again changed the side: {get_opponent(client)}")
     play_against_the_own_engine(client)
 
     # Black for the person: the program plays White and opens the new game
@@ -993,18 +900,11 @@ def run_opponent_panel_scenario(client: BagiControlClient, headless: bool) -> No
     tree = press_in_the_panel(client, "ModeTwo", "ChessSetMode", "two")
     check_selected(tree, ["ModeTwo", "ColorBlack", "EngineOwn", "LevelEasy"], ["ModeComputer", "ColorWhite"])
     check_no_group_disabled(tree)
-    check(get_opponent(client)["plays"] is None, f"two people: the opponent is {get_opponent(client)}")
-    tree = press_in_the_panel(client, "LevelMax", "ChessSetLevel", "max")
-    check_selected(tree, ["LevelMax"], ["LevelEasy"])
-    check(get_opponent(client)["level"] == "max", f"a click on Level with two people was not read back: {get_opponent(client)}")
     moves = get_moves(client)
     let_frames_pass(client, FRAMES_WITHOUT_AN_ANSWER)
     check(get_moves(client) == moves and get_opponent(client)["thinking"] is False, "the program moved with nobody picked")
-
-    # OK closes the panel
     tree = press_in_the_panel(client, "Ok", "ChessCloseOpponent", "")
     check(find_ui_canvas(tree, "OpponentPanel")["visible"] is False, "OK did not close the panel")
-    expect_error("not_clickable", lambda: client.call("ui_click", {"name": "ModeComputer"}), "a click on a segment of the closed panel")
 
 
 def run_without_stockfish_scenario(client: BagiControlClient, headless: bool) -> None:
