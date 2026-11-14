@@ -27,7 +27,7 @@ namespace BECore::Tests {
         // that it lays out like the HUD in config/SceneConfig.xml, the one the game ships.
         constexpr const char* kChessHudHtml = R"(
 <span id="Turn">{turn}</span>
-<button id="Menu" data-action="ChessOpenOpponent">Menu</button>
+<button id="Menu" data-action="ChessOpenMenu">Menu</button>
 <button id="Reset" data-action="ChessReset">Reset</button>
 <span id="Status">{status}</span>)";
 
@@ -75,7 +75,10 @@ namespace BECore::Tests {
     </div>
   </div>
   <span id="OpponentError">{opponentError}</span>
-  <button id="Ok" data-action="ChessCloseOpponent">OK</button>
+  <div id="OpponentButtons" class="row">
+    <button id="OpponentBack" data-action="ChessOpenMenu">Back</button>
+    <button id="OpponentClose" data-action="ChessCloseMenu">Close</button>
+  </div>
 </div>)";
 
         constexpr const char* kChessPanelCss = R"(
@@ -86,12 +89,14 @@ namespace BECore::Tests {
 .group         { display: flex; flex-direction: row; gap: 4px; flex: 1; height: 56px; background: rgb(30, 30, 30); }
 .group button  { flex: 1; height: 56px; font-size: 24px; background: rgb(70, 70, 100); }
 #OpponentError { height: 32px; font-size: 22px; text-align: center; vertical-align: middle; color: rgb(240, 120, 120); }
-#Ok            { height: 56px; font-size: 26px; background: rgb(50, 115, 85); }
+#OpponentBack  { flex: 1; height: 56px; font-size: 26px; background: rgb(50, 115, 85); }
+#OpponentClose { flex: 1; height: 56px; font-size: 26px; background: rgb(110, 60, 60); }
 )";
 
-        constexpr const char* kPanelNames[] = {"Plate",        "Title",      "ModeRow",    "ModeCaption", "ModeGroup",     "ModeTwo",     "ModeComputer",    "ColorRow",  "ColorCaption",
-                                               "ColorGroup",   "ColorWhite", "ColorBlack", "EngineRow",   "EngineCaption", "EngineGroup", "EngineStockfish", "EngineOwn", "LevelRow",
-                                               "LevelCaption", "LevelGroup", "LevelEasy",  "LevelMedium", "LevelHard",     "LevelMax",    "OpponentError",   "Ok"};
+        constexpr const char* kPanelNames[] = {"Plate",       "Title",           "ModeRow",    "ModeCaption",   "ModeGroup",       "ModeTwo",      "ModeComputer",
+                                               "ColorRow",    "ColorCaption",    "ColorGroup", "ColorWhite",    "ColorBlack",      "EngineRow",    "EngineCaption",
+                                               "EngineGroup", "EngineStockfish", "EngineOwn",  "LevelRow",      "LevelCaption",    "LevelGroup",   "LevelEasy",
+                                               "LevelMedium", "LevelHard",       "LevelMax",   "OpponentError", "OpponentButtons", "OpponentBack", "OpponentClose"};
 
         std::filesystem::path ShippedSceneConfig() {
             return std::filesystem::path(__FILE__).parent_path().parent_path() / "config" / "SceneConfig.xml";

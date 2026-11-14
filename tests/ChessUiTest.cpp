@@ -769,17 +769,30 @@ namespace BECore::Chess::Tests {
             return ClickControl(PanelElement(name));
         }
 
-        /// The Menu button of the HUD, clicked where it is drawn; whether the panel is shown afterwards
+        /// The canvas of the list of the menu: the node `MenuPanel`
+        IntrusivePtr<UICanvasComponent> MenuList() const {
+            return CanvasOf("MenuPanel");
+        }
+
+        /// A click on a control of the list of the menu, by name
+        Taken ClickMenuList(const char* name) {
+            return ClickControl(ElementOf("MenuPanel", name));
+        }
+
+        /// The Menu button of the HUD and then the Opponent button of the list, clicked where they are drawn; whether the opponent panel is shown afterwards
         bool OpenThePanel() {
             if (!ClickButton(kMenuColor)) {
+                return false;
+            }
+            if (!MenuList() || !MenuList()->_visible || !ClickMenuList("MenuSectionOpponent").Both()) {
                 return false;
             }
             return Panel() && Panel()->_visible;
         }
 
-        /// The Ok button of the panel, clicked where it is laid out; whether the panel is hidden afterwards
+        /// The Close button of the opponent panel, clicked where it is laid out; whether the panel and the list are hidden afterwards
         bool CloseThePanel() {
-            return ClickPanel("Ok").Both() && Panel() && !Panel()->_visible;
+            return ClickPanel("OpponentClose").Both() && Panel() && !Panel()->_visible && MenuList() && !MenuList()->_visible;
         }
 
         /// The canvas of the promotion panel: the node `PromotionPanel`
@@ -1552,7 +1565,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(IsButton(*menu) && TextOf(*menu) != nullptr) << "the Menu button is a button: a text and a clicker";
         EXPECT_EQ(TextOf(*menu)->text, "Menu") << "a literal: not bound to a variable";
         EXPECT_EQ(ShownText(*menu), "Menu");
-        EXPECT_EQ(ClickerOf(*menu)->action, PoolString::Intern("ChessOpenOpponent"));
+        EXPECT_EQ(ClickerOf(*menu)->action, PoolString::Intern("ChessOpenMenu"));
         EXPECT_NEAR(menu->rect.w, 110.0f, 0.5f) << "as wide as Reset";
         EXPECT_NEAR(menu->rect.h, 56.0f, 0.5f);
         EXPECT_EQ(HudElement("Opponent"), nullptr) << "the button was called Opponent when it showed the state; the name is not used any more";
@@ -1785,8 +1798,9 @@ namespace BECore::Chess::Tests {
                                action == PoolString::Intern(kSetLevelAction);
             EXPECT_TRUE(known) << segment.name.c_str() << " emits " << action.CStr() << ", which the board does not answer";
         }
-        EXPECT_EQ(ClickerOf(PanelButton("Ok"))->action, PoolString::Intern("ChessCloseOpponent"));
-        EXPECT_EQ(ClickerOf(*HudElement("Menu"))->action, PoolString::Intern("ChessOpenOpponent"));
+        EXPECT_EQ(ClickerOf(PanelButton("OpponentBack"))->action, PoolString::Intern("ChessOpenMenu"));
+        EXPECT_EQ(ClickerOf(PanelButton("OpponentClose"))->action, PoolString::Intern("ChessCloseMenu"));
+        EXPECT_EQ(ClickerOf(*HudElement("Menu"))->action, PoolString::Intern("ChessOpenMenu"));
     }
 
     // ---- the opponent panel: broken copies, so that the checks can fail --------------------------------------------------------------
@@ -2617,6 +2631,8 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(layerOf("BoardCoordinates"), -1);
         EXPECT_GT(layerOf("Result"), 0);
         EXPECT_GT(layerOf("Hud"), layerOf("Result"));
+        EXPECT_GT(layerOf("MenuPanel"), layerOf("Hud"));
+        EXPECT_EQ(layerOf("MenuPanel"), layerOf("OpponentPanel"));
         EXPECT_GT(layerOf("OpponentPanel"), layerOf("Hud"));
 
         // and the frame says the same: squares, then glyphs, then a piece, then the dim of a finished game and the buttons of the HUD
@@ -3767,7 +3783,7 @@ namespace BECore::Chess::Tests {
 
         // And a press on a button of the HUD is the HUD's: the selection is not changed by it
         EXPECT_TRUE(ClickButton(kMenuColor));
-        EXPECT_TRUE(Panel()->_visible);
+        EXPECT_TRUE(MenuList()->_visible);
         EXPECT_TRUE(Model().HasSelection());
         EXPECT_TRUE(Model().GetSelected() == Sq("e2"));
     }
@@ -4038,35 +4054,51 @@ namespace BECore::Chess::Tests {
         EXPECT_TRUE(Model().HasSelection()) << "the board under the hidden panel gets its clicks";
     }
 
-    TEST_F(ChessUiTest, TheMenuButtonOpensThePanelAndOkClosesIt) {
+    TEST_F(ChessUiTest, TheMenuButtonOpensTheListAndTheListWalksToTheOpponentPanelAndClosesEverything) {
         ActionLog log;
         Draw();
         EXPECT_EQ(ShownText(*HudElement("Menu")), "Menu");
+        EXPECT_FALSE(MenuList()->_visible);
         ASSERT_TRUE(ClickButton(kMenuColor));
-        EXPECT_EQ(log.LastAction(), PoolString::Intern("ChessOpenOpponent"));
-        ASSERT_TRUE(Panel()->_visible);
+        EXPECT_EQ(log.LastAction(), PoolString::Intern("ChessOpenMenu"));
+        ASSERT_TRUE(MenuList()->_visible);
+        EXPECT_FALSE(Panel()->_visible) << "the list shows no section";
         Draw();
         EXPECT_FALSE(RectCalls(kPlateColor).empty()) << "shown: the plate is drawn";
 
-        // The Menu button is under the dim now: the panel takes the press first, and nothing is emitted
+        // The Menu button is under the dim now: the list takes the press first, and nothing is emitted
         const size_t actions = log.Total();
         const auto button = ScreenCenter(*HudElement("Menu"));
         const Taken second = ClickAtPixel(button.first, button.second);
         EXPECT_TRUE(second.Both()) << "the modal canvas takes it";
         EXPECT_EQ(log.Total(), actions) << "and it is not the Menu button's";
 
+        // The section replaces the list, Back brings the list back, Close hides both
+        ASSERT_TRUE(ClickMenuList("MenuSectionOpponent").Both());
+        EXPECT_EQ(log.LastAction(), PoolString::Intern("ChessOpenSection"));
+        EXPECT_TRUE(Panel()->_visible);
+        EXPECT_FALSE(MenuList()->_visible);
+        ASSERT_TRUE(ClickPanel("OpponentBack").Both());
+        EXPECT_EQ(log.LastAction(), PoolString::Intern("ChessOpenMenu"));
+        EXPECT_TRUE(MenuList()->_visible);
+        EXPECT_FALSE(Panel()->_visible);
+        ASSERT_TRUE(ClickMenuList("MenuSectionOpponent").Both());
         ASSERT_TRUE(CloseThePanel());
-        EXPECT_EQ(log.LastAction(), PoolString::Intern("ChessCloseOpponent"));
+        EXPECT_EQ(log.LastAction(), PoolString::Intern("ChessCloseMenu"));
         Draw();
         EXPECT_TRUE(RectCalls(kPlateColor).empty());
 
-        // Closed: the board gets its clicks again and the button works
+        // Closed: the board gets its clicks again and the button works; Close of the list hides it
         const auto e2 = SquareCenter("e2");
         EXPECT_FALSE(CoreManager::GetUIInput().DispatchMouseButtonDown(Button(e2.first, e2.second, true)));
         EXPECT_TRUE(Model().HasSelection());
         ASSERT_TRUE(ClickButton(kMenuColor));
-        EXPECT_EQ(log.LastAction(), PoolString::Intern("ChessOpenOpponent"));
-        EXPECT_TRUE(Panel()->_visible);
+        EXPECT_EQ(log.LastAction(), PoolString::Intern("ChessOpenMenu"));
+        EXPECT_TRUE(MenuList()->_visible);
+        ASSERT_TRUE(ClickMenuList("MenuClose").Both());
+        EXPECT_EQ(log.LastAction(), PoolString::Intern("ChessCloseMenu"));
+        EXPECT_FALSE(MenuList()->_visible);
+        EXPECT_FALSE(Panel()->_visible);
     }
 
     TEST_F(ChessUiTest, WhileThePanelIsShownEveryPressIsItsAndTheBoardAndTheResetButtonUnderItSeeNone) {
@@ -4541,8 +4573,8 @@ namespace BECore::Chess::Tests {
         for (const pugi::xpath_node found : document.select_nodes("//element[@action]")) {
             const StringView action = found.node().attribute("action").value();
             EXPECT_EQ(action.find(kRemovedActions), StringView::npos) << found.node().attribute("name").value() << " emits " << ToStd(action);
-            const bool known = action == "ChessReset" || action == "ChessOpenOpponent" || action == "ChessCloseOpponent" || action == kSetModeAction || action == kSetColorAction ||
-                               action == kSetEngineAction || action == kSetLevelAction || action == kPromoteAction || action == kCancelPromotionAction;
+            const bool known = action == "ChessReset" || action == "ChessOpenMenu" || action == "ChessOpenSection" || action == "ChessCloseMenu" || action == kSetModeAction ||
+                               action == kSetColorAction || action == kSetEngineAction || action == kSetLevelAction || action == kPromoteAction || action == kCancelPromotionAction;
             EXPECT_TRUE(known) << found.node().attribute("name").value() << " emits " << ToStd(action) << ", which the board does not answer";
         }
         for (const pugi::xpath_node found : document.select_nodes("//element[@text]")) {
@@ -4582,6 +4614,7 @@ namespace BECore::Chess::Tests {
             ADD_FAILURE() << name << " is not a node of the scene";
             return 0;
         };
+        EXPECT_GT(layerOf("MenuPanel"), layerOf("Hud"));
         EXPECT_GT(layerOf("OpponentPanel"), layerOf("Hud"));
         EXPECT_GT(layerOf("Hud"), layerOf("Result"));
 
@@ -5063,12 +5096,12 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, NoElementNameIsInTwoCanvasesOfTheScene) {
-        // Elements are found by name in every canvas of the scene (SetVisibleByName and the lookups of the tests): the HUD, the board coordinates, the captured material, the opponent panel and
-        // the promotion panel keep their own names
+        // Elements are found by name in every canvas of the scene (SetVisibleByName and the lookups of the tests): the HUD, the board coordinates, the captured material, the menu list, the opponent
+        // panel and the promotion panel keep their own names
         const struct {
             const char* node;
             IntrusivePtr<UICanvasComponent> canvas;
-        } canvases[] = {{"Hud", Hud()}, {"BoardCoordinates", Coordinate()}, {"Material", Material()}, {"OpponentPanel", Panel()}, {"PromotionPanel", Promotion()}};
+        } canvases[] = {{"Hud", Hud()}, {"BoardCoordinates", Coordinate()}, {"Material", Material()}, {"MenuPanel", MenuList()}, {"OpponentPanel", Panel()}, {"PromotionPanel", Promotion()}};
         constexpr size_t kCanvasCount = std::size(canvases);
         Vector<PoolString> names[kCanvasCount];
         for (size_t i = 0; i < kCanvasCount; ++i) {
@@ -5167,7 +5200,7 @@ namespace BECore::Chess::Tests {
             }
             return -1;
         };
-        for (const char* name : {"Board", "BoardCoordinates", "Material", "Result", "Hud", "OpponentPanel", "PromotionPanel"}) {
+        for (const char* name : {"Board", "BoardCoordinates", "Material", "Result", "Hud", "MenuPanel", "OpponentPanel", "PromotionPanel"}) {
             ASSERT_GE(indexOf(name), 0) << "the scene has the node " << name;
         }
         const auto layerOf = [&](const char* name) { return nodes[static_cast<size_t>(indexOf(name))]->GetLayer(); };
@@ -5176,6 +5209,7 @@ namespace BECore::Chess::Tests {
         EXPECT_GT(layerOf("Material"), 0) << "over the pieces (layer 0)";
         EXPECT_GT(layerOf("Material"), layerOf("Result")) << "and over the result bar";
         EXPECT_LT(layerOf("Material"), layerOf("Hud"));
+        EXPECT_LT(layerOf("Material"), layerOf("MenuPanel"));
         EXPECT_LT(layerOf("Material"), layerOf("OpponentPanel"));
         EXPECT_LT(layerOf("Material"), layerOf("PromotionPanel"));
 
@@ -6893,7 +6927,7 @@ namespace BECore::Chess::Tests {
         EXPECT_FALSE(Model().HasSelection()) << "the opponent panel took the press";
         EXPECT_TRUE(Model().GetMoves().empty());
         EXPECT_FALSE(Lifted().has_value());
-        Press("ChessCloseOpponent");
+        Press("ChessCloseMenu");
         ASSERT_FALSE(Panel()->_visible);
 
         StartFrom(kPromotionFen);
@@ -7205,7 +7239,8 @@ namespace BECore::Chess::Tests {
         };
         EXPECT_LT(rankOf("BoardCoordinates"), rankOf("Material"));
         EXPECT_LT(rankOf("Material"), rankOf("Hud"));
-        EXPECT_LT(rankOf("Hud"), rankOf("OpponentPanel"));
+        EXPECT_LT(rankOf("Hud"), rankOf("MenuPanel"));
+        EXPECT_LT(rankOf("MenuPanel"), rankOf("OpponentPanel"));
         EXPECT_LT(rankOf("OpponentPanel"), rankOf("PromotionPanel"));
 
         Release(at.first, at.second);

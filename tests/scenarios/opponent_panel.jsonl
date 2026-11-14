@@ -2,7 +2,9 @@
 {"method": "step", "params": {"frames": 2}}
 {"method": "reset"}
 {"method": "step", "params": {"frames": 2}}
-{"method": "ui_click", "params": {"name": "Menu"}, "expect": {"equal": {"consumed": true, "action": "ChessOpenOpponent", "value": ""}}}
+{"method": "ui_click", "params": {"name": "Menu"}, "expect": {"equal": {"consumed": true, "action": "ChessOpenMenu", "value": ""}}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "ui_click", "params": {"name": "MenuSectionOpponent"}, "expect": {"equal": {"consumed": true, "action": "ChessOpenSection", "value": "opponent"}}}
 {"method": "step", "params": {"frames": 2}}
 {"method": "get_state", "expect": {"pointers": {"/state/opponent/plays": null, "/state/moves": []}, "versionStep": 0}}
 {"method": "ui_click", "params": {"name": "LevelHard"}, "expect": {"equal": {"consumed": true, "action": "ChessSetLevel", "value": "hard"}}}
@@ -31,6 +33,6 @@
 {"method": "ui_click", "params": {"name": "LevelMax"}, "expect": {"equal": {"consumed": true, "action": "ChessSetLevel", "value": "max"}}}
 {"method": "step", "params": {"frames": 2}}
 {"method": "get_state", "expect": {"pointers": {"/state/opponent/level": "max", "/state/opponent/plays": null, "/state/moves": []}, "versionStep": 1}}
-{"method": "ui_click", "params": {"name": "Ok"}, "expect": {"equal": {"consumed": true, "action": "ChessCloseOpponent", "value": ""}}}
+{"method": "ui_click", "params": {"name": "OpponentClose"}, "expect": {"equal": {"consumed": true, "action": "ChessCloseMenu", "value": ""}}}
 {"method": "step", "params": {"frames": 2}}
 {"method": "ui_click", "params": {"name": "ModeComputer"}, "expect": {"error": "not_clickable", "logClean": true}}

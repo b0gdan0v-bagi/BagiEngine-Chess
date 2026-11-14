@@ -297,9 +297,9 @@
              safe area), and a 56-unit button is still a 32 px touch target at the smallest fit scale of the size matrix (0.57, the 840 units of the width in a 480 px window).
              The top row is Turn (left), Menu and Reset (right); the bottom margin holds only Status (bottom right). Every element is anchored to a corner, so the row is
              as wide as the safe area, which is about 689 units in the narrowest window of the matrix (480 px with side insets): Turn (320), Menu (110) and Reset (110) with
-             their gaps add up to less than that, and ChessUiTest lays every word the game can show into them. Menu is the one button that opens the opponent panel (the
-             node OpponentPanel below): it emits ChessOpenOpponent, is always shown, and its text is the fixed word "Menu", not a state; the side, the engine and the level
-             are chosen in the panel, which also shows what is picked now, and not on buttons of the HUD: the margins are full. -->
+             their gaps add up to less than that, and ChessUiTest lays every word the game can show into them. Menu is the one button that opens the menu (the list panel
+             MenuPanel below): it emits ChessOpenMenu, is always shown, and its text is the fixed word "Menu", not a state; the side, the engine and the level
+             are chosen in the opponent panel, which the list opens and which also shows what is picked now, and not on buttons of the HUD: the margins are full. -->
         <node name="Hud" layer="10">
           <components>
             <component type="UICanvasComponent" space="SceneView" useSafeArea="true">
@@ -312,7 +312,7 @@
                 <element type="UIElement" name="Menu" anchor="TopRight" x="-134" y="12" width="110" height="56" fontSize="24" color="45,75,120,255">
                   <components>
                     <component type="UITextComponent" text="Menu" align="Center" verticalAlign="Center" wrap="false"/>
-                    <component type="UIInputClicker" action="ChessOpenOpponent"/>
+                    <component type="UIInputClicker" action="ChessOpenMenu"/>
                   </components>
                 </element>
                 <element type="UIElement" name="Reset" anchor="TopRight" x="-12" y="12" width="110" height="56" fontSize="26" color="40,90,60,255">
@@ -331,15 +331,55 @@
           </components>
         </node>
 
-        <!-- The opponent panel: a modal canvas over everything (layer 20, above the HUD and the end-of-game bar), started hidden. The Menu button of the HUD shows it
-             (ChessOpenOpponent) and OK hides it (ChessCloseOpponent); while it is shown the dim takes every click, so the board gets none. Four choice groups (UISegmented), a
+        <!-- The menu: a list of sections, a modal canvas over everything (layer 20, above the HUD and the end-of-game bar), started hidden. The Menu button of the HUD shows it
+             (ChessOpenMenu); a section button hides it and shows the canvas of the section (ChessOpenSection, the id of the section as the value: the table of MenuSections, which
+             ChessBoardComponent hides and shows the canvases through); Close hides it (ChessCloseMenu). The list and a section panel replace one another; while one is shown its dim
+             takes every click, so the board and the HUD under it get none, and there is no Escape and no click outside. Only the sections the game has are here: a feature that
+             does not exist yet has no button. Every name starts with Menu because elements are found by name in every canvas of the scene (the HUD button is the only one called
+             exactly Menu). The sections are one 56-unit button MenuSection<Name> each, in the order of MenuSections(). To add a section: a row in Game/MenuSections.cpp, a
+             MenuSection<Name> button here (and 68 units more in the height of MenuPlate: 56 for the button and 12 for the gap) and the panel node of the row. The plate is 94% of
+             the safe area up to 640 units: 16 + 44 (title) + 56 (Opponent) + 56 (Close) + 3 x 12 (spacing) + 16 = 224 units high.
+             The view is a fixed 840 x 800, so there is no portrait variant. -->
+        <node name="MenuPanel" layer="20">
+          <components>
+            <component type="UICanvasComponent" space="SceneView" useSafeArea="true" modal="true" visible="false">
+              <elements>
+                <element type="UIElement" name="MenuDim" anchor="Stretch" ignoreSafeArea="true" color="0,0,0,150" blocksInput="true" />
+                <element type="UIStack" name="MenuPlate" anchor="Center" width="94%" maxWidth="640" height="224" direction="Vertical" spacing="12" padding="16" crossAlign="Stretch" color="36,40,52,255" blocksInput="true">
+                  <children>
+                    <element type="UIElement" name="MenuTitle" height="44" fontSize="30">
+                      <components>
+                        <component type="UITextComponent" text="Menu" align="Center"/>
+                      </components>
+                    </element>
+                    <element type="UIElement" name="MenuSectionOpponent" height="56" fontSize="26" color="70,70,100,255">
+                      <components>
+                        <component type="UITextComponent" text="Opponent" align="Center" verticalAlign="Center" wrap="false"/>
+                        <component type="UIInputClicker" action="ChessOpenSection" value="opponent"/>
+                      </components>
+                    </element>
+                    <element type="UIElement" name="MenuClose" height="56" fontSize="26" color="110,60,60,255">
+                      <components>
+                        <component type="UITextComponent" text="Close" align="Center" verticalAlign="Center" wrap="false"/>
+                        <component type="UIInputClicker" action="ChessCloseMenu"/>
+                      </components>
+                    </element>
+                  </children>
+                </element>
+              </elements>
+            </component>
+          </components>
+        </node>
+
+        <!-- The opponent panel: a modal canvas over everything (layer 20, above the HUD and the end-of-game bar), started hidden. The Opponent button of the menu list shows it
+             (ChessOpenSection, value opponent); Back returns to the list (ChessOpenMenu) and Close hides both (ChessCloseMenu); while it is shown the dim takes every click, so the board gets none. Four choice groups (UISegmented), a
              caption beside each. A segment emits its action with its id as the value (ChessSetMode / ChessSetColor / ChessSetEngine / ChessSetLevel); ChessBoardComponent applies
              the pick at once and publishes the ids the groups are bound to (opponentMode, opponentColor, opponentEngine, opponentLevel), so the panel stays open and always shows
              what the game really has. The ids are those of the control API; the color is the PERSON's color (the program plays the other one). No group is greyed: a color or a level picked
              while two people play is remembered and applies when Computer is picked, and the engine can be picked at any time (the person needs it exactly when the Stockfish
              pick was refused). A pick of an engine that cannot be had changes nothing, the error line says why. The groups are named ModeGroup, ColorGroup, EngineGroup and LevelGroup and not Mode, Engine and Level on purpose: elements are found by name in every
              canvas of the scene. OpponentError is the sentence of the engine's error ({opponentError}, empty when there is none). A segment needs an explicit height (a flex
-             segment without one gets a rect of height 0). The plate is 16 + 44 (title) + 4 x 56 (rows) + 32 (error) + 56 (OK) + 6 x 12 (spacing) + 16 = 460 units high. The view
+             segment without one gets a rect of height 0). The plate is 16 + 44 (title) + 4 x 56 (rows) + 32 (error) + 56 (Back and Close) + 6 x 12 (spacing) + 16 = 460 units high. The view
              is a fixed 840 x 800, so there is no portrait variant. -->
         <node name="OpponentPanel" layer="20">
           <components>
@@ -470,11 +510,21 @@
                         <component type="UITextComponent" text="{opponentError}" textColor="240,120,120,255" align="Center" verticalAlign="Center"/>
                       </components>
                     </element>
-                    <element type="UIElement" name="Ok" height="56" fontSize="26" color="50,115,85,255">
-                      <components>
-                        <component type="UITextComponent" text="OK" align="Center" verticalAlign="Center" wrap="false"/>
-                        <component type="UIInputClicker" action="ChessCloseOpponent"/>
-                      </components>
+                    <element type="UIStack" name="OpponentButtons" height="56" direction="Horizontal" spacing="8" crossAlign="Stretch">
+                      <children>
+                        <element type="UIElement" name="OpponentBack" flex="1" height="56" fontSize="26" color="50,115,85,255">
+                          <components>
+                            <component type="UITextComponent" text="Back" align="Center" verticalAlign="Center" wrap="false"/>
+                            <component type="UIInputClicker" action="ChessOpenMenu"/>
+                          </components>
+                        </element>
+                        <element type="UIElement" name="OpponentClose" flex="1" height="56" fontSize="26" color="110,60,60,255">
+                          <components>
+                            <component type="UITextComponent" text="Close" align="Center" verticalAlign="Center" wrap="false"/>
+                            <component type="UIInputClicker" action="ChessCloseMenu"/>
+                          </components>
+                        </element>
+                      </children>
                     </element>
                   </children>
                 </element>

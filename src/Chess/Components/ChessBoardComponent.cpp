@@ -11,6 +11,7 @@
 #include <Chess/Engine/PositionAnalyst.h>
 #include <Chess/Game/BoardCoordinates.h>
 #include <Chess/Game/BoardOrientation.h>
+#include <Chess/Game/MenuSections.h>
 #include <Chess/Game/PromotionChoices.h>
 #include <Chess/Game/StatusText.h>
 #include <CoreSDL/SDLEvents.h>
@@ -237,20 +238,45 @@ namespace BECore::Chess {
         return true;
     }
 
+    void ChessBoardComponent::ShowMenuSection(Optional<MenuSection> shown) {
+        // The list and the section canvases are modal canvases of the scene, hidden at the start; a scene without one has nothing to show or hide
+        for (const MenuSection& section : MenuSections()) {
+            UICanvasComponent::SetVisibleByName(GetScene(), PoolString::Intern(section.node), shown && shown->id == section.id);
+        }
+    }
+
+    bool ChessBoardComponent::AnswerMenuAction(const InputEvents::ActionEvent& event) {
+        const PoolString menuNode = "MenuPanel"_intern;
+        if (event.action == "ChessOpenMenu"_intern) {
+            ShowMenuSection(std::nullopt);
+            UICanvasComponent::SetVisibleByName(GetScene(), menuNode, true);
+        } else if (event.action == "ChessCloseMenu"_intern) {
+            ShowMenuSection(std::nullopt);
+            UICanvasComponent::SetVisibleByName(GetScene(), menuNode, false);
+        } else if (event.action == "ChessOpenSection"_intern) {
+            const Optional<MenuSection> section = FindMenuSection(event.value.ToStringView());
+            if (!section) {
+                LOG_WARNING("ChessOpenSection ignored: '{}' is not a section of the menu"_format(event.value.ToStringView()));
+                return true;
+            }
+            UICanvasComponent::SetVisibleByName(GetScene(), menuNode, false);
+            ShowMenuSection(section);
+        } else {
+            return false;
+        }
+        return true;
+    }
+
     void ChessBoardComponent::OnAction(const InputEvents::ActionEvent& event) {
         // The actions of the buttons of the HUD in config/SceneConfig.xml
         const PoolString resetAction = "ChessReset"_intern;
-        const PoolString openPanelAction = "ChessOpenOpponent"_intern;
-        const PoolString closePanelAction = "ChessCloseOpponent"_intern;
         if (event.action == resetAction) {
             if (ChessGameModel* model = ChessGame::GetActiveModel()) {
                 model->Reset();
             }
             return;
         }
-        // The opponent panel is a modal canvas of the scene, hidden at the start; a scene without it has nothing to show or hide
-        if (event.action == openPanelAction || event.action == closePanelAction) {
-            UICanvasComponent::SetVisibleByName(GetScene(), "OpponentPanel"_intern, event.action == openPanelAction);
+        if (AnswerMenuAction(event)) {
             return;
         }
         if (AnswerPromotionAction(event)) {

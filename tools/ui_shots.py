@@ -73,7 +73,7 @@ MATE_IN_ONE_FEN = "6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1"
 MATING_MOVE = "a1a8"
 STALEMATE_FEN = "7k/5Q2/6K1/8/8/8/8/8 b - - 0 1"
 MIDDLEGAME_MOVES = ("e2e4", "d7d5", "e4d5", "d8d5", "b1c3", "d5a5")
-OPPONENT_PANEL_CLICKS = ("Menu", "EngineOwn", "ModeComputer", "LevelMedium", "ColorWhite")  # the person is White: the program plays Black and has nothing to answer
+OPPONENT_PANEL_CLICKS = ("Menu", "MenuSectionOpponent", "EngineOwn", "ModeComputer", "LevelMedium", "ColorWhite")  # the person is White: the program plays Black and has nothing to answer
 OPPONENT_PANEL_EXPECTED = {"plays": "black", "engine": "own", "level": "medium"}
 TURNED_BOARD_OPPONENT = {"plays": "white", "engine": "own", "level": "max"}  # the person is Black; White's turn is not on, so nothing is searched
 
