@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Smoke test of the match tool: runs `tools/uci_match.py` for real, with BagiChessUci playing BagiChessUci and BagiChess as the referee.
 
-    python tests/match_smoke.py --game-exe build/ClangmacOS/BagiChess --uci-exe build/ClangmacOS/BagiChessUci
+    python tests/match_smoke.py --game-exe build/macos-debug/bin/BagiChess --uci-exe build/macos-debug/bin/BagiChessUci
 
 ctest runs it as BagiChessMatchSmoke (CMakeLists.txt). Python 3, standard library only, no Stockfish: the opponent is a second BagiChessUci
 whose `Depth` option stands in for the Elo option (`--opponent-elo-option Depth --opponent-elo 1 --opponent-elo 2`), so the numbers of the table

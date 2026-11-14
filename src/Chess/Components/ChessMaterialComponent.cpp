@@ -3,7 +3,7 @@
 #include <BECore/GameManager/CoreManager.h>
 #include <BECore/Scene/SceneNode.h>
 #include <BECore/UI/UICanvasComponent.h>
-#include <BECore/UI/UIImage.h>
+#include <BECore/UI/UIImageComponent.h>
 #include <Chess/ChessGame.h>
 #include <Chess/Game/BoardOrientation.h>
 #include <Chess/Game/CapturedMaterial.h>
@@ -76,7 +76,7 @@ namespace BECore::Chess {
                 vars.Set(names.vars[row], eastl::string_view(word.data(), word.size()));
                 if (iconsToo && canvas) {
                     if (UIElement* element = canvas->GetRoot().FindByName(names.icons[row])) {
-                        if (UIImage* icon = element->Cast<UIImage>()) {
+                        if (UIImageComponent* icon = element->GetComponent<UIImageComponent>()) {
                             icon->sprite = PoolString::Intern(Format("{}{}", EnumUtils<PieceColor>::ToString(taken), EnumUtils<PieceType>::ToString(types[index])).c_str());
                         }
                     }

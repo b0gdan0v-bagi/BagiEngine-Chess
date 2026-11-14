@@ -58,10 +58,10 @@ Beyond that, SDL, SDL_image, the Vulkan headers and the Vulkan loader library ar
    cmake --build --preset macos-debug
    ```
 
-6. Run the game. The executable lands in `build/<Compiler><Platform>/`, not in the preset's folder (`build/ClangmacOS/` here; Debug and Release builds overwrite each other). Start it from a terminal so the log is visible:
+6. Run the game. The executable lands in `build/<preset>/bin/` (`build/macos-debug/bin/` here; Debug and Release sit side by side). Start it from a terminal so the log is visible:
 
    ```bash
-   build/ClangmacOS/BagiChess
+   build/macos-debug/bin/BagiChess
    ```
 
    It opens a window with two people on one screen; "Playing against the computer" below tells how to play the computer.
@@ -75,7 +75,7 @@ Beyond that, SDL, SDL_image, the Vulkan headers and the Vulkan loader library ar
    That is `ChessTests` (the gtest cases, each in its own process) `BagiChessControlSmoke`, a Python script that starts `BagiChess --control --headless` and plays it over the control API, and `BagiChessUciSmoke`, which starts `BagiChessUci` and talks UCI to it over pipes. A smoke test needs its built executable and is **skipped** (exit code 77) when it is missing, so build the default target as in step 5, or add `BagiChess` and `BagiChessUci` to a narrower `--target ChessTests BagiChess BagiChessUci`. Stockfish is not needed: the tests that use a real one skip themselves. To run them against yours:
 
    ```bash
-   build/ClangmacOS/ChessTests --gtest_filter='Stockfish*:UciEngineStockfishTest*'   # STOCKFISH or PATH
+   build/macos-debug/bin/ChessTests --gtest_filter='Stockfish*:UciEngineStockfishTest*'   # STOCKFISH or PATH
    ```
 
 Release is the same with `macos-release`. The `*-rmlui-*` presets also build the vendored RmlUi; the game does not need it.
@@ -98,7 +98,7 @@ The presets for Windows are in `engine/CMakePresets.json`. `windows-clang-debug`
   - `windows-msvc-debug` / `windows-msvc-release`: MSVC (`cl`) with Ninja, the same environment rule.
   - `windows-vs2022`: the Visual Studio 2022 generator, x64, MSVC; it needs no developer prompt. The build and test presets are `windows-vs2022-debug` and `windows-vs2022-release`. `windows-vs2022-clangcl` (build presets `windows-vs2022-clangcl-debug` / `-release`) is there too.
   - MSVC is not the default because its debug information (`/Zi`, a PDB per module beside the shared PCH, one `mspdbsrv` for every build on the machine) breaks a parallel build now and then (`LNK1103`, `LNK4020 ... pdb is corrupted`, `C1090`); a second run passes.
-- Step 6: the executable is `build/ClangWindows/BagiChess.exe` (`build/MSVCWindows/` for MSVC; a Visual Studio configuration adds `Debug/` or `Release/` below that folder).
+- Step 6: the executable is `build/windows-clang-debug/bin/BagiChess.exe` (the folder of the preset for MSVC too; a Visual Studio configuration adds `Debug/` or `Release/` below `bin/`).
 - Stockfish does not play on Windows yet, only the own engine does (see "Playing against the computer").
 
 ### VS Code
@@ -138,20 +138,20 @@ With none of the three the game still runs as two people, and picking Computer w
 Chess can be built for the browser with the engine's Emscripten presets (`web-release`, `web-debug`). **None of this part has been run with emsdk yet** (slice 2 of the todo entry `chess-web-build`, which waits for the engine's own browser build, the entry `web-build`): the steps below are taken from the engine's `CLAUDE.md` ("Build" table) and `engine/tools/web/CLAUDE.md` and are **not yet run**. What has been checked is the web-like build on the desktop (below).
 
 1. Install the Emscripten SDK as the engine's documentation says and run its `emsdk_env`, so that the environment variable `EMSDK` is set (the web presets are shown only then). The setup is the engine's, not this repository's: see `engine/CLAUDE.md` and the `build` skill.
-2. Configure and build, from the root of this repository: `cmake --preset web-release`, then `cmake --build --preset web-release --target BagiChess`. The output is `build/ClangWeb/BagiChess.html` with its script, `.wasm` and the preloaded content package `BagiChess.data` (`config/` and `assets/`; `cmake/ChessWeb.cmake` keeps the docs, `*.local.xml` and `imgui.ini` out of it).
-3. Package it: `python engine/tools/web/package.py build/ClangWeb dist --game BagiChess` (`dist/` is git-ignored).
+2. Configure and build, from the root of this repository: `cmake --preset web-release`, then `cmake --build --preset web-release --target BagiChess`. The output is `build/web-release/bin/BagiChess.html` with its script, `.wasm` and the preloaded content package `BagiChess.data` (`config/` and `assets/`; `cmake/ChessWeb.cmake` keeps the docs, `*.local.xml` and `imgui.ini` out of it).
+3. Package it: `python engine/tools/web/package.py build/web-release/bin dist --game BagiChess` (`dist/` is git-ignored).
 4. Serve it: `python engine/tools/web/serve.py --root dist` (add `--cross-origin-isolation` for a threaded build), then open http://localhost:8080.
 
 **What is different in the browser.** Only the **own engine** plays: there is no Stockfish (a browser cannot start a program; the Engine row of the panel has just "Own engine" and `stockfish` is refused as unavailable), no control API (the engine drops `RemoteControl` on the web) and no scene editor. The single-thread build has no worker thread, so the own engine's search is cut into slices of 256 nodes that yield to the frame budget (`chess-search-resumable`), and the page should keep drawing and taking clicks while the computer thinks. **This is checked on the desktop in the web-like build only, not yet in a browser** (the frame budget is the engine's default, 4 ms; reading it from the config is the entry `tasks-frame-budget`). The browser's `ApplicationConfig.xml` is the engine's own overlay; Chess's differs from it only in the renderer, and a test keeps it so (root `CLAUDE.md`, "The web build").
 
-**The web-like check on the desktop** (no emsdk needed): the same code with the web options, `-DENGINE_WITH_VULKAN=OFF -DENGINE_SINGLE_THREAD=ON -DENGINE_STATIC_SDL=ON -DCHESS_NO_STOCKFISH=ON`, in a build folder of its own, runs `ChessTests` (the tests that need a worker thread skip themselves). `BagiChess` does not start in that build (its `ApplicationConfig.xml` names the Vulkan renderer). The commands, and the warning that every build writes into `build/ClangWindows/` and so overwrites the desktop one, are in `tests/CLAUDE.md`, "Under `ENGINE_SINGLE_THREAD`". A desktop build with only `-DCHESS_NO_STOCKFISH=ON` (Vulkan on) starts the game without Stockfish and `python tests/control_smoke.py --exe <BagiChess>` checks it.
+**The web-like check on the desktop** (no emsdk needed): the same code with the web options, `-DENGINE_WITH_VULKAN=OFF -DENGINE_SINGLE_THREAD=ON -DENGINE_STATIC_SDL=ON -DCHESS_NO_STOCKFISH=ON`, in a build folder of its own, runs `ChessTests` (the tests that need a worker thread skip themselves). `BagiChess` does not start in that build (its `ApplicationConfig.xml` names the Vulkan renderer). The commands are in `tests/CLAUDE.md`, "Under `ENGINE_SINGLE_THREAD`". A desktop build with only `-DCHESS_NO_STOCKFISH=ON` (Vulkan on) starts the game without Stockfish and `python tests/control_smoke.py --exe <BagiChess>` checks it.
 
 ## UCI engine
 
 `BagiChessUci` is the own engine as a console program that speaks UCI on stdin and stdout, so that a tournament tool (cutechess-cli, fastchess) or a script can play it against another engine. It is built with everything else and opens no window:
 
 ```bash
-build/ClangmacOS/BagiChessUci
+build/macos-debug/bin/BagiChessUci
 ```
 
 Type `uci`, then for example `position startpos moves e2e4` and `go depth 3`; it answers `bestmove ...`. It understands `position`, `go` (`depth`, `movetime`, the clocks, `movestogo`, `infinite`), `stop`, `isready`, `ucinewgame`, `setoption` and `quit`. Its options are `Depth` (0 to 64, 0 is no limit), `BlunderPercent` (0 to 100, the share of random legal moves) and `Level` (`easy`, `medium`, `hard`, `max`, which sets the other two as the game plays that level). Details, and what is not supported, are in `src/Chess/Uci/CLAUDE.md`. To measure it against Stockfish, install Stockfish yourself (nothing of it is shipped) and see "Measuring the strength".
@@ -166,14 +166,14 @@ Stockfish is your own install (it is not shipped and no code of it is here): the
 
 ```bash
 # macOS
-python3 tools/uci_match.py --referee build/ClangmacOS/BagiChess --own build/ClangmacOS/BagiChessUci \
+python3 tools/uci_match.py --referee build/macos-debug/bin/BagiChess --own build/macos-debug/bin/BagiChessUci \
     --opponent /opt/homebrew/bin/stockfish --opponent-elo 1400 --opponent-elo 1700 --opponent-elo 2000 --games 20 --out match.json
 ```
 
 Windows (the interpreter is `python`; cmd syntax, `^` continues the line):
 
 ```bat
-python tools/uci_match.py --referee build/ClangWindows/BagiChess.exe --own build/ClangWindows/BagiChessUci.exe ^
+python tools/uci_match.py --referee build/windows-clang-release/bin/BagiChess.exe --own build/windows-clang-release/bin/BagiChessUci.exe ^
     --opponent C:/tools/stockfish/stockfish.exe --games 20 --out match.json
 ```
 

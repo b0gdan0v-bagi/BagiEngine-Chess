@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Smoke test of BagiChessUci: starts the real executable and talks UCI to it over pipes, the way a tournament tool does.
 
-    python tests/uci_smoke.py --exe build/ClangmacOS/BagiChessUci
+    python tests/uci_smoke.py --exe build/macos-debug/bin/BagiChessUci
 
 ctest runs it as BagiChessUciSmoke (CMakeLists.txt). Python 3, standard library only. The smoke does not implement chess: it checks that every
 bestmove is a move in the form [a-h][1-8][a-h][1-8][qrbn]? and that the NEXT position built with it is accepted, which the server proves by saying

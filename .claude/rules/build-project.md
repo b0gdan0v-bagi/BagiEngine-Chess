@@ -1,3 +1,12 @@
+---
+paths:
+  - "**/CMakeLists.txt"
+  - "CMakePresets.json"
+  - "CMakeUserPresets.json"
+  - "**/*.cmake"
+  - "CI/**/*"
+---
+
 # Build, format and include facts of this repository
 
 Read by the skills `build`, `clang-format` and `strip-pch-includes`. The three skills are symlinks into `engine/.claude/skills/` (the same text as in the engine repository); what differs between the repositories is here. This file has the same headings and fields as `engine/.claude/rules/build-project.md`, its template. The todo areas are in `todo-project.md`, not here.
@@ -19,7 +28,7 @@ Fields the `build` skill reads. The presets are the engine's (`CMakePresets.json
 
 | Field | Meaning | Value here |
 |-------|---------|------------|
-| Product | the executable (target name; the file is `build/{Clang\|MSVC}{macOS\|Windows}/<name>[.exe]`) | `BagiChess` |
+| Product | the executable (target name; the file is `build/<preset>/bin/<name>[.exe]`) | `BagiChess` |
 | Tests | the gtest targets; the argument `tests` builds exactly these (`--target <tests>`) | `ChessTests` |
 | Default build | what `cmake --build --preset <p>` with no `--target` builds | every target: `BagiChess` and `ChessTests` |
 | Source paths | the paths of `git status --porcelain -- <paths>` (a configure trigger) and of the `BE_CLASS` / `BE_EVENT` / `BE_REFLECT_FIELD` search | `src tests` |
@@ -28,7 +37,7 @@ Fields the `build` skill reads. The presets are the engine's (`CMakePresets.json
 | Extra gotchas | facts about the output, the tests or the run that hold only here | see "Gotchas" |
 | Test run | what `ctest --preset <p>` runs here and what it needs | see "Tests" |
 | Local overrides, editor | where per-machine settings and the IDE setup are described | below, "Local overrides" and "VS Code" |
-| Windows preset | what the `build` skill picks on Windows and how it runs it | `windows-clang-debug` / `windows-clang-release` (Clang + Ninja, `build/ClangWindows/`), every `cmake --preset` and `cmake --build --preset` through `python engine/CI/scripts/vs_env.py` (the x64 Visual Studio environment); MSVC only by explicit name, see "Gotchas" |
+| Windows preset | what the `build` skill picks on Windows and how it runs it | `windows-clang-debug` / `windows-clang-release` (Clang + Ninja, `build/windows-clang-{debug,release}/bin/`), every `cmake --preset` and `cmake --build --preset` through `python engine/CI/scripts/vs_env.py` (the x64 Visual Studio environment); MSVC only by explicit name, see "Gotchas" |
 
 The common configure triggers (the skill states them; this repository adds the one above): no `build/<p>/CMakeCache.txt`, the argument `configure`, added, deleted, renamed or untracked files under the source paths (sources are globbed without `CONFIGURE_DEPENDS`), a change in `CMakePresets.json`, `CMakeUserPresets.json` or any `*.cmake`, and a changed or new file under the source paths that contains `BE_CLASS`, `BE_EVENT` or `BE_REFLECT_FIELD` (reflection code is generated only at configure time).
 
@@ -43,13 +52,14 @@ The common configure triggers (the skill states them; this repository adds the o
 ### Gotchas
 
 - The engine is another repository: a build never edits `engine/`. A missing engine feature is `needs engine change`, not a patch here.
-- Executables land in `build/{Clang|MSVC}{macOS|Windows}/BagiChess[.exe]` and `ChessTests`, not in the preset folder; Debug and Release overwrite each other. On Windows that is `build/ClangWindows/` (the default presets) or `build/MSVCWindows/` (MSVC).
+- Executables land in `build/<preset>/bin/` (`BagiChess[.exe]`, `ChessTests`, `BagiChessUci`), static libraries in `build/<preset>/lib/`, so Debug and Release sit side by side (a Visual Studio preset adds `bin/<Config>/`). A folder of the old layout (`build/ClangWindows/`, `build/ClangmacOS/`) is not used any more and can be deleted by hand.
+- **`BE_WITH_EDITOR` inside one preset.** `ninja` does not notice that a library was built with the other `BE_WITH_EDITOR` (the editor sources are in one and not in the other): after flipping the option in a build folder, delete `build/<preset>/lib/` before building (symptoms of a mix: link errors for editor classes, crashes in the UI tests). The option and its presets: `engine/cmake/CLAUDE.md`, "The editor option".
 - **Why MSVC is not the default on Windows.** `windows-vs2022-*` (MSBuild, `/Zi`) failed the first run now and then with `LNK4020 ... BECoreModule.pdb is corrupted`, `LNK1103 debugging information corrupt`, sometimes `C1090` / `C1041` / `LNK1104` / `LNK1201`, and passed the second: every module takes the PCH of `BECoreModule` (`REUSE_FROM`) with a PDB of its own, MSBuild builds them in parallel, and one `mspdbsrv.exe` serves every build on the machine (the main checkout and the workers). Clang writes no `cl` PDB and uses no `mspdbsrv`. The MSVC presets stay for a run by explicit name.
 - `BagiChess` opens a window, so it is never started to check a build (to launch it use the `run` skill). `ChessTests` opens none.
 
 ### Tests
 
-`ctest --preset <p>` runs `ChessTests` (the gtests, each in its own process) and `BagiChessControlSmoke`, a Python script that starts `BagiChess --control --headless` and plays it over the control API. The smoke test is skipped (exit code 77) when the executable is not built, so a `--target` list without `BagiChess` (what the argument `tests` builds) does not run it: add `BagiChess`. `UciEngineStockfishTest` skips itself when there is no Stockfish (`CLAUDE.md`, "Tests").
+`ctest --preset <p>` runs `ChessTests` (the gtests, each in its own process) and `BagiChessControlSmoke`, a Python script that starts `BagiChess --control --headless` and plays it over the control API. The smoke test is skipped (exit code 77) when the executable is not built, so a `--target` list without `BagiChess` (what the argument `tests` builds) does not run it: add `BagiChess`. `UciEngineStockfishTest` skips itself when there is no Stockfish (`CLAUDE.md`, "Tests"). `BagiChessUciSmoke` and `BagiChessMatchSmoke` need `BagiChessUci` too. A full build (no `--target`) also builds the engine's `BagiRoomServer`, and then ctest runs its smokes `BagiRoomServerSmoke` / `BagiRoomServerHostile`; on Windows they fail (2026-11-14, the room server has not been made to run there yet): engine work, not a Chess failure. Sanitizers: the engine's preset `windows-clang-asan` (`macos-asan` on macOS) builds and runs the same targets under ASan + UBSan (`engine/.claude/rules/build-project.md`, "Sanitizers").
 
 ### Local overrides
 
@@ -60,50 +70,26 @@ The common configure triggers (the skill states them; this repository adds the o
     "version": 6,
     "configurePresets": [
         {
-            "name": "macos-debug-ccache",
+            "name": "macos-debug-local",
             "inherits": "macos-debug",
             "cacheVariables": {
-                "CMAKE_CXX_COMPILER_LAUNCHER": "ccache",
                 "VULKAN_SDK": "/Users/me/VulkanSDK/1.4.363.0/macOS"
             }
         }
     ],
     "buildPresets": [
         {
-            "name": "macos-debug-ccache",
+            "name": "macos-debug-local",
             "inherits": "macos-debug",
-            "configurePreset": "macos-debug-ccache"
+            "configurePreset": "macos-debug-local"
         }
     ]
 }
 ```
 
-`VULKAN_SDK` is only needed when `glslc` is not on PATH.
+`VULKAN_SDK` is only needed when `glslc` is not on PATH. ccache needs no preset: the build uses it by itself when it is installed (`ENGINE_CCACHE`, `engine/cmake/BagiCompilerCache.cmake`; `-DENGINE_CCACHE=OFF` switches it off). To share hits between this checkout and the worker folders, set `ENGINE_CCACHE_BASE_DIR` to a folder that holds all of them (`worker.py create` does it for new workers).
 
-On Windows, the default preset with ccache (configured and built through `python engine/CI/scripts/vs_env.py`, like the shared one):
-
-```json
-{
-    "version": 6,
-    "configurePresets": [
-        {
-            "name": "windows-clang-debug-ccache",
-            "inherits": "windows-clang-debug",
-            "cacheVariables": {
-                "CMAKE_C_COMPILER_LAUNCHER": "ccache",
-                "CMAKE_CXX_COMPILER_LAUNCHER": "ccache"
-            }
-        }
-    ],
-    "buildPresets": [
-        {
-            "name": "windows-clang-debug-ccache",
-            "inherits": "windows-clang-debug",
-            "configurePreset": "windows-clang-debug-ccache"
-        }
-    ]
-}
-```
+On Windows the same with the default Windows preset: `"inherits": "windows-clang-debug"`, configured and built through `python engine/CI/scripts/vs_env.py` like the shared preset.
 
 `.claude/settings.local.json` is git-ignored and per machine too.
 

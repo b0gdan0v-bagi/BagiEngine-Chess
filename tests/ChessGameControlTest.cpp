@@ -1,6 +1,7 @@
 #include "ChessTestUtil.h"
 #include "TestEngines.h"
 
+#include <BECore/Control/Json.h>
 #include <Chess/ChessGameControl.h>
 #include <Chess/Engine/OwnEngine.h>
 #include <Chess/Game/MoveGenerator.h>
