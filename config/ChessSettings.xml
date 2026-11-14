@@ -1,10 +1,13 @@
 <?xml version="1.0"?>
 <!--
-  Settings of the computer opponent.
+  Settings of the computer opponent and of the memory of the game.
 
   stockfishPath: the full path of a Stockfish you installed (the game does not ship one).
     Leave it empty to use the environment variable STOCKFISH and then "stockfish" on PATH.
     Put your own path in config/ChessSettings.local.xml, which git ignores, not here:
     this file is committed and has to stay empty.
+
+  rememberGame: "true" restores the unfinished game and the opponent choice at the start and saves them as you play.
+    Set "false" in config/ChessSettings.local.xml to start every run new. A run with the control API or --headless never saves, whatever this says.
 -->
-<ChessSettings stockfishPath=""/>
+<ChessSettings stockfishPath="" rememberGame="true"/>
