@@ -93,27 +93,51 @@ namespace BECore::Chess::Tests {
         }
 
 #if defined(_WIN32)
-        /// The process has ended. Once UciProcess let go of its handle the id names nothing (OpenProcess fails); if something else still holds a handle, it must be signalled
-        void ExpectReaped(int processId) {
-            const HANDLE process = OpenProcess(SYNCHRONIZE, FALSE, static_cast<DWORD>(processId));
-            if (process == nullptr) {
-                return;
+        /// Watches one child so that a test can tell it has ended. Made while UciProcess still holds its handle: it keeps the identity of the process, which an id looked up
+        /// after Close() does not (Windows hands a freed id to the next process at once, and ctest starts many)
+        class ExitWatch {
+        public:
+            explicit ExitWatch(int processId) : _processId(processId), _handle(OpenProcess(SYNCHRONIZE, FALSE, static_cast<DWORD>(processId))) {
+                EXPECT_NE(_handle, nullptr) << "cannot watch process " << processId;
             }
-            const DWORD waited = WaitForSingleObject(process, 0);
-            CloseHandle(process);
-            EXPECT_EQ(waited, WAIT_OBJECT_0) << "process " << processId << " is still running";
-        }
+            ~ExitWatch() {
+                if (_handle != nullptr) {
+                    CloseHandle(_handle);
+                }
+            }
+            ExitWatch(const ExitWatch&) = delete;
+            ExitWatch& operator=(const ExitWatch&) = delete;
+
+            /// The process has ended: its handle is signalled
+            void ExpectReaped() const {
+                if (_handle != nullptr) {
+                    EXPECT_EQ(WaitForSingleObject(_handle, 0), WAIT_OBJECT_0) << "process " << _processId << " is still running";
+                }
+            }
+
+        private:
+            int _processId;
+            HANDLE _handle;
+        };
 
         // ERROR_PATH_NOT_FOUND: the directory of the program does not exist
         constexpr const char* kMissingProgramText = "(error 3)";
 #else
-        /// The process is gone and collected: a zombie would still answer kill(pid, 0)
-        void ExpectReaped(int processId) {
-            const int result = kill(static_cast<pid_t>(processId), 0);
-            const int error = errno;
-            EXPECT_EQ(result, -1) << "process " << processId << " is still there";
-            EXPECT_EQ(error, ESRCH) << "process " << processId << " was not collected";
-        }
+        /// The same for POSIX, where the process is gone and collected when the id answers nothing: a zombie would still answer kill(pid, 0)
+        class ExitWatch {
+        public:
+            explicit ExitWatch(int processId) : _processId(processId) {}
+
+            void ExpectReaped() const {
+                const int result = kill(static_cast<pid_t>(_processId), 0);
+                const int error = errno;
+                EXPECT_EQ(result, -1) << "process " << _processId << " is still there";
+                EXPECT_EQ(error, ESRCH) << "process " << _processId << " was not collected";
+            }
+
+        private:
+            int _processId;
+        };
 
         constexpr const char* kMissingProgramText = "No such file";
 #endif
@@ -344,6 +368,7 @@ namespace BECore::Chess::Tests {
         const auto process = StartFake({"--die-on-go"});
         ASSERT_NE(process, nullptr);
         const int processId = process->GetProcessId();
+        const ExitWatch watch(processId);
         Write(*process, "go");
 
         const auto first = process->ReadLine(kMustNotTimeOut);
@@ -355,7 +380,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(second.error().kind, EngineErrorKind::ProcessDied);
         EXPECT_FALSE(process->IsRunning());
         process->Close();
-        ExpectReaped(processId);
+        watch.ExpectReaped();
     }
 
     TEST(UciProcessTest, TheLinesBeforeTheEndAreReadBeforeProcessDied) {
@@ -407,12 +432,13 @@ namespace BECore::Chess::Tests {
         ASSERT_NE(process, nullptr);
         Handshake(*process);
         const int processId = process->GetProcessId();
+        const ExitWatch watch(processId);
         Write(*process, "quit");
 
         // The log shows the child got `quit`; whether it left by itself or a signal ended it, the test cannot tell (that would take a clock)
         process->Close(kMustNotTimeOut);
 
-        ExpectReaped(processId);
+        watch.ExpectReaped();
         EXPECT_FALSE(process->IsRunning());
         EXPECT_EQ(ReadFileLines(directory.File("fake.log")), Lines({"isready", "quit"}));
     }
@@ -423,11 +449,12 @@ namespace BECore::Chess::Tests {
         ASSERT_NE(process, nullptr);
         Handshake(*process);
         const int processId = process->GetProcessId();
+        const ExitWatch watch(processId);
 
         // No quit: the end of the input is the request
         process->Close(kMustNotTimeOut);
 
-        ExpectReaped(processId);
+        watch.ExpectReaped();
     }
 
     TEST(UciProcessTest, ClosingAChildThatIgnoresQuitEndsItAfterTheGrace) {
@@ -438,6 +465,7 @@ namespace BECore::Chess::Tests {
         ASSERT_NE(process, nullptr);
         Handshake(*process);
         const int processId = process->GetProcessId();
+        const ExitWatch watch(processId);
         Write(*process, "quit");
         ASSERT_TRUE(WaitForLogLine(directory.File("fake.log"), "quit"));  // read by the child before Close: a loaded machine may be slower than the short grace
 
@@ -445,7 +473,7 @@ namespace BECore::Chess::Tests {
         process->Close(kShortGrace);
         const Clock::duration took = Clock::now() - begin;
 
-        ExpectReaped(processId);
+        watch.ExpectReaped();
         EXPECT_GE(took, kShortGrace);  // it got its grace first
         EXPECT_EQ(ReadFileLines(directory.File("fake.log")), Lines({"isready", "quit"}));
     }
@@ -459,6 +487,7 @@ namespace BECore::Chess::Tests {
         ASSERT_NE(process, nullptr);
         Handshake(*process);  // the signal handler is installed before the first line is read
         const int processId = process->GetProcessId();
+        const ExitWatch watch(processId);
         Write(*process, "quit");
         ASSERT_TRUE(WaitForLogLine(directory.File("fake.log"), "quit"));
 
@@ -466,7 +495,7 @@ namespace BECore::Chess::Tests {
         process->Close(kShortGrace);
         const Clock::duration took = Clock::now() - begin;
 
-        ExpectReaped(processId);
+        watch.ExpectReaped();
         EXPECT_GE(took, kShortGrace + kTerminateWait);  // the grace, then SIGTERM and its wait, then SIGKILL
         EXPECT_EQ(ReadFileLines(directory.File("fake.log")), Lines({"isready", "quit", "<SIGTERM ignored>"}));
     }
@@ -478,10 +507,11 @@ namespace BECore::Chess::Tests {
         ASSERT_NE(process, nullptr);
         Handshake(*process);
         const int processId = process->GetProcessId();
+        const ExitWatch watch(processId);
 
         process.reset();
 
-        ExpectReaped(processId);
+        watch.ExpectReaped();
     }
 
     TEST(UciProcessTest, AClosedProcessAnswersProcessDiedAndClosingTwiceIsHarmless) {
@@ -489,6 +519,7 @@ namespace BECore::Chess::Tests {
         const auto process = StartFake();
         ASSERT_NE(process, nullptr);
         const int processId = process->GetProcessId();
+        const ExitWatch watch(processId);
 
         process->Close(kMustNotTimeOut);
         process->Close(kMustNotTimeOut);
@@ -501,7 +532,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(read.error().kind, EngineErrorKind::ProcessDied);
         EXPECT_FALSE(process->IsRunning());
         EXPECT_EQ(process->GetProcessId(), processId);
-        ExpectReaped(processId);
+        watch.ExpectReaped();
     }
 
 #if defined(_WIN32)
