@@ -64,8 +64,8 @@ namespace BECore::Chess::Tests {
     }  // namespace HudWordsDetail
 
     /// The words of the HUD, from a scratch game of their own that reaches every status, then the thinking form of the turn and the sentence of every kind of engine
-    /// error. The names of the segments of the panel (modes, colors, engines, levels) are not here: they are elements of the scene that a test walks, and a test holds
-    /// their text to the tables
+    /// error (also the `opponentError` list: the variable of the panel's error line). The names of the segments of the panel (modes, colors, engines, levels)
+    /// are not here: they are elements of the scene that a test walks, and a test holds their text to the tables
     inline HudWords AllHudWords() {
         using namespace HudWordsDetail;
         HudWords words;

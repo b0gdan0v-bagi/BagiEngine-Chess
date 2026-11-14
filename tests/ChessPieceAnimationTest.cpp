@@ -41,7 +41,8 @@ namespace BECore::Chess::Tests {
         constexpr float kThreeQuarters = 0.75f;
         constexpr float kDefaultSlide = 0.15f;  // what SceneConfig.xml gets from the code
         constexpr int kStepsToEnd = 4;          // tween steps (frames after the first) until the slide ends
-        constexpr float kViewWidth = 840.0f;    // the view of the scene (SceneConfig.xml) and half a square, to turn a square into the output pixel of its middle
+        // The view of the scene (config/SceneConfig.xml) and half a square, to turn a square into the output pixel of its middle
+        constexpr float kViewWidth = 840.0f;
         constexpr float kViewHeight = 800.0f;
         constexpr float kHalfSquare = 40.0f;
         constexpr float kDragStepPixels = 20.0f;  // a first motion of a drag, well past the threshold of the board
