@@ -35,7 +35,7 @@ namespace BECore::Chess::Tests {
 
         void ExpectPerft(StringView fen, std::initializer_list<PerftCase> cases) {
             Position position = PositionFromFen(fen);
-            const eastl::string startFen = position.ToFen();
+            const String startFen = position.ToFen();
             const ZobristKey startKey = position.Key();
             for (const PerftCase& perftCase : cases) {
                 EXPECT_EQ(Perft(position, perftCase.depth), perftCase.nodes) << "depth " << perftCase.depth << " of " << startFen.c_str();

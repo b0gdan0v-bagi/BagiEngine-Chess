@@ -11,8 +11,8 @@ namespace BECore::Chess::Tests {
         constexpr PieceColor kBlack = PieceColor::Black;
         constexpr int kBoardSize = 8;  // files and ranks
 
-        eastl::string Joined(bool files, PieceColor bottom) {
-            eastl::string text;
+        String Joined(bool files, PieceColor bottom) {
+            String text;
             for (int index = 0; index < kBoardSize; ++index) {
                 const StringView label = files ? FileLabel(index, bottom) : RankLabel(index, bottom);
                 text.append(label.data(), label.size());

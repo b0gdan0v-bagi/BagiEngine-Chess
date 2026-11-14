@@ -609,11 +609,11 @@ namespace BECore::Chess::Tests {
             ExpectEveryPieceOnItsSquare();
             ExpectOn(pawn, "d5");
 
-            std::string moves;
+            String moves;
             for (const Move move : Model().GetMoves()) {
-                moves += std::string(move.ToUci().c_str()) + " ";
+                moves += String(move.ToUci().c_str()) + " ";
             }
-            return std::tuple{Model().GetVersion() - version, moves, std::string(Model().GetPosition().ToFen().c_str())};
+            return std::tuple{Model().GetVersion() - version, moves, String(Model().GetPosition().ToFen().c_str())};
         };
 
         const auto animated = play(kDuration);

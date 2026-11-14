@@ -27,7 +27,7 @@ namespace BECore::Chess::Tests {
         /// The words a server line may begin with
         constexpr const char* kKnownKeywords[] = {"id", "option", "uciok", "readyok", "bestmove", "info"};
 
-        bool StartsWith(const eastl::string& text, StringView prefix) {
+        bool StartsWith(const String& text, StringView prefix) {
             return StringView(text).starts_with(prefix);
         }
 
@@ -140,7 +140,7 @@ namespace BECore::Chess::Tests {
                 }
             }
 
-            [[nodiscard]] Vector<eastl::string> Lines() const {
+            [[nodiscard]] Vector<String> Lines() const {
                 const std::lock_guard lock(_mutex);
                 return _lines;
             }
@@ -151,27 +151,27 @@ namespace BECore::Chess::Tests {
 
             [[nodiscard]] size_t CountOf(StringView prefix) const {
                 size_t count = 0;
-                for (const eastl::string& line : Lines()) {
+                for (const String& line : Lines()) {
                     count += StartsWith(line, prefix) ? 1 : 0;
                 }
                 return count;
             }
 
             /// The moves of the `bestmove` lines, in order ("(none)" as it is)
-            [[nodiscard]] Vector<eastl::string> BestMoves() const {
-                Vector<eastl::string> moves;
-                for (const eastl::string& line : Lines()) {
+            [[nodiscard]] Vector<String> BestMoves() const {
+                Vector<String> moves;
+                for (const String& line : Lines()) {
                     if (const auto parsed = UciProtocol::ParseBestMove(StringView(line))) {
-                        moves.push_back(parsed->move.empty() ? eastl::string("(none)") : parsed->move);
+                        moves.push_back(parsed->move.empty() ? String("(none)") : parsed->move);
                     }
                 }
                 return moves;
             }
 
-            [[nodiscard]] eastl::string OnlyBestMove() const {
-                const Vector<eastl::string> moves = BestMoves();
+            [[nodiscard]] String OnlyBestMove() const {
+                const Vector<String> moves = BestMoves();
                 EXPECT_EQ(moves.size(), 1u);
-                return moves.empty() ? eastl::string() : moves.front();
+                return moves.empty() ? String() : moves.front();
             }
 
             Uci::UciServer& Server() {
@@ -180,7 +180,7 @@ namespace BECore::Chess::Tests {
 
         private:
             mutable std::mutex _mutex;
-            Vector<eastl::string> _lines;
+            Vector<String> _lines;
             Uci::UciServer _server;
         };
 
@@ -196,14 +196,14 @@ namespace BECore::Chess::Tests {
         }
 
         /// The move that BlunderEngine over OwnEngine answers for @p request
-        eastl::string BlunderAnswer(int percent, const SearchRequest& request) {
+        String BlunderAnswer(int percent, const SearchRequest& request) {
             BlunderEngine engine(eastl::make_shared<OwnEngine>(), percent);
             const auto move = engine.FindMove(request, CancellationToken::Create());
             EXPECT_TRUE(move.has_value());
-            return move ? move->ToUci() : eastl::string();
+            return move ? move->ToUci() : String();
         }
 
-        bool IsLegalIn(const SearchRequest& request, const eastl::string& uci) {
+        bool IsLegalIn(const SearchRequest& request, const String& uci) {
             const auto position = request.FinalPosition();
             return position && MoveGenerator::ParseUci(*position, StringView(uci)).has_value();
         }
@@ -217,7 +217,7 @@ namespace BECore::Chess::Tests {
     TEST(UciServerTest, UciAnswersIdOptionsAndEndsWithUciok) {
         Session session;
         session.Send("uci");
-        const Vector<eastl::string> lines = session.Lines();
+        const Vector<String> lines = session.Lines();
         ASSERT_EQ(lines.size(), 6u);
         EXPECT_EQ(lines[0], "id name BagiChess Own");
         EXPECT_TRUE(StartsWith(lines[1], "id author "));
@@ -230,7 +230,7 @@ namespace BECore::Chess::Tests {
     TEST(UciServerTest, IsReadyAnswersReadyok) {
         Session session;
         session.Send("isready");
-        EXPECT_EQ(session.Lines(), Vector<eastl::string>{"readyok"});
+        EXPECT_EQ(session.Lines(), Vector<String>{"readyok"});
     }
 
     TEST(UciServerTest, UnknownLinesAreSkippedInSilence) {
@@ -242,14 +242,14 @@ namespace BECore::Chess::Tests {
     TEST(UciServerTest, GoAfterMovesAnswersALegalMoveOfTheSideToMove) {
         Session session;
         session.Play({"position startpos moves e2e4 e7e5", "go depth 2"});
-        const eastl::string move = session.OnlyBestMove();
+        const String move = session.OnlyBestMove();
         EXPECT_TRUE(IsLegalIn(StartRequest({"e2e4", "e7e5"}, SearchLimits{0, kShallow}), move)) << move.c_str();
     }
 
     TEST(UciServerTest, TheMoveIsReadByTheClientSideOfTheProtocol) {
         Session session;
         session.Play({"position startpos moves e2e4", "go depth 1"});
-        const Vector<eastl::string> lines = session.Lines();
+        const Vector<String> lines = session.Lines();
         ASSERT_EQ(lines.size(), 1u);
         const auto parsed = UciProtocol::ParseBestMove(StringView(lines[0]));
         ASSERT_TRUE(parsed.has_value());
@@ -265,7 +265,7 @@ namespace BECore::Chess::Tests {
     TEST(UciServerTest, TheSameGameAndDepthGiveTheSameMove) {
         Session session;
         session.Play({"position startpos moves d2d4 g8f6 c2c4", "go depth 3", "go depth 3"});
-        const Vector<eastl::string> moves = session.BestMoves();
+        const Vector<String> moves = session.BestMoves();
         ASSERT_EQ(moves.size(), 2u);
         EXPECT_EQ(moves[0], moves[1]);
     }
@@ -305,7 +305,7 @@ namespace BECore::Chess::Tests {
         ASSERT_GT(easy.blunderPercent, 0);
         const Vector<Vector<const char*>> games = {{}, {"e2e4"}, {"d2d4", "d7d5"}, {"e2e4", "e7e5", "g1f3"}};
         for (const Vector<const char*>& moves : games) {
-            eastl::string position = "position startpos";
+            String position = "position startpos";
             SearchRequest request = StartRequest({}, SearchLimits{0, easy.ownDepth});
             if (!moves.empty()) {
                 position.append(" moves");
@@ -435,7 +435,7 @@ namespace BECore::Chess::Tests {
         session.Send("go depth 1");
         session.Server().WaitIdle();
         EXPECT_EQ(session.CountOf("info string "), 0u);
-        const Vector<eastl::string> moves = session.BestMoves();
+        const Vector<String> moves = session.BestMoves();
         ASSERT_EQ(moves.size(), 2u);
         EXPECT_EQ(moves[0], ScriptedEngine::MoveFor(StartRequest({}, {}), kBlockedDepth - 1).ToUci());
         EXPECT_EQ(moves[1], ScriptedEngine::MoveFor(StartRequest({"d2d4"}, {}), 1).ToUci());
@@ -522,7 +522,7 @@ namespace BECore::Chess::Tests {
     TEST(UciServerTest, ThePromotionIsSpelledWithItsPiece) {
         Session session;
         session.Play({"position fen 8/P6k/8/8/8/8/8/K7 w - - 0 1", "go depth 1"});
-        const eastl::string move = session.OnlyBestMove();
+        const String move = session.OnlyBestMove();
         ASSERT_EQ(move.size(), 5u) << move.c_str();
         EXPECT_EQ(move, "a7a8q");
     }
@@ -531,15 +531,15 @@ namespace BECore::Chess::Tests {
         Session session;
         session.Play({"uci", "isready", "setoption name Foo value 1", "position startpos moves e2e5", "position startpos moves e2e4", "go depth 1", "position fen 6k1/5ppp/8/8/8/8/8/R3K3 w - - 0 1",
                       "go infinite", "ucinewgame", "go wtime 100 btime 100", "stop"});
-        const Vector<eastl::string> lines = session.Lines();
+        const Vector<String> lines = session.Lines();
         EXPECT_GT(lines.size(), 6u);
-        for (const eastl::string& line : lines) {
+        for (const String& line : lines) {
             bool known = false;
             for (const char* keyword : kKnownKeywords) {
                 known = known || line == keyword || StartsWith(line, Format("{} ", keyword));
             }
             EXPECT_TRUE(known) << line.c_str();
-            EXPECT_EQ(line.find('\n'), eastl::string::npos);
+            EXPECT_EQ(line.find('\n'), String::npos);
         }
         EXPECT_EQ(session.BestMoves().size(), 3u);
     }

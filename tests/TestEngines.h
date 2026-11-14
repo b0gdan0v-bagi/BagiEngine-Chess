@@ -34,8 +34,8 @@ namespace BECore::Chess::Tests {
     }
 
     /// An error as a sentence for a failed test ("no error" when there is none)
-    inline eastl::string DescribeError(const Optional<EngineError>& error) {
-        return error ? Format("{}: {}", EnumUtils<EngineErrorKind>::ToString(error->kind), error->detail) : eastl::string("no error");
+    inline String DescribeError(const Optional<EngineError>& error) {
+        return error ? Format("{}: {}", EnumUtils<EngineErrorKind>::ToString(error->kind), error->detail) : String("no error");
     }
 
     /// The first legal move of the position a request leads to; NoMove when the game is over there
@@ -329,7 +329,7 @@ namespace BECore::Chess::Tests {
         }
 
         /// The id of the engine ("stockfish", "own") of each call, in order
-        [[nodiscard]] const Vector<eastl::string>& Engines() const {
+        [[nodiscard]] const Vector<String>& Engines() const {
             return _engineIds;
         }
 
@@ -346,7 +346,7 @@ namespace BECore::Chess::Tests {
 
         Vector<eastl::shared_ptr<IChessEngine>> _engines;
         Optional<EngineError> _error;
-        Vector<eastl::string> _engineIds;
+        Vector<String> _engineIds;
     };
 
     /**
@@ -373,12 +373,12 @@ namespace BECore::Chess::Tests {
         }
 
         /// The id of the level of each call, in order
-        [[nodiscard]] const Vector<eastl::string>& Levels() const {
+        [[nodiscard]] const Vector<String>& Levels() const {
             return _levels;
         }
 
         /// The id of the engine ("stockfish", "own") of each call, in order
-        [[nodiscard]] const Vector<eastl::string>& Engines() const {
+        [[nodiscard]] const Vector<String>& Engines() const {
             return _engineIds;
         }
 
@@ -396,8 +396,8 @@ namespace BECore::Chess::Tests {
 
         Vector<eastl::shared_ptr<IChessEngine>> _engines;
         Optional<EngineError> _error;
-        Vector<eastl::string> _levels;
-        Vector<eastl::string> _engineIds;
+        Vector<String> _levels;
+        Vector<String> _engineIds;
     };
 
 }  // namespace BECore::Chess::Tests

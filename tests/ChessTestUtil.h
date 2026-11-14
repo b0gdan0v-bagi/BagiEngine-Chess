@@ -89,7 +89,7 @@ namespace BECore::Chess::Tests {
     inline Position PositionFromFen(StringView fen) {
         auto position = Position::FromFen(fen);
         if (!position) {
-            ADD_FAILURE() << "Invalid FEN in test: " << eastl::string(fen).c_str() << " (" << EnumUtils<FenError>::ToString(position.error()).data() << ")";
+            ADD_FAILURE() << "Invalid FEN in test: " << String(fen).c_str() << " (" << EnumUtils<FenError>::ToString(position.error()).data() << ")";
             return Position::Start();
         }
         return *position;
@@ -114,9 +114,9 @@ namespace BECore::Chess::Tests {
             return c;
         }
 
-        inline Vector<std::string> SplitOn(const std::string& text, char separator) {
-            Vector<std::string> parts;
-            std::string current;
+        inline Vector<String> SplitOn(const String& text, char separator) {
+            Vector<String> parts;
+            String current;
             for (const char c : text) {
                 if (c == separator) {
                     parts.push_back(current);
@@ -133,12 +133,12 @@ namespace BECore::Chess::Tests {
 
     /// The same game seen from the other side of the table: ranks flipped, colors swapped, the other side to move,
     /// the castling rights and the en passant square swapped with them
-    inline std::string MirrorFen(StringView fen) {
-        const Vector<std::string> fields = MirrorDetail::SplitOn(std::string(fen.data(), fen.size()), ' ');
+    inline String MirrorFen(StringView fen) {
+        const Vector<String> fields = MirrorDetail::SplitOn(String(fen.data(), fen.size()), ' ');
         EXPECT_GE(fields.size(), 4U);
 
-        Vector<std::string> ranks = MirrorDetail::SplitOn(fields[0], '/');
-        std::string placement;
+        Vector<String> ranks = MirrorDetail::SplitOn(fields[0], '/');
+        String placement;
         for (auto rank = ranks.rbegin(); rank != ranks.rend(); ++rank) {
             if (!placement.empty()) {
                 placement.push_back('/');
@@ -148,29 +148,29 @@ namespace BECore::Chess::Tests {
             }
         }
 
-        const std::string side = fields[1] == "w" ? "b" : "w";
+        const String side = fields[1] == "w" ? "b" : "w";
 
-        std::string castling;
+        String castling;
         for (const char c : fields[2]) {
             castling.push_back(MirrorDetail::SwapCase(c));
         }
         if (castling != "-") {
             // The order of the letters is the FEN's: KQkq
-            std::string ordered;
-            for (const char c : std::string("KQkq")) {
-                if (castling.find(c) != std::string::npos) {
+            String ordered;
+            for (const char c : String("KQkq")) {
+                if (castling.find(c) != String::npos) {
                     ordered.push_back(c);
                 }
             }
             castling = ordered;
         }
 
-        std::string enPassant = fields[3];
+        String enPassant = fields[3];
         if (enPassant != "-") {
             enPassant[1] = static_cast<char>('1' + '8' - enPassant[1]);
         }
 
-        std::string mirrored = placement + " " + side + " " + castling + " " + enPassant;
+        String mirrored = placement + " " + side + " " + castling + " " + enPassant;
         for (size_t i = 4; i < fields.size(); ++i) {
             mirrored += " " + fields[i];
         }

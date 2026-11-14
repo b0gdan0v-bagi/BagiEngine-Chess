@@ -85,23 +85,22 @@ namespace BECore::Chess::Tests {
         }
 
         OpponentSettings SettingsFor(StringView path) {
-            return OpponentSettings{eastl::string(path.data(), path.size())};
+            return OpponentSettings{String(path.data(), path.size())};
         }
 
         OpponentSettings SettingsFor(const std::filesystem::path& program) {
-            const std::string path = program.string();
-            return SettingsFor(StringView(path.c_str(), path.size()));
+            return SettingsFor(StringView(FromStdString(program.string())));
         }
 
         /// A Stockfish at @p path at the weakest `Skill Level`, the way the game starts one for the weakest level (but not through the factory: the games ask it directly)
-        UciEngineSettings WeakStockfish(const eastl::string& path) {
+        UciEngineSettings WeakStockfish(const String& path) {
             UciEngineSettings settings = StockfishSettings(path);
             settings.options.emplace_back("Skill Level", Format("{}", kStockfishSkill));
             settings.quitGraceMs = kQuitGraceMs;
             return settings;
         }
 
-        eastl::string ResultOf(const ChessGameModel& model) {
+        String ResultOf(const ChessGameModel& model) {
             if (!model.IsGameOver()) {
                 return "unfinished";
             }
@@ -113,7 +112,7 @@ namespace BECore::Chess::Tests {
         /// A shell script that notes its start in @p launches, its process id in @p pidFile and, when @p stdinLog is given, a copy of every line the game sends in that file
         /// (tee), then becomes the Stockfish at @p stockfish. Without @p stdinLog the script `exec`s the program, so its id is the engine's. With it the script stays the
         /// parent of a pipe `tee | program`: the second line of @p pidFile is the id of the program itself (a shell that `exec`s it), the first is the script's
-        std::filesystem::path WriteWrapper(const TempDirectory& directory, const eastl::string& stockfish, const char* pidFile, const char* stdinLog = nullptr) {
+        std::filesystem::path WriteWrapper(const TempDirectory& directory, const String& stockfish, const char* pidFile, const char* stdinLog = nullptr) {
             const std::filesystem::path script = directory.File(kWrapperName);
             {
                 std::ofstream out(script);
@@ -133,7 +132,7 @@ namespace BECore::Chess::Tests {
 
         /// The process id on line @p index (from 0) of @p pidFile, once the script has written it
         Optional<int> ProcessIdAt(const std::filesystem::path& pidFile, size_t index) {
-            const Vector<eastl::string> lines = ReadFileLines(pidFile);
+            const Vector<String> lines = ReadFileLines(pidFile);
             return index < lines.size() ? ParseInt(lines[index].c_str(), lines[index].size()) : std::nullopt;
         }
 
@@ -144,7 +143,7 @@ namespace BECore::Chess::Tests {
 
         /// Starts a max level search of the Stockfish at @p stockfishPath, calls Shutdown() while it runs and checks what is left: the processes are gone, the program was told
         /// `stop`, nothing late is played. With @p checkSpeed Shutdown() must also have returned within kShutdownBudget (the yardstick; a normal run decides nothing by a clock)
-        void ShutdownDuringAMaxLevelSearch(const eastl::string& stockfishPath, bool checkSpeed) {
+        void ShutdownDuringAMaxLevelSearch(const String& stockfishPath, bool checkSpeed) {
             const TempDirectory directory;
             const std::filesystem::path wrapper = WriteWrapper(directory, stockfishPath, kPidLogName, kStdinLogName);  // a copy of what the game writes to the program lands in stdin.log
             ChessGameModel model;
@@ -243,7 +242,7 @@ namespace BECore::Chess::Tests {
             const Player engine = EnginePlayer(stockfish, SearchLimits{kGameMoveTimeMs, 0});
             const Player mover = RandomPlayer(random);
 
-            const Vector<eastl::string> moves = PlayGame(model, stockfishIsWhite ? engine : mover, stockfishIsWhite ? mover : engine, kRandomGamePlies);
+            const Vector<String> moves = PlayGame(model, stockfishIsWhite ? engine : mover, stockfishIsWhite ? mover : engine, kRandomGamePlies);
 
             // Every move was accepted (PlayGame); the one claim about the result is that the random side did not win
             EXPECT_TRUE(model.IsGameOver() || model.GetMoves().size() == kRandomGamePlies) << "game " << game;
@@ -265,12 +264,12 @@ namespace BECore::Chess::Tests {
             const Player ownPlayer = EnginePlayer(own, SearchLimits{0, kOwnDepth});
             const Player stockfishPlayer = EnginePlayer(stockfish, SearchLimits{kGameMoveTimeMs, 0});
 
-            const Vector<eastl::string> moves = PlayGame(model, ownIsWhite ? ownPlayer : stockfishPlayer, ownIsWhite ? stockfishPlayer : ownPlayer, kOwnGamePlies);
+            const Vector<String> moves = PlayGame(model, ownIsWhite ? ownPlayer : stockfishPlayer, ownIsWhite ? stockfishPlayer : ownPlayer, kOwnGamePlies);
 
             // No refused move and no EngineError (the players report both); the result is recorded, not asserted: a time-limited Stockfish is not deterministic
             EXPECT_TRUE(model.IsGameOver() || model.GetMoves().size() == kOwnGamePlies) << "game " << game;
             EXPECT_GE(moves.size(), kShortestMate) << "a game, not a stop at the first move";
-            const eastl::string result = Format("own engine plays {}: {} after {} plies", ownIsWhite ? "White" : "Black", ResultOf(model), model.GetMoves().size());
+            const String result = Format("own engine plays {}: {} after {} plies", ownIsWhite ? "White" : "Black", ResultOf(model), model.GetMoves().size());
             RecordProperty(Format("game{}", game).c_str(), result.c_str());
             std::printf("[   RESULT ] %s\n", result.c_str());
         }
@@ -356,7 +355,7 @@ namespace BECore::Chess::Tests {
 
         ASSERT_FALSE(refused.has_value());
         EXPECT_EQ(refused.error().kind, EngineErrorKind::LaunchFailed);
-        EXPECT_NE(refused.error().detail.find(kMissingPath.data(), 0, kMissingPath.size()), eastl::string::npos) << refused.error().detail.c_str();
+        EXPECT_NE(refused.error().detail.find(kMissingPath.data(), 0, kMissingPath.size()), String::npos) << refused.error().detail.c_str();
         EXPECT_FALSE(controller.GetPlays().has_value()) << "a pick that finds no engine changes nothing";
         ASSERT_TRUE(controller.GetError().has_value());
         EXPECT_EQ(controller.GetError()->kind, EngineErrorKind::LaunchFailed);

@@ -7,8 +7,8 @@ namespace BECore::Chess::Tests {
     namespace {
 
         /// gtest cannot stream an EASTL string view
-        std::string Text(StringView text) {
-            return std::string(text.data(), text.size());
+        String Text(StringView text) {
+            return String(text.data(), text.size());
         }
 
     }  // namespace

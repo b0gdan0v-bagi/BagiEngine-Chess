@@ -52,7 +52,7 @@ namespace BECore::Chess::Tests {
 
         /// One search to run and to compare: a position (with the moves behind it), the depth and the settings that differ from the defaults
         struct GoldenCase {
-            eastl::string name;
+            String name;
             StringView fen;
             Vector<const char*> moves;
             int depth = 1;
@@ -78,7 +78,7 @@ namespace BECore::Chess::Tests {
             bool complete;
         };
 
-        GoldenCase Case(eastl::string name, StringView fen, int depth) {
+        GoldenCase Case(String name, StringView fen, int depth) {
             GoldenCase c;
             c.name = eastl::move(name);
             c.fen = fen;
@@ -328,22 +328,22 @@ namespace BECore::Chess::Tests {
         };
         // clang-format on
 
-        std::string Describe(const GoldenRow& row) {
-            return std::string(row.best) + " score " + std::to_string(row.score) + " depth " + std::to_string(row.depth) + " nodes " + std::to_string(row.nodes) + (row.stopped ? " stopped" : "") +
+        String Describe(const GoldenRow& row) {
+            return String(row.best) + " score " + ToString(row.score) + " depth " + ToString(row.depth) + " nodes " + ToString(row.nodes) + (row.stopped ? " stopped" : "") +
                    (row.complete ? " complete" : " incomplete");
         }
 
-        std::string Describe(const SearchResult& result) {
-            return std::string(result.best.IsNull() ? "(none)" : result.best.ToUci().c_str()) + " score " + std::to_string(result.score) + " depth " + std::to_string(result.depth) + " nodes " +
-                   std::to_string(result.nodes) + (result.stopped ? " stopped" : "") + (result.complete ? " complete" : " incomplete");
+        String Describe(const SearchResult& result) {
+            return String(result.best.IsNull() ? "(none)" : result.best.ToUci().c_str()) + " score " + ToString(result.score) + " depth " + ToString(result.depth) + " nodes " +
+                   ToString(result.nodes) + (result.stopped ? " stopped" : "") + (result.complete ? " complete" : " incomplete");
         }
 
-        std::string Describe(const GoldenRow& row, const SearchResult& result) {
+        String Describe(const GoldenRow& row, const SearchResult& result) {
             return "expected " + Describe(row) + ", got " + Describe(result);
         }
 
         bool Matches(const GoldenRow& row, const SearchResult& result) {
-            const std::string best = result.best.IsNull() ? "(none)" : std::string(result.best.ToUci().c_str());
+            const String best = result.best.IsNull() ? "(none)" : String(result.best.ToUci().c_str());
             return best == row.best && result.score == row.score && result.depth == row.depth && result.nodes == row.nodes && result.stopped == row.stopped && result.complete == row.complete;
         }
 
@@ -376,7 +376,7 @@ namespace BECore::Chess::Tests {
     TEST(SearchSliceGolden, DISABLED_PrintTheGoldenTable) {
         for (const GoldenCase& c : BuildGoldenCases()) {
             const SearchResult result = RunGoldenCase(c);
-            const std::string best = result.best.IsNull() ? "(none)" : std::string(result.best.ToUci().c_str());
+            const String best = result.best.IsNull() ? "(none)" : String(result.best.ToUci().c_str());
             std::cout << "            {\"" << c.name.c_str() << "\", \"" << best << "\", " << result.score << ", " << result.depth << ", " << result.nodes << ", "
                       << (result.stopped ? "true" : "false") << ", " << (result.complete ? "true" : "false") << "},\n";
         }
@@ -639,7 +639,7 @@ namespace BECore::Chess::Tests {
         // The job works on a copy: the caller's position is the same after a job that ran to the end, and a stopped Search() hands it back equal
         Position position = PositionFromFen(kKiwipeteFen);
         position.DoMove(Mv("e2a6"));
-        const eastl::string fenBefore = position.ToFen();
+        const String fenBefore = position.ToFen();
         const ZobristKey keyBefore = position.Key();
         SearchSettings settings;
         settings.maxDepth = kGoldenShallowDepth;
@@ -783,9 +783,8 @@ namespace BECore::Chess::Tests {
             return answer ? std::nullopt : Optional<EngineErrorKind>(answer.error().kind);
         }
 
-        std::string Describe(const AnalysisLine& line) {
-            return std::string(line.move.ToUci().c_str()) + " " + (line.score.kind == AnalysisScoreKind::Mate ? "mate " : "cp ") + std::to_string(line.score.value) + " depth " +
-                   std::to_string(line.depth);
+        String Describe(const AnalysisLine& line) {
+            return String(line.move.ToUci().c_str()) + " " + (line.score.kind == AnalysisScoreKind::Mate ? "mate " : "cp ") + ToString(line.score.value) + " depth " + ToString(line.depth);
         }
 
         /// Whether two analyses have the same lines: move, score (kind and value) and depth
@@ -801,8 +800,8 @@ namespace BECore::Chess::Tests {
             return true;
         }
 
-        std::string Describe(const Analysis& analysis) {
-            std::string text;
+        String Describe(const Analysis& analysis) {
+            String text;
             for (const AnalysisLine& line : analysis.lines) {
                 text += "[" + Describe(line) + "] ";
             }
@@ -851,7 +850,7 @@ namespace BECore::Chess::Tests {
         const NamedPolicy sizes[] = {{"1 node", Fixed(kSliceOfOneNode)}, {"7 nodes", Fixed(kSliceOfSevenNodes)}, {"256 nodes", Fixed(kSearchSliceNodes)}, {"varying", Varying}};
 
         for (const int depth : kEngineDepths) {
-            Vector<std::pair<std::string, SearchRequest>> requests;
+            Vector<std::pair<String, SearchRequest>> requests;
             for (const NamedFen& position : kPerftPositions) {
                 requests.emplace_back(position.name, RequestFor(position.fen, depth));
             }

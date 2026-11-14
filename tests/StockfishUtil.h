@@ -7,7 +7,7 @@
 
 // A test against a real Stockfish begins with this: it declares `path` (the Stockfish executable) or skips the test
 #define SKIP_WITHOUT_STOCKFISH(path)                                                                                                                                                                   \
-    const BECore::Optional<eastl::string> path = ::BECore::Chess::Tests::StockfishPath();                                                                                                              \
+    const BECore::Optional<BECore::String> path = ::BECore::Chess::Tests::StockfishPath();                                                                                                             \
     if (!path.has_value()) {                                                                                                                                                                           \
         GTEST_SKIP() << "no Stockfish (or no process code in this build): set STOCKFISH to its executable or put stockfish on PATH";                                                                   \
     }
@@ -16,7 +16,7 @@
 namespace BECore::Chess::Tests {
 
     /// Where Stockfish is, or nothing; nothing too where the process code is not there (CHESS_NO_STOCKFISH, the web)
-    inline Optional<eastl::string> StockfishPath() {
+    inline Optional<String> StockfishPath() {
 #if !CHESS_HAS_UCI_PROCESS
         return std::nullopt;
 #else
@@ -25,12 +25,12 @@ namespace BECore::Chess::Tests {
     }
 
     /// An error as a sentence for a failed test
-    inline eastl::string Describe(const EngineError& error) {
+    inline String Describe(const EngineError& error) {
         return DescribeError(error);
     }
 
     /// The settings of a UciEngine over the Stockfish at @p path, no options
-    inline UciEngineSettings StockfishSettings(const eastl::string& path) {
+    inline UciEngineSettings StockfishSettings(const String& path) {
         UciEngineSettings settings;
         settings.launch.path = path;
         return settings;

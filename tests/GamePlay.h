@@ -35,8 +35,8 @@ namespace BECore::Chess::Tests {
     }
 
     /// Plays @p white and @p black against each other until the game ends or @p plyCap plies; every move must be accepted. Returns the moves in UCI
-    inline Vector<eastl::string> PlayGame(ChessGameModel& model, const Player& white, const Player& black, size_t plyCap = kDefaultPlyCap) {
-        Vector<eastl::string> played;
+    inline Vector<String> PlayGame(ChessGameModel& model, const Player& white, const Player& black, size_t plyCap = kDefaultPlyCap) {
+        Vector<String> played;
         while (!model.IsGameOver() && model.GetMoves().size() < plyCap) {
             const Move move = (model.GetTurn() == PieceColor::White ? white : black)(model);
             const auto accepted = model.TryMove(move);

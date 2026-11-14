@@ -17,8 +17,8 @@ namespace BECore::Chess::Tests {
             return move.has_value() && model.TryMove(*move).has_value();
         }
 
-        eastl::string SpellMoves(const SearchRequest& request) {
-            eastl::string text;
+        String SpellMoves(const SearchRequest& request) {
+            String text;
             for (const Move& move : request.moves) {
                 text.append(text.empty() ? "" : " ");
                 text.append(move.ToUci());
@@ -63,7 +63,7 @@ namespace BECore::Chess::Tests {
         const ChessGameModel model;
         const SearchRequest request = SearchRequest::FromModel(model, kMoveTime100);
 
-        EXPECT_EQ(request.startFen, eastl::string(Position::kStartFen));
+        EXPECT_EQ(request.startFen, String(Position::kStartFen));
         EXPECT_TRUE(request.moves.empty());
         EXPECT_EQ(request.limits.moveTimeMs, 100);
         EXPECT_EQ(request.limits.depth, 0);
@@ -78,7 +78,7 @@ namespace BECore::Chess::Tests {
 
         const SearchRequest request = SearchRequest::FromModel(model, SearchLimits{0, 8});
 
-        EXPECT_EQ(request.startFen, eastl::string(kCastlingAndPromotionFen));
+        EXPECT_EQ(request.startFen, String(kCastlingAndPromotionFen));
         EXPECT_EQ(SpellMoves(request), "e1c1 e8g8 b7b8q");
         EXPECT_EQ(request.limits.moveTimeMs, 0);
         EXPECT_EQ(request.limits.depth, 8);
@@ -105,7 +105,7 @@ namespace BECore::Chess::Tests {
         model.SetPosition(PositionFromFen(kKiwipeteFen));
 
         EXPECT_EQ(SpellMoves(request), "e2e4");
-        EXPECT_EQ(request.startFen, eastl::string(Position::kStartFen));
+        EXPECT_EQ(request.startFen, String(Position::kStartFen));
     }
 
     TEST(SearchRequestTest, APositionGivesItsFenAndNoMoves) {
@@ -190,7 +190,7 @@ namespace BECore::Chess::Tests {
         const auto finalPosition = request.FinalPosition();
 
         ASSERT_NO_FATAL_FAILURE(ExpectBadRequest(finalPosition));
-        EXPECT_NE(finalPosition.error().detail.find("e2e5"), eastl::string::npos);
+        EXPECT_NE(finalPosition.error().detail.find("e2e5"), String::npos);
     }
 
     TEST(SearchRequestTest, AMoveOutOfTurnIsABadRequest) {
@@ -209,7 +209,7 @@ namespace BECore::Chess::Tests {
         const auto finalPosition = request.FinalPosition();
 
         ASSERT_NO_FATAL_FAILURE(ExpectBadRequest(finalPosition));
-        EXPECT_NE(finalPosition.error().detail.find("move 3"), eastl::string::npos);
+        EXPECT_NE(finalPosition.error().detail.find("move 3"), String::npos);
     }
 
     TEST(SearchRequestTest, TheNullMoveIsABadRequest) {
@@ -281,7 +281,7 @@ namespace BECore::Chess::Tests {
 
             const auto valid = request.Validate();
             ASSERT_NO_FATAL_FAILURE(ExpectBadRequest(valid)) << lines;
-            EXPECT_NE(valid.error().detail.find(Format("{}", lines).c_str()), eastl::string::npos) << "the sentence names the number";
+            EXPECT_NE(valid.error().detail.find(Format("{}", lines).c_str()), String::npos) << "the sentence names the number";
         }
     }
 

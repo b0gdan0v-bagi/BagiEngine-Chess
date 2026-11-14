@@ -65,9 +65,9 @@ namespace BECore::Chess::Tests {
             return bytes;
         }
 
-        std::string Member(const Json& json, StringView key) {
+        String Member(const Json& json, StringView key) {
             const auto value = GetJsonString(json, key);
-            return value ? std::string(value->c_str(), value->size()) : std::string("<missing>");
+            return value ? String(value->c_str(), value->size()) : String("<missing>");
         }
 
     }  // namespace
@@ -107,8 +107,8 @@ namespace BECore::Chess::Tests {
         void SetCommandLine(const Vector<String>& flags, bool withFolder) {
             Vector<String> arguments = flags;
             if (withFolder) {
-                const std::string path = _saves.string();
-                arguments.push_back(String("--save-dir=") + String(path.c_str(), path.size()));
+                const String path = FromStdString(_saves.string());
+                arguments.push_back(String("--save-dir=") + path);
             }
             CoreManager::GetCommandLine().Set(arguments);
         }
@@ -323,7 +323,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(Game().GetChoice().SetLevel("hard").has_value());
         ASSERT_TRUE(Game().GetChoice().SetMode("computer").has_value());  // the person is White and it is White's turn: the program has nothing to answer
         Frames(3);
-        const std::string fen = std::string(Game().GetModel().GetPosition().ToFen().c_str());
+        const String fen = String(Game().GetModel().GetPosition().ToFen().c_str());
         const Json before = State();
 
         Restart();
@@ -399,7 +399,7 @@ namespace BECore::Chess::Tests {
             ASSERT_TRUE(Game().AsControllable()->SetState(request).has_value());
         }
         ASSERT_TRUE(Play(Game().GetModel(), "e2e4"));
-        const std::string fen = std::string(Game().GetModel().GetPosition().ToFen().c_str());
+        const String fen = String(Game().GetModel().GetPosition().ToFen().c_str());
         Frames(2);
 
         Restart();

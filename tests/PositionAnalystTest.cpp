@@ -828,7 +828,7 @@ namespace BECore::Chess::Tests {
 
         ASSERT_FALSE(engine.has_value());
         EXPECT_EQ(engine.error().kind, EngineErrorKind::LaunchFailed);
-        EXPECT_NE(engine.error().detail.find("/no/such/file"), eastl::string::npos) << engine.error().detail.c_str();
+        EXPECT_NE(engine.error().detail.find("/no/such/file"), String::npos) << engine.error().detail.c_str();
     }
 
 #endif  // CHESS_NO_STOCKFISH

@@ -153,13 +153,13 @@ namespace BECore::Chess::Tests {
         }
 
         /// The text a label or a button shows
-        eastl::string ShownText(const UIElement& element) {
+        String ShownText(const UIElement& element) {
             const UITextComponent* text = TextOf(element);
             if (!text) {
                 return {};
             }
             const StringView shown = text->GetDisplayText(element);
-            return eastl::string(shown.data(), shown.size());
+            return String(shown.data(), shown.size());
         }
 
         /// The rect lies inside the other one and both have the same middle
@@ -187,14 +187,14 @@ namespace BECore::Chess::Tests {
         constexpr const char* kCancelPromotionAction = "ChessCancelPromotion";
 
         /// Replaces the first @p what in @p text and fails the test when it is not there (a broken copy that changed nothing would prove nothing)
-        void Replace(std::string& text, const std::string& what, const std::string& with) {
+        void Replace(String& text, const String& what, const String& with) {
             const size_t at = text.find(what);
-            ASSERT_NE(at, std::string::npos) << what;
+            ASSERT_NE(at, String::npos) << what;
             text.replace(at, what.size(), with);
         }
 
         /// The `<elements>` of the canvas on the node @p nodeName of the shipped scene, as the content of a screen; empty when there is none
-        std::string ShippedElementsXml(const char* nodeName) {
+        String ShippedElementsXml(const char* nodeName) {
             pugi::xml_document document;
             if (!document.load_file(ShippedSceneConfig().string().c_str())) {
                 return {};
@@ -208,7 +208,7 @@ namespace BECore::Chess::Tests {
             out << "<ui>";
             elements.print(out, "", pugi::format_raw);
             out << "</ui>";
-            return out.str();
+            return FromStdString(out.str());
         }
 
         /// A canvas of the SceneView space laid out on its own, for the copies of the panel that a test breaks on purpose: the elements come from the text of the shipped file
@@ -217,9 +217,9 @@ namespace BECore::Chess::Tests {
             UIScreenContent content;
             UICanvasLayout layout;
 
-            explicit CanvasCopy(const std::string& xml, bool useSafeArea = true) {
+            explicit CanvasCopy(const String& xml, bool useSafeArea = true) {
                 XmlDeserializer deserializer;
-                EXPECT_TRUE(deserializer.LoadFromString(FromStd(xml)));
+                EXPECT_TRUE(deserializer.LoadFromString(StringView(xml)));
                 content.Deserialize(deserializer);
                 EXPECT_FALSE(deserializer.HasErrors());
                 layout.root->children = content.elements;
@@ -287,8 +287,8 @@ namespace BECore::Chess::Tests {
         /// What is wrong with a modal panel as it is laid out (the plate is the element @p plateName), one problem to a line, nothing when it is right: a control that is not shown at all (an empty
         /// rect: a segment without a `height`), text that its control cuts (the validator does not see it for an ellipsis label; a button keeps kButtonAir between its text and the edge of its fill),
         /// a button under kSegmentHeight, and a plate that leaves the safe area
-        eastl::string PanelProblems(const UICanvasLayout& layout, const char* plateName = "Plate") {
-            eastl::string problems;
+        String PanelProblems(const UICanvasLayout& layout, const char* plateName = "Plate") {
+            String problems;
             const float scale = layout.GetResolved().scale;
             Vector<const UIElement*> controls;
             CollectControls(*layout.root, controls);
@@ -333,14 +333,14 @@ namespace BECore::Chess::Tests {
 
         /// A segment of the panel as the tables of the game say it must be: the element, its group and action, the word on it and the id it emits
         struct PanelSegment {
-            eastl::string name;
+            String name;
             const char* group = "";
             const char* action = "";
-            eastl::string word;
-            eastl::string id;
+            String word;
+            String id;
         };
 
-        eastl::string Joined(StringView prefix, StringView name) {
+        String Joined(StringView prefix, StringView name) {
             return Format("{}{}", prefix, name);
         }
 
@@ -349,21 +349,20 @@ namespace BECore::Chess::Tests {
             Vector<PanelSegment> segments;
             for (const OpponentMode mode : EnumUtils<OpponentMode>::Values()) {
                 const StringView id = OpponentModeId(mode);
-                segments.push_back({Joined("Mode", EnumUtils<OpponentMode>::ToString(mode)), "ModeGroup", kSetModeAction, OpponentText::ModeLabel(mode == OpponentMode::Computer),
-                                    eastl::string(id.data(), id.size())});
+                segments.push_back(
+                    {Joined("Mode", EnumUtils<OpponentMode>::ToString(mode)), "ModeGroup", kSetModeAction, OpponentText::ModeLabel(mode == OpponentMode::Computer), String(id.data(), id.size())});
             }
             for (const PieceColor color : {PieceColor::White, PieceColor::Black}) {
                 const StringView id = PieceColorId(color);
-                segments.push_back({Joined("Color", EnumUtils<PieceColor>::ToString(color)), "ColorGroup", kSetColorAction, OpponentText::ColorLabel(color), eastl::string(id.data(), id.size())});
+                segments.push_back({Joined("Color", EnumUtils<PieceColor>::ToString(color)), "ColorGroup", kSetColorAction, OpponentText::ColorLabel(color), String(id.data(), id.size())});
             }
             for (const OpponentEngine engine : EnumUtils<OpponentEngine>::Values()) {
                 const StringView id = OpponentEngineId(engine);
                 const StringView word = OpponentEngineName(engine);
-                segments.push_back(
-                    {Joined("Engine", EnumUtils<OpponentEngine>::ToString(engine)), "EngineGroup", kSetEngineAction, eastl::string(word.data(), word.size()), eastl::string(id.data(), id.size())});
+                segments.push_back({Joined("Engine", EnumUtils<OpponentEngine>::ToString(engine)), "EngineGroup", kSetEngineAction, String(word.data(), word.size()), String(id.data(), id.size())});
             }
             for (const OpponentLevel& level : GetOpponentLevels()) {
-                segments.push_back({Joined("Level", level.name), "LevelGroup", kSetLevelAction, eastl::string(level.name.data(), level.name.size()), eastl::string(level.id.data(), level.id.size())});
+                segments.push_back({Joined("Level", level.name), "LevelGroup", kSetLevelAction, String(level.name.data(), level.name.size()), String(level.id.data(), level.id.size())});
             }
             return segments;
         }
@@ -383,7 +382,7 @@ namespace BECore::Chess::Tests {
 
         /// One label of the board coordinates: its name and the drawn cell it sits in (the rank labels are in the left column, one per row; the file labels in the bottom row, one per column)
         struct BoardLabel {
-            eastl::string name;
+            String name;
             bool file = false;
             int column = 0;
             int row = 0;
@@ -409,8 +408,8 @@ namespace BECore::Chess::Tests {
         /// What is wrong with the labels of the board as they are laid out, one problem to a line, nothing when it is right: a label that is missing or not shown, a glyph the box cuts
         /// (the validator does not see it for a label that clips), a box that is not in the corner of its edge cell (the top left, left of the piece, for a rank; the bottom right, right of it, for a
         /// file) or leaves the board, and a text color that does not read on the cell
-        eastl::string BoardLabelProblems(const UICanvasLayout& layout) {
-            eastl::string problems;
+        String BoardLabelProblems(const UICanvasLayout& layout) {
+            String problems;
             const float scale = layout.GetResolved().scale;
             for (const BoardLabel& spec : ExpectedBoardLabels()) {
                 const UIElement* element = layout.root->FindByName(PoolString::Intern(spec.name));
@@ -460,11 +459,11 @@ namespace BECore::Chess::Tests {
             size_t row = 0;
             for (const char* group : kMaterialGroups) {
                 for (const char* piece : kMaterialPieces) {
-                    const eastl::string word = Format("x{}", static_cast<int>((round + row++) % kMostCaptured) + 1);
+                    const String word = Format("x{}", static_cast<int>((round + row++) % kMostCaptured) + 1);
                     vars.Set(PoolString::Intern(Format("material{}{}", group, piece).c_str()), StringView(word));
                 }
                 const size_t shift = group == kMaterialGroups[0] ? 0 : kMaterialRounds / 2;
-                const eastl::string sign = BalanceText(static_cast<int>((round + shift) % kMaterialRounds) + 1);
+                const String sign = BalanceText(static_cast<int>((round + shift) % kMaterialRounds) + 1);
                 vars.Set(PoolString::Intern(Format("material{}Balance", group).c_str()), StringView(sign));
             }
         }
@@ -482,14 +481,14 @@ namespace BECore::Chess::Tests {
         /// count or balance outside the margin (x 0 to 100, the rows of the board) or on top of one another, a row under kMaterialRowHeight, a count or a sign that its box cuts (the validator
         /// does not see a Clip label's cut), and, while the box of the lists lies inside the safe area (the rule of Game/MaterialLayout.h, so the rows would be shown), a list that is not inside
         /// the safe area; a balance box must always be inside it
-        eastl::string MaterialProblems(const UICanvasLayout& layout) {
-            eastl::string problems;
+        String MaterialProblems(const UICanvasLayout& layout) {
+            String problems;
             const float scale = layout.GetResolved().scale;
             const Rect safe = layout.GetResolved().safeBounds;
             const bool listsFit = MaterialListFits(safe.x, safe.y, safe.x + safe.w, safe.y + safe.h);
             const Rect margin{0.0f, kBoardTop, kMaterialMarginRight, kBoardBottom - kBoardTop};
 
-            const auto find = [&](const eastl::string& name) -> const UIElement* {
+            const auto find = [&](const String& name) -> const UIElement* {
                 const UIElement* element = layout.root->FindByName(PoolString::Intern(name.c_str()));
                 if (element == nullptr) {
                     problems += Format("{} is missing\n", name.c_str());
@@ -573,8 +572,8 @@ namespace BECore::Chess::Tests {
 
         /// The rects of the canvas Material that are on the screen (a row with a rect, a balance) against the controls of the canvas @p other (a label or a button with a rect): the pairs closer than
         /// @p gap, one to a line
-        eastl::string MaterialClearance(const UICanvasLayout& material, const UICanvasLayout& other, float gap) {
-            eastl::string problems;
+        String MaterialClearance(const UICanvasLayout& material, const UICanvasLayout& other, float gap) {
+            String problems;
             Vector<const UIElement*> mine;
             for (const char* group : kMaterialGroups) {
                 for (const char* piece : kMaterialPieces) {
@@ -843,7 +842,7 @@ namespace BECore::Chess::Tests {
         }
 
         /// The text a label or a button of the panel shows after a frame
-        eastl::string PanelText(const char* name) {
+        String PanelText(const char* name) {
             Draw();
             return ShownText(PanelElement(name));
         }
@@ -869,18 +868,18 @@ namespace BECore::Chess::Tests {
         }
 
         /// The text of a UI variable after a frame was drawn: the board publishes the words of the HUD when it draws
-        eastl::string Var(const char* name) {
+        String Var(const char* name) {
             Draw();
             const StringView value = CoreManager::GetUIVars().Get(PoolString::Intern(name));
-            return eastl::string(value.data(), value.size());
+            return String(value.data(), value.size());
         }
 
         /// The letters or the numbers at the edge of the board as the 16 variables read after a frame: coordFile0..7 (files, by column) or coordRank0..7 (ranks, by row from the top), joined
-        eastl::string Coordinates(bool files) {
+        String Coordinates(bool files) {
             Draw();
-            eastl::string text;
+            String text;
             for (int index = 0; index <= kLastBoardIndex; ++index) {
-                const eastl::string name = files ? "coordFile{}"_format(index) : "coordRank{}"_format(index);
+                const String name = files ? "coordFile{}"_format(index) : "coordRank{}"_format(index);
                 const StringView value = CoreManager::GetUIVars().Get(PoolString::Intern(StringView(name)));
                 text.append(value.data(), value.size());
             }
@@ -915,9 +914,9 @@ namespace BECore::Chess::Tests {
         }
 
         /// One string member of "opponent" of get_state ("plays", "level", "engine"); "<missing>" for null or absent
-        std::string ControlOpponentString(const char* key) const {
+        String ControlOpponentString(const char* key) const {
             const auto value = GetJsonString(ControlOpponent(), key);
-            return value ? std::string(value->c_str(), value->size()) : std::string("<missing>");
+            return value ? String(value->c_str(), value->size()) : String("<missing>");
         }
 
         /// set_state {"opponent": {"plays": ..}} of the control API: "white", "black" or null for two people
@@ -1154,8 +1153,8 @@ namespace BECore::Chess::Tests {
         /// What is wrong with the HUD as it is laid out, one problem to a line, nothing when it is right: text that its control cuts, and two controls closer than kMinGap.
         /// The validator of the matrix does not see the first (a label with an ellipsis "can shrink", so TextDoesNotFit is not reported), which is why it is checked here, on the
         /// text that is shown; a button must also keep kButtonAir between its text and the edge of the fill. A hidden control has an empty rect and counts for nothing
-        static eastl::string HudProblems(const UICanvasLayout& layout) {
-            eastl::string problems;
+        static String HudProblems(const UICanvasLayout& layout) {
+            String problems;
             const float scale = layout.GetResolved().scale;
             const auto& elements = layout.root->children;
             for (size_t i = 0; i < elements.size(); ++i) {
@@ -1199,15 +1198,15 @@ namespace BECore::Chess::Tests {
             ASSERT_GE(words.Rounds(), 2u);
 
             size_t failed = 0;
-            eastl::string report;
+            String report;
             for (size_t round = 0; round < words.Rounds(); ++round) {
                 words.Publish(round);
                 const auto failures = ValidateOnMatrix(canvas->GetLayout(), options, base);
                 if (!failures.empty() && ++failed <= kReportedFailures) {
                     report += Format("round {}: {}", round, DescribeMatrixFailures(failures).c_str());
                 }
-                OnEveryCaseOfTheMatrix(canvas->GetLayout(), [&](const eastl::string& label, const UICanvasLayout& layout) {
-                    const eastl::string problems = HudProblems(layout);
+                OnEveryCaseOfTheMatrix(canvas->GetLayout(), [&](const String& label, const UICanvasLayout& layout) {
+                    const String problems = HudProblems(layout);
                     if (!problems.empty() && ++failed <= kReportedFailures) {
                         report += Format("round {}, {}:\n{}", round, label.c_str(), problems.c_str());
                     }
@@ -1231,14 +1230,14 @@ namespace BECore::Chess::Tests {
         }
 
         /// PanelProblems() on every case of the matrix for each round of words: the lines of the first @p reportedCases cases that have any
-        eastl::string PanelProblemsOnMatrix(UICanvasLayout& layout, size_t reportedCases = kReportedCases, const char* plateName = "Plate") const {
-            eastl::string report;
+        String PanelProblemsOnMatrix(UICanvasLayout& layout, size_t reportedCases = kReportedCases, const char* plateName = "Plate") const {
+            String report;
             size_t reported = 0;
             const HudWords words = AllHudWords();
             for (size_t round = 0; round < words.Rounds(); ++round) {
                 words.Publish(round);
-                OnEveryCaseOfTheMatrix(layout, [&](const eastl::string& label, const UICanvasLayout& laidOut) {
-                    const eastl::string problems = PanelProblems(laidOut, plateName);
+                OnEveryCaseOfTheMatrix(layout, [&](const String& label, const UICanvasLayout& laidOut) {
+                    const String problems = PanelProblems(laidOut, plateName);
                     if (!problems.empty() && reported++ < reportedCases) {
                         report += Format("round {}, {}:\n{}", round, label.c_str(), problems.c_str());
                     }
@@ -1283,8 +1282,8 @@ namespace BECore::Chess::Tests {
         }
 
         /// The rows on the screen after the last draw, in the order of the scene ("TopQueen BottomPawn"), nothing when none is
-        eastl::string ShownMaterialRows() const {
-            eastl::string shown;
+        String ShownMaterialRows() const {
+            String shown;
             for (const char* group : {"Top", "Bottom"}) {
                 for (const char* piece : kMaterialPieces) {
                     if (RowShown(group, piece)) {
@@ -1297,25 +1296,25 @@ namespace BECore::Chess::Tests {
         }
 
         /// The text of the variable that a count of the display shows, after a frame: "x3" or ""
-        eastl::string MaterialCount(const char* group, const char* piece) {
+        String MaterialCount(const char* group, const char* piece) {
             return Var(Format("material{}{}", group, piece).c_str());
         }
 
         /// The sprite the icon of a row has been given
-        eastl::string MaterialSprite(const char* group, const char* piece) const {
+        String MaterialSprite(const char* group, const char* piece) const {
             const UIImageComponent* icon = MaterialElement(Format("Material{}{}Icon", group, piece).c_str()).GetComponent<UIImageComponent>();
             if (icon == nullptr) {
                 ADD_FAILURE() << group << piece << " has no UIImageComponent icon";
                 return {};
             }
             const StringView name = icon->sprite.ToStringView();
-            return eastl::string(name.data(), name.size());
+            return String(name.data(), name.size());
         }
 
         /// The twelve variables of the display after a frame, joined: ten counts (top group queen to pawn, then the bottom group) and the two balances ("|" between them)
-        eastl::string MaterialWords() {
+        String MaterialWords() {
             Draw();
-            eastl::string words;
+            String words;
             for (const char* group : {"Top", "Bottom"}) {
                 for (const char* piece : kMaterialPieces) {
                     const StringView value = CoreManager::GetUIVars().Get(PoolString::Intern(Format("material{}{}", group, piece).c_str()));
@@ -1371,19 +1370,19 @@ namespace BECore::Chess::Tests {
             const StringView digits = kRankDigits;
             for (int index = 0; index <= kLastBoardIndex; ++index) {
                 const size_t at = (static_cast<size_t>(index) + round) % letters.size();
-                CoreManager::GetUIVars().Set(PoolString::Intern(eastl::string("coordFile{}"_format(index))), letters.substr(at, 1));
-                CoreManager::GetUIVars().Set(PoolString::Intern(eastl::string("coordRank{}"_format(index))), digits.substr(at, 1));
+                CoreManager::GetUIVars().Set(PoolString::Intern(String("coordFile{}"_format(index))), letters.substr(at, 1));
+                CoreManager::GetUIVars().Set(PoolString::Intern(String("coordRank{}"_format(index))), digits.substr(at, 1));
             }
         }
 
         /// BoardLabelProblems() on every case of the matrix for each of the 8 rounds of letters: the lines of the first @p reportedCases cases that have any
-        eastl::string BoardLabelProblemsOnMatrix(UICanvasLayout& layout, size_t reportedCases = kReportedCases) const {
-            eastl::string report;
+        String BoardLabelProblemsOnMatrix(UICanvasLayout& layout, size_t reportedCases = kReportedCases) const {
+            String report;
             size_t reported = 0;
             for (size_t round = 0; round < kBoardEdgeCells; ++round) {
                 PublishCoordinateRound(round);
-                OnEveryCaseOfTheMatrix(layout, [&](const eastl::string& label, const UICanvasLayout& laidOut) {
-                    const eastl::string problems = BoardLabelProblems(laidOut);
+                OnEveryCaseOfTheMatrix(layout, [&](const String& label, const UICanvasLayout& laidOut) {
+                    const String problems = BoardLabelProblems(laidOut);
                     if (!problems.empty() && reported++ < reportedCases) {
                         report += Format("round {}, {}:\n{}", round, label.c_str(), problems.c_str());
                     }
@@ -1402,13 +1401,13 @@ namespace BECore::Chess::Tests {
         }
 
         /// MaterialProblems() on every case of the matrix for the first @p rounds rounds of words (rows already shown): the lines of the first @p reportedCases cases that have any
-        eastl::string MaterialProblemsOnMatrix(UICanvasLayout& layout, size_t rounds = kMaterialRounds, size_t reportedCases = kReportedCases) const {
-            eastl::string report;
+        String MaterialProblemsOnMatrix(UICanvasLayout& layout, size_t rounds = kMaterialRounds, size_t reportedCases = kReportedCases) const {
+            String report;
             size_t reported = 0;
             for (size_t round = 0; round < rounds; ++round) {
                 PublishMaterialRound(round);
-                OnEveryCaseOfTheMatrix(layout, [&](const eastl::string& label, const UICanvasLayout& laidOut) {
-                    const eastl::string problems = MaterialProblems(laidOut);
+                OnEveryCaseOfTheMatrix(layout, [&](const String& label, const UICanvasLayout& laidOut) {
+                    const String problems = MaterialProblems(laidOut);
                     if (!problems.empty() && reported++ < reportedCases) {
                         report += Format("round {}, {}:\n{}", round, label.c_str(), problems.c_str());
                     }
@@ -1534,7 +1533,7 @@ namespace BECore::Chess::Tests {
         const HudWords words = AllHudWords();
         for (size_t round = 0; round < words.Rounds(); ++round) {
             words.Publish(round);
-            const eastl::string problems = HudProblems(layout);
+            const String problems = HudProblems(layout);
             EXPECT_TRUE(problems.empty()) << "round " << round << ":\n" << problems.c_str();
         }
         for (const char* name : {"Turn", "Menu", "Reset", "Status"}) {
@@ -1610,7 +1609,7 @@ namespace BECore::Chess::Tests {
         auto panel = Panel();
         ASSERT_TRUE(panel);
         panel->UpdateLayout(1280.0f, 720.0f);
-        const eastl::string problems = PanelProblemsOnMatrix(panel->GetLayout());
+        const String problems = PanelProblemsOnMatrix(panel->GetLayout());
         EXPECT_TRUE(problems.empty()) << problems.c_str();
     }
 
@@ -1628,7 +1627,7 @@ namespace BECore::Chess::Tests {
         const HudWords words = AllHudWords();
         for (size_t round = 0; round < words.Rounds(); ++round) {
             words.Publish(round);
-            const eastl::string problems = PanelProblems(layout);
+            const String problems = PanelProblems(layout);
             EXPECT_TRUE(problems.empty()) << "round " << round << ":\n" << problems.c_str();
         }
 
@@ -1658,7 +1657,7 @@ namespace BECore::Chess::Tests {
 
         size_t sentences = 0;
         for (const EngineErrorKind kind : EnumUtils<EngineErrorKind>::Values()) {
-            const eastl::string sentence = OpponentText::Error(EngineError{kind, {}});
+            const String sentence = OpponentText::Error(EngineError{kind, {}});
             CoreManager::GetUIVars().Set("opponentError"_intern, StringView(sentence));
             const UIContentFit fit = line.CheckContent(line.rect.w, line.rect.h, scale);
             EXPECT_TRUE(fit.hasContent && fit.fits) << "'" << sentence.c_str() << "' in " << line.rect.w << " units";
@@ -1708,7 +1707,7 @@ namespace BECore::Chess::Tests {
             const UIElement& button = PanelButton(want.name.c_str());
             EXPECT_EQ(ShownText(button), want.word) << "the word on the segment is the one of the table";
             const StringView value = ClickerOf(button)->value.ToStringView();
-            EXPECT_EQ(eastl::string(value.data(), value.size()), want.id);
+            EXPECT_EQ(String(value.data(), value.size()), want.id);
             EXPECT_EQ(ClickerOf(button)->action, PoolString::Intern(want.action));
             EXPECT_EQ(button.selected, false) << "nothing is selected before a frame";
         }
@@ -1792,17 +1791,17 @@ namespace BECore::Chess::Tests {
     // Each copy is the text of the shipped panel with one edit (ShippedElementsXml), laid out alone
 
     TEST_F(ChessUiTest, AWordCutByAFontThatIsTooBigIsCaughtByTheFitCheckAndNotByTheValidator) {
-        std::string xml = ShippedElementsXml("OpponentPanel");
+        String xml = ShippedElementsXml("OpponentPanel");
         ASSERT_FALSE(xml.empty());
         ASSERT_NO_FATAL_FAILURE(Replace(xml, R"(name="EngineOwn" flex="1" height="56" fontSize="24")", R"(name="EngineOwn" flex="1" height="56" fontSize="44")"));
         CanvasCopy copy(xml);
 
         EXPECT_FALSE(HasIssue(ValidateWithWords(copy.layout), UILayoutIssueKind::TextDoesNotFit)) << "an ellipsis label can shrink: the validator does not report it";
-        const eastl::string problems = PanelProblemsOnMatrix(copy.layout);
-        EXPECT_NE(problems.find("EngineOwn cuts 'Own engine'"), eastl::string::npos) << problems.c_str();
+        const String problems = PanelProblemsOnMatrix(copy.layout);
+        EXPECT_NE(problems.find("EngineOwn cuts 'Own engine'"), String::npos) << problems.c_str();
 
         // With the clip the validator reports it too
-        std::string clipped = ShippedElementsXml("OpponentPanel");
+        String clipped = ShippedElementsXml("OpponentPanel");
         ASSERT_NO_FATAL_FAILURE(Replace(clipped, R"(name="EngineOwn" flex="1" height="56" fontSize="24")", R"(name="EngineOwn" flex="1" height="56" fontSize="44")"));
         ASSERT_NO_FATAL_FAILURE(Replace(clipped, R"(text="Own engine")", R"(text="Own engine" overflow="Clip")"));
         CanvasCopy clippedCopy(clipped);
@@ -1811,54 +1810,54 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, ALongerWordInTheNarrowestWindowIsCaught) {
         // A word that fits in the plate of a wide window but not in a quarter of the Level row on the narrowest one
-        std::string xml = ShippedElementsXml("OpponentPanel");
+        String xml = ShippedElementsXml("OpponentPanel");
         ASSERT_NO_FATAL_FAILURE(Replace(xml, R"(text="Medium")", R"(text="Intermediate")"));
         CanvasCopy copy(xml);
         LayOutInTheNarrowestWindow(copy.layout);
-        const eastl::string problems = PanelProblems(copy.layout);
-        EXPECT_NE(problems.find("LevelMedium cuts 'Intermediate'"), eastl::string::npos) << problems.c_str();
+        const String problems = PanelProblems(copy.layout);
+        EXPECT_NE(problems.find("LevelMedium cuts 'Intermediate'"), String::npos) << problems.c_str();
     }
 
     TEST_F(ChessUiTest, ASegmentUnderTheTouchSizeIsCaught) {
-        std::string xml = ShippedElementsXml("OpponentPanel");
+        String xml = ShippedElementsXml("OpponentPanel");
         ASSERT_NO_FATAL_FAILURE(Replace(xml, R"(name="LevelMax" flex="1" height="56")", R"(name="LevelMax" flex="1" height="40")"));
         CanvasCopy copy(xml);
         EXPECT_TRUE(HasIssue(ValidateWithWords(copy.layout), UILayoutIssueKind::TouchTargetTooSmall));
-        EXPECT_NE(PanelProblemsOnMatrix(copy.layout).find("LevelMax is 40.0 units high"), eastl::string::npos);
+        EXPECT_NE(PanelProblemsOnMatrix(copy.layout).find("LevelMax is 40.0 units high"), String::npos);
     }
 
     TEST_F(ChessUiTest, ASegmentWithoutAnExplicitHeightHasNoRectAndIsCaughtHere) {
         // The gotcha of the widget: flex shares the width, not the height, so a segment without `height` gets a rect of height 0. It is not drawn, a click cannot find it
         // (`ui_click` answers "hidden") and the validator skips an empty rect, so only PanelProblems() sees it
-        std::string xml = ShippedElementsXml("OpponentPanel");
+        String xml = ShippedElementsXml("OpponentPanel");
         ASSERT_NO_FATAL_FAILURE(Replace(xml, R"(name="LevelHard" flex="1" height="56")", R"(name="LevelHard" flex="1")"));
         CanvasCopy copy(xml);
         LayOutInTheNarrowestWindow(copy.layout);
         const UIElement* hard = copy.layout.root->FindByName(PoolString::Intern("LevelHard"));
         ASSERT_NE(hard, nullptr);
         EXPECT_NEAR(hard->rect.h, 0.0f, kPixelTolerance);
-        const eastl::string problems = PanelProblems(copy.layout);
-        EXPECT_NE(problems.find("LevelHard 'Hard' has an empty rect"), eastl::string::npos) << problems.c_str();
+        const String problems = PanelProblems(copy.layout);
+        EXPECT_NE(problems.find("LevelHard 'Hard' has an empty rect"), String::npos) << problems.c_str();
     }
 
     TEST_F(ChessUiTest, AnErrorSentenceWiderThanThePlateIsCaught) {
         // A plate 200 units wide cannot hold the longest sentences of the error line; the same copy with the shipped width is clean
-        std::string xml = ShippedElementsXml("OpponentPanel");
+        String xml = ShippedElementsXml("OpponentPanel");
         ASSERT_NO_FATAL_FAILURE(Replace(xml, R"(maxWidth="640")", R"(maxWidth="200")"));
         CanvasCopy copy(xml);
-        const eastl::string problems = PanelProblemsOnMatrix(copy.layout, 100000);
-        EXPECT_NE(problems.find("OpponentError cuts"), eastl::string::npos) << problems.c_str();
+        const String problems = PanelProblemsOnMatrix(copy.layout, 100000);
+        EXPECT_NE(problems.find("OpponentError cuts"), String::npos) << problems.c_str();
 
         CanvasCopy shipped(ShippedElementsXml("OpponentPanel"));
         EXPECT_TRUE(PanelProblemsOnMatrix(shipped.layout).empty()) << PanelProblemsOnMatrix(shipped.layout).c_str();
     }
 
     TEST_F(ChessUiTest, APlateTallerThanTheSafeAreaIsCaught) {
-        std::string xml = ShippedElementsXml("OpponentPanel");
+        String xml = ShippedElementsXml("OpponentPanel");
         ASSERT_NO_FATAL_FAILURE(Replace(xml, R"(height="460")", R"(height="1200")"));
         CanvasCopy copy(xml);
         LayOutInTheNarrowestWindow(copy.layout);
-        EXPECT_NE(PanelProblems(copy.layout).find("leaves the safe area"), eastl::string::npos);
+        EXPECT_NE(PanelProblems(copy.layout).find("leaves the safe area"), String::npos);
     }
 
     // ---- the words --------------------------------------------------------------------------------------------------------
@@ -2269,7 +2268,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, ARefusedPickLeavesTheOrientationAsItWas) {
         SKIP_WITHOUT_WORKER_THREADS();
-        Vector<eastl::string> asked;
+        Vector<String> asked;
         Opponent().SetEngineFactory([&asked](OpponentEngine engine, const OpponentLevel&) -> MadeEngine {
             const StringView id = OpponentEngineId(engine);
             asked.emplace_back(id.data(), id.size());
@@ -2438,7 +2437,7 @@ namespace BECore::Chess::Tests {
             const auto failures = ValidateOnMatrix(canvas->GetLayout(), options, ViewContext());
             EXPECT_TRUE(failures.empty()) << "round " << round << ": " << DescribeMatrixFailures(failures).c_str();
         }
-        const eastl::string problems = BoardLabelProblemsOnMatrix(canvas->GetLayout());
+        const String problems = BoardLabelProblemsOnMatrix(canvas->GetLayout());
         EXPECT_TRUE(problems.empty()) << problems.c_str();
     }
 
@@ -2453,7 +2452,7 @@ namespace BECore::Chess::Tests {
 
         for (size_t round = 0; round < kBoardEdgeCells; ++round) {
             PublishCoordinateRound(round);
-            const eastl::string problems = BoardLabelProblems(layout);
+            const String problems = BoardLabelProblems(layout);
             EXPECT_TRUE(problems.empty()) << "round " << round << ":\n" << problems.c_str();
         }
         layout.Invalidate();
@@ -2704,7 +2703,7 @@ namespace BECore::Chess::Tests {
         Opponent().SetEngineFactory(factory.AsFactory());
         const auto read = [&](bool files) {
             Draw();
-            eastl::string text;
+            String text;
             for (int index = 0; index <= kLastBoardIndex; ++index) {
                 const UIElement* label = CoordinateLabel((files ? "FileLabel{}"_format(index) : "RankLabel{}"_format(index)).c_str());
                 if (label != nullptr) {
@@ -2769,46 +2768,46 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, ABrokenCopyOfTheCoordinateLabelsIsCaughtByTheChecks) {
         Draw();  // the variables the labels show
-        const std::string shipped = ShippedElementsXml("BoardCoordinates");
+        const String shipped = ShippedElementsXml("BoardCoordinates");
         ASSERT_FALSE(shipped.empty());
-        const auto problemsOf = [&](const std::string& xml) {
+        const auto problemsOf = [&](const String& xml) {
             CanvasCopy copy(xml, false);
             return BoardLabelProblemsOnMatrix(copy.layout, 100000);
         };
 
         EXPECT_EQ(problemsOf(shipped), "") << "the same checks pass on the shipped labels";
 
-        std::string bigFont = shipped;
+        String bigFont = shipped;
         Replace(bigFont, "fontSize=\"18\"", "fontSize=\"60\"");
-        EXPECT_NE(problemsOf(bigFont).find("RankLabel0 cuts"), eastl::string::npos) << "a font of 60 does not fit the box";
+        EXPECT_NE(problemsOf(bigFont).find("RankLabel0 cuts"), String::npos) << "a font of 60 does not fit the box";
 
-        std::string narrow = shipped;
+        String narrow = shipped;
         Replace(narrow, "name=\"RankLabel0\" x=\"102\" y=\"82\" width=\"13\"", "name=\"RankLabel0\" x=\"102\" y=\"82\" width=\"3\"");
-        EXPECT_NE(problemsOf(narrow).find("RankLabel0 cuts"), eastl::string::npos) << "a box of 3 units cuts the glyph";
+        EXPECT_NE(problemsOf(narrow).find("RankLabel0 cuts"), String::npos) << "a box of 3 units cuts the glyph";
 
-        std::string wide = shipped;
+        String wide = shipped;
         Replace(wide, "name=\"RankLabel0\" x=\"102\" y=\"82\" width=\"13\"", "name=\"RankLabel0\" x=\"102\" y=\"82\" width=\"30\"");
-        EXPECT_NE(problemsOf(wide).find("RankLabel0 (102.0, 82.0, 30.0, 26.0) is not in the corner"), eastl::string::npos) << "a box that reaches the piece";
+        EXPECT_NE(problemsOf(wide).find("RankLabel0 (102.0, 82.0, 30.0, 26.0) is not in the corner"), String::npos) << "a box that reaches the piece";
 
-        std::string inside = shipped;
+        String inside = shipped;
         Replace(inside, "name=\"RankLabel3\" x=\"102\"", "name=\"RankLabel3\" x=\"182\"");
-        EXPECT_NE(problemsOf(inside).find("RankLabel3 (182.0"), eastl::string::npos) << "a label under a cell that is not at the edge";
+        EXPECT_NE(problemsOf(inside).find("RankLabel3 (182.0"), String::npos) << "a label under a cell that is not at the edge";
 
-        std::string rankAtTheBottom = shipped;
+        String rankAtTheBottom = shipped;
         Replace(rankAtTheBottom, "name=\"RankLabel0\" x=\"102\" y=\"82\"", "name=\"RankLabel0\" x=\"102\" y=\"132\"");
-        EXPECT_NE(problemsOf(rankAtTheBottom).find("RankLabel0 (102.0, 132.0"), eastl::string::npos) << "a rank number in the bottom left of its cell is not in the corner";
+        EXPECT_NE(problemsOf(rankAtTheBottom).find("RankLabel0 (102.0, 132.0"), String::npos) << "a rank number in the bottom left of its cell is not in the corner";
 
-        std::string fileAtTheTop = shipped;
+        String fileAtTheTop = shipped;
         Replace(fileAtTheTop, "name=\"FileLabel7\" x=\"725\" y=\"692\"", "name=\"FileLabel7\" x=\"725\" y=\"642\"");
-        EXPECT_NE(problemsOf(fileAtTheTop).find("FileLabel7 (725.0, 642.0"), eastl::string::npos) << "a file letter in the top right of its cell is not in the corner";
+        EXPECT_NE(problemsOf(fileAtTheTop).find("FileLabel7 (725.0, 642.0"), String::npos) << "a file letter in the top right of its cell is not in the corner";
 
-        std::string wrongColor = shipped;
+        String wrongColor = shipped;
         Replace(wrongColor, "textColor=\"181,136,99,255\"", "textColor=\"240,217,181,255\"");
-        EXPECT_NE(problemsOf(wrongColor).find("RankLabel0 has not the color"), eastl::string::npos) << "cream on a light cell";
+        EXPECT_NE(problemsOf(wrongColor).find("RankLabel0 has not the color"), String::npos) << "cream on a light cell";
 
-        std::string missing = shipped;
+        String missing = shipped;
         Replace(missing, "name=\"FileLabel7\"", "name=\"FileLabelX\"");
-        EXPECT_NE(problemsOf(missing).find("FileLabel7 is missing"), eastl::string::npos);
+        EXPECT_NE(problemsOf(missing).find("FileLabel7 is missing"), String::npos);
     }
 
     TEST_F(ChessUiTest, TheHudStillStaysOutsideTheBoardWithTheCoordinatesOnIt) {
@@ -2839,7 +2838,7 @@ namespace BECore::Chess::Tests {
         ASSERT_EQ(board->size(), 8u);
         const char* const expected[] = {"rnbqkbnr", "pppppppp", "........", "........", "........", "........", "PPPPPPPP", "RNBQKBNR"};
         for (size_t row = 0; row < board->size(); ++row) {
-            EXPECT_EQ((*board)[row].get_ref<const std::string&>(), expected[row]) << "row " << row << ": rank 8 first, white upper case";
+            EXPECT_EQ((*board)[row].get_ref<const std::string&>(), expected[row]) << "row " << row << ": rank 8 first, white upper case";  //-NoStd: nlohmann string
         }
     }
 
@@ -2851,7 +2850,7 @@ namespace BECore::Chess::Tests {
 
         InputEvents::ActionEvent::Emit(PoolString::Intern("ChessReset"));
 
-        EXPECT_EQ(Model().GetPosition().ToFen(), eastl::string(Position::kStartFen));
+        EXPECT_EQ(Model().GetPosition().ToFen(), String(Position::kStartFen));
         EXPECT_GT(Model().GetVersion(), before);
     }
 
@@ -2870,10 +2869,10 @@ namespace BECore::Chess::Tests {
         const float y = fill->rect.y + fill->rect.h * 0.5f;
 
         EXPECT_TRUE(CoreManager::GetUIInput().DispatchMouseButtonDown(Button(x, y, true))) << "the button takes the click";
-        EXPECT_NE(Model().GetPosition().ToFen(), eastl::string(Position::kStartFen)) << "a press alone does nothing";
+        EXPECT_NE(Model().GetPosition().ToFen(), String(Position::kStartFen)) << "a press alone does nothing";
         EXPECT_TRUE(CoreManager::GetUIInput().DispatchMouseButtonUp(Button(x, y, false)));
 
-        EXPECT_EQ(Model().GetPosition().ToFen(), eastl::string(Position::kStartFen));
+        EXPECT_EQ(Model().GetPosition().ToFen(), String(Position::kStartFen));
     }
 
     TEST_F(ChessUiTest, TheBoardStillTakesItsClicksUnderTheCanvas) {
@@ -2885,7 +2884,7 @@ namespace BECore::Chess::Tests {
         EXPECT_FALSE(CoreManager::GetUIInput().DispatchMouseButtonDown(Button(from.first, from.second, true)));
         EXPECT_FALSE(CoreManager::GetUIInput().DispatchMouseButtonDown(Button(to.first, to.second, true)));
 
-        EXPECT_EQ(Model().GetPosition().ToFen(), eastl::string("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1"));
+        EXPECT_EQ(Model().GetPosition().ToFen(), String("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1"));
     }
 
     // ---- the opponent -----------------------------------------------------------------------------------------------------
@@ -3201,7 +3200,7 @@ namespace BECore::Chess::Tests {
 
         EXPECT_FALSE(Model().IsGameOver());
         EXPECT_GT(Model().GetVersion(), version);
-        EXPECT_EQ(Model().GetPosition().ToFen(), eastl::string(Position::kStartFen));
+        EXPECT_EQ(Model().GetPosition().ToFen(), String(Position::kStartFen));
         EXPECT_FALSE(Model().HasSelection());
         ASSERT_TRUE(FramesUntil([&] { return Model().GetMoves().size() == 1; })) << "the new game opens with the move of the program, which plays White";
         EXPECT_EQ(Model().GetTurn(), PieceColor::Black);
@@ -3227,7 +3226,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(WaitUntil([&] { return engine->Answered() == 1; })) << "the stale search returns its move";
         IdleFrames();
         EXPECT_TRUE(Model().GetMoves().empty()) << "and the move is never played";
-        EXPECT_EQ(Model().GetPosition().ToFen(), eastl::string(Position::kStartFen));
+        EXPECT_EQ(Model().GetPosition().ToFen(), String(Position::kStartFen));
         EXPECT_FALSE(Opponent().GetError().has_value());
         EXPECT_EQ(engine->Calls(), 1) << "it was white's turn after the reset: nothing to search";
 
@@ -3447,7 +3446,7 @@ namespace BECore::Chess::Tests {
         _manager->UpdateAll();
 
         for (size_t index = 0; index < levels.size(); ++index) {
-            const eastl::string id(levels[index].id.data(), levels[index].id.size());
+            const String id(levels[index].id.data(), levels[index].id.size());
             PressWith(kSetLevelAction, id.c_str());
             EXPECT_EQ(Opponent().GetLevel(), index) << id.c_str();
             EXPECT_EQ(Var("opponentLevel"), id) << id.c_str();
@@ -3724,7 +3723,7 @@ namespace BECore::Chess::Tests {
 
         EXPECT_TRUE(ClickButton(kResetColor));
 
-        EXPECT_EQ(Model().GetPosition().ToFen(), eastl::string(Position::kStartFen));
+        EXPECT_EQ(Model().GetPosition().ToFen(), String(Position::kStartFen));
         EXPECT_EQ(Opponent().GetEngine(), OpponentEngine::Own) << "a new game keeps the engine";
         EXPECT_EQ(Var("opponentEngine"), "own");
         EXPECT_EQ(Opponent().GetPlays(), Optional<PieceColor>(PieceColor::Black));
@@ -3743,7 +3742,7 @@ namespace BECore::Chess::Tests {
 
         EXPECT_TRUE(ClickButton(kResetColor));
 
-        EXPECT_EQ(Model().GetPosition().ToFen(), eastl::string(Position::kStartFen));
+        EXPECT_EQ(Model().GetPosition().ToFen(), String(Position::kStartFen));
         EXPECT_EQ(Opponent().GetPlays(), Optional<PieceColor>(PieceColor::Black)) << "a new game keeps the opponent";
         Draw();
         EXPECT_EQ(ShownText(*HudElement("Menu")), "Menu");
@@ -3908,7 +3907,7 @@ namespace BECore::Chess::Tests {
     TEST_F(ChessUiTest, WhenNoStockfishIsFoundTheEngineRowLeadsToTheOwnEngineAndComputerPlays) {
         // The user's path through the panel's actions: Stockfish is not installed, Computer says so and leaves two people, Own engine and Computer again let the program play.
         // The factory fails for Stockfish and nothing else, so the program cannot have fallen back by itself
-        Vector<eastl::string> asked;
+        Vector<String> asked;
         Opponent().SetEngineFactory([&asked](OpponentEngine engine, const OpponentLevel&) -> MadeEngine {
             const StringView id = OpponentEngineId(engine);
             asked.emplace_back(id.data(), id.size());
@@ -3972,7 +3971,7 @@ namespace BECore::Chess::Tests {
                 EXPECT_FALSE(reported.has_value());
             } else {
                 ASSERT_TRUE(reported.has_value());
-                EXPECT_EQ(std::string(reported->c_str(), reported->size()), plays);
+                EXPECT_EQ(String(reported->c_str(), reported->size()), plays);
             }
             EXPECT_EQ(Var("opponentMode"), mode);
             EXPECT_EQ(Var("opponentColor"), personColor) << "the person has the opposite of what the program plays";
@@ -4268,7 +4267,7 @@ namespace BECore::Chess::Tests {
     TEST_F(ChessUiTest, ARefusedStockfishPickOnThePanelKeepsComputerTheOwnEngineAndTheLevelAndTheProgramStillAnswers) {
         // The owner's report: choosing Stockfish switched the mode to Two players. An engine that cannot be had cannot be saved: nothing changes and the error is said
         SKIP_WITHOUT_STOCKFISH_SEGMENT();  // the pick of the name is the action's in that build: WithoutStockfishThePickOfTheNameOnTheActionIsRefused...
-        Vector<eastl::string> asked;
+        Vector<String> asked;
         Opponent().SetEngineFactory([&asked](OpponentEngine engine, const OpponentLevel&) -> MadeEngine {
             const StringView id = OpponentEngineId(engine);
             asked.emplace_back(id.data(), id.size());
@@ -4353,7 +4352,7 @@ namespace BECore::Chess::Tests {
 
         const auto failures = ValidateWithWords(layout);
         EXPECT_TRUE(failures.empty()) << DescribeMatrixFailures(failures).c_str();
-        const eastl::string problems = PanelProblemsOnMatrix(layout);
+        const String problems = PanelProblemsOnMatrix(layout);
         EXPECT_TRUE(problems.empty()) << problems.c_str();
 
         LayOutInTheNarrowestWindow(layout);
@@ -4446,7 +4445,7 @@ namespace BECore::Chess::Tests {
     TEST_F(ChessUiTest, WhenNoStockfishIsFoundThePanelLeadsToTheOwnEngineAndTheProgramPlays) {
         // Was WhenNoStockfishIsFoundTheEngineButtonLeadsToTheOwnEngine... (the action-level twin is WhenNoStockfishIsFoundTheEngineRowLeadsToTheOwnEngineAndComputerPlays). The
         // factory stands in for "no Stockfish found" and nothing else: it never makes the own engine for a Stockfish pick, so the program cannot have fallen back by itself
-        Vector<eastl::string> asked;
+        Vector<String> asked;
         Opponent().SetEngineFactory([&asked](OpponentEngine engine, const OpponentLevel&) -> MadeEngine {
             const StringView id = OpponentEngineId(engine);
             asked.emplace_back(id.data(), id.size());
@@ -4622,7 +4621,7 @@ namespace BECore::Chess::Tests {
         constexpr const char* kMatingPromotionFen = "7k/P7/6K1/8/8/8/8/8 w - - 0 1";  // a8 gives mate with a queen or a rook
 
         /// The name of the button of a promotion piece in the scene: PromoteQueen, PromoteRook, ...
-        eastl::string PromoteButton(PieceType piece) {
+        String PromoteButton(PieceType piece) {
             return Format("Promote{}", PromotionLabel(piece));
         }
 
@@ -4655,7 +4654,7 @@ namespace BECore::Chess::Tests {
     TEST_F(ChessUiTest, AClickOnAPromotionTargetOpensThePanelAndPlaysNothing) {
         StartFrom(kPromotionFen);
         const uint64_t version = Model().GetVersion();
-        const eastl::string fen = Model().GetPosition().ToFen();
+        const String fen = Model().GetPosition().ToFen();
 
         Click("a7");
         EXPECT_FALSE(PromotionShown()) << "selecting the pawn is not a promotion";
@@ -4673,7 +4672,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, EachPieceButtonPlaysItsPromotionClosesThePanelAndTheHandleReportsThePiece) {
         for (const PieceType piece : PromotionPieces()) {
-            SCOPED_TRACE(eastl::string(PromotionLabel(piece)).c_str());
+            SCOPED_TRACE(String(PromotionLabel(piece)).c_str());
             StartFrom(kPromotionFen);
             const uint64_t version = Model().GetVersion();
             const ChessGameModel::PieceHandle pawn = PieceNodeAt("a7");
@@ -4685,7 +4684,7 @@ namespace BECore::Chess::Tests {
             EXPECT_TRUE(taken.Both());
 
             ASSERT_EQ(Model().GetMoves().size(), 1u);
-            EXPECT_EQ(Model().GetMoves().back().ToUci().substr(0, 4), eastl::string("a7a8"));
+            EXPECT_EQ(Model().GetMoves().back().ToUci().substr(0, 4), String("a7a8"));
             EXPECT_TRUE(Model().GetMoves().back().IsPromotion());
             EXPECT_EQ(Model().GetPieceAt(Sq("a8")).type, piece);
             EXPECT_EQ(Model().GetPieceAt(Sq("a8")).color, PieceColor::White);
@@ -4706,7 +4705,7 @@ namespace BECore::Chess::Tests {
             ClickMove("a7", "a8");
             ASSERT_TRUE(ClickPromotion(PromoteButton(piece).c_str()).Both());
             ASSERT_EQ(Model().GetMoves().size(), 1u);
-            EXPECT_EQ(Model().GetMoves().back().ToUci(), eastl::string(uci));
+            EXPECT_EQ(Model().GetMoves().back().ToUci(), String(uci));
         }
     }
 
@@ -4859,7 +4858,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(ClickPromotion("PromoteRook").Both());
 
         ASSERT_EQ(Model().GetMoves().size(), 1u);
-        EXPECT_EQ(Model().GetMoves().front().ToUci(), eastl::string("a7a8r"));
+        EXPECT_EQ(Model().GetMoves().front().ToUci(), String("a7a8r"));
         EXPECT_FALSE(PromotionShown());
         ASSERT_TRUE(FramesUntil([&] { return Model().GetMoves().size() == 2; })) << "the program answers the promotion";
         EXPECT_EQ(Model().GetTurn(), PieceColor::White);
@@ -4890,7 +4889,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(ClickPromotion("PromoteKnight").Both());
 
         ASSERT_EQ(Model().GetMoves().size(), 1u);
-        EXPECT_EQ(Model().GetMoves().back().ToUci(), eastl::string("a2a1n"));
+        EXPECT_EQ(Model().GetMoves().back().ToUci(), String("a2a1n"));
         EXPECT_EQ(Model().GetPieceAt(Sq("a1")).type, PieceType::Knight);
         EXPECT_EQ(Model().GetPieceAt(Sq("a1")).color, PieceColor::Black);
         EXPECT_FALSE(PromotionShown());
@@ -4927,7 +4926,7 @@ namespace BECore::Chess::Tests {
         auto panel = Promotion();
         ASSERT_TRUE(panel);
         panel->UpdateLayout(1280.0f, 720.0f);
-        const eastl::string problems = PanelProblemsOnMatrix(panel->GetLayout(), kReportedCases, kPromotionPlate);
+        const String problems = PanelProblemsOnMatrix(panel->GetLayout(), kReportedCases, kPromotionPlate);
         EXPECT_TRUE(problems.empty()) << problems.c_str();
     }
 
@@ -4941,19 +4940,19 @@ namespace BECore::Chess::Tests {
         const float scale = kNarrowestWidth / kViewWidth;
         EXPECT_NEAR(layout.GetResolved().scale, scale, 0.01f);
         EXPECT_NEAR(layout.root->rect.w, kNarrowestWidth * (1.0f - 2.0f * UIPreview::kSideInsetShare) / scale, 0.5f) << "the safe area, in view units: about 689";
-        const eastl::string problems = PanelProblems(layout, kPromotionPlate);
+        const String problems = PanelProblems(layout, kPromotionPlate);
         EXPECT_TRUE(problems.empty()) << problems.c_str();
 
         // 94% of the safe area is more than maxWidth, so the plate is 640 here and in every other window: 608 inside the padding, 146 a piece button
         EXPECT_NEAR(PromotionElement(kPromotionPlate).rect.w, 640.0f, kPixelTolerance);
 
         const float minTouch = CoreManager::GetUIEnvironment().GetSettings().minTouchSize;
-        Vector<eastl::string> buttons{"PromotionCancel"};
+        Vector<String> buttons{"PromotionCancel"};
         for (const PieceType piece : PromotionPieces()) {
             buttons.push_back(PromoteButton(piece));
         }
         ASSERT_EQ(buttons.size(), 5u) << "four pieces and Cancel";
-        for (const eastl::string& name : buttons) {
+        for (const String& name : buttons) {
             const UIElement& button = PromotionButton(name.c_str());
             EXPECT_GE(button.rect.h, kSegmentHeight - kPixelTolerance) << name.c_str();
             EXPECT_GE(std::min(button.rect.w, button.rect.h) * layout.GetResolved().scale, minTouch - kPixelTolerance) << name.c_str() << " is a touch target on the smallest window";
@@ -5020,8 +5019,8 @@ namespace BECore::Chess::Tests {
             EXPECT_EQ(button.name, PoolString::Intern(PromoteButton(piece).c_str())) << "the buttons are in the order of the table";
             const StringView label = PromotionLabel(piece);
             const StringView id = PromotionId(piece);
-            EXPECT_EQ(ShownText(button), eastl::string(label.data(), label.size()));
-            EXPECT_EQ(eastl::string(clicker->value.ToStringView().data(), clicker->value.ToStringView().size()), eastl::string(id.data(), id.size()));
+            EXPECT_EQ(ShownText(button), String(label.data(), label.size()));
+            EXPECT_EQ(String(clicker->value.ToStringView().data(), clicker->value.ToStringView().size()), String(id.data(), id.size()));
             EXPECT_EQ(clicker->action, PoolString::Intern(kPromoteAction));
             EXPECT_EQ(FindPromotion(clicker->value.ToStringView()), Optional<PieceType>(piece)) << "the value is an id the board accepts";
         }
@@ -5088,18 +5087,18 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, APromotionButtonUnderTheTouchSizeIsCaught) {
         // The row stretches its buttons to its own height (crossAlign), so the row is what makes the four piece buttons low; Cancel has a height of its own
-        std::string cancel = ShippedElementsXml("PromotionPanel");
+        String cancel = ShippedElementsXml("PromotionPanel");
         ASSERT_FALSE(cancel.empty());
         ASSERT_NO_FATAL_FAILURE(Replace(cancel, R"(name="PromotionCancel" height="56")", R"(name="PromotionCancel" height="40")"));
         CanvasCopy lowCancel(cancel);
         EXPECT_TRUE(HasIssue(ValidateWithWords(lowCancel.layout), UILayoutIssueKind::TouchTargetTooSmall));
-        EXPECT_NE(PanelProblemsOnMatrix(lowCancel.layout, kReportedCases, kPromotionPlate).find("PromotionCancel is 40.0 units high"), eastl::string::npos);
+        EXPECT_NE(PanelProblemsOnMatrix(lowCancel.layout, kReportedCases, kPromotionPlate).find("PromotionCancel is 40.0 units high"), String::npos);
 
-        std::string row = ShippedElementsXml("PromotionPanel");
+        String row = ShippedElementsXml("PromotionPanel");
         ASSERT_NO_FATAL_FAILURE(Replace(row, R"(name="PromotionPieces" height="56")", R"(name="PromotionPieces" height="40")"));
         CanvasCopy lowRow(row);
         EXPECT_TRUE(HasIssue(ValidateWithWords(lowRow.layout), UILayoutIssueKind::TouchTargetTooSmall));
-        EXPECT_NE(PanelProblemsOnMatrix(lowRow.layout, kReportedCases, kPromotionPlate).find("PromoteBishop is 40.0 units high"), eastl::string::npos);
+        EXPECT_NE(PanelProblemsOnMatrix(lowRow.layout, kReportedCases, kPromotionPlate).find("PromoteBishop is 40.0 units high"), String::npos);
 
         CanvasCopy shipped(ShippedElementsXml("PromotionPanel"));
         EXPECT_TRUE(PanelProblemsOnMatrix(shipped.layout, kReportedCases, kPromotionPlate).empty()) << "the same checks pass on the shipped panel";
@@ -5107,29 +5106,29 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, APromotionWordCutByAFontThatIsTooBigIsCaught) {
-        std::string xml = ShippedElementsXml("PromotionPanel");
+        String xml = ShippedElementsXml("PromotionPanel");
         ASSERT_NO_FATAL_FAILURE(Replace(xml, R"(name="PromoteKnight" flex="1" height="56" fontSize="26")", R"(name="PromoteKnight" flex="1" height="56" fontSize="60")"));
         CanvasCopy copy(xml);
-        const eastl::string problems = PanelProblemsOnMatrix(copy.layout, kReportedCases, kPromotionPlate);
-        EXPECT_NE(problems.find("PromoteKnight cuts 'Knight'"), eastl::string::npos) << problems.c_str();
+        const String problems = PanelProblemsOnMatrix(copy.layout, kReportedCases, kPromotionPlate);
+        EXPECT_NE(problems.find("PromoteKnight cuts 'Knight'"), String::npos) << problems.c_str();
     }
 
     TEST_F(ChessUiTest, APromotionPlateTooNarrowForTheFourButtonsIsCaught) {
         // A plate of 300 units leaves about 61 for a button, which cannot hold "Knight" with its air; the shipped 640 can
-        std::string xml = ShippedElementsXml("PromotionPanel");
+        String xml = ShippedElementsXml("PromotionPanel");
         ASSERT_NO_FATAL_FAILURE(Replace(xml, R"(maxWidth="640")", R"(maxWidth="300")"));
         CanvasCopy copy(xml);
         LayOutInTheNarrowestWindow(copy.layout);
-        const eastl::string problems = PanelProblems(copy.layout, kPromotionPlate);
-        EXPECT_NE(problems.find("cuts '"), eastl::string::npos) << problems.c_str();
+        const String problems = PanelProblems(copy.layout, kPromotionPlate);
+        EXPECT_NE(problems.find("cuts '"), String::npos) << problems.c_str();
     }
 
     TEST_F(ChessUiTest, APromotionPlateTallerThanTheSafeAreaIsCaught) {
-        std::string xml = ShippedElementsXml("PromotionPanel");
+        String xml = ShippedElementsXml("PromotionPanel");
         ASSERT_NO_FATAL_FAILURE(Replace(xml, R"(height="224")", R"(height="1200")"));
         CanvasCopy copy(xml);
         LayOutInTheNarrowestWindow(copy.layout);
-        EXPECT_NE(PanelProblems(copy.layout, kPromotionPlate).find("leaves the safe area"), eastl::string::npos);
+        EXPECT_NE(PanelProblems(copy.layout, kPromotionPlate).find("leaves the safe area"), String::npos);
     }
 
     // ---- the captured material: the node Material ---------------------------------------------------------------------------------------
@@ -5202,7 +5201,7 @@ namespace BECore::Chess::Tests {
             EXPECT_FALSE(element->blocksInput) << element->name.CStr();
             EXPECT_FALSE(element->IsInteractive()) << element->name.CStr();
             if (element != &root) {
-                EXPECT_EQ(std::string(element->name.CStr()).rfind("Material", 0), 0u) << element->name.CStr() << " starts with Material: elements are found by name in every canvas";
+                EXPECT_EQ(String(element->name.CStr()).rfind("Material", 0), 0u) << element->name.CStr() << " starts with Material: elements are found by name in every canvas";
             }
         }
 
@@ -5620,7 +5619,7 @@ namespace BECore::Chess::Tests {
             ASSERT_TRUE(IsLabel(*label));
             const PoolString variable = PoolString::Intern(Format("material{}Balance", group).c_str());
             for (int points = 1; points <= 99; ++points) {
-                const eastl::string text = BalanceText(points);
+                const String text = BalanceText(points);
                 CoreManager::GetUIVars().Set(variable, StringView(text));
                 const UIContentFit fit = label->CheckContent(label->rect.w, label->rect.h, scale);
                 ASSERT_TRUE(fit.hasContent) << text.c_str();
@@ -5640,10 +5639,10 @@ namespace BECore::Chess::Tests {
     namespace {
 
         /// The elements of the canvas Material as the shipped XML has them, with the rows shown (the copies of the tests start from this text)
-        std::string ShownMaterialXml() {
-            std::string xml = ShippedElementsXml("Material");
-            const std::string hidden = " visible=\"false\"";
-            for (size_t at = xml.find(hidden); at != std::string::npos; at = xml.find(hidden)) {
+        String ShownMaterialXml() {
+            String xml = ShippedElementsXml("Material");
+            const String hidden = " visible=\"false\"";
+            for (size_t at = xml.find(hidden); at != String::npos; at = xml.find(hidden)) {
                 xml.erase(at, hidden.size());
             }
             return xml;
@@ -5654,7 +5653,7 @@ namespace BECore::Chess::Tests {
     TEST_F(ChessUiTest, TheMaterialCanvasHasTheElementsAndTheOrderOfTheScene) {
         const auto canvas = Material();
         ASSERT_TRUE(canvas);
-        Vector<eastl::string> expected;
+        Vector<String> expected;
         for (const char* group : kMaterialGroups) {
             expected.push_back(Format("Material{}List", group));
             for (const char* piece : kMaterialPieces) {
@@ -5695,7 +5694,7 @@ namespace BECore::Chess::Tests {
             const auto failures = ValidateOnMatrix(canvas->GetLayout(), options, ViewContext());
             ASSERT_TRUE(failures.empty()) << "round " << round << ": " << DescribeMatrixFailures(failures).c_str();
         }
-        const eastl::string problems = MaterialProblemsOnMatrix(canvas->GetLayout());
+        const String problems = MaterialProblemsOnMatrix(canvas->GetLayout());
         EXPECT_TRUE(problems.empty()) << problems.c_str();
     }
 
@@ -5721,12 +5720,12 @@ namespace BECore::Chess::Tests {
 
         size_t hidden = 0;
         size_t shown = 0;
-        eastl::string hiddenCases;
+        String hiddenCases;
         for (const UIMatrixCase& matrixCase : UILayoutMatrix()) {
             layout.Update(ContextOf(matrixCase));
             const Rect safe = layout.GetResolved().safeBounds;
             const bool fits = MaterialListFits(safe.x, safe.y, safe.x + safe.w, safe.y + safe.h);
-            const bool sideInsets = matrixCase.label.find("side insets") != eastl::string::npos;
+            const bool sideInsets = matrixCase.label.find("side insets") != String::npos;
             if (!fits) {
                 EXPECT_TRUE(sideInsets) << matrixCase.label.c_str() << ": only side insets take the margin (a notch takes the top 7 % of the short side, which is above the lists)";
                 EXPECT_GT(safe.x, kMaterialListLeft) << matrixCase.label.c_str();
@@ -5760,7 +5759,7 @@ namespace BECore::Chess::Tests {
 
         for (size_t round = 0; round < kMaterialRounds; ++round) {
             PublishMaterialRound(round);
-            const eastl::string problems = MaterialProblems(layout);
+            const String problems = MaterialProblems(layout);
             ASSERT_TRUE(problems.empty()) << "round " << round << ":\n" << problems.c_str();
         }
         // The balance boxes are the part that stays: inside the safe area, inside the margin, clear of the board (x 100) and of the coordinate labels (x 102)
@@ -5793,18 +5792,18 @@ namespace BECore::Chess::Tests {
             material->GetLayout().Update(context);
             hud->GetLayout().Update(context);
             coordinates->GetLayout().Update(context);
-            const eastl::string labels = MaterialClearance(material->GetLayout(), coordinates->GetLayout(), 1.0f);
+            const String labels = MaterialClearance(material->GetLayout(), coordinates->GetLayout(), 1.0f);
             EXPECT_TRUE(labels.empty()) << matrixCase.label.c_str() << ":\n" << labels.c_str();
-            const eastl::string controls = MaterialClearance(material->GetLayout(), hud->GetLayout(), kMinGap);
-            if (matrixCase.label.find("notch") != eastl::string::npos) {
+            const String controls = MaterialClearance(material->GetLayout(), hud->GetLayout(), kMinGap);
+            if (matrixCase.label.find("notch") != String::npos) {
                 ++notchCases;
                 if (!controls.empty()) {
                     ++notchCasesWithAnOverlap;
                     // Not only close: the Turn label lies on top of the balance of the upper group, and of its first rows (src/Chess/Components/CLAUDE.md, "The captured material", "Known limits")
-                    const eastl::string touching = MaterialClearance(material->GetLayout(), hud->GetLayout(), 0.0f);
-                    EXPECT_NE(touching.find("MaterialTopBalance ("), eastl::string::npos) << matrixCase.label.c_str() << ":\n" << touching.c_str();
-                    EXPECT_NE(touching.find("MaterialTopQueenRow ("), eastl::string::npos) << matrixCase.label.c_str() << ":\n" << touching.c_str();
-                    EXPECT_NE(touching.find(") and Turn ("), eastl::string::npos) << matrixCase.label.c_str() << ":\n" << touching.c_str();
+                    const String touching = MaterialClearance(material->GetLayout(), hud->GetLayout(), 0.0f);
+                    EXPECT_NE(touching.find("MaterialTopBalance ("), String::npos) << matrixCase.label.c_str() << ":\n" << touching.c_str();
+                    EXPECT_NE(touching.find("MaterialTopQueenRow ("), String::npos) << matrixCase.label.c_str() << ":\n" << touching.c_str();
+                    EXPECT_NE(touching.find(") and Turn ("), String::npos) << matrixCase.label.c_str() << ":\n" << touching.c_str();
                 }
             } else {
                 EXPECT_TRUE(controls.empty()) << matrixCase.label.c_str() << ":\n" << controls.c_str();
@@ -5889,43 +5888,43 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, ABrokenCopyOfTheMaterialCanvasIsCaughtByTheChecks) {
         Draw();
-        const std::string shipped = ShownMaterialXml();
+        const String shipped = ShownMaterialXml();
         ASSERT_FALSE(shipped.empty());
         auto hud = Hud();
         ASSERT_TRUE(hud);
         hud->UpdateLayout(1280.0f, 720.0f);
-        const auto problemsOf = [&](const std::string& xml) {
+        const auto problemsOf = [&](const String& xml) {
             CanvasCopy copy(xml, false);
             return MaterialProblemsOnMatrix(copy.layout, 3, 100000);
         };
 
         EXPECT_EQ(problemsOf(shipped), "") << "the same checks pass on the shipped canvas";
 
-        std::string wide = shipped;
+        String wide = shipped;
         ASSERT_NO_FATAL_FAILURE(Replace(wide, R"(name="MaterialTopList" x="8" y="84" width="64")", R"(name="MaterialTopList" x="8" y="84" width="104")"));
-        EXPECT_NE(problemsOf(wide).find("MaterialTopList (8.0, 84.0, 104.0"), eastl::string::npos) << "a list that reaches the board leaves the margin";
+        EXPECT_NE(problemsOf(wide).find("MaterialTopList (8.0, 84.0, 104.0"), String::npos) << "a list that reaches the board leaves the margin";
 
-        std::string bigFont = shipped;
+        String bigFont = shipped;
         ASSERT_NO_FATAL_FAILURE(Replace(bigFont, R"(name="MaterialTopQueenCount" flex="1" fontSize="20")", R"(name="MaterialTopQueenCount" flex="1" fontSize="60")"));
-        EXPECT_NE(problemsOf(bigFont).find("MaterialTopQueenCount cuts"), eastl::string::npos) << "a font of 60 does not fit the count box";
+        EXPECT_NE(problemsOf(bigFont).find("MaterialTopQueenCount cuts"), String::npos) << "a font of 60 does not fit the count box";
 
-        std::string smallBox = shipped;
+        String smallBox = shipped;
         ASSERT_NO_FATAL_FAILURE(Replace(smallBox, R"(name="MaterialTopBalance" x="77" y="84" width="23")", R"(name="MaterialTopBalance" x="77" y="84" width="8")"));
-        EXPECT_NE(problemsOf(smallBox).find("MaterialTopBalance cuts"), eastl::string::npos) << "a balance box of 8 units cuts the sign even at the smallest size";
+        EXPECT_NE(problemsOf(smallBox).find("MaterialTopBalance cuts"), String::npos) << "a balance box of 8 units cuts the sign even at the smallest size";
 
-        std::string lowRow = shipped;
+        String lowRow = shipped;
         ASSERT_NO_FATAL_FAILURE(Replace(lowRow, R"(name="MaterialTopQueenRow" height="40")", R"(name="MaterialTopQueenRow" height="20")"));
-        EXPECT_NE(problemsOf(lowRow).find("MaterialTopQueenRow is 20.0 units high"), eastl::string::npos);
+        EXPECT_NE(problemsOf(lowRow).find("MaterialTopQueenRow is 20.0 units high"), String::npos);
 
-        std::string missing = shipped;
+        String missing = shipped;
         ASSERT_NO_FATAL_FAILURE(Replace(missing, R"(name="MaterialTopPawnRow")", R"(name="MaterialTopPawnRowX")"));
-        EXPECT_NE(problemsOf(missing).find("MaterialTopPawnRow is missing"), eastl::string::npos);
+        EXPECT_NE(problemsOf(missing).find("MaterialTopPawnRow is missing"), String::npos);
 
         // A list that moved up under the first row of the HUD: the clearance against the HUD finds it, in a window without insets
-        std::string underTheHud = shipped;
+        String underTheHud = shipped;
         ASSERT_NO_FATAL_FAILURE(Replace(underTheHud, R"(name="MaterialTopList" x="8" y="84")", R"(name="MaterialTopList" x="8" y="20")"));
         CanvasCopy moved(underTheHud, false);
-        EXPECT_NE(problemsOf(underTheHud).find("MaterialTopList (8.0, 20.0"), eastl::string::npos) << "above the rows of the board";
+        EXPECT_NE(problemsOf(underTheHud).find("MaterialTopList (8.0, 20.0"), String::npos) << "above the rows of the board";
         const UIMatrixCase* plain = nullptr;
         for (const UIMatrixCase& matrixCase : UILayoutMatrix()) {
             if (matrixCase.label == "16:9 1280x720 no insets") {
@@ -5935,7 +5934,7 @@ namespace BECore::Chess::Tests {
         ASSERT_NE(plain, nullptr);
         moved.layout.Update(ContextOf(*plain));
         hud->GetLayout().Update(ContextOf(*plain));
-        EXPECT_NE(MaterialClearance(moved.layout, hud->GetLayout(), kMinGap).find("MaterialTopQueenRow"), eastl::string::npos) << "the first row is on the Turn label";
+        EXPECT_NE(MaterialClearance(moved.layout, hud->GetLayout(), kMinGap).find("MaterialTopQueenRow"), String::npos) << "the first row is on the Turn label";
         CanvasCopy fine(shipped, false);
         fine.layout.Update(ContextOf(*plain));
         EXPECT_EQ(MaterialClearance(fine.layout, hud->GetLayout(), kMinGap), "");
@@ -6147,9 +6146,9 @@ namespace BECore::Chess::Tests {
             const Json* fen = state ? FindJsonMember(*state, "fen") : nullptr;
             const Json* moves = state ? FindJsonMember(*state, "moves") : nullptr;
             EXPECT_TRUE(board && fen && moves);
-            return board && fen && moves ? DumpJson(*board) + DumpJson(*fen) + DumpJson(*moves) : eastl::string();
+            return board && fen && moves ? DumpJson(*board) + DumpJson(*fen) + DumpJson(*moves) : String();
         };
-        const eastl::string before = boardOf();
+        const String before = boardOf();
         const uint64_t modelVersion = Model().GetVersion();
         ASSERT_TRUE(ShowTheHint());
         IdleFrames(20);
@@ -6567,7 +6566,7 @@ namespace BECore::Chess::Tests {
 
         EXPECT_FALSE(Model().IsGameOver());
         EXPECT_GT(Model().GetVersion(), version);
-        EXPECT_EQ(Model().GetPosition().ToFen(), eastl::string(Position::kStartFen));
+        EXPECT_EQ(Model().GetPosition().ToFen(), String(Position::kStartFen));
         EXPECT_FALSE(Model().HasSelection());
         ASSERT_TRUE(FramesUntil([&] { return white->Calls() == 1; })) << "the new game opens with White's program";
         EXPECT_TRUE(Opponent().IsWatching()) << "the click starts the next game, not a person's game";
@@ -6590,7 +6589,7 @@ namespace BECore::Chess::Tests {
         Press("ChessReset");
         _manager->UpdateAll();
 
-        EXPECT_EQ(Model().GetPosition().ToFen(), eastl::string(Position::kStartFen));
+        EXPECT_EQ(Model().GetPosition().ToFen(), String(Position::kStartFen));
         EXPECT_TRUE(Opponent().IsWatching()) << "Reset keeps the opponent";
         ASSERT_TRUE(FramesUntil([&] { return white->Calls() == 1; })) << "and the program opens the new game";
         Click("e2");
@@ -6701,9 +6700,9 @@ namespace BECore::Chess::Tests {
     TEST_F(ChessUiTest, ADragPlaysWhatTwoClicksPlay) {
         const uint64_t start = Model().GetVersion();
         ClickMove("e2", "e4");
-        const eastl::string byClicks = Model().GetPosition().ToFen();
+        const String byClicks = Model().GetPosition().ToFen();
         ASSERT_EQ(Model().GetMoves().size(), 1u);
-        const eastl::string clickedMove = Model().GetMoves().back().ToUci();
+        const String clickedMove = Model().GetMoves().back().ToUci();
         EXPECT_EQ(Model().GetVersion(), start + 1);
 
         Model().Reset();
@@ -6878,7 +6877,7 @@ namespace BECore::Chess::Tests {
         Drag("e2", "e4");
 
         EXPECT_FALSE(Model().IsGameOver());
-        EXPECT_EQ(Model().GetPosition().ToFen(), eastl::string(Position::kStartFen));
+        EXPECT_EQ(Model().GetPosition().ToFen(), String(Position::kStartFen));
         EXPECT_TRUE(Model().GetMoves().empty());
         EXPECT_FALSE(Model().HasSelection());
         EXPECT_FALSE(Lifted().has_value());
@@ -6910,7 +6909,7 @@ namespace BECore::Chess::Tests {
     TEST_F(ChessUiTest, ADragToTheLastRankOpensThePromotionPanelAndMovesNothingUntilAPieceIsPicked) {
         StartFrom(kPromotionFen);
         const uint64_t version = Model().GetVersion();
-        const eastl::string fen = Model().GetPosition().ToFen();
+        const String fen = Model().GetPosition().ToFen();
 
         Drag("a7", "a8");
 

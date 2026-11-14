@@ -13,7 +13,7 @@ namespace BECore::Chess::Tests {
 
         SearchRequest RequestOf(StringView fen, std::initializer_list<const char*> moves) {
             SearchRequest request;
-            request.startFen = eastl::string(fen.data(), fen.size());
+            request.startFen = String(fen.data(), fen.size());
             for (const char* move : moves) {
                 request.moves.push_back(Mv(move));
             }
@@ -23,13 +23,13 @@ namespace BECore::Chess::Tests {
 
         void ExpectBestMove(StringView line, const char* move, bool isNone) {
             const auto parsed = UciProtocol::ParseBestMove(line);
-            ASSERT_TRUE(parsed.has_value()) << eastl::string(line.data(), line.size()).c_str();
+            ASSERT_TRUE(parsed.has_value()) << String(line.data(), line.size()).c_str();
             EXPECT_EQ(parsed->move, move);
             EXPECT_EQ(parsed->IsNone(), isNone);
         }
 
         void ExpectNotBestMove(StringView line) {
-            EXPECT_FALSE(UciProtocol::ParseBestMove(line).has_value()) << eastl::string(line.data(), line.size()).c_str();
+            EXPECT_FALSE(UciProtocol::ParseBestMove(line).has_value()) << String(line.data(), line.size()).c_str();
         }
 
         Optional<UciProtocol::Info> ParsedInfo(StringView line) {
@@ -37,7 +37,7 @@ namespace BECore::Chess::Tests {
         }
 
         void ExpectNotInfo(StringView line) {
-            EXPECT_FALSE(UciProtocol::ParseInfo(line).has_value()) << eastl::string(line.data(), line.size()).c_str();
+            EXPECT_FALSE(UciProtocol::ParseInfo(line).has_value()) << String(line.data(), line.size()).c_str();
         }
 
         constexpr AnalysisScore Cp(int value) {

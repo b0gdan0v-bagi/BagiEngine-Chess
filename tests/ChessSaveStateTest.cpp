@@ -20,14 +20,14 @@ namespace BECore::Chess::Tests {
                     end = line.size();
                 }
                 const Optional<Move> move = MoveGenerator::ParseUci(model.GetPosition(), line.substr(begin, end - begin));
-                ASSERT_TRUE(move.has_value()) << "not a legal move: " << std::string(line.substr(begin, end - begin).data(), end - begin);
+                ASSERT_TRUE(move.has_value()) << "not a legal move: " << String(line.substr(begin, end - begin).data(), end - begin);
                 ASSERT_TRUE(model.TryMove(*move).has_value());
                 begin = end + 1;
             }
         }
 
-        std::string MovesText(const ChessGameModel& model) {
-            std::string text;
+        String MovesText(const ChessGameModel& model) {
+            String text;
             for (const Move move : model.GetMoves()) {
                 text += text.empty() ? "" : " ";
                 text += move.ToUci().c_str();
@@ -42,10 +42,10 @@ namespace BECore::Chess::Tests {
         }
 
         /// The fields of a state as one comparable text
-        std::string Describe(const ChessSaveState& state) {
-            std::string text;
+        String Describe(const ChessSaveState& state) {
+            String text;
             for (const String* field : {&state.startFen, &state.moves, &state.plays, &state.whiteEngine, &state.whiteLevel, &state.blackEngine, &state.blackLevel, &state.personColor}) {
-                text += std::string(field->c_str(), field->size()) + "|";
+                text += String(field->c_str(), field->size()) + "|";
             }
             return text;
         }
@@ -119,7 +119,7 @@ namespace BECore::Chess::Tests {
 
         /// Everything that must not move when a file is refused
         struct Snapshot {
-            std::string state;
+            String state;
             uint64_t modelVersion = 0;
             uint64_t revision = 0;
             bool hasError = false;
@@ -297,7 +297,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(target.model.GetVersion(), versionBefore);
         EXPECT_EQ(target.model.GetStatus(), GameStatus::Ongoing);
         EXPECT_TRUE(target.model.GetMoves().empty());
-        EXPECT_EQ(target.model.GetPosition().ToFen(), eastl::string(Position::kStartFen.data(), Position::kStartFen.size()));
+        EXPECT_EQ(target.model.GetPosition().ToFen(), String(Position::kStartFen.data(), Position::kStartFen.size()));
         EXPECT_EQ(target.controller.GetPlays(), PieceColor::Black);
         EXPECT_EQ(target.controller.GetSeatChoice(PieceColor::Black), Seat(OpponentEngine::Own, "hard"));
     }

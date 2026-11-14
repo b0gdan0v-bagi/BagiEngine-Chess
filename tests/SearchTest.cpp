@@ -63,7 +63,7 @@ namespace BECore::Chess::Tests {
         /// What a position is, as far as a search could change it: the key and the FEN
         struct Snapshot {
             ZobristKey key = 0;
-            eastl::string fen;
+            String fen;
             bool operator==(const Snapshot&) const = default;
         };
 
@@ -656,7 +656,7 @@ namespace BECore::Chess::Tests {
         // where the bound lets the table in (a node with the clock c and d plies left is allowed when c + d + 32 is under 100), so the sweep
         // crosses the bound in the middle of the tree. Measured equal at each of these clocks; a guard on one position, not a proof
         for (const int clock : {0, 40, 60, 64, 68, 72, 80, 90, 96, 99}) {
-            const eastl::string fen = Format("4k3/8/8/8/8/8/8/R3K3 w - - {} 80", clock);
+            const String fen = Format("4k3/8/8/8/8/8/8/R3K3 w - - {} 80", clock);
             Position withTable = PositionFromFen(fen.c_str());
             Position withoutTable = PositionFromFen(fen.c_str());
 

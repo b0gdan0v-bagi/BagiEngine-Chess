@@ -70,18 +70,18 @@ namespace BECore::Chess::Tests {
         ASSERT_GE(sizeof(fens) / sizeof(fens[0]), 8U);
 
         for (const StringView fen : fens) {
-            const std::string mirrored = MirrorFen(fen);
-            const std::string text(fen.data(), fen.size());
-            EXPECT_EQ(EvaluateFen(fen), EvaluateFen(FromStd(mirrored))) << text << " <-> " << mirrored;
+            const String mirrored = MirrorFen(fen);
+            const String text(fen.data(), fen.size());
+            EXPECT_EQ(EvaluateFen(fen), EvaluateFen(StringView(mirrored))) << text << " <-> " << mirrored;
         }
     }
 
     TEST(EvaluationTest, TheMirrorHelperIsItsOwnInverse) {
         // A check on the test's own tool: a symmetry test with a broken mirror would pass for the wrong reason
-        const std::string once = MirrorFen(kKiwipeteFen);
-        const std::string twice = MirrorFen(FromStd(once));
+        const String once = MirrorFen(kKiwipeteFen);
+        const String twice = MirrorFen(StringView(once));
 
-        EXPECT_EQ(twice, std::string(kKiwipeteFen.data(), kKiwipeteFen.size()));
+        EXPECT_EQ(twice, String(kKiwipeteFen.data(), kKiwipeteFen.size()));
         EXPECT_EQ(MirrorFen("rnbqkbnr/ppp1pppp/8/3pP3/8/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 3"), "rnbqkbnr/pppp1ppp/8/8/3Pp3/8/PPP1PPPP/RNBQKBNR b KQkq d3 0 3");
     }
 

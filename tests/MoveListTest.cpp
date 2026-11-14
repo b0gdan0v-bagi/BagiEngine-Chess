@@ -24,7 +24,7 @@ namespace BECore::Chess::Tests {
             for (const StringView uci : line) {
                 const Optional<Move> move = MoveGenerator::ParseUci(position, uci);
                 if (!move) {
-                    ADD_FAILURE() << "Not a legal move: " << eastl::string(uci).c_str() << " in " << position.ToFen().c_str();
+                    ADD_FAILURE() << "Not a legal move: " << String(uci).c_str() << " in " << position.ToFen().c_str();
                     break;
                 }
                 position.DoMove(*move);
@@ -34,13 +34,13 @@ namespace BECore::Chess::Tests {
         }
 
         /// The rows as a score sheet: "1.e4 e5 2.Nf3", "7...Nf6 8.Nc3" for a row with no White move
-        std::string TextOf(const Vector<MoveListRow>& rows) {
-            std::string text;
+        String TextOf(const Vector<MoveListRow>& rows) {
+            String text;
             for (const MoveListRow& row : rows) {
                 if (!text.empty()) {
                     text += ' ';
                 }
-                text += std::to_string(row.number);
+                text += ToString(row.number);
                 text += row.white.san.empty() ? "..." : ".";
                 text += row.white.san.c_str();
                 if (!row.black.san.empty()) {
@@ -51,7 +51,7 @@ namespace BECore::Chess::Tests {
             return text;
         }
 
-        std::string ListOf(StringView fen, const Vector<StringView>& line) {
+        String ListOf(StringView fen, const Vector<StringView>& line) {
             return TextOf(BuildMoveList(fen, MovesOf(fen, line)));
         }
 

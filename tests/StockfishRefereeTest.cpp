@@ -28,13 +28,13 @@ namespace BECore::Chess::Tests {
 
         /// What `go perft N` printed: the leaves under each root move (in the order Stockfish gave them) and the total
         struct PerftResult {
-            Vector<eastl::pair<eastl::string, uint64_t>> divide;
+            Vector<eastl::pair<String, uint64_t>> divide;
             uint64_t nodes = 0;
         };
 
         /// The moves of a `go perft 1` result, sorted
-        Vector<eastl::string> MoveTexts(const PerftResult& result) {
-            Vector<eastl::string> moves;
+        Vector<String> MoveTexts(const PerftResult& result) {
+            Vector<String> moves;
             for (const auto& entry : result.divide) {
                 moves.push_back(entry.first);
             }
@@ -73,7 +73,7 @@ namespace BECore::Chess::Tests {
         class StockfishReferee {
         public:
             /// Starts the program at @p path and does the `uci` / `isready` handshake once; empty on a failure (already reported)
-            static UniquePtr<StockfishReferee> Start(const eastl::string& path) {
+            static UniquePtr<StockfishReferee> Start(const String& path) {
                 ProcessLaunch launch;
                 launch.path = path;
                 auto process = UciProcess::Start(launch);
@@ -97,7 +97,7 @@ namespace BECore::Chess::Tests {
 
             /// `go perft @p depth` from @p fen; nothing on a failure (reported, with the FEN)
             Optional<PerftResult> Perft(StringView fen, int depth) {
-                const eastl::string where(fen.data(), fen.size());
+                const String where(fen.data(), fen.size());
                 if (!Send(Format("position fen {}", fen), where) || !Send(Format("go perft {}", depth), where)) {
                     return std::nullopt;
                 }
@@ -126,13 +126,13 @@ namespace BECore::Chess::Tests {
                             ADD_FAILURE() << "no count in '" << line->c_str() << "' for " << where.c_str();
                             return std::nullopt;
                         }
-                        result.divide.emplace_back(eastl::string(text.data(), colon), *count);
+                        result.divide.emplace_back(String(text.data(), colon), *count);
                     }
                 }
             }
 
             /// The legal moves of @p fen as Stockfish counts them, sorted; nothing on a failure
-            Optional<Vector<eastl::string>> Moves(StringView fen) {
+            Optional<Vector<String>> Moves(StringView fen) {
                 const Optional<PerftResult> result = Perft(fen, 1);
                 if (!result) {
                     return std::nullopt;
@@ -143,7 +143,7 @@ namespace BECore::Chess::Tests {
         private:
             explicit StockfishReferee(UniquePtr<UciProcess> process) : _process(std::move(process)) {}
 
-            bool Send(const eastl::string& line, const eastl::string& where) {
+            bool Send(const String& line, const String& where) {
                 const auto written = _process->WriteLine(line);
                 if (!written) {
                     ADD_FAILURE() << "Stockfish did not take '" << line.c_str() << "' for " << where.c_str() << ": " << Describe(written.error()).c_str();
@@ -155,7 +155,7 @@ namespace BECore::Chess::Tests {
                 while (true) {
                     const auto line = _process->ReadLine(kHandshakeTimeout);
                     if (!line) {
-                        ADD_FAILURE() << "Stockfish did not say '" << eastl::string(expected.data(), expected.size()).c_str() << "': " << Describe(line.error()).c_str();
+                        ADD_FAILURE() << "Stockfish did not say '" << String(expected.data(), expected.size()).c_str() << "': " << Describe(line.error()).c_str();
                         return false;
                     }
                     if (*line == expected) {
@@ -172,9 +172,9 @@ namespace BECore::Chess::Tests {
         };
 
         /// "e2e4 g1f3" style list of the elements of @p moves that @p others does not hold
-        eastl::string Missing(const Vector<eastl::string>& moves, const Vector<eastl::string>& others) {
-            eastl::string text;
-            for (const eastl::string& move : moves) {
+        String Missing(const Vector<String>& moves, const Vector<String>& others) {
+            String text;
+            for (const String& move : moves) {
                 if (eastl::find(others.begin(), others.end(), move) == others.end()) {
                     text = text.empty() ? move : Format("{} {}", text, move);
                 }
@@ -182,8 +182,8 @@ namespace BECore::Chess::Tests {
             return text;
         }
 
-        Vector<eastl::string> OurMoves(const Position& position) {
-            Vector<eastl::string> moves;
+        Vector<String> OurMoves(const Position& position) {
+            Vector<String> moves;
             for (const Move move : MoveGenerator::GenerateLegal(position)) {
                 moves.push_back(move.ToUci());
             }
@@ -193,12 +193,12 @@ namespace BECore::Chess::Tests {
 
         /// Compares the move sets for @p position; true when equal, else the failure lists the moves only one side has
         bool ExpectSameMoves(StockfishReferee& referee, const Position& position) {
-            const eastl::string fen = position.ToFen();
-            const Optional<Vector<eastl::string>> theirs = referee.Moves(fen);
+            const String fen = position.ToFen();
+            const Optional<Vector<String>> theirs = referee.Moves(fen);
             if (!theirs) {
                 return false;
             }
-            const Vector<eastl::string> ours = OurMoves(position);
+            const Vector<String> ours = OurMoves(position);
             if (ours == *theirs) {
                 return true;
             }
@@ -224,20 +224,20 @@ namespace BECore::Chess::Tests {
         void ExpectSamePerft(StockfishReferee& referee, StringView fen, int depth, uint64_t expectedNodes) {
             const Optional<PerftResult> theirs = referee.Perft(fen, depth);
             ASSERT_TRUE(theirs.has_value());
-            EXPECT_EQ(theirs->nodes, expectedNodes) << "Stockfish at depth " << depth << " of " << eastl::string(fen.data(), fen.size()).c_str();
+            EXPECT_EQ(theirs->nodes, expectedNodes) << "Stockfish at depth " << depth << " of " << String(fen.data(), fen.size()).c_str();
 
             Position position = PositionFromFen(fen);
             uint64_t total = 0;
             for (const auto& [text, count] : theirs->divide) {
                 const auto move = MoveGenerator::ParseUci(position, text);
                 if (!move) {
-                    ADD_FAILURE() << "Stockfish has the root move " << text.c_str() << ", which our generator does not know, in " << eastl::string(fen.data(), fen.size()).c_str();
+                    ADD_FAILURE() << "Stockfish has the root move " << text.c_str() << ", which our generator does not know, in " << String(fen.data(), fen.size()).c_str();
                     continue;
                 }
                 position.DoMove(*move);
                 const uint64_t ours = depth <= 1 ? 1 : OurPerft(position, depth - 1);
                 position.UndoMove();
-                EXPECT_EQ(ours, count) << "leaves under " << text.c_str() << " at depth " << depth << " of " << eastl::string(fen.data(), fen.size()).c_str();
+                EXPECT_EQ(ours, count) << "leaves under " << text.c_str() << " at depth " << depth << " of " << String(fen.data(), fen.size()).c_str();
                 total += ours;
             }
             EXPECT_EQ(total, expectedNodes) << "our total at depth " << depth;
@@ -253,7 +253,7 @@ namespace BECore::Chess::Tests {
         ASSERT_NE(referee, nullptr);
 
         for (const StringView fen : {Position::kStartFen, kKiwipeteFen, kPosition3Fen, kPosition4Fen, kPosition5Fen, kPosition6Fen}) {
-            SCOPED_TRACE(eastl::string(fen.data(), fen.size()).c_str());
+            SCOPED_TRACE(String(fen.data(), fen.size()).c_str());
             const Position position = PositionFromFen(fen);
             EXPECT_TRUE(ExpectSameMoves(*referee, position));
         }
@@ -295,8 +295,8 @@ namespace BECore::Chess::Tests {
         ASSERT_NE(referee, nullptr);
 
         for (const StringView fen : {kMateFen, kStalemateFen}) {
-            SCOPED_TRACE(eastl::string(fen.data(), fen.size()).c_str());
-            const Optional<Vector<eastl::string>> theirs = referee->Moves(fen);
+            SCOPED_TRACE(String(fen.data(), fen.size()).c_str());
+            const Optional<Vector<String>> theirs = referee->Moves(fen);
             ASSERT_TRUE(theirs.has_value());
             EXPECT_TRUE(theirs->empty());
             EXPECT_TRUE(MoveGenerator::GenerateLegal(PositionFromFen(fen)).empty());

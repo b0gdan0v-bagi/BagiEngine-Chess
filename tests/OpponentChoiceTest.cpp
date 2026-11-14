@@ -21,8 +21,8 @@ namespace BECore::Chess::Tests {
             return EngineError{EngineErrorKind::LaunchFailed, "no Stockfish in the test"};
         }
 
-        eastl::string Text(StringView text) {
-            return eastl::string(text.data(), text.size());
+        String Text(StringView text) {
+            return String(text.data(), text.size());
         }
 
         /// A controller, its factory and the choice over them; the factory hands out an InstantEngine
@@ -38,17 +38,17 @@ namespace BECore::Chess::Tests {
         };
 
         /// The spelling of a failed pick for a failed expectation
-        std::string Describe(const std::expected<void, ChoiceError>& picked) {
+        String Describe(const std::expected<void, ChoiceError>& picked) {
             if (picked) {
                 return "picked";
             }
-            return std::string(EnumUtils<ChoiceErrorKind>::ToString(picked.error().kind).data()) + ": " + picked.error().detail.c_str();
+            return String(EnumUtils<ChoiceErrorKind>::ToString(picked.error().kind).data()) + ": " + picked.error().detail.c_str();
         }
 
         /// The ids that no table has: empty, the wrong case, a prefix, a trailing or a leading space, a word of another table
-        const Vector<eastl::string>& BadIds() {
-            static const Vector<eastl::string> ids = {"",         "White",     "BLACK",     "whit", "black ",     " white", "Two",  "two players",
-                                                      "Computer", "computer ", "Stockfish", "OWN",  "own engine", "med",    "Hard", "hard\n"};
+        const Vector<String>& BadIds() {
+            static const Vector<String> ids = {"",         "White",     "BLACK",     "whit", "black ",     " white", "Two",  "two players",
+                                               "Computer", "computer ", "Stockfish", "OWN",  "own engine", "med",    "Hard", "hard\n"};
             return ids;
         }
 
@@ -194,7 +194,7 @@ namespace BECore::Chess::Tests {
             const int calls = seat.factory.Calls();
             const uint64_t revision = seat.controller.GetRevision();
 
-            for (const eastl::string& id : BadIds()) {
+            for (const String& id : BadIds()) {
                 const StringView view(id.data(), id.size());
                 const std::expected<void, ChoiceError> results[] = {seat.choice.SetMode(view), seat.choice.SetColor(view), seat.choice.SetEngine(view), seat.choice.SetLevel(view)};
                 for (const auto& result : results) {
@@ -236,7 +236,7 @@ namespace BECore::Chess::Tests {
         ChessGameModel model;
         OpponentController controller(model);
         OpponentChoice choice(controller);
-        Vector<eastl::string> asked;
+        Vector<String> asked;
         controller.SetEngineFactory([&asked](OpponentEngine engine, const OpponentLevel&) -> std::expected<eastl::shared_ptr<IChessEngine>, EngineError> {
             asked.push_back(Text(OpponentEngineId(engine)));
             if (engine == OpponentEngine::Stockfish) {

@@ -654,7 +654,7 @@ namespace BECore::Chess::Tests {
                 kGameBudget);
             EXPECT_TRUE(done) << "moves so far: " << model.GetMoves().size() << ", " << DescribeError(controller.GetError()).c_str();
             EXPECT_FALSE(controller.GetError().has_value()) << DescribeError(controller.GetError()).c_str();
-            Vector<eastl::string> moves;
+            Vector<String> moves;
             for (const Move& played : model.GetMoves()) {
                 if (moves.size() == kPlyCap) {
                     break;  // a search that was already running when the cap was reached may have played one more
@@ -664,7 +664,7 @@ namespace BECore::Chess::Tests {
             return moves;
         };
 
-        const Vector<eastl::string> first = playedTheGame();
+        const Vector<String> first = playedTheGame();
         ASSERT_FALSE(first.empty());
 
         // Every move is legal in its position (so the turns alternate): the moves replayed on a model of our own
@@ -675,7 +675,7 @@ namespace BECore::Chess::Tests {
 
         // A reset starts the game again, with the same two programs, and it goes the same way
         model.Reset();
-        const Vector<eastl::string> second = playedTheGame();
+        const Vector<String> second = playedTheGame();
         EXPECT_EQ(first, second);
     }
 

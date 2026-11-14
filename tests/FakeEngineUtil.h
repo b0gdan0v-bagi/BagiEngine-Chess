@@ -36,7 +36,7 @@ namespace BECore::Chess::Tests {
     inline ProcessLaunch FakeEngineLaunch(std::initializer_list<StringView> flags = {}) {
         ProcessLaunch launch;
         launch.path = CHESS_TEST_PYTHON;
-        const std::string script = FakeEngineScript().string();
+        const String script = FromStdString(FakeEngineScript().string());
         launch.args.emplace_back(script.c_str(), script.size());
         for (const StringView flag : flags) {
             launch.args.emplace_back(flag.data(), flag.size());
@@ -65,13 +65,12 @@ namespace BECore::Chess::Tests {
         }
 
         /// The same as text, for a flag of the fake engine such as --log
-        [[nodiscard]] eastl::string FileText(const char* name) const {
-            const std::string text = File(name).string();
-            return eastl::string(text.c_str(), text.size());
+        [[nodiscard]] String FileText(const char* name) const {
+            return FromStdString(File(name).string());
         }
 
     private:
-        static eastl::string DirectoryName() {
+        static String DirectoryName() {
             const ::testing::TestInfo* info = ::testing::UnitTest::GetInstance()->current_test_info();
             return Format("BagiChessTests_{}_{}", info->test_suite_name(), info->name());
         }
@@ -80,10 +79,10 @@ namespace BECore::Chess::Tests {
     };
 
     /// The lines of a text file, none when it does not exist (the fake engine's --log file: what the engine received)
-    inline Vector<eastl::string> ReadFileLines(const std::filesystem::path& file) {
-        Vector<eastl::string> lines;
+    inline Vector<String> ReadFileLines(const std::filesystem::path& file) {
+        Vector<String> lines;
         std::ifstream stream(file);
-        std::string line;
+        std::string line;  //-NoStd: std::getline
         while (std::getline(stream, line)) {
             lines.emplace_back(line.c_str(), line.size());
         }
@@ -91,8 +90,8 @@ namespace BECore::Chess::Tests {
     }
 
     /// A list of lines to compare with ReadFileLines()
-    inline Vector<eastl::string> Lines(std::initializer_list<StringView> texts) {
-        Vector<eastl::string> lines;
+    inline Vector<String> Lines(std::initializer_list<StringView> texts) {
+        Vector<String> lines;
         for (const StringView text : texts) {
             lines.emplace_back(text.data(), text.size());
         }
@@ -105,7 +104,7 @@ namespace BECore::Chess::Tests {
         constexpr std::chrono::milliseconds kPollInterval{5};
         const auto deadline = std::chrono::steady_clock::now() + timeout;
         for (;;) {
-            for (const eastl::string& line : ReadFileLines(file)) {
+            for (const String& line : ReadFileLines(file)) {
                 if (StringView(line) == text) {
                     return true;
                 }

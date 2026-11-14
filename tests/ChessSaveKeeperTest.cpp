@@ -52,7 +52,7 @@ namespace BECore::Chess::Tests {
             return bytes;
         }
 
-        void WriteBytes(const std::filesystem::path& path, const std::string& bytes) {
+        void WriteBytes(const std::filesystem::path& path, const String& bytes) {
             std::ofstream file(path, std::ios::binary | std::ios::trunc);
             file << bytes;
         }
@@ -101,7 +101,7 @@ namespace BECore::Chess::Tests {
     TEST(SaveSettingsTest, AValueThatIsNotTrueOrFalseIsFalseAndIsNotAnError) {
         for (const char* value : {"yes", "1", "TRUE", "True", "", " true"}) {
             SCOPED_TRACE(value);
-            const std::string shared = std::string("<ChessSettings rememberGame=\"") + value + "\"/>";
+            const String shared = String("<ChessSettings rememberGame=\"") + value + "\"/>";
             EXPECT_FALSE(Read(shared.c_str(), nullptr).rememberGame);
         }
         // A bad local value is the local value: it does not fall through to the shared one
@@ -238,8 +238,8 @@ namespace BECore::Chess::Tests {
         void SetCommandLine(const Vector<String>& flags, bool withFolder = true) {
             Vector<String> arguments = flags;
             if (withFolder) {
-                const std::string path = _saves.string();
-                arguments.push_back(String("--save-dir=") + String(path.c_str(), path.size()));
+                const String path = FromStdString(_saves.string());
+                arguments.push_back(String("--save-dir=") + path);
             }
             CoreManager::GetCommandLine().Set(arguments);
         }

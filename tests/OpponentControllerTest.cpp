@@ -55,8 +55,8 @@ namespace BECore::Chess::Tests {
             return index.value_or(kDefaultOpponentLevel);
         }
 
-        bool Contains(const eastl::string& text, StringView part) {
-            return text.find(part.data(), 0, part.size()) != eastl::string::npos;
+        bool Contains(const String& text, StringView part) {
+            return text.find(part.data(), 0, part.size()) != String::npos;
         }
 
         /// The own engine that remembers the limits it was asked with (RecordingEngine); what it answers is the real OwnEngine's
@@ -68,14 +68,14 @@ namespace BECore::Chess::Tests {
         };
 
         /// The reply of the own engine through the default factory (no factory set, no settings, no process) to e2e4 at @p level, or an empty string when none came
-        eastl::string OwnReplyToE2e4(size_t level) {
+        String OwnReplyToE2e4(size_t level) {
             ChessGameModel model;
             OpponentController controller(model);
             EXPECT_TRUE(controller.Choose(PieceColor::Black, level, OpponentEngine::Own).has_value());
             EXPECT_TRUE(Play(model, "e2e4"));
             const bool answered = UpdateUntil(controller, [&] { return model.GetMoves().size() == 2; });
             EXPECT_TRUE(answered) << DescribeError(controller.GetError()).c_str();
-            return answered ? model.GetMoves()[1].ToUci() : eastl::string();
+            return answered ? model.GetMoves()[1].ToUci() : String();
         }
 
     }  // namespace
@@ -739,7 +739,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OpponentControllerTest, TheDefaultFactoryNamesThePathItTriedWhenThereIsNoFile) {
         ChessGameModel model;
-        OpponentController controller(model, OpponentSettings{eastl::string(kMissingPath.data(), kMissingPath.size())});  // an explicit path decides: $STOCKFISH and PATH are not asked
+        OpponentController controller(model, OpponentSettings{String(kMissingPath.data(), kMissingPath.size())});  // an explicit path decides: $STOCKFISH and PATH are not asked
 
         const auto picked = controller.SetSide(PieceColor::Black);
 
@@ -751,7 +751,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(controller.GetError()->detail, picked.error().detail);
 
         // A path with a tilde names no file either (nothing expands it), and the sentence says so
-        controller.SetSettings(OpponentSettings{eastl::string(kTildePath.data(), kTildePath.size())});
+        controller.SetSettings(OpponentSettings{String(kTildePath.data(), kTildePath.size())});
         const auto tilde = controller.SetSide(PieceColor::Black);
         ASSERT_FALSE(tilde.has_value());
         EXPECT_EQ(tilde.error().kind, EngineErrorKind::LaunchFailed);
@@ -770,10 +770,10 @@ namespace BECore::Chess::Tests {
                 std::ofstream out(script);
 #if defined(_WIN32)
                 // No exec: cmd.exe stays the parent of the fake, and UciProcess's job ends both
-                out << "@\"" << CHESS_TEST_PYTHON << "\" \"" << FakeEngineScript().string() << "\" " << std::string(flags.data(), flags.size()) << "\r\n";
+                out << "@\"" << CHESS_TEST_PYTHON << "\" \"" << FakeEngineScript().string() << "\" " << String(flags.data(), flags.size()) << "\r\n";
 #else
                 out << "#!/bin/sh\n";
-                out << "exec \"" << CHESS_TEST_PYTHON << "\" \"" << FakeEngineScript().string() << "\" " << std::string(flags.data(), flags.size()) << "\n";
+                out << "exec \"" << CHESS_TEST_PYTHON << "\" \"" << FakeEngineScript().string() << "\" " << String(flags.data(), flags.size()) << "\n";
 #endif
             }
             std::filesystem::permissions(script, kScriptPermissions, std::filesystem::perm_options::replace);
@@ -781,8 +781,7 @@ namespace BECore::Chess::Tests {
         }
 
         OpponentSettings SettingsFor(const std::filesystem::path& program) {
-            const std::string path = program.string();
-            return OpponentSettings{eastl::string(path.c_str(), path.size())};
+            return OpponentSettings{FromStdString(program.string())};
         }
 
     }  // namespace
@@ -790,7 +789,7 @@ namespace BECore::Chess::Tests {
     TEST_F(OpponentControllerTest, TheDefaultFactoryStartsTheProgramOfThePathWithTheSkillOfTheLevel) {
         SKIP_WITHOUT_FAKE_ENGINE();
         const TempDirectory directory;
-        const eastl::string log = directory.FileText(kLogName);
+        const String log = directory.FileText(kLogName);
         const std::filesystem::path wrapper = WriteWrapper(directory, Format("--log \"{}\" --moves e7e5", log));
         ChessGameModel model;
         OpponentController controller(model, SettingsFor(wrapper));
@@ -811,7 +810,7 @@ namespace BECore::Chess::Tests {
     TEST_F(OpponentControllerTest, AChangeOfLevelStartsAnEngineWithTheNewSkill) {
         SKIP_WITHOUT_FAKE_ENGINE();
         const TempDirectory directory;
-        const eastl::string log = directory.FileText(kLogName);
+        const String log = directory.FileText(kLogName);
         const std::filesystem::path wrapper = WriteWrapper(directory, Format("--log \"{}\" --moves e7e5", log));  // every process answers e7e5 to its first search
         ChessGameModel model;
         OpponentController controller(model, SettingsFor(wrapper));
@@ -832,10 +831,10 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(UpdateUntil(controller, [&] { return model.GetMoves().size() == 2; })) << DescribeError(controller.GetError()).c_str();
 
         // The new process got the new Skill Level at its handshake: the log of the fake has one line of each, the old process and the new one
-        const eastl::string first = Format("setoption name Skill Level value {}", before.skillLevel);
-        const eastl::string second = Format("setoption name Skill Level value {}", after.skillLevel);
+        const String first = Format("setoption name Skill Level value {}", before.skillLevel);
+        const String second = Format("setoption name Skill Level value {}", after.skillLevel);
         EXPECT_TRUE(WaitForLogLine(directory.File(kLogName), second));
-        const Vector<eastl::string> lines = ReadFileLines(directory.File(kLogName));
+        const Vector<String> lines = ReadFileLines(directory.File(kLogName));
         EXPECT_EQ(std::count(lines.begin(), lines.end(), first), 1);
         EXPECT_EQ(std::count(lines.begin(), lines.end(), second), 1);
     }
@@ -846,7 +845,7 @@ namespace BECore::Chess::Tests {
         /// reference to the engine: dropping it closes the child here, which ignores `quit` until it is signalled. With @p checkSpeed the close must also have taken less
         /// than kShutdownBudget (the yardstick)
         void ShutDownWithAStubbornChild(const TempDirectory& directory, bool checkSpeed) {
-            const eastl::string log = directory.FileText(kLogName);
+            const String log = directory.FileText(kLogName);
             const std::filesystem::path wrapper = WriteWrapper(directory, Format("--log \"{}\" --ignore-quit --moves e7e5", log));
             ChessGameModel model;
             OpponentController controller(model, SettingsFor(wrapper));
@@ -1068,7 +1067,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(model.GetTurn(), PieceColor::White);
         EXPECT_FALSE(controller.IsThinking());
         EXPECT_FALSE(controller.GetError().has_value());
-        const eastl::string reply = model.GetMoves()[1].ToUci();
+        const String reply = model.GetMoves()[1].ToUci();
 
         // A fixed depth is deterministic: another controller on another model answers the same (at easy this goes through the handicap, a pure function of the position)
         EXPECT_EQ(OwnReplyToE2e4(LevelIndex("easy")), reply);
@@ -1085,14 +1084,14 @@ namespace BECore::Chess::Tests {
         const auto plain = OwnEngine().FindMove(request, CancellationToken::Create());
         ASSERT_TRUE(plain.has_value());
 
-        const eastl::string reply = OwnReplyToE2e4(max);
+        const String reply = OwnReplyToE2e4(max);
 
         EXPECT_EQ(reply, plain->ToUci()) << "depth 5, no wrapper at 0 percent: the reply is the one of an OwnEngine given the request of the level";
     }
 
     TEST_F(OpponentControllerTest, TheOwnEngineIsMadeWhateverTheStockfishPathIsAndTheStockfishPickStillNamesThePath) {
         ChessGameModel model;
-        OpponentController controller(model, OpponentSettings{eastl::string(kMissingPath.data(), kMissingPath.size())});
+        OpponentController controller(model, OpponentSettings{String(kMissingPath.data(), kMissingPath.size())});
 
         ASSERT_TRUE(controller.Choose(PieceColor::Black, LevelIndex("easy"), OpponentEngine::Own).has_value()) << "the settings are not read for the own engine";
         EXPECT_TRUE(controller.PlaysFor(PieceColor::Black));

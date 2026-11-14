@@ -60,11 +60,11 @@ namespace BECore::Chess::Tests {
             });
         }
 
-        eastl::string Describe(const Optional<EngineError>& error) {
-            return error ? Format("{}: {}", EnumUtils<EngineErrorKind>::ToString(error->kind), error->detail) : eastl::string("no error");
+        String Describe(const Optional<EngineError>& error) {
+            return error ? Format("{}: {}", EnumUtils<EngineErrorKind>::ToString(error->kind), error->detail) : String("no error");
         }
 
-        eastl::string StartPositionCommand() {
+        String StartPositionCommand() {
             return Format("position fen {}", Position::kStartFen);
         }
 
@@ -162,7 +162,7 @@ namespace BECore::Chess::Tests {
         SKIP_WITHOUT_FAKE_ENGINE();
         SKIP_WITHOUT_WORKER_THREADS();
         const TempDirectory directory;
-        const eastl::string log = directory.FileText(kLogName);
+        const String log = directory.FileText(kLogName);
         ChessGameModel model;
         EngineOpponent opponent(MakeFakeEngine({"--log", log, "--moves", "e7e5,g8f6"}), PieceColor::Black, kLimits);
         const uint64_t versionBefore = model.GetVersion();
@@ -192,7 +192,7 @@ namespace BECore::Chess::Tests {
         SKIP_WITHOUT_FAKE_ENGINE();
         SKIP_WITHOUT_WORKER_THREADS();
         const TempDirectory directory;
-        const eastl::string log = directory.FileText(kLogName);
+        const String log = directory.FileText(kLogName);
         ChessGameModel model;
         EngineOpponent opponent(MakeFakeEngine({"--log", log, "--think-ms", kThinksUntilStopped, "--moves", "e7e5"}), PieceColor::Black, kLimits);
         ASSERT_TRUE(Play(model, "e2e4"));
@@ -248,7 +248,7 @@ namespace BECore::Chess::Tests {
         SKIP_WITHOUT_FAKE_ENGINE();
         SKIP_WITHOUT_WORKER_THREADS();
         const TempDirectory directory;
-        const eastl::string log = directory.FileText(kLogName);
+        const String log = directory.FileText(kLogName);
         // The first search thinks until it is stopped and then answers e7e5; the second answers d7d5 at once
         ChessGameModel model;
         EngineOpponent opponent(MakeFakeEngine({"--log", log, "--think-ms", kThinksUntilStopped, "--think-first-only", "--moves", "e7e5,d7d5"}), PieceColor::Black, kLimits);
@@ -385,7 +385,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(UpdateUntil(opponent, model, [&] { return opponent.GetLastError().has_value(); }));
 
         EXPECT_EQ(opponent.GetLastError()->kind, EngineErrorKind::IllegalMove);
-        EXPECT_NE(opponent.GetLastError()->detail.find("e2e4"), eastl::string::npos) << Describe(opponent.GetLastError()).c_str();
+        EXPECT_NE(opponent.GetLastError()->detail.find("e2e4"), String::npos) << Describe(opponent.GetLastError()).c_str();
         EXPECT_EQ(model.GetVersion(), version);
         for (int frame = 0; frame < kManyUpdates; ++frame) {
             opponent.Update(model);
@@ -397,7 +397,7 @@ namespace BECore::Chess::Tests {
     TEST_F(EngineOpponentTest, ADyingEngineIsProcessDiedAndTheOpponentRecoversAfterClearError) {
         SKIP_WITHOUT_FAKE_ENGINE();
         const TempDirectory directory;
-        const eastl::string marker = directory.FileText("died-once");
+        const String marker = directory.FileText("died-once");
         ChessGameModel model;
         EngineOpponent opponent(MakeFakeEngine({"--die-once", marker, "--moves", "e7e5"}), PieceColor::Black, kLimits);
         ASSERT_TRUE(Play(model, "e2e4"));
@@ -418,7 +418,7 @@ namespace BECore::Chess::Tests {
         SKIP_WITHOUT_FAKE_ENGINE();
         SKIP_WITHOUT_WORKER_THREADS();
         const TempDirectory directory;
-        const eastl::string log = directory.FileText(kLogName);
+        const String log = directory.FileText(kLogName);
         ChessGameModel model;
         {
             EngineOpponent opponent(MakeFakeEngine({"--log", log, "--think-ms", kThinksUntilStopped}), PieceColor::Black, kLimits);

@@ -58,25 +58,25 @@ namespace BECore::Chess::Tests {
         /// A request for the position @p fen, no moves behind it
         SearchRequest RequestFor(StringView fen, SearchLimits limits = kDepth10) {
             SearchRequest request;
-            request.startFen = eastl::string(fen.data(), fen.size());
+            request.startFen = String(fen.data(), fen.size());
             request.limits = limits;
             return request;
         }
 
         /// The answer of a fresh UciEngine over the Stockfish at @p path
-        std::expected<Move, EngineError> Ask(const eastl::string& path, const SearchRequest& request) {
+        std::expected<Move, EngineError> Ask(const String& path, const SearchRequest& request) {
             UciEngine engine(StockfishSettings(path));
             return engine.FindMove(request, CancellationToken());
         }
 
         /// The analysis of a fresh UciEngine over the Stockfish at @p path
-        std::expected<Analysis, EngineError> Analyse(const eastl::string& path, const SearchRequest& request) {
+        std::expected<Analysis, EngineError> Analyse(const String& path, const SearchRequest& request) {
             UciEngine engine(StockfishSettings(path));
             return engine.Analyse(request, CancellationToken());
         }
 
         /// The best line of the analysis, or a failure that says why not
-        Optional<AnalysisLine> BestLine(const eastl::string& path, StringView fen, SearchLimits limits = kDepth10) {
+        Optional<AnalysisLine> BestLine(const String& path, StringView fen, SearchLimits limits = kDepth10) {
             const auto result = Analyse(path, RequestFor(fen, limits));
             if (!result) {
                 ADD_FAILURE() << Describe(result.error()).c_str();
@@ -101,7 +101,7 @@ namespace BECore::Chess::Tests {
         }
 
         /// The move Stockfish gives for @p request, or a failure that says why not
-        Optional<Move> Answer(const eastl::string& path, const SearchRequest& request) {
+        Optional<Move> Answer(const String& path, const SearchRequest& request) {
             const auto result = Ask(path, request);
             if (!result) {
                 ADD_FAILURE() << Describe(result.error()).c_str();
@@ -111,7 +111,7 @@ namespace BECore::Chess::Tests {
         }
 
         /// Stockfish answers with @p expected, and the game accepts the move and ends in @p status
-        void ExpectMoveAndStatus(const eastl::string& path, StringView fen, Move expected, GameStatus status) {
+        void ExpectMoveAndStatus(const String& path, StringView fen, Move expected, GameStatus status) {
             const auto answer = Answer(path, RequestFor(fen));
             ASSERT_TRUE(answer.has_value());
             EXPECT_EQ(*answer, expected) << answer->ToUci().c_str() << " instead of " << expected.ToUci().c_str();
@@ -454,8 +454,8 @@ namespace BECore::Chess::Tests {
             EXPECT_EQ(fromStockfish->Best().score, expected) << test.fen.data() << " (Stockfish): " << ScoreText(fromStockfish->Best().score).c_str();
             EXPECT_EQ(fromOwn->Best().score, expected) << test.fen.data() << " (own): " << ScoreText(fromOwn->Best().score).c_str();
             if (test.key != nullptr) {
-                EXPECT_EQ(fromStockfish->Best().move.ToUci(), eastl::string(test.key)) << test.fen.data();
-                EXPECT_EQ(fromOwn->Best().move.ToUci(), eastl::string(test.key)) << test.fen.data();
+                EXPECT_EQ(fromStockfish->Best().move.ToUci(), String(test.key)) << test.fen.data();
+                EXPECT_EQ(fromOwn->Best().move.ToUci(), String(test.key)) << test.fen.data();
             }
         }
     }

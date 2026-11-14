@@ -28,8 +28,8 @@ namespace BECore::Chess::Tests {
             return answer ? Optional<Move>(*answer) : std::nullopt;
         }
 
-        eastl::string Uci(const std::expected<Move, EngineError>& answer) {
-            return answer ? answer->ToUci() : eastl::string("error");
+        String Uci(const std::expected<Move, EngineError>& answer) {
+            return answer ? answer->ToUci() : String("error");
         }
 
         bool IsLegalIn(const Position& position, Move move) {
@@ -64,8 +64,8 @@ namespace BECore::Chess::Tests {
             return Decision{inner.Calls() == before, Found(answer)};
         }
 
-        eastl::string Describe(const Decision& decision) {
-            return Format("{} {}", decision.blundered ? "blunder" : "delegated", decision.move ? decision.move->ToUci() : eastl::string("none"));
+        String Describe(const Decision& decision) {
+            return Format("{} {}", decision.blundered ? "blunder" : "delegated", decision.move ? decision.move->ToUci() : String("none"));
         }
 
     }  // namespace
@@ -146,7 +146,7 @@ namespace BECore::Chess::Tests {
         const SearchRequest start = SearchRequest::FromPosition(Position::Start(), kLimits);
         const SearchRequest kiwipete = SearchRequest::FromPosition(PositionFromFen(kKiwipeteFen), kLimits);
         const auto row = [&](const SearchRequest& request) {
-            eastl::string text;
+            String text;
             for (const int percent : {10, 25, 50, 75, 90, 100}) {
                 BlunderEngine engine(inner, percent);
                 text += Format("{}:{} ", percent, Describe(Decide(engine, *inner, request)));
@@ -290,14 +290,14 @@ namespace BECore::Chess::Tests {
         const auto selfPlay = [&](IChessEngine& engine) {
             ChessGameModel model;
             const Player player = EnginePlayer(engine, SearchLimits{0, 2});
-            const Vector<eastl::string> moves = PlayGame(model, player, player, kSelfPlayPlies);
+            const Vector<String> moves = PlayGame(model, player, player, kSelfPlayPlies);
             EXPECT_TRUE(model.IsGameOver() || model.GetMoves().size() == kSelfPlayPlies) << "the game ended or reached the cap, no move was refused";
             return moves;
         };
 
-        const Vector<eastl::string> plain = selfPlay(*own);
-        const Vector<eastl::string> exact = selfPlay(neverBlunders);
-        const Vector<eastl::string> random = selfPlay(alwaysBlunders);
+        const Vector<String> plain = selfPlay(*own);
+        const Vector<String> exact = selfPlay(neverBlunders);
+        const Vector<String> random = selfPlay(alwaysBlunders);
 
         EXPECT_GT(plain.size(), 20u);
         EXPECT_EQ(exact, plain) << "0 percent equals the plain engine, move for move";

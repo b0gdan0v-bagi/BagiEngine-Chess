@@ -15,9 +15,9 @@
 namespace BECore::Chess::Tests {
 
     struct HudWords {
-        Vector<eastl::string> turn;           ///< `{turn}`: whose move it is, who won, "Computer is thinking"
-        Vector<eastl::string> status;         ///< `{status}`: the status of the game ("" included) and every sentence of an engine error
-        Vector<eastl::string> opponentError;  ///< `{opponentError}` of the opponent panel: "" and every sentence of an engine error
+        Vector<String> turn;           ///< `{turn}`: whose move it is, who won, "Computer is thinking"
+        Vector<String> status;         ///< `{status}`: the status of the game ("" included) and every sentence of an engine error
+        Vector<String> opponentError;  ///< `{opponentError}` of the opponent panel: "" and every sentence of an engine error
 
         /// How many rounds cover every word: round i takes the word i of each list (the shorter lists wrap round). The elements of the HUD lay out independently of one another,
         /// so a word needs a round with some word of the others, not with each of them
@@ -34,15 +34,15 @@ namespace BECore::Chess::Tests {
         }
 
     private:
-        static StringView View(const Vector<eastl::string>& words, size_t round) {
-            const eastl::string& word = words[round % words.size()];
+        static StringView View(const Vector<String>& words, size_t round) {
+            const String& word = words[round % words.size()];
             return StringView(word);
         }
     };
 
     namespace HudWordsDetail {
 
-        inline void Add(Vector<eastl::string>& words, eastl::string word) {
+        inline void Add(Vector<String>& words, String word) {
             if (eastl::find(words.begin(), words.end(), word) == words.end()) {
                 words.push_back(std::move(word));
             }
@@ -50,7 +50,7 @@ namespace BECore::Chess::Tests {
 
         inline void Play(ChessGameModel& model, StringView uci) {
             const auto move = MoveGenerator::ParseUci(model.GetPosition(), uci);
-            EXPECT_TRUE(move.has_value() && model.TryMove(*move).has_value()) << "a move of the scratch game: " << std::string(uci.data(), uci.size());
+            EXPECT_TRUE(move.has_value() && model.TryMove(*move).has_value()) << "a move of the scratch game: " << String(uci.data(), uci.size());
         }
 
         /// What the HUD says about the model as it stands; @p seen gets the status of the game, so AllHudWords() can tell that every status was reached

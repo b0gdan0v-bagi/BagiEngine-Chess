@@ -85,7 +85,7 @@ namespace BECore::Chess::Tests {
         EXPECT_FALSE(model.IsInCheck());
         EXPECT_FALSE(model.HasSelection());
         EXPECT_FALSE(model.GetWinner().has_value());
-        EXPECT_EQ(model.GetPosition().ToFen(), eastl::string(Position::kStartFen));
+        EXPECT_EQ(model.GetPosition().ToFen(), String(Position::kStartFen));
     }
 
     TEST(ChessGameModelTest, SelectingAPieceShowsItsLegalMoves) {
@@ -164,7 +164,7 @@ namespace BECore::Chess::Tests {
         EXPECT_FALSE(model.TryMove(Mv("e2e5"))) << "a pawn cannot jump three squares";
         EXPECT_FALSE(model.TryMove(Mv("e7e5"))) << "not black's turn";
         EXPECT_FALSE(model.TryMove(Move{}));
-        EXPECT_EQ(model.GetPosition().ToFen(), eastl::string(Position::kStartFen));
+        EXPECT_EQ(model.GetPosition().ToFen(), String(Position::kStartFen));
     }
 
     TEST(ChessGameModelTest, TryMoveSaysWhyItRefusedAMove) {
@@ -268,7 +268,7 @@ namespace BECore::Chess::Tests {
         ChessGameModel model;
         model.SetPosition(PositionFromFen(kPromotionFen));
         const uint64_t version = model.GetVersion();
-        const eastl::string fen = model.GetPosition().ToFen();
+        const String fen = model.GetPosition().ToFen();
         EXPECT_FALSE(model.HasPendingPromotion());
 
         EXPECT_FALSE(Click(model, "a7"));
@@ -345,7 +345,7 @@ namespace BECore::Chess::Tests {
         ChessGameModel model;
         model.SetPosition(PositionFromFen(kPromotionFen));
         const uint64_t version = model.GetVersion();
-        const eastl::string fen = model.GetPosition().ToFen();
+        const String fen = model.GetPosition().ToFen();
 
         for (const PieceType piece : {PieceType::Queen, PieceType::Knight, PieceType::Pawn}) {
             const auto result = model.ChoosePromotion(piece);
@@ -587,7 +587,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(model.GetStatus(), GameStatus::Ongoing);
         EXPECT_FALSE(model.IsInCheck());
         EXPECT_TRUE(model.GetTurn() == PieceColor::White);
-        EXPECT_EQ(model.GetPosition().ToFen(), eastl::string(Position::kStartFen));
+        EXPECT_EQ(model.GetPosition().ToFen(), String(Position::kStartFen));
         EXPECT_TRUE(Play(model, "e2e4"));
     }
 
@@ -608,7 +608,7 @@ namespace BECore::Chess::Tests {
     TEST(ChessGameModelTest, PlayedMovesAreKeptInOrder) {
         ChessGameModel model;
         EXPECT_TRUE(model.GetMoves().empty());
-        EXPECT_EQ(model.GetStartFen(), eastl::string(Position::kStartFen));
+        EXPECT_EQ(model.GetStartFen(), String(Position::kStartFen));
 
         for (const char* uci : {"e2e4", "e7e5", "g1f3"}) {
             ASSERT_TRUE(Play(model, uci)) << uci;
@@ -667,8 +667,8 @@ namespace BECore::Chess::Tests {
 
         model.SetPosition(PositionFromFen(kKiwipeteFen));
 
-        EXPECT_EQ(model.GetPosition().ToFen(), eastl::string(kKiwipeteFen));
-        EXPECT_EQ(model.GetStartFen(), eastl::string(kKiwipeteFen));
+        EXPECT_EQ(model.GetPosition().ToFen(), String(kKiwipeteFen));
+        EXPECT_EQ(model.GetStartFen(), String(kKiwipeteFen));
         EXPECT_TRUE(model.GetMoves().empty());
         EXPECT_FALSE(model.HasSelection());
         EXPECT_EQ(model.GetStatus(), GameStatus::Ongoing);
@@ -946,11 +946,11 @@ namespace BECore::Chess::Tests {
 
         EXPECT_EQ(model.TakeBack(), 1u);
 
-        EXPECT_EQ(model.GetPosition().ToFen(), eastl::string(Position::kStartFen));
+        EXPECT_EQ(model.GetPosition().ToFen(), String(Position::kStartFen));
         EXPECT_TRUE(model.GetMoves().empty());
         EXPECT_EQ(model.GetVersion(), version + 1);
         EXPECT_TRUE(model.GetTurn() == PieceColor::White);
-        EXPECT_EQ(model.GetStartFen(), eastl::string(Position::kStartFen));
+        EXPECT_EQ(model.GetStartFen(), String(Position::kStartFen));
     }
 
     TEST(ChessGameModelTest, TakeBackOfNothingChangesNothingAndKeepsTheVersion) {
@@ -959,7 +959,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(model.TakeBack(), 0u) << "no moves";
         EXPECT_EQ(model.TakeBack(5), 0u);
         EXPECT_EQ(model.GetVersion(), version);
-        EXPECT_EQ(model.GetPosition().ToFen(), eastl::string(Position::kStartFen));
+        EXPECT_EQ(model.GetPosition().ToFen(), String(Position::kStartFen));
 
         ASSERT_TRUE(Play(model, "e2e4"));
         ASSERT_TRUE(Play(model, "e7e5"));
@@ -993,7 +993,7 @@ namespace BECore::Chess::Tests {
         }
         EXPECT_EQ(model.TakeBack(100), 3u);
         EXPECT_TRUE(model.GetMoves().empty());
-        EXPECT_EQ(model.GetPosition().ToFen(), eastl::string(Position::kStartFen));
+        EXPECT_EQ(model.GetPosition().ToFen(), String(Position::kStartFen));
         EXPECT_EQ(model.TakeBack(100), 0u);
     }
 
@@ -1079,11 +1079,11 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(Play(model, "e8c8"));
 
         EXPECT_EQ(model.TakeBack(10), 2u);
-        EXPECT_EQ(model.GetPosition().ToFen(), eastl::string(kKiwipeteFen));
-        EXPECT_EQ(model.GetStartFen(), eastl::string(kKiwipeteFen));
+        EXPECT_EQ(model.GetPosition().ToFen(), String(kKiwipeteFen));
+        EXPECT_EQ(model.GetStartFen(), String(kKiwipeteFen));
         EXPECT_TRUE(model.GetMoves().empty());
         EXPECT_EQ(model.TakeBack(), 0u);
-        EXPECT_EQ(model.GetPosition().ToFen(), eastl::string(kKiwipeteFen));
+        EXPECT_EQ(model.GetPosition().ToFen(), String(kKiwipeteFen));
     }
 
     TEST(ChessGameModelTest, TakeBackOfAGameThatBeganFinishedChangesNothing) {

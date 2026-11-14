@@ -92,7 +92,7 @@ namespace BECore::Chess::Tests {
 
     TEST(ChessWebConfigTest, EveryOverlayFileIsAbsentFromChessOrIsTheApplicationConfigThatAgrees) {
         for (const std::filesystem::path& overlayFile : XmlFilesOf(OverlayConfigFolder())) {
-            const std::string name = overlayFile.filename().string();
+            const std::string name = overlayFile.filename().string();  //-NoStd: joined to a path and streamed
             const std::filesystem::path gameFile = GameConfigFolder() / name;
             if (!std::filesystem::exists(gameFile)) {
                 continue;

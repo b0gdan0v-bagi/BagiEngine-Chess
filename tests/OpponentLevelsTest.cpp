@@ -14,8 +14,8 @@ namespace BECore::Chess::Tests {
         constexpr int kHighestSkillLevel = 20;
 
         /// gtest cannot stream an EASTL string view
-        std::string Text(StringView text) {
-            return std::string(text.data(), text.size());
+        String Text(StringView text) {
+            return String(text.data(), text.size());
         }
 
         bool IsWireName(StringView id) {
@@ -106,7 +106,7 @@ namespace BECore::Chess::Tests {
         const auto levels = GetOpponentLevels();
 
         for (size_t i = 0; i + 1 < levels.size(); ++i) {
-            const std::string at = Text(levels[i + 1].id);
+            const String at = Text(levels[i + 1].id);
             EXPECT_LE(levels[i].skillLevel, levels[i + 1].skillLevel) << at;
             EXPECT_LT(levels[i].moveTimeMs, levels[i + 1].moveTimeMs) << at;
             EXPECT_GE(levels[i].blunderPercent, levels[i + 1].blunderPercent) << at;

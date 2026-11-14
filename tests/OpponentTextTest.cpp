@@ -10,14 +10,14 @@ namespace BECore::Chess::Tests {
     namespace {
 
         /// The sentence of an error of the given kind; the detail is empty, because the sentence does not depend on it
-        eastl::string ErrorWords(EngineErrorKind kind) {
+        String ErrorWords(EngineErrorKind kind) {
             return OpponentText::Error(EngineError{kind, {}});
         }
 
         /// The name of a kind for a failed expectation (gtest cannot stream an EASTL string view)
-        std::string KindName(EngineErrorKind kind) {
+        String KindName(EngineErrorKind kind) {
             const StringView name = EnumUtils<EngineErrorKind>::ToString(kind);
-            return std::string(name.data(), name.size());
+            return String(name.data(), name.size());
         }
 
     }  // namespace
@@ -30,7 +30,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(OpponentTextTest, NoTwoSegmentsOfAGroupOfThePanelSayTheSameWord) {
-        const auto distinct = [](const Vector<eastl::string>& words) {
+        const auto distinct = [](const Vector<String>& words) {
             for (size_t a = 0; a < words.size(); ++a) {
                 EXPECT_FALSE(words[a].empty());
                 for (size_t b = a + 1; b < words.size(); ++b) {
@@ -41,13 +41,13 @@ namespace BECore::Chess::Tests {
 
         distinct({OpponentText::ModeLabel(false), OpponentText::ModeLabel(true)});
         distinct({OpponentText::ColorLabel(PieceColor::White), OpponentText::ColorLabel(PieceColor::Black)});
-        Vector<eastl::string> engines;
+        Vector<String> engines;
         for (const OpponentEngine engine : EnumUtils<OpponentEngine>::Values()) {
             const StringView name = OpponentEngineName(engine);
             engines.emplace_back(name.data(), name.size());
         }
         distinct(engines);
-        Vector<eastl::string> levels;
+        Vector<String> levels;
         for (const OpponentLevel& level : GetOpponentLevels()) {
             levels.emplace_back(level.name.data(), level.name.size());
         }
@@ -65,16 +65,16 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(OpponentTextTest, EveryKindOfErrorHasItsOwnShortSentence) {
-        Vector<eastl::string> sentences;
+        Vector<String> sentences;
         for (const EngineErrorKind kind : EnumUtils<EngineErrorKind>::Values()) {
-            const eastl::string sentence = ErrorWords(kind);
-            const std::string name = KindName(kind);
+            const String sentence = ErrorWords(kind);
+            const String name = KindName(kind);
 
             EXPECT_FALSE(sentence.empty()) << name;
             EXPECT_LE(sentence.size(), OpponentText::kMaxErrorLength) << name << ": '" << sentence.c_str() << "' is longer than the Status label is laid out for";
-            EXPECT_NE(sentence, eastl::string(OpponentText::kUnknownErrorSentence.data(), OpponentText::kUnknownErrorSentence.size()))
+            EXPECT_NE(sentence, String(OpponentText::kUnknownErrorSentence.data(), OpponentText::kUnknownErrorSentence.size()))
                 << name << " has no sentence of its own: it reached the fallback of Error()";
-            for (const eastl::string& other : sentences) {
+            for (const String& other : sentences) {
                 EXPECT_NE(sentence, other) << name << ": two kinds of error with the same words";
             }
             sentences.push_back(sentence);
@@ -84,8 +84,8 @@ namespace BECore::Chess::Tests {
 
     TEST(OpponentTextTest, TheSentenceDoesNotDependOnTheDetail) {
         for (const EngineErrorKind kind : EnumUtils<EngineErrorKind>::Values()) {
-            const eastl::string plain = ErrorWords(kind);
-            const eastl::string withDetail = OpponentText::Error(EngineError{kind, "/Users/someone/bin/stockfish: a very long sentence for the log that must not reach the window"});
+            const String plain = ErrorWords(kind);
+            const String withDetail = OpponentText::Error(EngineError{kind, "/Users/someone/bin/stockfish: a very long sentence for the log that must not reach the window"});
             EXPECT_EQ(plain, withDetail);
         }
     }

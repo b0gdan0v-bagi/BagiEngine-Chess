@@ -9,13 +9,13 @@ namespace BECore::Chess::Tests {
 
         constexpr StringView kSparseFen = "4k3/8/8/8/8/8/8/R3K2R w - - 0 1";
 
-        std::string NameOf(Square square) {
-            return std::string{static_cast<char>('a' + square.file), static_cast<char>('1' + square.rank)};
+        String NameOf(Square square) {
+            return String{static_cast<char>('a' + square.file), static_cast<char>('1' + square.rank)};
         }
 
         /// The targets of a piece as a sorted list of names, so a test reads "e3 e4"
-        Vector<std::string> TargetsOf(const PremoveBoard& board, StringView from, PieceColor color) {
-            Vector<std::string> names;
+        Vector<String> TargetsOf(const PremoveBoard& board, StringView from, PieceColor color) {
+            Vector<String> names;
             for (const Square square : board.Targets(Sq(from), color)) {
                 names.push_back(NameOf(square));
             }
@@ -23,8 +23,8 @@ namespace BECore::Chess::Tests {
             return names;
         }
 
-        Vector<std::string> Names(std::initializer_list<const char*> list) {
-            Vector<std::string> names(list.begin(), list.end());
+        Vector<String> Names(std::initializer_list<const char*> list) {
+            Vector<String> names(list.begin(), list.end());
             std::sort(names.begin(), names.end());
             return names;
         }
