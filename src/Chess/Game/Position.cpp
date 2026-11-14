@@ -7,7 +7,7 @@ namespace BECore::Chess {
     namespace {
 
         constexpr int kBoardSide = 8;
-        constexpr int kRankStep = 8;  // index distance between two squares one rank apart
+        constexpr int kRankStep = 8;
 
         constexpr int kA1 = 0;
         constexpr int kE1 = 4;
@@ -152,7 +152,6 @@ namespace BECore::Chess {
             }
         }
 
-        // 2. Side to move.
         if (fields[1] == "w") {
             pos._sideToMove = PieceColor::White;
         } else if (fields[1] == "b") {
@@ -226,7 +225,6 @@ namespace BECore::Chess {
             }
         }
 
-        // 5. and 6. Clocks.
         if (fieldCount > 4 && !ParseNumber(fields[4], pos._halfmoveClock)) {
             return std::unexpected(FenError::BadClock);
         }
