@@ -3194,7 +3194,7 @@ namespace BECore::Chess::Tests {
         ASSERT_EQ(board->size(), 8u);
         const char* const expected[] = {"rnbqkbnr", "pppppppp", "........", "........", "........", "........", "PPPPPPPP", "RNBQKBNR"};
         for (size_t row = 0; row < board->size(); ++row) {
-            EXPECT_EQ((*board)[row].get_ref<const std::string&>(), expected[row]) << "row " << row << ": rank 8 first, white upper case";  //-NoStd: nlohmann string
+            EXPECT_EQ((*board)[row], MakeJsonString(expected[row])) << "row " << row << ": rank 8 first, white upper case";
         }
     }
 

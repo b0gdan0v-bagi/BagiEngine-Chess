@@ -357,7 +357,7 @@ namespace BECore::Chess::Tests {
         const char* const expected[] = {"rnbqkbnr", "pppppppp", "........", "........", "........", "........", "PPPPPPPP", "RNBQKBNR"};
         for (size_t row = 0; row < board->size(); ++row) {
             ASSERT_TRUE((*board)[row].is_string());
-            EXPECT_EQ((*board)[row].get_ref<const std::string&>(), expected[row]) << "row " << row;  //-NoStd: nlohmann string
+            EXPECT_EQ((*board)[row], MakeJsonString(expected[row])) << "row " << row;
         }
     }
 
@@ -368,10 +368,10 @@ namespace BECore::Chess::Tests {
         const Json state = State();
         const Json* board = FindJsonMember(state, "board");
         ASSERT_NE(board, nullptr);
-        EXPECT_EQ((*board)[1].get_ref<const std::string&>(), "pp.ppppp") << "rank 7, the c pawn left";  //-NoStd: nlohmann string
-        EXPECT_EQ((*board)[3].get_ref<const std::string&>(), "..p.....") << "rank 5";                   //-NoStd: nlohmann string
-        EXPECT_EQ((*board)[4].get_ref<const std::string&>(), "....P...") << "rank 4";                   //-NoStd: nlohmann string
-        EXPECT_EQ((*board)[6].get_ref<const std::string&>(), "PPPP.PPP") << "rank 2, the e pawn left";  //-NoStd: nlohmann string
+        EXPECT_EQ((*board)[1], MakeJsonString("pp.ppppp")) << "rank 7, the c pawn left";
+        EXPECT_EQ((*board)[3], MakeJsonString("..p.....")) << "rank 5";
+        EXPECT_EQ((*board)[4], MakeJsonString("....P...")) << "rank 4";
+        EXPECT_EQ((*board)[6], MakeJsonString("PPPP.PPP")) << "rank 2, the e pawn left";
         EXPECT_EQ(StringMember(state, "turn"), "white");
     }
 
@@ -384,8 +384,8 @@ namespace BECore::Chess::Tests {
         const Json* moves = FindJsonMember(state, "moves");
         ASSERT_NE(moves, nullptr);
         ASSERT_EQ(moves->size(), 3u);
-        EXPECT_EQ((*moves)[0].get_ref<const std::string&>(), "e2e4");  //-NoStd: nlohmann string
-        EXPECT_EQ((*moves)[2].get_ref<const std::string&>(), "g1f3");  //-NoStd: nlohmann string
+        EXPECT_EQ((*moves)[0], MakeJsonString("e2e4"));
+        EXPECT_EQ((*moves)[2], MakeJsonString("g1f3"));
         EXPECT_EQ(StringMember(state, "startFen"), String(Position::kStartFen.data(), Position::kStartFen.size()));
     }
 
@@ -400,7 +400,7 @@ namespace BECore::Chess::Tests {
         const Json* moves = FindJsonMember(state, "moves");
         ASSERT_NE(moves, nullptr);
         for (size_t index = 0; index < moves->size(); ++index) {
-            const std::string& uci = (*moves)[index].get_ref<const std::string&>();  //-NoStd: nlohmann string
+            const std::string& uci = (*moves)[index].get_ref<const std::string&>();  //-NoStd: nlohmann string, no engine accessor for it
             const auto move = MoveGenerator::ParseUci(*replayed, StringView(uci.c_str(), uci.size()));
             ASSERT_TRUE(move.has_value()) << uci;
             replayed->DoMove(*move);
