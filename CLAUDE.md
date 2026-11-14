@@ -28,7 +28,7 @@ cmake/ChessWeb.cmake          the web build: which files of config/ and assets/ 
 | `src/Chess/Engine/CLAUDE.md` | the opponent: the engine interface, UCI and Stockfish, the own engine, the levels and the handicap, the settings file, the controller and the choice, the analysis |
 | `src/Chess/Save/CLAUDE.md` | what is saved, the gate (flags, `rememberGame`), the folder, when it writes, a refused save |
 | `src/Chess/Uci/CLAUDE.md` | `BagiChessUci`: the commands and options, the `stop` and clock rules, how to run it and its smoke |
-| `src/Chess/Components/CLAUDE.md` | the scene and the UI: pieces, board, hint, HUD, opponent panel, promotion picker, draw order; **read it before changing `config/SceneConfig.xml`** |
+| `src/Chess/Components/CLAUDE.md` | the scene and the UI: pieces, board, hint, HUD, the menu and its opponent panel, promotion picker, draw order; **read it before changing `config/SceneConfig.xml`** |
 | `tests/CLAUDE.md` | where a test goes, the helpers, the fake UCI engine, the smokes, the build variants |
 
 ## Control API

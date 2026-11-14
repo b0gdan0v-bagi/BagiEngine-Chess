@@ -27,7 +27,7 @@ namespace BECore::Tests {
         // that it lays out like the HUD in config/SceneConfig.xml, the one the game ships.
         constexpr const char* kChessHudHtml = R"(
 <span id="Turn">{turn}</span>
-<button id="Menu" data-action="ChessOpenOpponent">Menu</button>
+<button id="Menu" data-action="ChessOpenMenu">Menu</button>
 <button id="Reset" data-action="ChessReset">Reset</button>
 <span id="Status">{status}</span>)";
 
@@ -75,7 +75,10 @@ namespace BECore::Tests {
     </div>
   </div>
   <span id="OpponentError">{opponentError}</span>
-  <button id="Ok" data-action="ChessCloseOpponent">OK</button>
+  <div id="OpponentButtons" class="row">
+    <button id="OpponentBack" data-action="ChessOpenMenu">Back</button>
+    <button id="OpponentClose" data-action="ChessCloseMenu">Close</button>
+  </div>
 </div>)";
 
         constexpr const char* kChessPanelCss = R"(
@@ -86,12 +89,32 @@ namespace BECore::Tests {
 .group         { display: flex; flex-direction: row; gap: 4px; flex: 1; height: 56px; background: rgb(30, 30, 30); }
 .group button  { flex: 1; height: 56px; font-size: 24px; background: rgb(70, 70, 100); }
 #OpponentError { height: 32px; font-size: 22px; text-align: center; vertical-align: middle; color: rgb(240, 120, 120); }
-#Ok            { height: 56px; font-size: 26px; background: rgb(50, 115, 85); }
+#OpponentBack  { flex: 1; height: 56px; font-size: 26px; background: rgb(50, 115, 85); }
+#OpponentClose { flex: 1; height: 56px; font-size: 26px; background: rgb(110, 60, 60); }
 )";
 
-        constexpr const char* kPanelNames[] = {"Plate",        "Title",      "ModeRow",    "ModeCaption", "ModeGroup",     "ModeTwo",     "ModeComputer",    "ColorRow",  "ColorCaption",
-                                               "ColorGroup",   "ColorWhite", "ColorBlack", "EngineRow",   "EngineCaption", "EngineGroup", "EngineStockfish", "EngineOwn", "LevelRow",
-                                               "LevelCaption", "LevelGroup", "LevelEasy",  "LevelMedium", "LevelHard",     "LevelMax",    "OpponentError",   "Ok"};
+        // The plate of the list of the menu (the node MenuPanel) in the same form: a title, one button per section of the table and Close. The dim is left out as above. The buttons
+        // have no flex: they are rows of a vertical stack, 56 units high each
+        constexpr const char* kChessMenuHtml = R"(
+<div id="MenuPlate">
+  <span id="MenuTitle">Menu</span>
+  <button id="MenuSectionOpponent" data-action="ChessOpenSection" data-value="opponent">Opponent</button>
+  <button id="MenuClose" data-action="ChessCloseMenu">Close</button>
+</div>)";
+
+        constexpr const char* kChessMenuCss = R"(
+#MenuPlate           { anchor: center; display: flex; flex-direction: column; align-items: stretch; gap: 12px; padding: 16px; width: 94%; max-width: 640px; height: 224px; background: rgb(36, 40, 52); }
+#MenuTitle           { height: 44px; font-size: 30px; text-align: center; }
+#MenuSectionOpponent { height: 56px; font-size: 26px; background: rgb(70, 70, 100); }
+#MenuClose           { height: 56px; font-size: 26px; background: rgb(110, 60, 60); }
+)";
+
+        constexpr const char* kMenuNames[] = {"MenuPlate", "MenuTitle", "MenuSectionOpponent", "MenuClose"};
+
+        constexpr const char* kPanelNames[] = {"Plate",       "Title",           "ModeRow",    "ModeCaption",   "ModeGroup",       "ModeTwo",      "ModeComputer",
+                                               "ColorRow",    "ColorCaption",    "ColorGroup", "ColorWhite",    "ColorBlack",      "EngineRow",    "EngineCaption",
+                                               "EngineGroup", "EngineStockfish", "EngineOwn",  "LevelRow",      "LevelCaption",    "LevelGroup",   "LevelEasy",
+                                               "LevelMedium", "LevelHard",       "LevelMax",   "OpponentError", "OpponentButtons", "OpponentBack", "OpponentClose"};
 
         std::filesystem::path ShippedSceneConfig() {
             return std::filesystem::path(__FILE__).parent_path().parent_path() / "config" / "SceneConfig.xml";
@@ -115,17 +138,17 @@ namespace BECore::Tests {
             return FromStdString(out.str());
         }
 
-        /// The plate of the canvas on the OpponentPanel node of the shipped scene (without the dim), as the content of a screen, with ONE difference from the file: every
+        /// The plate named @p plateName of the canvas on the node @p nodeName of the shipped scene (without the dim), as the content of a screen, with ONE difference from the file: every
         /// UISegmented gets `blocksInput="true"`. The HTML front-end writes it on every element with a background (a filled box takes clicks in a web page), so the compiled
         /// group has it; the shipped file does without, because the plate behind the group blocks input already and the only place the group would take a click is the 4-unit
         /// gap between two segments, where the result is the same (the modal canvas takes it). The engine's own UIWebTest makes the same step for its panel (kPanelXml).
-        String ShippedPanelXml() {
+        String ShippedPlateXml(const char* nodeName, const char* plateName) {
             pugi::xml_document document;
             if (!document.load_file(ShippedSceneConfig().string().c_str())) {
                 return {};
             }
-            pugi::xml_node panel = document.select_node("//node[@name='OpponentPanel']").node();
-            pugi::xml_node plate = panel.select_node(".//component[@type='UICanvasComponent']/elements/element[@name='Plate']").node();
+            pugi::xml_node panel = document.select_node(Format("//node[@name='{}']", nodeName).c_str()).node();
+            pugi::xml_node plate = panel.select_node(Format(".//component[@type='UICanvasComponent']/elements/element[@name='{}']", plateName).c_str()).node();
             if (!plate) {
                 return {};
             }
@@ -137,6 +160,16 @@ namespace BECore::Tests {
             plate.print(out, "", pugi::format_raw);
             out << "</elements></ui>";
             return FromStdString(out.str());
+        }
+
+        /// The plate of the opponent panel
+        String ShippedPanelXml() {
+            return ShippedPlateXml("OpponentPanel", "Plate");
+        }
+
+        /// The plate of the list of the menu
+        String ShippedMenuXml() {
+            return ShippedPlateXml("MenuPanel", "MenuPlate");
         }
 
         struct Compiled {
@@ -390,6 +423,74 @@ namespace BECore::Tests {
             const auto failures = ValidateOnMatrix(web.layout, options, base);
             EXPECT_TRUE(failures.empty()) << "round " << round << ": " << DescribeMatrixFailures(failures).c_str();
         }
+    }
+
+    // ---- the list of the menu -----------------------------------------------------------------------------------------------
+
+    TEST_F(ChessHudWebTest, TheMenuListInHtmlBuildsTheElementsOfTheShippedXml) {
+        const auto compiled = Compile(kChessMenuHtml, kChessMenuCss);
+        ASSERT_FALSE(compiled->deserializeErrors) << compiled->xml.c_str();
+        EXPECT_FALSE(compiled->report.HasIssues()) << compiled->report.issues[0].message.c_str() << " / " << compiled->xml.c_str();
+
+        const String shippedXml = ShippedMenuXml();
+        ASSERT_FALSE(shippedXml.empty()) << ShippedSceneConfig().string();
+        pugi::xml_document reference;
+        ASSERT_TRUE(reference.load_string(shippedXml.c_str()));
+        ExpectSameAttributes(reference.child("ui").child("elements").child("element"), compiled->document.child("ui").child("elements").child("element"));
+
+        const UIScreenContent shipped = ReadXml(shippedXml);
+        ExpectSameElements(shipped.elements, compiled->content.elements);
+
+        // The fields the tree comparison does not look at: a button keeps its action and its value
+        const struct {
+            const char* name;
+            const char* action;
+            const char* value;
+        } buttons[] = {{"MenuSectionOpponent", "ChessOpenSection", "opponent"}, {"MenuClose", "ChessCloseMenu", ""}};
+        for (const auto& [name, action, value] : buttons) {
+            SCOPED_TRACE(name);
+            const UIElement* element = compiled->Element(name);
+            ASSERT_NE(element, nullptr);
+            const auto* button = element->GetComponent<UIInputClicker>();
+            ASSERT_NE(button, nullptr) << "a button";
+            EXPECT_EQ(button->action.ToStringView(), action);
+            EXPECT_EQ(button->value.ToStringView(), value);
+        }
+    }
+
+    TEST_F(ChessHudWebTest, TheMenuListInHtmlLaysOutLikeTheShippedXml) {
+        const auto compiled = Compile(kChessMenuHtml, kChessMenuCss);
+        ASSERT_FALSE(compiled->deserializeErrors) << compiled->xml.c_str();
+        const String shippedXml = ShippedMenuXml();
+        ASSERT_FALSE(shippedXml.empty()) << ShippedSceneConfig().string();
+        const UIScreenContent shipped = ReadXml(shippedXml);
+        LaidOut web(compiled->content);
+        LaidOut xml(shipped);
+        for (const auto& [width, height] : {Pair<float, float>{1280.0f, 720.0f}, {640.0f, 360.0f}, {480.0f, 480.0f}, {720.0f, 1280.0f}, {2560.0f, 1080.0f}}) {
+            web.At(width, height);
+            xml.At(width, height);
+            for (const char* name : kMenuNames) {
+                SCOPED_TRACE(Format("{} at {}x{}", name, width, height).c_str());
+                ExpectSameRect(xml.Find(name), web.Find(name), name);
+            }
+        }
+        // The list has the sizes the XML says, so the comparison above is not between two empty rects
+        web.At(1280.0f, 720.0f);
+        ASSERT_NE(web.Find("MenuPlate"), nullptr);
+        EXPECT_FLOAT_EQ(web.Find("MenuPlate")->rect.h, 224.0f);
+        EXPECT_FLOAT_EQ(web.Find("MenuClose")->rect.h, 56.0f);
+    }
+
+    TEST_F(ChessHudWebTest, TheMenuListInHtmlPassesTheSizeMatrix) {
+        const auto compiled = Compile(kChessMenuHtml, kChessMenuCss);
+        LaidOut web(compiled->content);
+        UILayoutValidatorOptions options;
+        options.minTouchSize = CoreManager::GetUIEnvironment().GetSettings().minTouchSize;
+        UILayoutContext base;
+        base.sceneViewWidth = kViewWidth;
+        base.sceneViewHeight = kViewHeight;
+        const auto failures = ValidateOnMatrix(web.layout, options, base);
+        EXPECT_TRUE(failures.empty()) << DescribeMatrixFailures(failures).c_str();
     }
 
 }  // namespace BECore::Tests

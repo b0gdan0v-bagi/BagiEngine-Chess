@@ -2,6 +2,7 @@
 
 #include <BECore/Scene/IComponent.h>
 #include <Chess/Game/ChessTypes.h>
+#include <Chess/Game/MenuSections.h>
 
 namespace BECore {
 
@@ -37,8 +38,9 @@ namespace BECore::Chess {
      * The HUD is not drawn here: it is a UI canvas of the scene (`config/SceneConfig.xml`) whose labels follow the variables `turn`, `status`
      * and, for the opponent panel, the ids `opponentMode`, `opponentColor`, `opponentEngine`, `opponentLevel` and the sentence `opponentError`, which this component publishes
      * to `CoreManager::GetUIVars()` whenever the game or the opponent changed (StatusText, OpponentText): `turn` says "Computer is thinking" while the program searches, `status` is the sentence of
-     * the opponent's error while one stands and the status of the game otherwise. Its buttons emit the actions `ChessReset` (a new game), `ChessOpenOpponent` and `ChessCloseOpponent` (show and hide
-     * the modal canvas of the node `OpponentPanel`, the `Menu` button and the OK button), which this component answers; so are the four actions of the panel's choice groups, `ChessSetMode`,
+     * the opponent's error while one stands and the status of the game otherwise. Its buttons emit the actions `ChessReset` (a new game), `ChessOpenMenu` (show the modal list `MenuPanel`, hide every
+     * section canvas: the `Menu` button and `Back`), `ChessOpenSection` (hide the list and show the canvas of the section whose id is the `value`, through the table MenuSections; an id in no table is
+     * ignored with one warning) and `ChessCloseMenu` (hide the list and every section canvas), which this component answers; so are the four actions of the panel's choice groups, `ChessSetMode`,
      * `ChessSetColor`, `ChessSetEngine` and `ChessSetLevel`, whose `value` is an id (OpponentChoice picks it; an id that is in no table is ignored with one warning). `opponentColor` is the PERSON's
      * color, the opposite of the one the control API's `opponent.plays` names. No group of the panel is greyed: a color or a level picked while two people play is remembered
      * and applies when Computer is picked. It reads the person's color on every refresh so a side set from outside is remembered.
@@ -152,6 +154,12 @@ namespace BECore::Chess {
 
         /// The four actions of the choice groups of the opponent panel (ChessSetMode, ChessSetColor, ChessSetEngine, ChessSetLevel, the id in `value`); any other action is ignored
         void AnswerSetAction(const InputEvents::ActionEvent& event);
+
+        /// Shows the canvas of this section of the menu and hides the canvases of the others (none: hides them all); the list `MenuPanel` is not touched
+        void ShowMenuSection(Optional<MenuSection> shown);
+
+        /// The three actions of the menu, ChessOpenMenu, ChessOpenSection (the id of the section in `value`) and ChessCloseMenu; false for any other action
+        bool AnswerMenuAction(const InputEvents::ActionEvent& event);
 
         /// The two actions of the promotion panel, ChessPromote (the id of the piece in `value`; an id in no table is ignored with one warning) and ChessCancelPromotion; false for any other action
         bool AnswerPromotionAction(const InputEvents::ActionEvent& event);
