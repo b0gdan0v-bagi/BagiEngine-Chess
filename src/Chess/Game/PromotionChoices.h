@@ -8,12 +8,12 @@ namespace BECore::Chess {
     [[nodiscard]] eastl::span<const PieceType> PromotionPieces();
 
     /// The name of a promotion piece in the scene and in the actions: "queen", "rook", "bishop", "knight" (lower case); empty for any other piece
-    [[nodiscard]] eastl::string_view PromotionId(PieceType type);
+    [[nodiscard]] StringView PromotionId(PieceType type);
 
     /// The word on the button of the promotion panel for a promotion piece: "Queen", "Rook", "Bishop", "Knight"; empty for any other piece
-    [[nodiscard]] eastl::string_view PromotionLabel(PieceType type);
+    [[nodiscard]] StringView PromotionLabel(PieceType type);
 
     /// The promotion piece with this id (exactly as written: ids are lower case), or nothing
-    [[nodiscard]] Optional<PieceType> FindPromotion(eastl::string_view id);
+    [[nodiscard]] Optional<PieceType> FindPromotion(StringView id);
 
 }  // namespace BECore::Chess

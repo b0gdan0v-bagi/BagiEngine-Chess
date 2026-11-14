@@ -6,24 +6,24 @@ namespace BECore::Chess {
 
         namespace {
 
-            constexpr eastl::string_view kLineWhitespace = " \r\n";
+            constexpr StringView kLineWhitespace = " \r\n";
             constexpr char kTokenSeparator = ' ';
-            constexpr eastl::string_view kBestMoveToken = "bestmove";
-            constexpr eastl::string_view kNoMoveText = "(none)";
-            constexpr eastl::string_view kNullMoveText = "0000";
-            constexpr eastl::string_view kInfoToken = "info";
-            constexpr eastl::string_view kStringToken = "string";
-            constexpr eastl::string_view kDepthToken = "depth";
-            constexpr eastl::string_view kMultiPvToken = "multipv";
-            constexpr eastl::string_view kScoreToken = "score";
-            constexpr eastl::string_view kCentipawnsToken = "cp";
-            constexpr eastl::string_view kMateToken = "mate";
-            constexpr eastl::string_view kLowerBoundToken = "lowerbound";
-            constexpr eastl::string_view kUpperBoundToken = "upperbound";
-            constexpr eastl::string_view kPvToken = "pv";
+            constexpr StringView kBestMoveToken = "bestmove";
+            constexpr StringView kNoMoveText = "(none)";
+            constexpr StringView kNullMoveText = "0000";
+            constexpr StringView kInfoToken = "info";
+            constexpr StringView kStringToken = "string";
+            constexpr StringView kDepthToken = "depth";
+            constexpr StringView kMultiPvToken = "multipv";
+            constexpr StringView kScoreToken = "score";
+            constexpr StringView kCentipawnsToken = "cp";
+            constexpr StringView kMateToken = "mate";
+            constexpr StringView kLowerBoundToken = "lowerbound";
+            constexpr StringView kUpperBoundToken = "upperbound";
+            constexpr StringView kPvToken = "pv";
 
             /// The text up to the next separator, cut off @p rest (which then starts at the separator or is empty)
-            eastl::string_view TakeToken(eastl::string_view& rest) {
+            StringView TakeToken(StringView& rest) {
                 while (!rest.empty() && rest.front() == kTokenSeparator) {
                     rest.remove_prefix(1);
                 }
@@ -31,13 +31,13 @@ namespace BECore::Chess {
                 while (length < rest.size() && rest[length] != kTokenSeparator) {
                     ++length;
                 }
-                const eastl::string_view token = rest.substr(0, length);
+                const StringView token = rest.substr(0, length);
                 rest.remove_prefix(length);
                 return token;
             }
 
             /// Reads @p text as a whole decimal number (a leading '-' allowed); false for an empty token, any other character or a value out of int
-            bool ParseInt(eastl::string_view text, int& out) {
+            bool ParseInt(StringView text, int& out) {
                 if (text.empty()) {
                     return false;
                 }
@@ -46,8 +46,8 @@ namespace BECore::Chess {
             }
 
             /// Reads the number that follows in @p rest and takes it off only when it is one, so a keyword that follows a missing value (`score cp lowerbound`) is still seen
-            bool TakeInt(eastl::string_view& rest, int& out) {
-                eastl::string_view after = rest;
+            bool TakeInt(StringView& rest, int& out) {
+                StringView after = rest;
                 if (!ParseInt(TakeToken(after), out)) {
                     return false;
                 }
@@ -56,8 +56,8 @@ namespace BECore::Chess {
             }
 
             /// `cp N` or `mate N` after `score`. Nothing for a kind we do not know, a missing or non-numeric value, and for a mate in 0
-            Optional<AnalysisScore> TakeScore(eastl::string_view& rest) {
-                const eastl::string_view kind = TakeToken(rest);
+            Optional<AnalysisScore> TakeScore(StringView& rest) {
+                const StringView kind = TakeToken(rest);
                 int value = 0;
                 if (kind == kCentipawnsToken && TakeInt(rest, value)) {
                     return AnalysisScore{AnalysisScoreKind::Centipawns, value};
@@ -71,7 +71,7 @@ namespace BECore::Chess {
         }  // namespace
 
         bool BestMove::IsNone() const noexcept {
-            const eastl::string_view text(move.data(), move.size());
+            const StringView text(move.data(), move.size());
             return text.empty() || text == kNoMoveText || text == kNullMoveText;
         }
 
@@ -98,31 +98,31 @@ namespace BECore::Chess {
             return command;
         }
 
-        eastl::string SetOptionCommand(eastl::string_view name, eastl::string_view value) {
+        eastl::string SetOptionCommand(StringView name, StringView value) {
             return Format("setoption name {} value {}", name, value);
         }
 
-        Optional<BestMove> ParseBestMove(eastl::string_view line) {
-            eastl::string_view rest = TrimLine(line);
+        Optional<BestMove> ParseBestMove(StringView line) {
+            StringView rest = TrimLine(line);
             if (TakeToken(rest) != kBestMoveToken) {
                 return std::nullopt;
             }
-            const eastl::string_view move = TakeToken(rest);
+            const StringView move = TakeToken(rest);
             return BestMove{eastl::string(move.data(), move.size())};
         }
 
-        Optional<Info> ParseInfo(eastl::string_view line) {
-            eastl::string_view rest = TrimLine(line);
+        Optional<Info> ParseInfo(StringView line) {
+            StringView rest = TrimLine(line);
             if (TakeToken(rest) != kInfoToken) {
                 return std::nullopt;
             }
             Info info;
-            for (eastl::string_view token = TakeToken(rest); !token.empty(); token = TakeToken(rest)) {
+            for (StringView token = TakeToken(rest); !token.empty(); token = TakeToken(rest)) {
                 if (token == kStringToken) {
                     break;  // the rest of the line is text for a person, whatever words are in it
                 }
                 if (token == kPvToken) {
-                    const eastl::string_view move = TakeToken(rest);
+                    const StringView move = TakeToken(rest);
                     info.firstPvMove = eastl::string(move.data(), move.size());
                     break;  // the other moves of the line are of no use here
                 }
@@ -147,9 +147,9 @@ namespace BECore::Chess {
             return info;
         }
 
-        eastl::string_view TrimLine(eastl::string_view text) {
+        StringView TrimLine(StringView text) {
             const size_t first = text.find_first_not_of(kLineWhitespace);
-            if (first == eastl::string_view::npos) {
+            if (first == StringView::npos) {
                 return {};
             }
             const size_t last = text.find_last_not_of(kLineWhitespace);
@@ -158,7 +158,7 @@ namespace BECore::Chess {
 
         LineCollector::LineCollector(int lineCount) : _exact(static_cast<size_t>(std::max(lineCount, 1))), _bound(static_cast<size_t>(std::max(lineCount, 1))) {}
 
-        void LineCollector::Offer(eastl::string_view line) {
+        void LineCollector::Offer(StringView line) {
             const Optional<Info> info = ParseInfo(line);
             if (!info || !info->score || info->multiPv < 1 || static_cast<size_t>(info->multiPv) > _exact.size()) {
                 return;

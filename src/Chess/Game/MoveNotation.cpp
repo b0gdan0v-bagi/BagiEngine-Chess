@@ -10,8 +10,8 @@ namespace BECore::Chess {
         constexpr char kCheckMark = '+';
         constexpr char kMateMark = '#';
         constexpr char kPromotionMark = '=';
-        constexpr eastl::string_view kCastlingKingSide = "O-O";
-        constexpr eastl::string_view kCastlingQueenSide = "O-O-O";
+        constexpr StringView kCastlingKingSide = "O-O";
+        constexpr StringView kCastlingQueenSide = "O-O-O";
 
         char PieceLetter(PieceType type) {
             switch (type) {
@@ -85,7 +85,7 @@ namespace BECore::Chess {
         const Square to = move.To();
 
         if (move.Kind() == MoveKind::Castling) {
-            const eastl::string_view castling = to.file > from.file ? kCastlingKingSide : kCastlingQueenSide;
+            const StringView castling = to.file > from.file ? kCastlingKingSide : kCastlingQueenSide;
             text.append(castling.data(), castling.size());
         } else {
             const bool isCapture = move.Kind() == MoveKind::EnPassant || !before.GetPieceAt(to).IsEmpty();

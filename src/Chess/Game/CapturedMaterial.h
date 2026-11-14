@@ -13,10 +13,10 @@ namespace BECore::Chess {
     [[nodiscard]] eastl::span<const PieceType> CapturableTypes();
 
     /// The name of a capturable piece in the scene and in the control API: "queen", "rook", "bishop", "knight", "pawn" (lower case); empty for any other piece
-    [[nodiscard]] eastl::string_view CapturedId(PieceType type);
+    [[nodiscard]] StringView CapturedId(PieceType type);
 
     /// The capturable piece with this id (exactly as written: ids are lower case), or nothing
-    [[nodiscard]] Optional<PieceType> FindCaptured(eastl::string_view id);
+    [[nodiscard]] Optional<PieceType> FindCaptured(StringView id);
 
     /**
      * @brief What a position says about the material: which pieces of each color are gone and how many points each side has on the board.

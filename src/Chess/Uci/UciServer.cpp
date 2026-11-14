@@ -12,10 +12,10 @@ namespace BECore::Chess::Uci {
 
     namespace {
 
-        constexpr eastl::string_view kInfoStringPrefix = "info string ";
-        constexpr eastl::string_view kBestMovePrefix = "bestmove ";
-        constexpr eastl::string_view kNoMoveText = "(none)";
-        constexpr eastl::string_view kBusyText = "a search is running: the command was ignored";
+        constexpr StringView kInfoStringPrefix = "info string ";
+        constexpr StringView kBestMovePrefix = "bestmove ";
+        constexpr StringView kNoMoveText = "(none)";
+        constexpr StringView kBusyText = "a search is running: the command was ignored";
 
         /// The depth of the search that answers a `stop` when no depth has finished (and of the bounded `go` that was stopped)
         constexpr int kStopFallbackDepth = 1;
@@ -24,7 +24,7 @@ namespace BECore::Chess::Uci {
             return c >= 'A' && c <= 'Z' ? static_cast<char>(c - 'A' + 'a') : c;
         }
 
-        bool EqualsIgnoreCase(eastl::string_view a, eastl::string_view b) {
+        bool EqualsIgnoreCase(StringView a, StringView b) {
             if (a.size() != b.size()) {
                 return false;
             }
@@ -36,7 +36,7 @@ namespace BECore::Chess::Uci {
             return true;
         }
 
-        eastl::string Lowered(eastl::string_view text) {
+        eastl::string Lowered(StringView text) {
             eastl::string result;
             for (const char c : text) {
                 result.push_back(Lower(c));
@@ -46,7 +46,7 @@ namespace BECore::Chess::Uci {
 
         /// The game of a `position`: the start FEN and the moves as Move values. The text of the reason when the FEN or a move is refused
         std::expected<SearchRequest, eastl::string> BuildGame(const PositionParams& params) {
-            const auto start = Position::FromFen(eastl::string_view(params.startFen.data(), params.startFen.size()));
+            const auto start = Position::FromFen(StringView(params.startFen));
             if (!start) {
                 return std::unexpected(Format("position refused: '{}' is not a position this game can play ({})", params.startFen, EnumUtils<FenError>::ToString(start.error())));
             }
@@ -55,7 +55,7 @@ namespace BECore::Chess::Uci {
             Position position = *start;
             for (size_t index = 0; index < params.moves.size(); ++index) {
                 const eastl::string& text = params.moves[index];
-                const Optional<Move> move = MoveGenerator::ParseUci(position, eastl::string_view(text.data(), text.size()));
+                const Optional<Move> move = MoveGenerator::ParseUci(position, StringView(text));
                 if (!move) {
                     return std::unexpected(Format("position refused: move {} ({}) is not legal", index + 1, text));
                 }
@@ -92,12 +92,12 @@ namespace BECore::Chess::Uci {
         }
     }
 
-    void UciServer::Say(eastl::string_view line) {
+    void UciServer::Say(StringView line) {
         const std::lock_guard lock(_sinkMutex);
         _sink(line);
     }
 
-    void UciServer::SayInfo(eastl::string_view text) {
+    void UciServer::SayInfo(StringView text) {
         Say(Format("{}{}", kInfoStringPrefix, text));
     }
 
@@ -119,7 +119,7 @@ namespace BECore::Chess::Uci {
         _token.Cancel();
     }
 
-    void UciServer::HandleLine(eastl::string_view line) {
+    void UciServer::HandleLine(StringView line) {
         const UciCommand command = ParseCommand(line);
         switch (command.kind) {
             case UciCommandKind::Uci:
@@ -178,8 +178,8 @@ namespace BECore::Chess::Uci {
             SayInfo(kBusyText);
             return;
         }
-        const eastl::string_view name(params.name.data(), params.name.size());
-        const eastl::string_view value(params.value.data(), params.value.size());
+        const StringView name(params.name.data(), params.name.size());
+        const StringView value(params.value.data(), params.value.size());
         if (EqualsIgnoreCase(name, kLevelOption)) {
             if (EqualsIgnoreCase(value, kCustomLevel)) {
                 return;

@@ -37,7 +37,7 @@ namespace BECore::Chess {
                 for (size_t group = 0; group < kMaterialGroupCount; ++group) {
                     for (size_t index = 0; index < kMaterialRowsPerGroup; ++index) {
                         const size_t row = group * kMaterialRowsPerGroup + index;
-                        const eastl::string_view type = EnumUtils<PieceType>::ToString(types[index]);
+                        const StringView type = EnumUtils<PieceType>::ToString(types[index]);
                         made.vars[row] = PoolString::Intern(Format("material{}{}", GroupWord(group), type).c_str());
                         made.rows[row] = PoolString::Intern(Format("Material{}{}Row", GroupWord(group), type).c_str());
                         made.icons[row] = PoolString::Intern(Format("Material{}{}Icon", GroupWord(group), type).c_str());
@@ -73,7 +73,7 @@ namespace BECore::Chess {
                 const int count = summary.GetMissing(taken, types[index]);
                 _counts[row] = count;
                 const eastl::string word = count > 0 ? Format("x{}", count) : eastl::string();
-                vars.Set(names.vars[row], eastl::string_view(word.data(), word.size()));
+                vars.Set(names.vars[row], StringView(word));
                 if (iconsToo && canvas) {
                     if (UIElement* element = canvas->GetRoot().FindByName(names.icons[row])) {
                         if (UIImageComponent* icon = element->GetComponent<UIImageComponent>()) {
@@ -83,7 +83,7 @@ namespace BECore::Chess {
                 }
             }
             const eastl::string balance = BalanceText(summary.GetPoints(color) - summary.GetPoints(taken));
-            vars.Set(names.balanceVars[group], eastl::string_view(balance.data(), balance.size()));
+            vars.Set(names.balanceVars[group], StringView(balance));
         }
     }
 

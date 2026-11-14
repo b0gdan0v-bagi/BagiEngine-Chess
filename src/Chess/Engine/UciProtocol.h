@@ -45,17 +45,17 @@ namespace BECore::Chess {
         [[nodiscard]] eastl::string GoCommand(const SearchLimits& limits);
 
         /// `setoption name Skill Level value 5`; a name may hold spaces, the value is taken as it is
-        [[nodiscard]] eastl::string SetOptionCommand(eastl::string_view name, eastl::string_view value);
+        [[nodiscard]] eastl::string SetOptionCommand(StringView name, StringView value);
 
         /// The answer in @p line when it is a `bestmove` line (an end of line left on it does no harm), nothing for any other line (`info ...`, an empty one)
-        [[nodiscard]] Optional<BestMove> ParseBestMove(eastl::string_view line);
+        [[nodiscard]] Optional<BestMove> ParseBestMove(StringView line);
 
         /// The fields of @p line when it is an `info` line, nothing for any other line (`bestmove ...`, an empty one). Tolerant: `info string ...` is text to the end of
         /// the line (a `score` inside it is not read), unknown tokens are skipped, and a missing or non-numeric value leaves its field as it was and never fails the line
-        [[nodiscard]] Optional<Info> ParseInfo(eastl::string_view line);
+        [[nodiscard]] Optional<Info> ParseInfo(StringView line);
 
         /// @p text without the spaces, `\r` and `\n` at both ends: a child on Windows ends its lines with `\r\n`. A view into @p text
-        [[nodiscard]] eastl::string_view TrimLine(eastl::string_view text);
+        [[nodiscard]] StringView TrimLine(StringView text);
 
         /**
          * @brief Keeps, from the `info` lines an engine sends while it searches, the line of each `multipv` index 1..N that an analysis is read from. Pure: no process.
@@ -69,7 +69,7 @@ namespace BECore::Chess {
             /// @p lineCount is how many lines the search was asked for (the value of `MultiPV`), at least 1
             explicit LineCollector(int lineCount);
 
-            void Offer(eastl::string_view line);
+            void Offer(StringView line);
 
             /// The kept lines, in the order of their `multipv` index (Info::multiPv, from 1), the indices that had no usable line left out
             [[nodiscard]] eastl::vector<Info> Lines() const;

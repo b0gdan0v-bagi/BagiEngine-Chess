@@ -67,7 +67,7 @@ namespace BECore::Chess {
         const bool wanted = !_search->token.IsCancelled() && _searchVersion == model.GetVersion();
         _search.reset();
 
-        const eastl::string_view side = EnumUtils<PieceColor>::ToString(_side);
+        const StringView side = EnumUtils<PieceColor>::ToString(_side);
         if (!wanted) {
             LOG_INFO("Engine opponent ({}): the answer of a cancelled or out-of-date search is dropped"_format(side));
             return;

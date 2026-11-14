@@ -111,7 +111,7 @@ namespace BECore::Chess {
         [[nodiscard]] std::expected<void, EngineError> Begin(const SearchRequest& request, int lineCount, const CancellationToken& token);
         [[nodiscard]] std::expected<void, EngineError> Handshake(const CancellationToken& token);
         [[nodiscard]] std::expected<void, EngineError> WaitUntilReady(const CancellationToken& token);
-        [[nodiscard]] std::expected<void, EngineError> Send(eastl::string_view command);
+        [[nodiscard]] std::expected<void, EngineError> Send(StringView command);
 
         /// The token was cancelled during the search: `stop`, and the `bestmove` that answers it is read and dropped. The process is closed when it does not answer
         [[nodiscard]] std::unexpected<EngineError> StopSearch();
@@ -136,6 +136,6 @@ namespace BECore::Chess {
      * Only a lookup: nothing here knows where Stockfish is installed, and nothing of it is shipped with the game.
      * With CHESS_NO_STOCKFISH (the web build) the answer is always nothing and nothing is looked at.
      */
-    [[nodiscard]] Optional<eastl::string> FindStockfish(eastl::string_view explicitPath);
+    [[nodiscard]] Optional<eastl::string> FindStockfish(StringView explicitPath);
 
 }  // namespace BECore::Chess

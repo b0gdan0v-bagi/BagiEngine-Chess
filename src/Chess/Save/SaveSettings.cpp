@@ -12,8 +12,8 @@ namespace BECore::Chess {
 
         constexpr const char* kSaveOrganization = "BagiEngine";
         constexpr const char* kSaveApplication = "BagiChess";
-        constexpr eastl::string_view kSaveSubfolder = "saves";
-        constexpr eastl::string_view kTrue = "true";
+        constexpr StringView kSaveSubfolder = "saves";
+        constexpr StringView kTrue = "true";
 
         /// The value of the attribute of @p root; nothing when the node or the attribute is missing
         Optional<bool> ReadRememberGame(const XmlNode& root) {
@@ -45,7 +45,7 @@ namespace BECore::Chess {
 
     SaveSettings SaveSettings::Load() {
         const ConfigManager& configs = CoreManager::GetConfigManager();
-        const auto root = [&configs](eastl::string_view name) { return configs.HasConfig(name) ? configs.GetConfig(name) : XmlNode{}; };
+        const auto root = [&configs](StringView name) { return configs.HasConfig(name) ? configs.GetConfig(name) : XmlNode{}; };
         return FromConfig(root(OpponentSettings::kSharedConfigName), root(OpponentSettings::kLocalConfigName));
     }
 

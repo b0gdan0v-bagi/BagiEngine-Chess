@@ -15,7 +15,7 @@ namespace BECore::Chess {
 
     }  // namespace
 
-    eastl::vector<MoveListRow> BuildMoveList(eastl::string_view startFen, const eastl::vector<Move>& moves) {
+    eastl::vector<MoveListRow> BuildMoveList(StringView startFen, const eastl::vector<Move>& moves) {
         eastl::vector<MoveListRow> rows;
         auto parsed = Position::FromFen(startFen);
         if (!parsed) {

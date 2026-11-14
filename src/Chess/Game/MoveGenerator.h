@@ -23,7 +23,7 @@ namespace BECore::Chess {
         [[nodiscard]] static MoveList GenerateLegal(const Position& position);
 
         /// The legal move spelled @p text in UCI ("e2e4", "e7e8q", "e1g1"), or nothing if no legal move has that spelling.
-        [[nodiscard]] static Optional<Move> ParseUci(const Position& position, eastl::string_view text);
+        [[nodiscard]] static Optional<Move> ParseUci(const Position& position, StringView text);
     };
 
 }  // namespace BECore::Chess

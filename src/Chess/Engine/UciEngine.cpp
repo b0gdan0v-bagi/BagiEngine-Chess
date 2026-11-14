@@ -10,18 +10,18 @@ namespace BECore::Chess {
 
         using std::chrono::milliseconds;
         using Clock = std::chrono::steady_clock;
-        using LinePredicate = bool (*)(eastl::string_view);
+        using LinePredicate = bool (*)(StringView);
 
         constexpr milliseconds kWaitSlice{20};  // the longest single wait for a line: how often a cancelled token is looked at
-        constexpr eastl::string_view kUciCommand = "uci";
-        constexpr eastl::string_view kIsReadyCommand = "isready";
-        constexpr eastl::string_view kNewGameCommand = "ucinewgame";
-        constexpr eastl::string_view kStopCommand = "stop";
-        constexpr eastl::string_view kQuitCommand = "quit";
-        constexpr eastl::string_view kUciOkReply = "uciok";
-        constexpr eastl::string_view kReadyOkReply = "readyok";
-        constexpr eastl::string_view kBestMoveReply = "bestmove";
-        constexpr eastl::string_view kMultiPvOption = "MultiPV";
+        constexpr StringView kUciCommand = "uci";
+        constexpr StringView kIsReadyCommand = "isready";
+        constexpr StringView kNewGameCommand = "ucinewgame";
+        constexpr StringView kStopCommand = "stop";
+        constexpr StringView kQuitCommand = "quit";
+        constexpr StringView kUciOkReply = "uciok";
+        constexpr StringView kReadyOkReply = "readyok";
+        constexpr StringView kBestMoveReply = "bestmove";
+        constexpr StringView kMultiPvOption = "MultiPV";
 
 #if !CHESS_NO_STOCKFISH
         constexpr const char* kStockfishVariable = "STOCKFISH";
@@ -39,15 +39,15 @@ namespace BECore::Chess {
             return std::unexpected(EngineError{kind, std::move(detail)});
         }
 
-        bool IsUciOk(eastl::string_view line) {
+        bool IsUciOk(StringView line) {
             return line == kUciOkReply;
         }
 
-        bool IsReadyOk(eastl::string_view line) {
+        bool IsReadyOk(StringView line) {
             return line == kReadyOkReply;
         }
 
-        bool IsBestMove(eastl::string_view line) {
+        bool IsBestMove(StringView line) {
             return UciProtocol::ParseBestMove(line).has_value();
         }
 
@@ -57,7 +57,7 @@ namespace BECore::Chess {
          * what was waited for in the sentence. A token that was never made (the default one) is never cancelled. @p skipped, when given, sees every
          * line that is skipped (the wait for `bestmove` passes one; the handshake and the answer to `stop` pass none).
          */
-        std::expected<eastl::string, EngineError> ReadUntil(UciProcess& process, LinePredicate wanted, eastl::string_view what, int timeoutMs, const CancellationToken& token,
+        std::expected<eastl::string, EngineError> ReadUntil(UciProcess& process, LinePredicate wanted, StringView what, int timeoutMs, const CancellationToken& token,
                                                             UciProtocol::LineCollector* skipped = nullptr) {
             const Clock::time_point deadline = Clock::now() + milliseconds(std::max(timeoutMs, 0));
             for (;;) {
@@ -71,7 +71,7 @@ namespace BECore::Chess {
 
                 auto line = process.ReadLine(std::min(kWaitSlice, std::chrono::ceil<milliseconds>(remaining)));
                 if (line) {
-                    const eastl::string_view text = UciProtocol::TrimLine(eastl::string_view(line->data(), line->size()));
+                    const StringView text = UciProtocol::TrimLine(StringView(line->data(), line->size()));
                     if (wanted(text)) {
                         return eastl::string(text.data(), text.size());
                     }
@@ -185,7 +185,7 @@ namespace BECore::Chess {
             if (info.firstPvMove.empty()) {
                 continue;
             }
-            const Optional<Move> move = MoveGenerator::ParseUci(searched->position, eastl::string_view(info.firstPvMove.data(), info.firstPvMove.size()));
+            const Optional<Move> move = MoveGenerator::ParseUci(searched->position, StringView(info.firstPvMove));
             if (!move) {
                 return Fail(EngineErrorKind::IllegalMove, Format("the engine answered '{}' for line {}, which is not legal in {}", info.firstPvMove, info.multiPv, searched->position.ToFen()));
             }
@@ -227,11 +227,11 @@ namespace BECore::Chess {
         }
 
         // The process is alive and in step from here on: it answered, so whatever is wrong with the answer, the next search can use it
-        const Optional<UciProtocol::BestMove> best = UciProtocol::ParseBestMove(eastl::string_view(answer->data(), answer->size()));
+        const Optional<UciProtocol::BestMove> best = UciProtocol::ParseBestMove(StringView(answer->data(), answer->size()));
         if (!best || best->IsNone()) {
             return Fail(EngineErrorKind::NoMove, Format("the engine has no move here (it answered '{}') but the game has legal moves", *answer));
         }
-        const Optional<Move> move = MoveGenerator::ParseUci(*position, eastl::string_view(best->move.data(), best->move.size()));
+        const Optional<Move> move = MoveGenerator::ParseUci(*position, StringView(best->move));
         if (!move) {
             return Fail(EngineErrorKind::IllegalMove, Format("the engine answered '{}', which is not legal in {}", best->move, position->ToFen()));
         }
@@ -265,7 +265,7 @@ namespace BECore::Chess {
         // and a search for one line puts it back, so the opponent's own search is never slowed by a line count an analysis left
         if (lineCount != _multiPv) {
             const eastl::string value = Format("{}", lineCount);
-            if (auto sent = Send(UciProtocol::SetOptionCommand(kMultiPvOption, eastl::string_view(value.data(), value.size()))); !sent) {
+            if (auto sent = Send(UciProtocol::SetOptionCommand(kMultiPvOption, StringView(value))); !sent) {
                 return sent;
             }
             _multiPv = lineCount;
@@ -285,8 +285,8 @@ namespace BECore::Chess {
             return std::unexpected(std::move(reply.error()));
         }
         for (const auto& [name, value] : _settings.options) {
-            const eastl::string command = UciProtocol::SetOptionCommand(eastl::string_view(name.data(), name.size()), eastl::string_view(value.data(), value.size()));
-            if (auto sent = Send(eastl::string_view(command.data(), command.size())); !sent) {
+            const eastl::string command = UciProtocol::SetOptionCommand(StringView(name), StringView(value));
+            if (auto sent = Send(StringView(command)); !sent) {
                 return sent;
             }
         }
@@ -303,7 +303,7 @@ namespace BECore::Chess {
         return {};
     }
 
-    std::expected<void, EngineError> UciEngine::Send(eastl::string_view command) {
+    std::expected<void, EngineError> UciEngine::Send(StringView command) {
         return _process->WriteLine(command);
     }
 
@@ -343,7 +343,7 @@ namespace BECore::Chess {
         _multiPv = kSingleLine;
     }
 
-    Optional<eastl::string> FindStockfish([[maybe_unused]] eastl::string_view explicitPath) {
+    Optional<eastl::string> FindStockfish([[maybe_unused]] StringView explicitPath) {
 #if CHESS_NO_STOCKFISH
         return std::nullopt;  // nothing is looked for: no file system walk, no environment, and no process could be started from what was found
 #else

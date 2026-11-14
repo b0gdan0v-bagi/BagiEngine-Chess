@@ -6,15 +6,15 @@ namespace BECore::Chess {
 
     namespace {
 
-        constexpr eastl::string_view kNobodyId = "none";
-        constexpr eastl::string_view kBothId = "both";
+        constexpr StringView kNobodyId = "none";
+        constexpr StringView kBothId = "both";
         constexpr char kMoveSeparator = ' ';
 
         std::unexpected<SaveError> Corrupt(const eastl::string& reason) {
             return std::unexpected(SaveError{SaveErrorKind::Corrupt, Format("the saved {}", reason)});
         }
 
-        eastl::string_view PlaysId(ProgramSides sides) {
+        StringView PlaysId(ProgramSides sides) {
             if (sides.white && sides.black) {
                 return kBothId;
             }
@@ -27,7 +27,7 @@ namespace BECore::Chess {
             return kNobodyId;
         }
 
-        Optional<ProgramSides> ParsePlays(eastl::string_view id) {
+        Optional<ProgramSides> ParsePlays(StringView id) {
             if (id == kNobodyId) {
                 return ProgramSides{};
             }
@@ -40,11 +40,11 @@ namespace BECore::Chess {
             return std::nullopt;
         }
 
-        eastl::string_view View(const String& text) {
-            return eastl::string_view(text.data(), text.size());
+        StringView View(const String& text) {
+            return StringView(text);
         }
 
-        String Own(eastl::string_view text) {
+        String Own(StringView text) {
             return String(text.data(), text.size());
         }
 
@@ -54,11 +54,11 @@ namespace BECore::Chess {
             if (text.empty()) {
                 return moves;
             }
-            const eastl::string_view all = View(text);
+            const StringView all = View(text);
             size_t begin = 0;
             while (begin <= all.size()) {
                 size_t end = all.find(kMoveSeparator, begin);
-                if (end == eastl::string_view::npos) {
+                if (end == StringView::npos) {
                     end = all.size();
                 }
                 const size_t number = moves.size() + 1;
@@ -75,7 +75,7 @@ namespace BECore::Chess {
             return moves;
         }
 
-        std::expected<SeatChoice, SaveError> ParseSeat(const String& engineId, const String& levelId, eastl::string_view seat) {
+        std::expected<SeatChoice, SaveError> ParseSeat(const String& engineId, const String& levelId, StringView seat) {
             const Optional<OpponentEngine> engine = FindOpponentEngine(View(engineId));
             if (!engine) {
                 return Corrupt(Format("{} engine is not an engine of this game", seat));

@@ -7,12 +7,12 @@ namespace BECore::Chess {
 
     /// One strength of the computer opponent: its words, what the engine is given and how often the handicap replaces its move. Pure data, see GetOpponentLevels()
     struct OpponentLevel {
-        eastl::string_view id;    ///< lower case; the name of the level on the wire (the control API)
-        eastl::string_view name;  ///< the word of the HUD ("Medium")
-        int skillLevel = 0;       ///< the UCI option `Skill Level`, 0 (weakest) to 20 (full strength)
-        int moveTimeMs = 0;       ///< how long Stockfish thinks about a move
-        int ownDepth = 0;         ///< how many plies the own engine searches (a fixed depth is deterministic); 0 means none, which a search refuses
-        int blunderPercent = 0;   ///< 0..100: the share of moves replaced by a random legal move (BlunderEngine), for both engines; the one knob that goes below the floor of the engines
+        StringView id;           ///< lower case; the name of the level on the wire (the control API)
+        StringView name;         ///< the word of the HUD ("Medium")
+        int skillLevel = 0;      ///< the UCI option `Skill Level`, 0 (weakest) to 20 (full strength)
+        int moveTimeMs = 0;      ///< how long Stockfish thinks about a move
+        int ownDepth = 0;        ///< how many plies the own engine searches (a fixed depth is deterministic); 0 means none, which a search refuses
+        int blunderPercent = 0;  ///< 0..100: the share of moves replaced by a random legal move (BlunderEngine), for both engines; the one knob that goes below the floor of the engines
     };
 
     /// The levels, weakest first: a ladder for a casual person, from a beginner (Easy) to the full strength of each engine (Max). Stockfish at `Skill Level` 0 is about a
@@ -23,7 +23,7 @@ namespace BECore::Chess {
     inline constexpr size_t kDefaultOpponentLevel = 1;
 
     /// The index of the level with this id (exactly as written: ids are lower case), or nothing
-    [[nodiscard]] Optional<size_t> FindOpponentLevel(eastl::string_view id);
+    [[nodiscard]] Optional<size_t> FindOpponentLevel(StringView id);
 
     /// The longest the own engine may think about a move at any level. It is not a strength knob (the depth of the level ends the search): it only keeps the window from
     /// a freak position, so the own engine is deterministic unless this cap is hit

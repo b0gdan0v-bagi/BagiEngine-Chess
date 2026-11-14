@@ -179,14 +179,14 @@ namespace BECore::Chess {
         const eastl::string status = error ? OpponentText::Error(*error) : StatusText::Status(model);
         const eastl::string opponentError = error ? OpponentText::Error(*error) : eastl::string();
         UIVars& vars = CoreManager::GetUIVars();
-        vars.Set("turn"_intern, eastl::string_view(turn.data(), turn.size()));
-        vars.Set("status"_intern, eastl::string_view(status.data(), status.size()));
+        vars.Set("turn"_intern, StringView(turn));
+        vars.Set("status"_intern, StringView(status));
         // The ids of the opponent panel, those of the control API (the person's color, not the program's); the words are the text of the segments in the scene
         vars.Set("opponentMode"_intern, choice.ModeId());
         vars.Set("opponentColor"_intern, choice.ColorId());
         vars.Set("opponentEngine"_intern, choice.EngineId());
         vars.Set("opponentLevel"_intern, choice.LevelId());
-        vars.Set("opponentError"_intern, eastl::string_view(opponentError.data(), opponentError.size()));
+        vars.Set("opponentError"_intern, StringView(opponentError));
     }
 
     void ChessBoardComponent::AnswerSetAction(const InputEvents::ActionEvent& event) {
@@ -195,7 +195,7 @@ namespace BECore::Chess {
         if (!choice) {
             return;
         }
-        const eastl::string_view value = event.value.ToStringView();
+        const StringView value = event.value.ToStringView();
         std::expected<void, ChoiceError> picked;
         if (event.action == "ChessSetMode"_intern) {
             picked = choice->SetMode(value);

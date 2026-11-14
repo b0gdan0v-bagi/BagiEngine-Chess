@@ -39,12 +39,12 @@ namespace BECore::Chess {
      */
     class Position {
     public:
-        static constexpr eastl::string_view kStartFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+        static constexpr StringView kStartFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
         [[nodiscard]] static Position Start();
 
         /// Parse a FEN string. The halfmove clock and fullmove number may be left out (they default to 0 and 1).
-        [[nodiscard]] static std::expected<Position, FenError> FromFen(eastl::string_view fen);
+        [[nodiscard]] static std::expected<Position, FenError> FromFen(StringView fen);
 
         [[nodiscard]] eastl::string ToFen() const;
 

@@ -44,10 +44,10 @@ namespace BECore::Chess::Uci {
     };
 
     /// A whole decimal number (a leading '-' allowed); nothing for an empty text, any other character or a value out of int
-    [[nodiscard]] Optional<int> ParseInt(eastl::string_view text);
+    [[nodiscard]] Optional<int> ParseInt(StringView text);
 
     /// The command in @p line. Tolerant: spaces at both ends and a `\r` are ignored, unknown tokens inside `go` are skipped, a value that is not a number leaves
     /// its field empty. A first token that is no command, an empty line, and a `position` with neither `startpos` nor `fen` are Unknown
-    [[nodiscard]] UciCommand ParseCommand(eastl::string_view line);
+    [[nodiscard]] UciCommand ParseCommand(StringView line);
 
 }  // namespace BECore::Chess::Uci

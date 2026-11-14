@@ -22,11 +22,11 @@ namespace BECore::Chess {
      */
     struct OpponentSettings {
         /// The names of the two configs: ConfigManager keys a file by its name without `.xml`
-        static constexpr eastl::string_view kSharedConfigName = "ChessSettings";
-        static constexpr eastl::string_view kLocalConfigName = "ChessSettings.local";
+        static constexpr StringView kSharedConfigName = "ChessSettings";
+        static constexpr StringView kLocalConfigName = "ChessSettings.local";
 
         /// The attribute of the root element of both files
-        static constexpr eastl::string_view kStockfishPathAttribute = "stockfishPath";
+        static constexpr StringView kStockfishPathAttribute = "stockfishPath";
 
         /// The path of the Stockfish to start; empty when no file names one
         eastl::string stockfishPath;

@@ -40,7 +40,7 @@ namespace BECore::Chess {
         static_assert(!kLevels.empty());
         static_assert(kDefaultOpponentLevel < kLevels.size());
 
-        constexpr eastl::string_view kSkillLevelOption = "Skill Level";
+        constexpr StringView kSkillLevelOption = "Skill Level";
 
     }  // namespace
 
@@ -48,7 +48,7 @@ namespace BECore::Chess {
         return eastl::span<const OpponentLevel>(kLevels.data(), kLevels.size());
     }
 
-    Optional<size_t> FindOpponentLevel(eastl::string_view id) {
+    Optional<size_t> FindOpponentLevel(StringView id) {
         for (size_t index = 0; index < kLevels.size(); ++index) {
             if (kLevels[index].id == id) {
                 return index;

@@ -6,8 +6,8 @@ namespace BECore::Chess {
 
         struct PromotionEntry {
             PieceType type;
-            eastl::string_view id;
-            eastl::string_view label;
+            StringView id;
+            StringView label;
         };
 
         constexpr eastl::array<PromotionEntry, 4> kPromotions{{
@@ -34,17 +34,17 @@ namespace BECore::Chess {
         return kPromotionPieces;
     }
 
-    eastl::string_view PromotionId(PieceType type) {
+    StringView PromotionId(PieceType type) {
         const PromotionEntry* entry = Find(type);
-        return entry ? entry->id : eastl::string_view{};
+        return entry ? entry->id : StringView{};
     }
 
-    eastl::string_view PromotionLabel(PieceType type) {
+    StringView PromotionLabel(PieceType type) {
         const PromotionEntry* entry = Find(type);
-        return entry ? entry->label : eastl::string_view{};
+        return entry ? entry->label : StringView{};
     }
 
-    Optional<PieceType> FindPromotion(eastl::string_view id) {
+    Optional<PieceType> FindPromotion(StringView id) {
         for (const PromotionEntry& entry : kPromotions) {
             if (entry.id == id) {
                 return entry.type;

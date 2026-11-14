@@ -28,7 +28,7 @@ namespace BECore::Chess {
         constexpr size_t kFenMinFields = 4;
         constexpr size_t kFenMaxFields = 6;
 
-        constexpr eastl::string_view kPieceLetters = "pnbrqk";  // index = PieceType - 1, lower case; upper case is White
+        constexpr StringView kPieceLetters = "pnbrqk";  // index = PieceType - 1, lower case; upper case is White
 
         // Castling rights a move from or onto this square takes away (the king or a rook leaves, or a rook is captured at home).
         constexpr int RightsLostOn(int sq) noexcept {
@@ -59,13 +59,13 @@ namespace BECore::Chess {
             const bool isWhite = letter >= 'A' && letter <= 'Z';
             const char lower = isWhite ? static_cast<char>(letter - 'A' + 'a') : letter;
             const size_t found = kPieceLetters.find(lower);
-            if (found == eastl::string_view::npos) {
+            if (found == StringView::npos) {
                 return std::nullopt;
             }
             return Piece{static_cast<PieceType>(found + 1), isWhite ? PieceColor::White : PieceColor::Black};
         }
 
-        bool ParseNumber(eastl::string_view text, int& out) noexcept {
+        bool ParseNumber(StringView text, int& out) noexcept {
             if (text.empty()) {
                 return false;
             }
@@ -86,8 +86,8 @@ namespace BECore::Chess {
         return *start;
     }
 
-    std::expected<Position, FenError> Position::FromFen(eastl::string_view fen) {
-        eastl::array<eastl::string_view, kFenMaxFields> fields{};
+    std::expected<Position, FenError> Position::FromFen(StringView fen) {
+        eastl::array<StringView, kFenMaxFields> fields{};
         size_t fieldCount = 0;
         size_t cursor = 0;
         while (cursor < fen.size()) {

@@ -15,7 +15,7 @@ namespace BECore::Chess {
         return 0;
     }
 
-    eastl::string_view MoveRatingReasonId(MoveRatingReason reason) {
+    StringView MoveRatingReasonId(MoveRatingReason reason) {
         switch (reason) {
             case MoveRatingReason::Brilliant:
                 return "brilliant";

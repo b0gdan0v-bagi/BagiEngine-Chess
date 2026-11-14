@@ -26,7 +26,7 @@ namespace BECore::Chess {
         }
 
         /// UTF-16 of UTF-8 text, nothing for text that is not UTF-8
-        Optional<std::wstring> Widen(eastl::string_view text) {
+        Optional<std::wstring> Widen(StringView text) {
             if (text.empty()) {
                 return std::wstring();
             }
@@ -64,7 +64,7 @@ namespace BECore::Chess {
             }
             eastl::string text = message != nullptr ? Narrow(message, end) : eastl::string();
             LocalFree(message);
-            constexpr eastl::string_view kPlaceholder = "%1";
+            constexpr StringView kPlaceholder = "%1";
             for (size_t at = text.find(kPlaceholder.data(), 0, kPlaceholder.size()); at != eastl::string::npos; at = text.find(kPlaceholder.data(), at, kPlaceholder.size())) {
                 text.replace(at, kPlaceholder.size(), "the program");
             }
@@ -238,7 +238,7 @@ namespace BECore::Chess {
         if (launch.path.empty()) {
             return Fail(EngineErrorKind::LaunchFailed, "no program to start");
         }
-        const auto cannotStart = [&launch](eastl::string_view reason) { return Fail(EngineErrorKind::LaunchFailed, Format("cannot start {}: {}", launch.path, reason)); };
+        const auto cannotStart = [&launch](StringView reason) { return Fail(EngineErrorKind::LaunchFailed, Format("cannot start {}: {}", launch.path, reason)); };
 
         Optional<std::wstring> application = Widen(launch.path);
         if (!application) {
@@ -326,8 +326,8 @@ namespace BECore::Chess {
         return eastl::unique_ptr<UciProcess>(new UciProcess(static_cast<int>(created.dwProcessId), std::move(state)));
     }
 
-    std::expected<void, EngineError> UciProcess::WriteLine(eastl::string_view text) {
-        if (text.find_first_of("\r\n") != eastl::string_view::npos) {
+    std::expected<void, EngineError> UciProcess::WriteLine(StringView text) {
+        if (text.find_first_of("\r\n") != StringView::npos) {
             return Fail(EngineErrorKind::BadRequest, "a command line must not hold an end of line");
         }
         if (_ended || !_windows->input) {

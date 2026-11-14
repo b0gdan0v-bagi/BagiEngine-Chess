@@ -28,6 +28,6 @@ namespace BECore::Chess {
      * A start FEN that does not parse gives no rows. A move that is not legal in its turn (the model never produces one) ends the list there: the
      * rows before it stay.
      */
-    [[nodiscard]] eastl::vector<MoveListRow> BuildMoveList(eastl::string_view startFen, const eastl::vector<Move>& moves);
+    [[nodiscard]] eastl::vector<MoveListRow> BuildMoveList(StringView startFen, const eastl::vector<Move>& moves);
 
 }  // namespace BECore::Chess

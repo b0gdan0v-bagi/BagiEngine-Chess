@@ -8,7 +8,7 @@ namespace BECore::Chess {
 
         struct CapturableEntry {
             PieceType type;
-            eastl::string_view id;
+            StringView id;
             int startCount;
         };
 
@@ -58,7 +58,7 @@ namespace BECore::Chess {
         return kCapturableTypes;
     }
 
-    eastl::string_view CapturedId(PieceType type) {
+    StringView CapturedId(PieceType type) {
         for (const CapturableEntry& entry : kCapturable) {
             if (entry.type == type) {
                 return entry.id;
@@ -67,7 +67,7 @@ namespace BECore::Chess {
         return {};
     }
 
-    Optional<PieceType> FindCaptured(eastl::string_view id) {
+    Optional<PieceType> FindCaptured(StringView id) {
         for (const CapturableEntry& entry : kCapturable) {
             if (entry.id == id) {
                 return entry.type;

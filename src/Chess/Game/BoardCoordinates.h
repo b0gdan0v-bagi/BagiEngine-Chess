@@ -11,21 +11,21 @@ namespace BECore::Chess {
     constexpr int kLabelRow = kLastBoardIndex;
 
     /// The names of the files and of the ranks, indexed by `Square::file` and `Square::rank`
-    constexpr eastl::string_view kFileLetters = "abcdefgh";
-    constexpr eastl::string_view kRankDigits = "12345678";
+    constexpr StringView kFileLetters = "abcdefgh";
+    constexpr StringView kRankDigits = "12345678";
 
     /// The letter of the file drawn in the bottom-row cell of a column ("a".."h"), given the color at the bottom; empty for a column outside the board.
     /// White at the bottom reads a..h from the left, Black at the bottom (the grid turned by 180 degrees) h..a
-    [[nodiscard]] constexpr eastl::string_view FileLabel(int column, PieceColor bottom) noexcept {
+    [[nodiscard]] constexpr StringView FileLabel(int column, PieceColor bottom) noexcept {
         const Optional<Square> square = SquareAt(column, kLabelRow, bottom);
-        return square ? kFileLetters.substr(square->file, 1) : eastl::string_view();
+        return square ? kFileLetters.substr(square->file, 1) : StringView();
     }
 
     /// The number of the rank drawn in the left-column cell of a row ("1".."8"), given the color at the bottom; empty for a row outside the board.
     /// White at the bottom reads 8..1 from the top, Black at the bottom 1..8
-    [[nodiscard]] constexpr eastl::string_view RankLabel(int rowFromTop, PieceColor bottom) noexcept {
+    [[nodiscard]] constexpr StringView RankLabel(int rowFromTop, PieceColor bottom) noexcept {
         const Optional<Square> square = SquareAt(kLabelColumn, rowFromTop, bottom);
-        return square ? kRankDigits.substr(square->rank, 1) : eastl::string_view();
+        return square ? kRankDigits.substr(square->rank, 1) : StringView();
     }
 
     /// Whether a square is painted light (a1 is dark, h1 is light): the one rule of the checkered base, which the board paints with and the labels take their contrast from

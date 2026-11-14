@@ -240,7 +240,7 @@ namespace BECore::Chess {
 
     UciProcess::~UciProcess() = default;
 
-    std::expected<void, EngineError> UciProcess::WriteLine(eastl::string_view) {
+    std::expected<void, EngineError> UciProcess::WriteLine(StringView) {
         return Fail(EngineErrorKind::Unsupported, kNoProcessDetail);
     }
 
@@ -305,8 +305,8 @@ namespace BECore::Chess {
         return eastl::unique_ptr<UciProcess>(new UciProcess(static_cast<int>(processId), inputToChild.Release(), outputFromChild.Release()));
     }
 
-    std::expected<void, EngineError> UciProcess::WriteLine(eastl::string_view text) {
-        if (text.find_first_of("\r\n") != eastl::string_view::npos) {
+    std::expected<void, EngineError> UciProcess::WriteLine(StringView text) {
+        if (text.find_first_of("\r\n") != StringView::npos) {
             return Fail(EngineErrorKind::BadRequest, "a command line must not hold an end of line");
         }
         if (_ended || _inputDescriptor < 0) {

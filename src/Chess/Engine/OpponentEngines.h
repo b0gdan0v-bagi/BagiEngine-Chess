@@ -21,13 +21,13 @@ namespace BECore::Chess {
     inline constexpr OpponentEngine kDefaultOpponentEngine = kStockfishAvailable ? OpponentEngine::Stockfish : OpponentEngine::Own;
 
     /// The name on the wire (the control API): "stockfish", "own"
-    [[nodiscard]] eastl::string_view OpponentEngineId(OpponentEngine engine);
+    [[nodiscard]] StringView OpponentEngineId(OpponentEngine engine);
 
     /// The word of the HUD: "Stockfish", "Own engine"
-    [[nodiscard]] eastl::string_view OpponentEngineName(OpponentEngine engine);
+    [[nodiscard]] StringView OpponentEngineName(OpponentEngine engine);
 
     /// The engine with this id (exactly as written: ids are lower case), or nothing
-    [[nodiscard]] Optional<OpponentEngine> FindOpponentEngine(eastl::string_view id);
+    [[nodiscard]] Optional<OpponentEngine> FindOpponentEngine(StringView id);
 
     /// The engine after this one in the cycle of OpponentController::CycleEngine: Stockfish, Own, and back to Stockfish; an engine that is not available (IsOpponentEngineAvailable) is skipped,
     /// so without Stockfish the cycle stays on Own
