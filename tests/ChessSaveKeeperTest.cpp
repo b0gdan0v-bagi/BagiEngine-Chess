@@ -43,6 +43,7 @@ namespace BECore::Chess::Tests {
         }
 
         Vector<uint8_t> BytesOfFile(const std::filesystem::path& path) {
+            //-NoStd: file layer (engine-file-layer)
             std::ifstream file(path, std::ios::binary);
             Vector<uint8_t> bytes;
             for (std::istreambuf_iterator<char> it(file), end; it != end; ++it) {
@@ -52,6 +53,7 @@ namespace BECore::Chess::Tests {
         }
 
         void WriteBytes(const std::filesystem::path& path, const String& bytes) {
+            //-NoStd: file layer (engine-file-layer)
             std::ofstream file(path, std::ios::binary | std::ios::trunc);
             file << bytes;
         }

@@ -8,6 +8,7 @@ namespace BECore::Chess {
 
     /// Makes the engine for one kind and level, or says why there is none. The default makes a UciEngine over the Stockfish the settings point at for Stockfish and an OwnEngine
     /// for Own (which cannot fail); a test gives a double
+    //-NoStd: no callable alias yet (callables-move-only)
     using EngineFactory = eastl::function<std::expected<SharedPtr<IChessEngine>, EngineError>(OpponentEngine, const OpponentLevel&)>;
 
     /// Why no Stockfish was found: names the path that was tried when @p path is not empty, else the three places that are looked at. Shared with the analysis (PositionAnalyst)

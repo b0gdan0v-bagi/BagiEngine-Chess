@@ -133,6 +133,10 @@ if(ENGINE_BUILD_TESTS)
         # check_includes.py over the whole game: src, tests, uci)
         add_test(NAME BagiChessIncludeStyle COMMAND ${Python3_EXECUTABLE} ${BAGI_ENGINE_DIR}/CI/scripts/check_includes.py --root ${CMAKE_CURRENT_SOURCE_DIR})
         set_tests_properties(BagiChessIncludeStyle PROPERTIES TIMEOUT 60)
+
+        # The game stays on the engine's type layer (check_types.py over the whole game); a real boundary says //-NoStd: <why>, there is no baseline file
+        add_test(NAME BagiChessTypesCheck COMMAND ${Python3_EXECUTABLE} ${BAGI_ENGINE_DIR}/CI/scripts/check_types.py --root ${CMAKE_CURRENT_SOURCE_DIR})
+        set_tests_properties(BagiChessTypesCheck PROPERTIES TIMEOUT 60)
     endif()
 
     # The files of the preload package of the web build are exactly the game's (cmake/ChessWeb.cmake); a cmake -P script, no Python, no executable

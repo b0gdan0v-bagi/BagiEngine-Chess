@@ -168,6 +168,7 @@ namespace BECore::Chess::Tests {
     TEST(UciProcessTest, AFileThatIsNoProgramIsLaunchFailed) {
         const TempDirectory directory;
         {
+            //-NoStd: file layer (engine-file-layer)
             std::ofstream text(directory.File("engine.exe"));
             text << "not a program\n";
         }
@@ -200,12 +201,29 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(ReadFileLines(folder / "fake.log"), Lines({"isready", "go"}));
     }
 
+    TEST(UciProcessTest, ArgumentsWithQuotesAndBackslashesArriveWhole) {
+        SKIP_WITHOUT_FAKE_ENGINE();
+        // The rules of the child's C runtime: a backslash is literal unless a quote follows it, and those before the closing quote are doubled. The fake logs each --probe
+        // value as it received it
+        const TempDirectory directory;
+        const String log = directory.FileText("fake.log");
+        const auto process = StartFake({"--log", log, "--probe", R"(say "hi")", "--probe", R"(back\"slash)", "--probe", R"(two\\"quotes)", "--probe", R"(plain\)", "--probe", R"(spaced end\)",
+                                        "--probe", R"(spaced end\\)", "--probe", R"(path\to\file name)", "--probe", ""});
+        ASSERT_NE(process, nullptr);
+
+        Handshake(*process);  // the probes are logged before the first line is read
+
+        EXPECT_EQ(ReadFileLines(directory.File("fake.log")), Lines({R"(probe say "hi")", R"(probe back\"slash)", R"(probe two\\"quotes)", R"(probe plain\)", R"(probe spaced end\)",
+                                                                    R"(probe spaced end\\)", R"(probe path\to\file name)", "probe ", "isready"}));
+    }
+
 #else
 
     TEST(UciProcessTest, AFileWithoutTheExecuteBitIsLaunchFailed) {
         const TempDirectory directory;
         const std::filesystem::path program = directory.File("engine.sh");
         {
+            //-NoStd: file layer (engine-file-layer)
             std::ofstream script(program);
             script << "#!/bin/sh\nexit 0\n";
         }
@@ -570,6 +588,7 @@ namespace BECore::Chess::Tests {
         const std::filesystem::path wrapper = directory.File("wrapper.cmd");
         const std::filesystem::path log = directory.File("fake.log");
         {
+            //-NoStd: file layer (engine-file-layer)
             std::ofstream out(wrapper);
             out << "@\"" << CHESS_TEST_PYTHON << "\" \"" << FakeEngineScript().string() << "\" --ignore-quit --ignore-term --log \"" << log.string() << "\"\r\n";
         }

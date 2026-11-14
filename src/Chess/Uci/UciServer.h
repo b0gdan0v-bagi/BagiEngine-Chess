@@ -43,6 +43,7 @@ namespace BECore::Chess::Uci {
      */
     class UciServer {
     public:
+        //-NoStd: no callable alias yet (callables-move-only)
         using Sink = eastl::function<void(StringView)>;
 
         /// @p engine answers the searches (not null); @p sink gets every line of the server

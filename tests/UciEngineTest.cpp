@@ -992,6 +992,7 @@ namespace BECore::Chess::Tests {
         const TempDirectory directory;
         const std::filesystem::path file = directory.File("stockfish-copy");
         {
+            //-NoStd: file layer (engine-file-layer)
             std::ofstream stream(file);
             stream << "not a program\n";
         }
@@ -1007,6 +1008,7 @@ namespace BECore::Chess::Tests {
         const TempDirectory directory;
         const std::filesystem::path file = directory.File("stockfish-copy");
         {
+            //-NoStd: file layer (engine-file-layer)
             std::ofstream stream(file);
             stream << "not a program\n";
         }
@@ -1065,6 +1067,7 @@ namespace BECore::Chess::Tests {
 
         void MakeFile(const std::filesystem::path& file, std::filesystem::perms permissions) {
             {
+                //-NoStd: file layer (engine-file-layer)
                 std::ofstream stream(file);
                 stream << "#!/bin/sh\nexit 0\n";
             }

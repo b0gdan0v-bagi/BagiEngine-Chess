@@ -30,6 +30,7 @@ namespace BECore::Chess::Tests {
 
         Vector<std::filesystem::path> XmlFilesOf(const std::filesystem::path& folder) {
             Vector<std::filesystem::path> files;
+            //-NoStd: allocates per entry; file layer (engine-file-layer, engine-path-type)
             for (const auto& entry : std::filesystem::directory_iterator(folder)) {
                 if (entry.is_regular_file() && entry.path().extension() == ".xml") {
                     files.push_back(entry.path());

@@ -36,6 +36,7 @@ It answers `uci` with `id name`, `id author`, one option (`Skill Level`) and `uc
     --long-line N        print one line of N bytes before the `info` line of an answer
     --ignore-quit        do not leave on `quit` or at the end of the input
     --ignore-term        ignore SIGTERM, and note `<SIGTERM ignored>` in the log (with --ignore-quit only SIGKILL ends the program)
+    --probe TEXT         (repeatable) write `probe TEXT` to the log when the program starts, so a test sees how an argument arrived (quotes, backslashes, spaces); needs --log
 """
 
 from __future__ import annotations
@@ -97,6 +98,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--long-line", type=int, default=0, metavar="N")
     parser.add_argument("--ignore-quit", action="store_true")
     parser.add_argument("--ignore-term", action="store_true")
+    parser.add_argument("--probe", action="append", default=[], metavar="TEXT")
     return parser
 
 
@@ -125,6 +127,8 @@ class FakeEngine:
         self._go_count = 0
         # A raw descriptor in append mode: every line is in the file when `log` returns, and a signal handler may write too
         self._log_fd = os.open(options.log, os.O_WRONLY | os.O_APPEND | os.O_CREAT, LOG_FILE_MODE) if options.log else None
+        for probe in options.probe:
+            self.log("probe " + probe)
 
     def run(self) -> int:
         if self._options.startup_delay_ms > 0:
