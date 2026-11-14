@@ -336,7 +336,7 @@ namespace BECore::Chess::Tests {
     private:
         MadeEngine Make(OpponentEngine engine) {
             const size_t call = _engineIds.size();
-            const eastl::string_view engineId = OpponentEngineId(engine);
+            const StringView engineId = OpponentEngineId(engine);
             _engineIds.emplace_back(engineId.data(), engineId.size());
             if (_error) {
                 return std::unexpected(*_error);
@@ -385,7 +385,7 @@ namespace BECore::Chess::Tests {
     private:
         MadeEngine Make(OpponentEngine engine, const OpponentLevel& level) {
             const size_t call = _levels.size();
-            const eastl::string_view engineId = OpponentEngineId(engine);
+            const StringView engineId = OpponentEngineId(engine);
             _engineIds.emplace_back(engineId.data(), engineId.size());
             _levels.emplace_back(level.id.data(), level.id.size());
             if (_error) {

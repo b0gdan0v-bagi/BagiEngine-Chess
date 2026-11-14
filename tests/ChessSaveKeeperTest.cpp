@@ -53,11 +53,11 @@ namespace BECore::Chess::Tests {
             file << bytes;
         }
 
-        void PlayLine(ChessGameModel& model, eastl::string_view line) {
+        void PlayLine(ChessGameModel& model, StringView line) {
             size_t begin = 0;
             while (begin < line.size()) {
                 size_t end = line.find(' ', begin);
-                if (end == eastl::string_view::npos) {
+                if (end == StringView::npos) {
                     end = line.size();
                 }
                 const Optional<Move> move = MoveGenerator::ParseUci(model.GetPosition(), line.substr(begin, end - begin));
@@ -67,7 +67,7 @@ namespace BECore::Chess::Tests {
             }
         }
 
-        constexpr eastl::string_view kOpening = "e2e4 e7e5";
+        constexpr StringView kOpening = "e2e4 e7e5";
 
     }  // namespace
 

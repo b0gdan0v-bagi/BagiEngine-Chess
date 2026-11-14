@@ -11,12 +11,12 @@ namespace BECore::Chess::Tests {
 
     namespace {
 
-        bool Click(ChessGameModel& model, eastl::string_view square) {
+        bool Click(ChessGameModel& model, StringView square) {
             return model.OnSquareClicked(Sq(square));
         }
 
         /// Plays a move given in UCI through TryMove (so castling, en passant and under-promotion work too).
-        bool Play(ChessGameModel& model, eastl::string_view uci) {
+        bool Play(ChessGameModel& model, StringView uci) {
             const auto move = MoveGenerator::ParseUci(model.GetPosition(), uci);
             return move.has_value() && model.TryMove(*move).has_value();
         }
@@ -43,7 +43,7 @@ namespace BECore::Chess::Tests {
             }
 
             /// The handle that started on @p square.
-            [[nodiscard]] const void* At(eastl::string_view square) const {
+            [[nodiscard]] const void* At(StringView square) const {
                 return AtIndex(SqIdx(square));
             }
             [[nodiscard]] const void* AtIndex(int sq) const {
@@ -240,20 +240,20 @@ namespace BECore::Chess::Tests {
 
     namespace {
 
-        constexpr eastl::string_view kPromotionFen = "8/P6k/8/8/8/8/8/K7 w - - 0 1";
-        constexpr eastl::string_view kPromotingCaptureFen = "1r5k/P7/8/8/8/8/8/K7 w - - 0 1";
-        constexpr eastl::string_view kMatingPromotionFen = "7k/P5pp/8/8/8/8/8/K7 w - - 0 1";
-        constexpr eastl::string_view kBlackPromotionFen = "k7/8/8/8/8/8/p6K/8 b - - 0 1";
+        constexpr StringView kPromotionFen = "8/P6k/8/8/8/8/8/K7 w - - 0 1";
+        constexpr StringView kPromotingCaptureFen = "1r5k/P7/8/8/8/8/8/K7 w - - 0 1";
+        constexpr StringView kMatingPromotionFen = "7k/P5pp/8/8/8/8/8/K7 w - - 0 1";
+        constexpr StringView kBlackPromotionFen = "k7/8/8/8/8/8/p6K/8 b - - 0 1";
 
         /// A model on @p fen with the pawn selected and its promotion target clicked
-        void StartPromotion(ChessGameModel& model, eastl::string_view fen, eastl::string_view from, eastl::string_view to) {
+        void StartPromotion(ChessGameModel& model, StringView fen, StringView from, StringView to) {
             model.SetPosition(PositionFromFen(fen));
             Click(model, from);
             Click(model, to);
         }
 
         /// The handle that stands on @p square now, or null
-        const void* HandleOn(const ChessGameModel& model, const Handles& handles, eastl::string_view square) {
+        const void* HandleOn(const ChessGameModel& model, const Handles& handles, StringView square) {
             for (int sq = 0; sq < kSquareCount; ++sq) {
                 if (model.IsActive(handles.AtIndex(sq)) && model.GetSquareOf(handles.AtIndex(sq)) == Sq(square)) {
                     return handles.AtIndex(sq);
@@ -917,7 +917,7 @@ namespace BECore::Chess::Tests {
 
         /// For every k, TakeBack(k) on a model that played all of @p moves equals a model that played the first moves.size() - k.
         /// An empty @p startFen is the opening; else the game begins from that FEN through SetPosition().
-        void ExpectTakeBackMatchesAFreshModel(eastl::string_view startFen, const eastl::vector<const char*>& moves) {
+        void ExpectTakeBackMatchesAFreshModel(StringView startFen, const eastl::vector<const char*>& moves) {
             for (size_t back = 1; back <= moves.size(); ++back) {
                 SCOPED_TRACE(testing::Message() << "taken back: " << back);
                 ChessGameModel taken;
@@ -1230,18 +1230,18 @@ namespace BECore::Chess::Tests {
 
     namespace {
 
-        bool PremoveClick(ChessGameModel& model, eastl::string_view square, PieceColor premover = PieceColor::White) {
+        bool PremoveClick(ChessGameModel& model, StringView square, PieceColor premover = PieceColor::White) {
             return model.OnPremoveClicked(premover, Sq(square));
         }
 
         /// A premove by two clicks; true when the second one queued it
-        bool Queue(ChessGameModel& model, eastl::string_view from, eastl::string_view to, PieceColor premover = PieceColor::White) {
+        bool Queue(ChessGameModel& model, StringView from, StringView to, PieceColor premover = PieceColor::White) {
             PremoveClick(model, from, premover);
             return PremoveClick(model, to, premover);
         }
 
         /// A game from @p fen (the side to move in it is the program's)
-        ChessGameModel ModelFrom(eastl::string_view fen) {
+        ChessGameModel ModelFrom(StringView fen) {
             ChessGameModel model;
             model.SetPosition(PositionFromFen(fen));
             return model;
@@ -1254,7 +1254,7 @@ namespace BECore::Chess::Tests {
             return model;
         }
 
-        bool HasTarget(const ChessGameModel& model, eastl::string_view square) {
+        bool HasTarget(const ChessGameModel& model, StringView square) {
             const auto& targets = model.GetLegalMoves();
             return eastl::find(targets.begin(), targets.end(), Sq(square)) != targets.end();
         }

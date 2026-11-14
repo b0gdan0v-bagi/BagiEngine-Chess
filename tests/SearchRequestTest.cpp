@@ -10,9 +10,9 @@ namespace BECore::Chess::Tests {
     namespace {
 
         constexpr SearchLimits kMoveTime100{100, 0};
-        constexpr eastl::string_view kCastlingAndPromotionFen = "4k2r/1P6/8/8/8/8/8/R3K2R w KQk - 0 1";
+        constexpr StringView kCastlingAndPromotionFen = "4k2r/1P6/8/8/8/8/8/R3K2R w KQk - 0 1";
 
-        bool Play(ChessGameModel& model, eastl::string_view uci) {
+        bool Play(ChessGameModel& model, StringView uci) {
             const auto move = MoveGenerator::ParseUci(model.GetPosition(), uci);
             return move.has_value() && model.TryMove(*move).has_value();
         }

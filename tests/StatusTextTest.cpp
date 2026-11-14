@@ -9,7 +9,7 @@ namespace BECore::Chess::Tests {
 
     namespace {
 
-        bool Play(ChessGameModel& model, eastl::string_view uci) {
+        bool Play(ChessGameModel& model, StringView uci) {
             const auto move = MoveGenerator::ParseUci(model.GetPosition(), uci);
             return move.has_value() && model.TryMove(*move).has_value();
         }

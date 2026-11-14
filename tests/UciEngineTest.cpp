@@ -34,23 +34,23 @@ namespace BECore::Chess::Tests {
             return Format("position fen {}", Position::kStartFen);
         }
 
-        SearchRequest MakeRequest(std::initializer_list<eastl::string_view> moves, SearchLimits limits = SearchLimits{kMoveTimeMs, 0}, const eastl::string& startFen = StartFen()) {
+        SearchRequest MakeRequest(std::initializer_list<StringView> moves, SearchLimits limits = SearchLimits{kMoveTimeMs, 0}, const eastl::string& startFen = StartFen()) {
             SearchRequest request;
             request.startFen = startFen;
-            for (const eastl::string_view move : moves) {
+            for (const StringView move : moves) {
                 request.moves.push_back(Mv(move));
             }
             request.limits = limits;
             return request;
         }
 
-        UciEngineSettings FakeSettings(std::initializer_list<eastl::string_view> flags) {
+        UciEngineSettings FakeSettings(std::initializer_list<StringView> flags) {
             UciEngineSettings settings;
             settings.launch = FakeEngineLaunch(flags);
             return settings;
         }
 
-        void ExpectMove(const std::expected<Move, EngineError>& result, eastl::string_view uci) {
+        void ExpectMove(const std::expected<Move, EngineError>& result, StringView uci) {
             if (!result) {
                 ADD_FAILURE() << "expected the move " << eastl::string(uci).c_str() << ", got " << Describe(result.error()).c_str();
                 return;
@@ -67,7 +67,7 @@ namespace BECore::Chess::Tests {
             EXPECT_FALSE(result.error().detail.empty());
         }
 
-        void ExpectAnalysis(const std::expected<Analysis, EngineError>& result, eastl::string_view uci, AnalysisScore score, int depth) {
+        void ExpectAnalysis(const std::expected<Analysis, EngineError>& result, StringView uci, AnalysisScore score, int depth) {
             if (!result) {
                 ADD_FAILURE() << "expected an analysis with the move " << eastl::string(uci).c_str() << ", got " << Describe(result.error()).c_str();
                 return;
@@ -95,8 +95,8 @@ namespace BECore::Chess::Tests {
             return AnalysisScore{AnalysisScoreKind::Mate, moves};
         }
 
-        size_t CountLines(const eastl::vector<eastl::string>& lines, eastl::string_view text) {
-            return static_cast<size_t>(std::count_if(lines.begin(), lines.end(), [text](const eastl::string& line) { return eastl::string_view(line.data(), line.size()) == text; }));
+        size_t CountLines(const eastl::vector<eastl::string>& lines, StringView text) {
+            return static_cast<size_t>(std::count_if(lines.begin(), lines.end(), [text](const eastl::string& line) { return StringView(line) == text; }));
         }
 
         /// Cancels a token once the fake has received a line: the moment a search is known to be running on the other side of the pipe
@@ -104,7 +104,7 @@ namespace BECore::Chess::Tests {
         public:
             CancelOnLogLine(CancellationToken token, std::filesystem::path logFile, eastl::string line)
                 : _thread([this, token, logFile = std::move(logFile), line = std::move(line)]() mutable {
-                      WaitForLogLine(logFile, eastl::string_view(line.data(), line.size()));  // cancels even when the line never came, so that the test fails and does not hang
+                      WaitForLogLine(logFile, StringView(line));  // cancels even when the line never came, so that the test fails and does not hang
                       _cancelledAt = Clock::now();
                       token.Cancel();
                   }) {}
@@ -806,7 +806,7 @@ namespace BECore::Chess::Tests {
     namespace {
 
         struct ExpectedLine {
-            eastl::string_view move;
+            StringView move;
             AnalysisScore score;
             int depth = 2;  // the final depth the fake prints for --lines with MultiPV above 1
         };
@@ -998,7 +998,7 @@ namespace BECore::Chess::Tests {
         }
         const std::string text = file.string();
 
-        EXPECT_FALSE(FindStockfish(eastl::string_view(text.data(), text.size())).has_value()) << "an explicit file that is there is not looked at";
+        EXPECT_FALSE(FindStockfish(FromStd(text)).has_value()) << "an explicit file that is there is not looked at";
         EXPECT_FALSE(FindStockfish({}).has_value());
     }
 
@@ -1013,7 +1013,7 @@ namespace BECore::Chess::Tests {
         }
         const std::string text = file.string();
 
-        const Optional<eastl::string> found = FindStockfish(eastl::string_view(text.data(), text.size()));
+        const Optional<eastl::string> found = FindStockfish(FromStd(text));
 
         ASSERT_TRUE(found.has_value());
         EXPECT_EQ(*found, eastl::string(text.c_str(), text.size()));
@@ -1024,8 +1024,8 @@ namespace BECore::Chess::Tests {
         const std::string missing = directory.File("no-such-file").string();
         const std::string folder = directory.File("").string();
 
-        EXPECT_FALSE(FindStockfish(eastl::string_view(missing.data(), missing.size())).has_value());
-        EXPECT_FALSE(FindStockfish(eastl::string_view(folder.data(), folder.size())).has_value()) << "a directory is no executable";
+        EXPECT_FALSE(FindStockfish(FromStd(missing)).has_value());
+        EXPECT_FALSE(FindStockfish(FromStd(folder)).has_value()) << "a directory is no executable";
     }
 
 #endif  // CHESS_NO_STOCKFISH
@@ -1088,7 +1088,7 @@ namespace BECore::Chess::Tests {
             const Optional<eastl::string> found = FindStockfish({});
             ASSERT_TRUE(found.has_value());
             EXPECT_EQ(*found, eastl::string(file.c_str(), file.size()));
-            EXPECT_FALSE(FindStockfish(eastl::string_view(missing.data(), missing.size())).has_value()) << "an explicit path that is not there does not fall back";
+            EXPECT_FALSE(FindStockfish(FromStd(missing)).has_value()) << "an explicit path that is not there does not fall back";
         }
         {
             const ScopedEnvironment variable("STOCKFISH", missing.c_str());
@@ -1179,7 +1179,7 @@ namespace BECore::Chess::Tests {
         const auto first = engine.FindMove(MakeRequest({}, SearchLimits{100, 0}), CancellationToken());
         ASSERT_TRUE(first.has_value()) << Describe(first.error()).c_str();
         const eastl::string firstMove = first->ToUci();
-        const auto second = engine.FindMove(MakeRequest({eastl::string_view(firstMove.data(), firstMove.size())}, SearchLimits{100, 0}), CancellationToken());
+        const auto second = engine.FindMove(MakeRequest({StringView(firstMove)}, SearchLimits{100, 0}), CancellationToken());
 
         EXPECT_TRUE(second.has_value()) << (second ? "" : Describe(second.error()).c_str());
     }

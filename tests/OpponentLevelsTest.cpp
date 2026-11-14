@@ -14,11 +14,11 @@ namespace BECore::Chess::Tests {
         constexpr int kHighestSkillLevel = 20;
 
         /// gtest cannot stream an EASTL string view
-        std::string Text(eastl::string_view text) {
+        std::string Text(StringView text) {
             return std::string(text.data(), text.size());
         }
 
-        bool IsWireName(eastl::string_view id) {
+        bool IsWireName(StringView id) {
             if (id.empty()) {
                 return false;
             }

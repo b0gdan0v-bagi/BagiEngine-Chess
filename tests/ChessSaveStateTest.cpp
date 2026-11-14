@@ -12,11 +12,11 @@ namespace BECore::Chess::Tests {
     namespace {
 
         /// Plays a line of UCI moves, separated by spaces, through the model's own TryMove
-        void PlayLine(ChessGameModel& model, eastl::string_view line) {
+        void PlayLine(ChessGameModel& model, StringView line) {
             size_t begin = 0;
             while (begin < line.size()) {
                 size_t end = line.find(' ', begin);
-                if (end == eastl::string_view::npos) {
+                if (end == StringView::npos) {
                     end = line.size();
                 }
                 const Optional<Move> move = MoveGenerator::ParseUci(model.GetPosition(), line.substr(begin, end - begin));
@@ -35,7 +35,7 @@ namespace BECore::Chess::Tests {
             return text;
         }
 
-        SeatChoice Seat(OpponentEngine engine, eastl::string_view level) {
+        SeatChoice Seat(OpponentEngine engine, StringView level) {
             const Optional<size_t> index = FindOpponentLevel(level);
             EXPECT_TRUE(index.has_value());
             return SeatChoice{engine, index.value_or(kDefaultOpponentLevel)};
@@ -54,8 +54,8 @@ namespace BECore::Chess::Tests {
             return std::vector<uint8_t>(bytes.begin(), bytes.end());
         }
 
-        constexpr eastl::string_view kFoolsMate = "f2f3 e7e5 g2g4 d8h4";
-        constexpr eastl::string_view kGameInProgress = "e2e4 e7e5 g1f3 b8c6";
+        constexpr StringView kFoolsMate = "f2f3 e7e5 g2g4 d8h4";
+        constexpr StringView kGameInProgress = "e2e4 e7e5 g1f3 b8c6";
 
     }  // namespace
 

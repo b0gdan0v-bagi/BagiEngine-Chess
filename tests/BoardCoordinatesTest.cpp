@@ -14,7 +14,7 @@ namespace BECore::Chess::Tests {
         eastl::string Joined(bool files, PieceColor bottom) {
             eastl::string text;
             for (int index = 0; index < kBoardSize; ++index) {
-                const eastl::string_view label = files ? FileLabel(index, bottom) : RankLabel(index, bottom);
+                const StringView label = files ? FileLabel(index, bottom) : RankLabel(index, bottom);
                 text.append(label.data(), label.size());
             }
             return text;

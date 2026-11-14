@@ -159,7 +159,7 @@ namespace BECore::Tests {
         std::unique_ptr<Compiled> Compile(const std::string& html, const std::string& css) {
             auto compiled = std::make_unique<Compiled>();
             const std::string source = "<style>" + css + "</style>" + html;
-            compiled->xml = UIWebCompiler::Compile(eastl::string_view(source.data(), source.size()), {}, compiled->report);
+            compiled->xml = UIWebCompiler::Compile(FromStd(source), {}, compiled->report);
             compiled->document.load_string(compiled->xml.c_str());
             XmlDeserializer deserializer;
             if (deserializer.LoadFromString(compiled->xml)) {
@@ -172,7 +172,7 @@ namespace BECore::Tests {
         UIScreenContent ReadXml(const std::string& xml) {
             UIScreenContent content;
             XmlDeserializer deserializer;
-            EXPECT_TRUE(deserializer.LoadFromString(eastl::string_view(xml.data(), xml.size())));
+            EXPECT_TRUE(deserializer.LoadFromString(FromStd(xml)));
             content.Deserialize(deserializer);
             EXPECT_FALSE(deserializer.HasErrors());
             return content;

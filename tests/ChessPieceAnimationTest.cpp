@@ -58,7 +58,7 @@ namespace BECore::Chess::Tests {
             return std::filesystem::path(__FILE__).parent_path().parent_path() / "config" / "SceneConfig.xml";
         }
 
-        bool Play(ChessGameModel& model, eastl::string_view uci) {
+        bool Play(ChessGameModel& model, StringView uci) {
             const auto move = MoveGenerator::ParseUci(model.GetPosition(), uci);
             return move.has_value() && model.TryMove(*move).has_value();
         }

@@ -7,14 +7,14 @@ namespace BECore::Chess::Tests {
 
     namespace {
 
-        constexpr eastl::string_view kSparseFen = "4k3/8/8/8/8/8/8/R3K2R w - - 0 1";
+        constexpr StringView kSparseFen = "4k3/8/8/8/8/8/8/R3K2R w - - 0 1";
 
         std::string NameOf(Square square) {
             return std::string{static_cast<char>('a' + square.file), static_cast<char>('1' + square.rank)};
         }
 
         /// The targets of a piece as a sorted list of names, so a test reads "e3 e4"
-        std::vector<std::string> TargetsOf(const PremoveBoard& board, eastl::string_view from, PieceColor color) {
+        std::vector<std::string> TargetsOf(const PremoveBoard& board, StringView from, PieceColor color) {
             std::vector<std::string> names;
             for (const Square square : board.Targets(Sq(from), color)) {
                 names.push_back(NameOf(square));
@@ -29,11 +29,11 @@ namespace BECore::Chess::Tests {
             return names;
         }
 
-        Premove Pm(eastl::string_view from, eastl::string_view to) {
+        Premove Pm(StringView from, StringView to) {
             return Premove{Sq(from), Sq(to)};
         }
 
-        PremoveBoard BoardOf(eastl::string_view fen) {
+        PremoveBoard BoardOf(StringView fen) {
             return PremoveBoard(PositionFromFen(fen));
         }
 

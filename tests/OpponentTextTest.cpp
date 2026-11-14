@@ -16,7 +16,7 @@ namespace BECore::Chess::Tests {
 
         /// The name of a kind for a failed expectation (gtest cannot stream an EASTL string view)
         std::string KindName(EngineErrorKind kind) {
-            const eastl::string_view name = EnumUtils<EngineErrorKind>::ToString(kind);
+            const StringView name = EnumUtils<EngineErrorKind>::ToString(kind);
             return std::string(name.data(), name.size());
         }
 
@@ -43,7 +43,7 @@ namespace BECore::Chess::Tests {
         distinct({OpponentText::ColorLabel(PieceColor::White), OpponentText::ColorLabel(PieceColor::Black)});
         eastl::vector<eastl::string> engines;
         for (const OpponentEngine engine : EnumUtils<OpponentEngine>::Values()) {
-            const eastl::string_view name = OpponentEngineName(engine);
+            const StringView name = OpponentEngineName(engine);
             engines.emplace_back(name.data(), name.size());
         }
         distinct(engines);

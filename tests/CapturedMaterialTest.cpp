@@ -10,30 +10,30 @@ namespace BECore::Chess::Tests {
 
     namespace {
 
-        constexpr eastl::string_view kUnreachableNinePawnsFen = "4k3/8/8/8/8/P7/PPPPPPPP/4K3 w - - 0 1";
-        constexpr eastl::string_view kUnreachableThreeQueensFen = "4k3/8/8/8/8/QQQ5/PPPPPPPP/4K3 w - - 0 1";
+        constexpr StringView kUnreachableNinePawnsFen = "4k3/8/8/8/8/P7/PPPPPPPP/4K3 w - - 0 1";
+        constexpr StringView kUnreachableThreeQueensFen = "4k3/8/8/8/8/QQQ5/PPPPPPPP/4K3 w - - 0 1";
 
-        std::string Text(eastl::string_view text) {
+        std::string Text(StringView text) {
             return std::string(text.data(), text.size());
         }
 
-        eastl::array<eastl::string_view, 6> PerftFens() {
+        eastl::array<StringView, 6> PerftFens() {
             return {Position::kStartFen, kKiwipeteFen, kPosition3Fen, kPosition4Fen, kPosition5Fen, kPosition6Fen};
         }
 
-        MaterialSummary SummaryOf(eastl::string_view fen) {
+        MaterialSummary SummaryOf(StringView fen) {
             return SummarizeMaterial(PositionFromFen(fen));
         }
 
         /// The move of the mirrored position: ranks flipped ("a7a8q" -> "a2a1q")
-        std::string MirrorUci(eastl::string_view uci) {
+        std::string MirrorUci(StringView uci) {
             std::string mirrored(uci.data(), uci.size());
             mirrored[1] = static_cast<char>('1' + '8' - mirrored[1]);
             mirrored[3] = static_cast<char>('1' + '8' - mirrored[3]);
             return mirrored;
         }
 
-        bool Play(ChessGameModel& model, eastl::string_view uci) {
+        bool Play(ChessGameModel& model, StringView uci) {
             const auto move = MoveGenerator::ParseUci(model.GetPosition(), uci);
             return move.has_value() && model.TryMove(*move).has_value();
         }
@@ -93,7 +93,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(Text(CapturedId(PieceType::Pawn)), "pawn");
 
         for (const PieceType type : CapturableTypes()) {
-            const eastl::string_view id = CapturedId(type);
+            const StringView id = CapturedId(type);
             const auto found = FindCaptured(id);
             ASSERT_TRUE(found.has_value()) << Text(id);
             EXPECT_TRUE(*found == type);
@@ -207,18 +207,18 @@ namespace BECore::Chess::Tests {
             const std::string withPawnGone = "rnbqkbnr/pppppppp/8/8/8/8/1PPPPPPP/RNBQKBNR w KQkq - 0 1";
             const std::string promoted = std::string("rnbqkbnr/pppppppp/8/8/8/") + test.piece + "7/1PPPPPPP/RNBQKBNR w KQkq - 0 1";
 
-            const MaterialSummary before = SummaryOf(eastl::string_view(withPawnGone.data(), withPawnGone.size()));
+            const MaterialSummary before = SummaryOf(FromStd(withPawnGone));
             EXPECT_EQ(before.GetMissing(PieceColor::White, PieceType::Pawn), 1);
             EXPECT_EQ(before.GetBalance(), -1);
 
-            const MaterialSummary after = SummaryOf(eastl::string_view(promoted.data(), promoted.size()));
+            const MaterialSummary after = SummaryOf(FromStd(promoted));
             ExpectGone(after, PieceColor::White, test.whiteGone, test.piece);
             ExpectGone(after, PieceColor::Black, {0, 0, 0, 0, 0}, test.piece);
             EXPECT_EQ(after.GetBalance(), test.points) << test.piece;
 
             // Black has the same, seen from the other side of the table
-            const std::string mirrored = MirrorFen(eastl::string_view(promoted.data(), promoted.size()));
-            const MaterialSummary seen = SummaryOf(eastl::string_view(mirrored.data(), mirrored.size()));
+            const std::string mirrored = MirrorFen(FromStd(promoted));
+            const MaterialSummary seen = SummaryOf(FromStd(mirrored));
             ExpectGone(seen, PieceColor::Black, test.whiteGone, test.piece);
             EXPECT_EQ(seen.GetBalance(), -test.points) << test.piece;
         }
@@ -241,16 +241,16 @@ namespace BECore::Chess::Tests {
                 std::string fen = test.fen;
                 std::string uci = test.uci;
                 if (mirror) {
-                    fen = MirrorFen(eastl::string_view(fen.data(), fen.size()));
-                    uci = MirrorUci(eastl::string_view(uci.data(), uci.size()));
+                    fen = MirrorFen(FromStd(fen));
+                    uci = MirrorUci(FromStd(uci));
                 }
                 const PieceColor mover = mirror ? PieceColor::Black : PieceColor::White;
                 const int sign = mirror ? -1 : 1;
 
                 ChessGameModel model;
-                model.SetPosition(PositionFromFen(eastl::string_view(fen.data(), fen.size())));
+                model.SetPosition(PositionFromFen(FromStd(fen)));
                 const MaterialSummary before = SummarizeMaterial(model.GetPosition());
-                ASSERT_TRUE(Play(model, eastl::string_view(uci.data(), uci.size()))) << fen << " " << uci;
+                ASSERT_TRUE(Play(model, FromStd(uci))) << fen << " " << uci;
                 const MaterialSummary after = SummarizeMaterial(model.GetPosition());
 
                 EXPECT_EQ(after.GetBalance() - before.GetBalance(), sign * test.gain) << fen << " " << uci;
@@ -297,7 +297,7 @@ namespace BECore::Chess::Tests {
     // ---- SetPosition, Reset ----
 
     TEST(CapturedMaterialTest, SetPositionGivesTheMaterialOfThatFen) {
-        for (const eastl::string_view fen : PerftFens()) {
+        for (const StringView fen : PerftFens()) {
             ChessGameModel model;
             model.SetPosition(PositionFromFen(fen));
             const MaterialSummary fromModel = SummarizeMaterial(model.GetPosition());
@@ -328,10 +328,10 @@ namespace BECore::Chess::Tests {
     // ---- Properties over the published positions ----
 
     TEST(CapturedMaterialTest, AMirroredPositionSwapsTheSidesAndNegatesTheLead) {
-        for (const eastl::string_view fen : PerftFens()) {
+        for (const StringView fen : PerftFens()) {
             const std::string mirrored = MirrorFen(fen);
             const MaterialSummary original = SummaryOf(fen);
-            const MaterialSummary swapped = SummaryOf(eastl::string_view(mirrored.data(), mirrored.size()));
+            const MaterialSummary swapped = SummaryOf(FromStd(mirrored));
 
             EXPECT_EQ(swapped.GetBalance(), -original.GetBalance()) << Text(fen);
             EXPECT_EQ(swapped.GetPoints(PieceColor::White), original.GetPoints(PieceColor::Black)) << Text(fen);
@@ -344,8 +344,8 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(CapturedMaterialTest, NoCountIsEverNegativeAndNothingExceedsTheStartingSet) {
-        const eastl::string_view fens[] = {Position::kStartFen, kKiwipeteFen, kPosition3Fen, kPosition4Fen, kPosition5Fen, kPosition6Fen, kUnreachableNinePawnsFen, kUnreachableThreeQueensFen};
-        for (const eastl::string_view fen : fens) {
+        const StringView fens[] = {Position::kStartFen, kKiwipeteFen, kPosition3Fen, kPosition4Fen, kPosition5Fen, kPosition6Fen, kUnreachableNinePawnsFen, kUnreachableThreeQueensFen};
+        for (const StringView fen : fens) {
             const MaterialSummary summary = SummaryOf(fen);
             for (const PieceColor color : {PieceColor::White, PieceColor::Black}) {
                 EXPECT_GE(summary.GetPoints(color), 0) << Text(fen);

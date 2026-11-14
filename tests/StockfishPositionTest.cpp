@@ -20,43 +20,43 @@ namespace BECore::Chess::Tests {
         constexpr SearchLimits kDepth10{0, 10};
 
         // A mate in two with one key move (Nf6+ gxf6 Bxf7#), and the same position with the colors exchanged (Black to move)
-        constexpr eastl::string_view kMateInTwoFen = "r2qkb1r/pp2nppp/3p4/2pNN1B1/2BnP3/3P4/PPP2PPP/R2bK2R w KQkq - 1 1";
-        constexpr eastl::string_view kMirroredMateInTwoFen = "r2Bk2r/ppp2ppp/3p4/2bNp3/2Pnn1b1/3P4/PP2NPPP/R2QKB1R b KQkq - 1 1";
+        constexpr StringView kMateInTwoFen = "r2qkb1r/pp2nppp/3p4/2pNN1B1/2BnP3/3P4/PPP2PPP/R2bK2R w KQkq - 1 1";
+        constexpr StringView kMirroredMateInTwoFen = "r2Bk2r/ppp2ppp/3p4/2bNp3/2Pnn1b1/3P4/PP2NPPP/R2QKB1R b KQkq - 1 1";
 
         // White has a king and a queen against a king: Qb6 stalemates, Qa6 or Qa1 mates
-        constexpr eastl::string_view kStalemateTrapFen = "k7/2K5/5Q2/8/8/8/8/8 w - - 0 1";
+        constexpr StringView kStalemateTrapFen = "k7/2K5/5Q2/8/8/8/8/8 w - - 0 1";
 
         // The pawn on c7 promotes with c8=N mate; c8=Q, c8=R and c8=B leave Black without a move and without check: stalemate
-        constexpr eastl::string_view kUnderpromotionFen = "b7/kpP5/pR1B4/P7/8/8/8/6K1 w - - 0 1";
-        constexpr eastl::string_view kMirroredUnderpromotionFen = "6k1/8/8/8/p7/Pr1b4/KPp5/B7 b - - 0 1";
+        constexpr StringView kUnderpromotionFen = "b7/kpP5/pR1B4/P7/8/8/8/6K1 w - - 0 1";
+        constexpr StringView kMirroredUnderpromotionFen = "6k1/8/8/8/p7/Pr1b4/KPp5/B7 b - - 0 1";
 
         // Castling kingside gives mate: the king leaves the first rank and the rook on f1 checks along it. The plain rook moves cannot (the king is in the way)
         // and the king's other steps are covered by the black rook on a2
-        constexpr eastl::string_view kCastlingMateFen = "8/8/8/4B3/1N6/8/r7/1k2K2R w K - 0 1";
-        constexpr eastl::string_view kMirroredCastlingMateFen = "1K2k2r/R7/8/1n6/4b3/8/8/8 b k - 0 1";
+        constexpr StringView kCastlingMateFen = "8/8/8/4B3/1N6/8/r7/1k2K2R w K - 0 1";
+        constexpr StringView kMirroredCastlingMateFen = "1K2k2r/R7/8/1n6/4b3/8/8/8 b k - 0 1";
 
         // A black pawn has just played d7-d5 and checks the king on c4; the only legal move is the pawn on c5 taking it en passant
-        constexpr eastl::string_view kEnPassantFen = "6k1/6b1/2p5/p1Pp4/2K5/r7/8/8 w - d6 0 1";
-        constexpr eastl::string_view kMirroredEnPassantFen = "8/8/R7/2k5/P1pP4/2P5/6B1/6K1 b - d3 0 1";
+        constexpr StringView kEnPassantFen = "6k1/6b1/2p5/p1Pp4/2K5/r7/8/8 w - d6 0 1";
+        constexpr StringView kMirroredEnPassantFen = "8/8/R7/2k5/P1pP4/2P5/6B1/6K1 b - d3 0 1";
 
         // Black has a queen and a rook for a rook and shuffles the queen; the white rook on h2 can take the black one on h8, which loses by
         // about a rook less than anything else. The bare FEN has White to move with the king on b1
-        constexpr eastl::string_view kShuffleStartFen = "7r/6k1/2q5/8/8/8/7R/K7 b - - 0 1";
-        constexpr eastl::string_view kShuffleBareFen = "7r/6k1/2q5/8/8/8/7R/1K6 w - - 0 1";
+        constexpr StringView kShuffleStartFen = "7r/6k1/2q5/8/8/8/7R/K7 b - - 0 1";
+        constexpr StringView kShuffleBareFen = "7r/6k1/2q5/8/8/8/7R/1K6 w - - 0 1";
 
         // Analysis: a mate in one for each color (Ra8# and Ra1#), a mate in two (kMateInTwoFen above), a side that every move of which loses to a
         // mate in one, a rook that takes a queen nothing guards, and a position where White has a lone king against a queen and a rook
-        constexpr eastl::string_view kMateInOneFen = "6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1";
-        constexpr eastl::string_view kMirroredMateInOneFen = "r5k1/5ppp/8/8/8/8/5PPP/6K1 b - - 0 1";
-        constexpr eastl::string_view kMatedInOneFen = "kbK5/pp6/RP6/8/8/8/8/8 b - - 0 1";
-        constexpr eastl::string_view kHangingQueenFen = "4k3/8/8/3q4/8/8/8/3RK3 w - - 0 1";
-        constexpr eastl::string_view kLostFen = "4k3/8/8/8/8/2q5/1r6/6K1 w - - 0 1";
+        constexpr StringView kMateInOneFen = "6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1";
+        constexpr StringView kMirroredMateInOneFen = "r5k1/5ppp/8/8/8/8/5PPP/6K1 b - - 0 1";
+        constexpr StringView kMatedInOneFen = "kbK5/pp6/RP6/8/8/8/8/8 b - - 0 1";
+        constexpr StringView kHangingQueenFen = "4k3/8/8/3q4/8/8/8/3RK3 w - - 0 1";
+        constexpr StringView kLostFen = "4k3/8/8/8/8/2q5/1r6/6K1 w - - 0 1";
 
-        constexpr eastl::string_view kMateFen = "7k/6Q1/6K1/8/8/8/8/8 b - - 0 1";
-        constexpr eastl::string_view kStalemateFen = "7k/5Q2/6K1/8/8/8/8/8 b - - 0 1";
+        constexpr StringView kMateFen = "7k/6Q1/6K1/8/8/8/8/8 b - - 0 1";
+        constexpr StringView kStalemateFen = "7k/5Q2/6K1/8/8/8/8/8 b - - 0 1";
 
         /// A request for the position @p fen, no moves behind it
-        SearchRequest RequestFor(eastl::string_view fen, SearchLimits limits = kDepth10) {
+        SearchRequest RequestFor(StringView fen, SearchLimits limits = kDepth10) {
             SearchRequest request;
             request.startFen = eastl::string(fen.data(), fen.size());
             request.limits = limits;
@@ -76,7 +76,7 @@ namespace BECore::Chess::Tests {
         }
 
         /// The best line of the analysis, or a failure that says why not
-        Optional<AnalysisLine> BestLine(const eastl::string& path, eastl::string_view fen, SearchLimits limits = kDepth10) {
+        Optional<AnalysisLine> BestLine(const eastl::string& path, StringView fen, SearchLimits limits = kDepth10) {
             const auto result = Analyse(path, RequestFor(fen, limits));
             if (!result) {
                 ADD_FAILURE() << Describe(result.error()).c_str();
@@ -89,12 +89,12 @@ namespace BECore::Chess::Tests {
             return model.TryMove(move).has_value();
         }
 
-        bool PlayUci(ChessGameModel& model, eastl::string_view uci) {
+        bool PlayUci(ChessGameModel& model, StringView uci) {
             const auto move = MoveGenerator::ParseUci(model.GetPosition(), uci);
             return move.has_value() && Play(model, *move);
         }
 
-        ChessGameModel ModelAt(eastl::string_view fen) {
+        ChessGameModel ModelAt(StringView fen) {
             ChessGameModel model;
             model.SetPosition(PositionFromFen(fen));
             return model;
@@ -111,7 +111,7 @@ namespace BECore::Chess::Tests {
         }
 
         /// Stockfish answers with @p expected, and the game accepts the move and ends in @p status
-        void ExpectMoveAndStatus(const eastl::string& path, eastl::string_view fen, Move expected, GameStatus status) {
+        void ExpectMoveAndStatus(const eastl::string& path, StringView fen, Move expected, GameStatus status) {
             const auto answer = Answer(path, RequestFor(fen));
             ASSERT_TRUE(answer.has_value());
             EXPECT_EQ(*answer, expected) << answer->ToUci().c_str() << " instead of " << expected.ToUci().c_str();
@@ -386,7 +386,7 @@ namespace BECore::Chess::Tests {
     TEST(StockfishPositionTest, APositionWithTwoLegalMovesGivesTwoLinesForFourAsked) {
         SKIP_WITHOUT_STOCKFISH(stockfish);
         // The white king on a1 is checked by the bishop on d4; it steps to a2 or b1 and nothing else is legal
-        constexpr eastl::string_view kTwoMovesFen = "7k/p7/8/8/3b4/8/7P/K7 w - - 0 1";
+        constexpr StringView kTwoMovesFen = "7k/p7/8/8/3b4/8/7P/K7 w - - 0 1";
         ASSERT_EQ(MoveGenerator::GenerateLegal(PositionFromFen(kTwoMovesFen)).size(), 2u);
         SearchRequest request = RequestFor(kTwoMovesFen);
         request.lines = 4;
@@ -432,7 +432,7 @@ namespace BECore::Chess::Tests {
         OwnEngine own;
         // Mates for the side to move in one and in two, for each color, and a loss to a mate in one: the sign, the kind and the number of moves are the same
         struct Case {
-            eastl::string_view fen;
+            StringView fen;
             int ownDepth;
             int mateMoves;
             const char* key;

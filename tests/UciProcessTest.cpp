@@ -50,7 +50,7 @@ namespace BECore::Chess::Tests {
         constexpr size_t kFloodLines = 20000;
         constexpr size_t kLineMargin = 1000;
 
-        eastl::unique_ptr<UciProcess> StartFake(std::initializer_list<eastl::string_view> flags = {}) {
+        eastl::unique_ptr<UciProcess> StartFake(std::initializer_list<StringView> flags = {}) {
             auto started = UciProcess::Start(FakeEngineLaunch(flags));
             EXPECT_TRUE(started.has_value()) << (started ? "" : started.error().detail.c_str());
             return started ? std::move(*started) : nullptr;
@@ -82,7 +82,7 @@ namespace BECore::Chess::Tests {
             }
         }
 
-        void Write(UciProcess& process, eastl::string_view text) {
+        void Write(UciProcess& process, StringView text) {
             const auto written = process.WriteLine(text);
             EXPECT_TRUE(written.has_value()) << (written ? "" : written.error().detail.c_str());
         }

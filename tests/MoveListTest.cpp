@@ -12,16 +12,16 @@ namespace BECore::Chess::Tests {
 
     namespace {
 
-        constexpr eastl::string_view kStartFen = Position::kStartFen;
-        constexpr eastl::string_view kBlackToMoveFen = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 7";
-        constexpr eastl::string_view kItalianGameText = "1.e4 e5 2.Nf3 Nc6 3.Bc4 Bc5 4.c3 Nf6 5.d4 exd4 6.cxd4";
-        const eastl::vector<eastl::string_view> kItalianGame = {"e2e4", "e7e5", "g1f3", "b8c6", "f1c4", "f8c5", "c2c3", "g8f6", "d2d4", "e5d4", "c3d4"};
+        constexpr StringView kStartFen = Position::kStartFen;
+        constexpr StringView kBlackToMoveFen = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 7";
+        constexpr StringView kItalianGameText = "1.e4 e5 2.Nf3 Nc6 3.Bc4 Bc5 4.c3 Nf6 5.d4 exd4 6.cxd4";
+        const eastl::vector<StringView> kItalianGame = {"e2e4", "e7e5", "g1f3", "b8c6", "f1c4", "f8c5", "c2c3", "g8f6", "d2d4", "e5d4", "c3d4"};
 
         /// The moves of a game from @p fen given in UCI; a spelling that is no legal move fails the test
-        eastl::vector<Move> MovesOf(eastl::string_view fen, const eastl::vector<eastl::string_view>& line) {
+        eastl::vector<Move> MovesOf(StringView fen, const eastl::vector<StringView>& line) {
             Position position = PositionFromFen(fen);
             eastl::vector<Move> moves;
-            for (const eastl::string_view uci : line) {
+            for (const StringView uci : line) {
                 const Optional<Move> move = MoveGenerator::ParseUci(position, uci);
                 if (!move) {
                     ADD_FAILURE() << "Not a legal move: " << eastl::string(uci).c_str() << " in " << position.ToFen().c_str();
@@ -51,7 +51,7 @@ namespace BECore::Chess::Tests {
             return text;
         }
 
-        std::string ListOf(eastl::string_view fen, const eastl::vector<eastl::string_view>& line) {
+        std::string ListOf(StringView fen, const eastl::vector<StringView>& line) {
             return TextOf(BuildMoveList(fen, MovesOf(fen, line)));
         }
 
@@ -76,7 +76,7 @@ namespace BECore::Chess::Tests {
             }
         }
 
-        bool Play(ChessGameModel& model, eastl::string_view uci) {
+        bool Play(ChessGameModel& model, StringView uci) {
             const auto move = MoveGenerator::ParseUci(model.GetPosition(), uci);
             return move.has_value() && model.TryMove(*move).has_value();
         }
@@ -211,7 +211,7 @@ namespace BECore::Chess::Tests {
 
     TEST(MoveListTest, TheListOfAModelThatPlayedTheItalianGame) {
         ChessGameModel model;
-        for (const eastl::string_view uci : kItalianGame) {
+        for (const StringView uci : kItalianGame) {
             ASSERT_TRUE(Play(model, uci));
         }
         const eastl::vector<MoveListRow> rows = BuildMoveList(model.GetStartFen(), model.GetMoves());

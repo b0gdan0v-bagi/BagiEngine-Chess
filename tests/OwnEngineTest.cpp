@@ -50,7 +50,7 @@ namespace BECore::Chess::Tests {
             return engine.FindMove(request, token);
         }
 
-        std::expected<Move, EngineError> AskFen(IChessEngine& engine, eastl::string_view fen, SearchLimits limits) {
+        std::expected<Move, EngineError> AskFen(IChessEngine& engine, StringView fen, SearchLimits limits) {
             return Ask(engine, SearchRequest::FromPosition(PositionFromFen(fen), limits));
         }
 
@@ -58,7 +58,7 @@ namespace BECore::Chess::Tests {
             return engine.Analyse(request, token);
         }
 
-        std::expected<Analysis, EngineError> AnalyseFen(IChessEngine& engine, eastl::string_view fen, SearchLimits limits) {
+        std::expected<Analysis, EngineError> AnalyseFen(IChessEngine& engine, StringView fen, SearchLimits limits) {
             return Analyse(engine, SearchRequest::FromPosition(PositionFromFen(fen), limits));
         }
 
@@ -78,7 +78,7 @@ namespace BECore::Chess::Tests {
             return request;
         }
 
-        bool Play(ChessGameModel& model, eastl::string_view uci) {
+        bool Play(ChessGameModel& model, StringView uci) {
             const auto move = MoveGenerator::ParseUci(model.GetPosition(), uci);
             return move.has_value() && model.TryMove(*move).has_value();
         }

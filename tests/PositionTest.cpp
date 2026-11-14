@@ -4,7 +4,7 @@ namespace BECore::Chess::Tests {
 
     namespace {
 
-        bool IsRejectedWith(eastl::string_view fen, FenError expected) {
+        bool IsRejectedWith(StringView fen, FenError expected) {
             const auto position = Position::FromFen(fen);
             return !position.has_value() && position.error() == expected;
         }
@@ -217,7 +217,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(PositionTest, CastlingMovesTheRookAndDropsTheRights) {
-        const eastl::string_view fen = "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1";
+        const StringView fen = "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1";
         Position position = PositionFromFen(fen);
 
         position.DoMove(CastlingMove("e1g1"));
@@ -245,7 +245,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(PositionTest, PromotionReplacesThePawnAndUndoRestoresIt) {
-        const eastl::string_view fen = "4k3/P7/8/8/8/8/8/4K3 w - - 0 1";
+        const StringView fen = "4k3/P7/8/8/8/8/8/4K3 w - - 0 1";
         Position position = PositionFromFen(fen);
         position.DoMove(Mv("a7a8q"));
         EXPECT_EQ(position.ToFen(), "Q3k3/8/8/8/8/8/8/4K3 b - - 0 1");

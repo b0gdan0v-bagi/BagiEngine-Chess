@@ -32,7 +32,7 @@ namespace BECore::Chess::Tests {
 
         constexpr double kFrame = 1.0 / 32.0;
         constexpr float kPixelTolerance = 0.01f;
-        constexpr eastl::string_view kGameInProgress = "e2e4 e7e5 g1f3 b8c6";
+        constexpr StringView kGameInProgress = "e2e4 e7e5 g1f3 b8c6";
         constexpr const char* kFoolsMate = "f2f3 e7e5 g2g4 d8h4";
         constexpr const char* kOddStartFen = "4k3/8/8/8/8/8/4P3/4K3 w - - 0 1";
 
@@ -40,11 +40,11 @@ namespace BECore::Chess::Tests {
             return std::filesystem::path(__FILE__).parent_path().parent_path() / "config" / "SceneConfig.xml";
         }
 
-        bool Play(ChessGameModel& model, eastl::string_view line) {
+        bool Play(ChessGameModel& model, StringView line) {
             size_t begin = 0;
             while (begin < line.size()) {
                 size_t end = line.find(' ', begin);
-                if (end == eastl::string_view::npos) {
+                if (end == StringView::npos) {
                     end = line.size();
                 }
                 const Optional<Move> move = MoveGenerator::ParseUci(model.GetPosition(), line.substr(begin, end - begin));
@@ -61,7 +61,7 @@ namespace BECore::Chess::Tests {
             return std::vector<uint8_t>(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
         }
 
-        std::string Member(const Json& json, eastl::string_view key) {
+        std::string Member(const Json& json, StringView key) {
             const auto value = GetJsonString(json, key);
             return value ? std::string(value->c_str(), value->size()) : std::string("<missing>");
         }
@@ -207,7 +207,7 @@ namespace BECore::Chess::Tests {
         }
 
         /// A state with moves and a computer opponent, as the first run of a test would have left it
-        static ChessSaveState SavedGameOf(eastl::string_view moves, const char* plays) {
+        static ChessSaveState SavedGameOf(StringView moves, const char* plays) {
             ChessSaveState state;
             state.startFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
             state.moves = String(moves.data(), moves.size());

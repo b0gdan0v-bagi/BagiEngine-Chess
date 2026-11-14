@@ -38,15 +38,15 @@ namespace BECore::Chess::Tests {
         constexpr int kQuitGraceMs = OpponentController::kQuitGraceMs;
         constexpr std::chrono::milliseconds kShutdownBudget{1000};   ///< Shutdown() cancels and returns, it does not wait for the search; only the yardstick checks it
         constexpr std::chrono::milliseconds kChildEndBudget{30000};  ///< the give-up limit of the wait for the child to leave after the cancel (`stop`, then the close): it only ends a broken test
-        constexpr eastl::string_view kMissingPath = "/no/such/file";
-        constexpr eastl::string_view kEasyLevelId = "easy";
-        constexpr eastl::string_view kHardLevelId = "hard";
-        constexpr eastl::string_view kMaxLevelId = "max";
+        constexpr StringView kMissingPath = "/no/such/file";
+        constexpr StringView kEasyLevelId = "easy";
+        constexpr StringView kHardLevelId = "hard";
+        constexpr StringView kMaxLevelId = "max";
         constexpr const char* kLaunchLogName = "launches.log";
         constexpr const char* kPidLogName = "pids.log";
         constexpr const char* kStdinLogName = "stdin.log";
-        constexpr eastl::string_view kMaxGoCommand = "go movetime 2000";  ///< what the Max level sends (kMaxMoveTimeMs of OpponentLevels.cpp)
-        constexpr eastl::string_view kStopCommand = "stop";
+        constexpr StringView kMaxGoCommand = "go movetime 2000";  ///< what the Max level sends (kMaxMoveTimeMs of OpponentLevels.cpp)
+        constexpr StringView kStopCommand = "stop";
         constexpr const char* kWrapperName = "stockfish-wrapper.sh";
         constexpr std::filesystem::perms kScriptPermissions = std::filesystem::perms::owner_all | std::filesystem::perms::group_read | std::filesystem::perms::group_exec |
                                                               std::filesystem::perms::others_read | std::filesystem::perms::others_exec;  // 755
@@ -64,7 +64,7 @@ namespace BECore::Chess::Tests {
             return error == std::errc{} && end == text + length ? Optional<int>(value) : std::nullopt;
         }
 
-        bool Play(ChessGameModel& model, eastl::string_view uci) {
+        bool Play(ChessGameModel& model, StringView uci) {
             const auto move = MoveGenerator::ParseUci(model.GetPosition(), uci);
             return move.has_value() && model.TryMove(*move).has_value();
         }
@@ -78,19 +78,19 @@ namespace BECore::Chess::Tests {
             });
         }
 
-        size_t LevelIndex(eastl::string_view id) {
+        size_t LevelIndex(StringView id) {
             const Optional<size_t> index = FindOpponentLevel(id);
             EXPECT_TRUE(index.has_value()) << id.data();
             return index.value_or(kDefaultOpponentLevel);
         }
 
-        OpponentSettings SettingsFor(eastl::string_view path) {
+        OpponentSettings SettingsFor(StringView path) {
             return OpponentSettings{eastl::string(path.data(), path.size())};
         }
 
         OpponentSettings SettingsFor(const std::filesystem::path& program) {
             const std::string path = program.string();
-            return SettingsFor(eastl::string_view(path.c_str(), path.size()));
+            return SettingsFor(StringView(path.c_str(), path.size()));
         }
 
         /// A Stockfish at @p path at the weakest `Skill Level`, the way the game starts one for the weakest level (but not through the factory: the games ask it directly)
@@ -279,7 +279,7 @@ namespace BECore::Chess::Tests {
     namespace {
 
         /// A person's e2e4 answered through the default factory (no SetEngineFactory: the controller starts the Stockfish at the path itself, under the handicap of the level)
-        void ExpectALegalAnswerAtLevel(eastl::string_view level) {
+        void ExpectALegalAnswerAtLevel(StringView level) {
             SKIP_WITHOUT_STOCKFISH(path);
             ChessGameModel model;
             OpponentController controller(model, SettingsFor(*path));

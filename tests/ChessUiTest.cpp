@@ -108,7 +108,7 @@ namespace BECore::Chess::Tests {
             return event;
         }
 
-        bool Play(ChessGameModel& model, eastl::string_view uci) {
+        bool Play(ChessGameModel& model, StringView uci) {
             const auto move = MoveGenerator::ParseUci(model.GetPosition(), uci);
             return move.has_value() && model.TryMove(*move).has_value();
         }
@@ -158,7 +158,7 @@ namespace BECore::Chess::Tests {
             if (!text) {
                 return {};
             }
-            const eastl::string_view shown = text->GetDisplayText(element);
+            const StringView shown = text->GetDisplayText(element);
             return eastl::string(shown.data(), shown.size());
         }
 
@@ -219,7 +219,7 @@ namespace BECore::Chess::Tests {
 
             explicit CanvasCopy(const std::string& xml, bool useSafeArea = true) {
                 XmlDeserializer deserializer;
-                EXPECT_TRUE(deserializer.LoadFromString(eastl::string_view(xml.data(), xml.size())));
+                EXPECT_TRUE(deserializer.LoadFromString(FromStd(xml)));
                 content.Deserialize(deserializer);
                 EXPECT_FALSE(deserializer.HasErrors());
                 layout.root->children = content.elements;
@@ -340,7 +340,7 @@ namespace BECore::Chess::Tests {
             eastl::string id;
         };
 
-        eastl::string Joined(eastl::string_view prefix, eastl::string_view name) {
+        eastl::string Joined(StringView prefix, StringView name) {
             return Format("{}{}", prefix, name);
         }
 
@@ -348,17 +348,17 @@ namespace BECore::Chess::Tests {
         eastl::vector<PanelSegment> ExpectedPanelSegments() {
             eastl::vector<PanelSegment> segments;
             for (const OpponentMode mode : EnumUtils<OpponentMode>::Values()) {
-                const eastl::string_view id = OpponentModeId(mode);
+                const StringView id = OpponentModeId(mode);
                 segments.push_back({Joined("Mode", EnumUtils<OpponentMode>::ToString(mode)), "ModeGroup", kSetModeAction, OpponentText::ModeLabel(mode == OpponentMode::Computer),
                                     eastl::string(id.data(), id.size())});
             }
             for (const PieceColor color : {PieceColor::White, PieceColor::Black}) {
-                const eastl::string_view id = PieceColorId(color);
+                const StringView id = PieceColorId(color);
                 segments.push_back({Joined("Color", EnumUtils<PieceColor>::ToString(color)), "ColorGroup", kSetColorAction, OpponentText::ColorLabel(color), eastl::string(id.data(), id.size())});
             }
             for (const OpponentEngine engine : EnumUtils<OpponentEngine>::Values()) {
-                const eastl::string_view id = OpponentEngineId(engine);
-                const eastl::string_view word = OpponentEngineName(engine);
+                const StringView id = OpponentEngineId(engine);
+                const StringView word = OpponentEngineName(engine);
                 segments.push_back(
                     {Joined("Engine", EnumUtils<OpponentEngine>::ToString(engine)), "EngineGroup", kSetEngineAction, eastl::string(word.data(), word.size()), eastl::string(id.data(), id.size())});
             }
@@ -461,11 +461,11 @@ namespace BECore::Chess::Tests {
             for (const char* group : kMaterialGroups) {
                 for (const char* piece : kMaterialPieces) {
                     const eastl::string word = Format("x{}", static_cast<int>((round + row++) % kMostCaptured) + 1);
-                    vars.Set(PoolString::Intern(Format("material{}{}", group, piece).c_str()), eastl::string_view(word.data(), word.size()));
+                    vars.Set(PoolString::Intern(Format("material{}{}", group, piece).c_str()), StringView(word));
                 }
                 const size_t shift = group == kMaterialGroups[0] ? 0 : kMaterialRounds / 2;
                 const eastl::string sign = BalanceText(static_cast<int>((round + shift) % kMaterialRounds) + 1);
-                vars.Set(PoolString::Intern(Format("material{}Balance", group).c_str()), eastl::string_view(sign.data(), sign.size()));
+                vars.Set(PoolString::Intern(Format("material{}Balance", group).c_str()), StringView(sign));
             }
         }
 
@@ -871,7 +871,7 @@ namespace BECore::Chess::Tests {
         /// The text of a UI variable after a frame was drawn: the board publishes the words of the HUD when it draws
         eastl::string Var(const char* name) {
             Draw();
-            const eastl::string_view value = CoreManager::GetUIVars().Get(PoolString::Intern(name));
+            const StringView value = CoreManager::GetUIVars().Get(PoolString::Intern(name));
             return eastl::string(value.data(), value.size());
         }
 
@@ -881,7 +881,7 @@ namespace BECore::Chess::Tests {
             eastl::string text;
             for (int index = 0; index <= kLastBoardIndex; ++index) {
                 const eastl::string name = files ? "coordFile{}"_format(index) : "coordRank{}"_format(index);
-                const eastl::string_view value = CoreManager::GetUIVars().Get(PoolString::Intern(eastl::string_view(name.data(), name.size())));
+                const StringView value = CoreManager::GetUIVars().Get(PoolString::Intern(StringView(name)));
                 text.append(value.data(), value.size());
             }
             return text;
@@ -1308,7 +1308,7 @@ namespace BECore::Chess::Tests {
                 ADD_FAILURE() << group << piece << " has no UIImageComponent icon";
                 return {};
             }
-            const eastl::string_view name = icon->sprite.ToStringView();
+            const StringView name = icon->sprite.ToStringView();
             return eastl::string(name.data(), name.size());
         }
 
@@ -1318,10 +1318,10 @@ namespace BECore::Chess::Tests {
             eastl::string words;
             for (const char* group : {"Top", "Bottom"}) {
                 for (const char* piece : kMaterialPieces) {
-                    const eastl::string_view value = CoreManager::GetUIVars().Get(PoolString::Intern(Format("material{}{}", group, piece).c_str()));
+                    const StringView value = CoreManager::GetUIVars().Get(PoolString::Intern(Format("material{}{}", group, piece).c_str()));
                     words += Format("{}|", value);
                 }
-                const eastl::string_view balance = CoreManager::GetUIVars().Get(PoolString::Intern(Format("material{}Balance", group).c_str()));
+                const StringView balance = CoreManager::GetUIVars().Get(PoolString::Intern(Format("material{}Balance", group).c_str()));
                 words += Format("{}|", balance);
             }
             return words;
@@ -1367,8 +1367,8 @@ namespace BECore::Chess::Tests {
 
         /// Sets the 16 variables of the labels to round @p round of the 8: every letter and every digit stands at every label once over the rounds, so the widest one is laid out in each box
         static void PublishCoordinateRound(size_t round) {
-            const eastl::string_view letters = kFileLetters;
-            const eastl::string_view digits = kRankDigits;
+            const StringView letters = kFileLetters;
+            const StringView digits = kRankDigits;
             for (int index = 0; index <= kLastBoardIndex; ++index) {
                 const size_t at = (static_cast<size_t>(index) + round) % letters.size();
                 CoreManager::GetUIVars().Set(PoolString::Intern(eastl::string("coordFile{}"_format(index))), letters.substr(at, 1));
@@ -1659,7 +1659,7 @@ namespace BECore::Chess::Tests {
         size_t sentences = 0;
         for (const EngineErrorKind kind : EnumUtils<EngineErrorKind>::Values()) {
             const eastl::string sentence = OpponentText::Error(EngineError{kind, {}});
-            CoreManager::GetUIVars().Set("opponentError"_intern, eastl::string_view(sentence.data(), sentence.size()));
+            CoreManager::GetUIVars().Set("opponentError"_intern, StringView(sentence));
             const UIContentFit fit = line.CheckContent(line.rect.w, line.rect.h, scale);
             EXPECT_TRUE(fit.hasContent && fit.fits) << "'" << sentence.c_str() << "' in " << line.rect.w << " units";
             ++sentences;
@@ -1685,7 +1685,7 @@ namespace BECore::Chess::Tests {
         float left = level.rect.x;
         float width = -1.0f;
         for (const PanelSegment& segment : ExpectedPanelSegments()) {
-            if (std::string_view(segment.group) != "LevelGroup") {
+            if (StringView(segment.group) != "LevelGroup") {
                 continue;
             }
             const UIElement& button = PanelButton(segment.name.c_str());
@@ -1707,7 +1707,7 @@ namespace BECore::Chess::Tests {
             SCOPED_TRACE(want.name.c_str());
             const UIElement& button = PanelButton(want.name.c_str());
             EXPECT_EQ(ShownText(button), want.word) << "the word on the segment is the one of the table";
-            const eastl::string_view value = ClickerOf(button)->value.ToStringView();
+            const StringView value = ClickerOf(button)->value.ToStringView();
             EXPECT_EQ(eastl::string(value.data(), value.size()), want.id);
             EXPECT_EQ(ClickerOf(button)->action, PoolString::Intern(want.action));
             EXPECT_EQ(button.selected, false) << "nothing is selected before a frame";
@@ -1718,15 +1718,15 @@ namespace BECore::Chess::Tests {
             const UISegmented& group = PanelControl<UISegmented>(groupName);
             size_t inTable = 0;
             for (const PanelSegment& want : expected) {
-                inTable += std::string_view(want.group) == groupName ? 1u : 0u;
+                inTable += StringView(want.group) == groupName ? 1u : 0u;
             }
             size_t buttons = 0;
             for (const auto& child : group.children) {
                 const UIInputClicker* button = ClickerOf(*child);
                 ASSERT_NE(button, nullptr) << groupName << ": only segments";
                 ++buttons;
-                const eastl::string_view value = button->value.ToStringView();
-                const std::string_view groupId = groupName;
+                const StringView value = button->value.ToStringView();
+                const StringView groupId = groupName;
                 if (groupId == "ModeGroup") {
                     EXPECT_TRUE(ParseMode(value).has_value()) << value.data();
                 } else if (groupId == "ColorGroup") {
@@ -2271,7 +2271,7 @@ namespace BECore::Chess::Tests {
         SKIP_WITHOUT_WORKER_THREADS();
         eastl::vector<eastl::string> asked;
         Opponent().SetEngineFactory([&asked](OpponentEngine engine, const OpponentLevel&) -> MadeEngine {
-            const eastl::string_view id = OpponentEngineId(engine);
+            const StringView id = OpponentEngineId(engine);
             asked.emplace_back(id.data(), id.size());
             if (engine == OpponentEngine::Stockfish) {
                 return std::unexpected(EngineError{EngineErrorKind::LaunchFailed, "no Stockfish in the test"});
@@ -3910,7 +3910,7 @@ namespace BECore::Chess::Tests {
         // The factory fails for Stockfish and nothing else, so the program cannot have fallen back by itself
         eastl::vector<eastl::string> asked;
         Opponent().SetEngineFactory([&asked](OpponentEngine engine, const OpponentLevel&) -> MadeEngine {
-            const eastl::string_view id = OpponentEngineId(engine);
+            const StringView id = OpponentEngineId(engine);
             asked.emplace_back(id.data(), id.size());
             if (engine == OpponentEngine::Stockfish) {
                 return std::unexpected(EngineError{EngineErrorKind::LaunchFailed, "no Stockfish in the test"});
@@ -4105,7 +4105,7 @@ namespace BECore::Chess::Tests {
         // Two people play first: only the mode and the engine groups take clicks. Computer is picked in the middle, which wakes the other two; then back to two
         const auto clickGroup = [&](const char* group) {
             for (const PanelSegment& segment : segments) {
-                if (std::string_view(segment.group) != group || !IsShown(segment)) {
+                if (StringView(segment.group) != group || !IsShown(segment)) {
                     continue;
                 }
                 SCOPED_TRACE(segment.name.c_str());
@@ -4118,15 +4118,15 @@ namespace BECore::Chess::Tests {
 
                 Draw();  // the board answered with the variable; the next draw moves the selection
                 for (const PanelSegment& other : segments) {
-                    if (std::string_view(other.group) == group && IsShown(other)) {
+                    if (StringView(other.group) == group && IsShown(other)) {
                         EXPECT_EQ(PanelButton(other.name.c_str()).selected, other.name == segment.name) << other.name.c_str();
                     }
                 }
-                if (std::string_view(group) == "ModeGroup") {
+                if (StringView(group) == "ModeGroup") {
                     EXPECT_EQ(Opponent().GetPlays().has_value(), segment.id == "computer");
-                } else if (std::string_view(group) == "ColorGroup") {
+                } else if (StringView(group) == "ColorGroup") {
                     EXPECT_EQ(Opponent().GetPlays(), Optional<PieceColor>(segment.id == "white" ? PieceColor::Black : PieceColor::White)) << "the program plays the other color";
-                } else if (std::string_view(group) == "EngineGroup") {
+                } else if (StringView(group) == "EngineGroup") {
                     EXPECT_EQ(Opponent().GetEngine(), *FindOpponentEngine(segment.id));
                 } else {
                     EXPECT_EQ(Opponent().GetLevel(), *FindOpponentLevel(segment.id));
@@ -4270,7 +4270,7 @@ namespace BECore::Chess::Tests {
         SKIP_WITHOUT_STOCKFISH_SEGMENT();  // the pick of the name is the action's in that build: WithoutStockfishThePickOfTheNameOnTheActionIsRefused...
         eastl::vector<eastl::string> asked;
         Opponent().SetEngineFactory([&asked](OpponentEngine engine, const OpponentLevel&) -> MadeEngine {
-            const eastl::string_view id = OpponentEngineId(engine);
+            const StringView id = OpponentEngineId(engine);
             asked.emplace_back(id.data(), id.size());
             if (engine == OpponentEngine::Stockfish) {
                 return std::unexpected(EngineError{EngineErrorKind::LaunchFailed, "no Stockfish in the test"});
@@ -4448,7 +4448,7 @@ namespace BECore::Chess::Tests {
         // factory stands in for "no Stockfish found" and nothing else: it never makes the own engine for a Stockfish pick, so the program cannot have fallen back by itself
         eastl::vector<eastl::string> asked;
         Opponent().SetEngineFactory([&asked](OpponentEngine engine, const OpponentLevel&) -> MadeEngine {
-            const eastl::string_view id = OpponentEngineId(engine);
+            const StringView id = OpponentEngineId(engine);
             asked.emplace_back(id.data(), id.size());
             if (engine == OpponentEngine::Stockfish) {
                 return std::unexpected(EngineError{EngineErrorKind::LaunchFailed, "no Stockfish in the test"});
@@ -4535,18 +4535,18 @@ namespace BECore::Chess::Tests {
         pugi::xml_document document;
         ASSERT_TRUE(document.load_file(ShippedSceneConfig().string().c_str()));
         EXPECT_TRUE(document.select_nodes("//element[@name='Side' or @name='Engine' or @name='Level']").empty()) << "the old HUD elements are gone, and nothing else takes their names";
-        constexpr std::string_view kRemovedActions = "ChessCy"
-                                                     "cle";  // split, so that a search of the sources for the removed actions finds no leftover
+        constexpr StringView kRemovedActions = "ChessCy"
+                                               "cle";  // split, so that a search of the sources for the removed actions finds no leftover
         for (const pugi::xpath_node found : document.select_nodes("//element[@action]")) {
-            const std::string_view action = found.node().attribute("action").value();
-            EXPECT_EQ(action.find(kRemovedActions), std::string_view::npos) << found.node().attribute("name").value() << " emits " << action;
+            const StringView action = found.node().attribute("action").value();
+            EXPECT_EQ(action.find(kRemovedActions), StringView::npos) << found.node().attribute("name").value() << " emits " << ToStd(action);
             const bool known = action == "ChessReset" || action == "ChessOpenOpponent" || action == "ChessCloseOpponent" || action == kSetModeAction || action == kSetColorAction ||
                                action == kSetEngineAction || action == kSetLevelAction || action == kPromoteAction || action == kCancelPromotionAction;
-            EXPECT_TRUE(known) << found.node().attribute("name").value() << " emits " << action << ", which the board does not answer";
+            EXPECT_TRUE(known) << found.node().attribute("name").value() << " emits " << ToStd(action) << ", which the board does not answer";
         }
         for (const pugi::xpath_node found : document.select_nodes("//element[@text]")) {
-            const std::string_view text = found.node().attribute("text").value();
-            EXPECT_TRUE(text.find("{level}") == std::string_view::npos && text.find("{engine}") == std::string_view::npos) << found.node().attribute("name").value() << ": " << text;
+            const StringView text = found.node().attribute("text").value();
+            EXPECT_TRUE(text.find("{level}") == StringView::npos && text.find("{engine}") == StringView::npos) << found.node().attribute("name").value() << ": " << ToStd(text);
         }
 
         // The same in the loaded scene: the HUD is Turn, Menu, Reset and Status, and nothing sits at the bottom left
@@ -5018,8 +5018,8 @@ namespace BECore::Chess::Tests {
             const UIInputClicker* clicker = ClickerOf(button);
             ASSERT_NE(clicker, nullptr);
             EXPECT_EQ(button.name, PoolString::Intern(PromoteButton(piece).c_str())) << "the buttons are in the order of the table";
-            const eastl::string_view label = PromotionLabel(piece);
-            const eastl::string_view id = PromotionId(piece);
+            const StringView label = PromotionLabel(piece);
+            const StringView id = PromotionId(piece);
             EXPECT_EQ(ShownText(button), eastl::string(label.data(), label.size()));
             EXPECT_EQ(eastl::string(clicker->value.ToStringView().data(), clicker->value.ToStringView().size()), eastl::string(id.data(), id.size()));
             EXPECT_EQ(clicker->action, PoolString::Intern(kPromoteAction));
@@ -5621,7 +5621,7 @@ namespace BECore::Chess::Tests {
             const PoolString variable = PoolString::Intern(Format("material{}Balance", group).c_str());
             for (int points = 1; points <= 99; ++points) {
                 const eastl::string text = BalanceText(points);
-                CoreManager::GetUIVars().Set(variable, eastl::string_view(text.data(), text.size()));
+                CoreManager::GetUIVars().Set(variable, StringView(text));
                 const UIContentFit fit = label->CheckContent(label->rect.w, label->rect.h, scale);
                 ASSERT_TRUE(fit.hasContent) << text.c_str();
                 EXPECT_TRUE(fit.fits) << group << ": " << text.c_str() << " is cut in a box of " << label->rect.w << " x " << label->rect.h << " units at scale " << scale;

@@ -14,16 +14,16 @@ namespace BECore::Chess::Tests {
     namespace {
 
         constexpr int kManyUpdates = 1000;
-        constexpr eastl::string_view kOneMoveFen = "k7/8/1K6/8/8/8/8/7R b - - 0 1";  // Black has one legal move, Kb8
+        constexpr StringView kOneMoveFen = "k7/8/1K6/8/8/8/8/7R b - - 0 1";  // Black has one legal move, Kb8
 
-        bool Play(ChessGameModel& model, eastl::string_view uci) {
+        bool Play(ChessGameModel& model, StringView uci) {
             const auto move = MoveGenerator::ParseUci(model.GetPosition(), uci);
             return move.has_value() && model.TryMove(*move).has_value();
         }
 
         /// A game from the opening: the moves of @p ucis in order
-        bool PlayAll(ChessGameModel& model, std::initializer_list<eastl::string_view> ucis) {
-            for (const eastl::string_view uci : ucis) {
+        bool PlayAll(ChessGameModel& model, std::initializer_list<StringView> ucis) {
+            for (const StringView uci : ucis) {
                 if (!Play(model, uci)) {
                     return false;
                 }
@@ -744,7 +744,7 @@ namespace BECore::Chess::Tests {
         }
 
         /// A game from @p fen: the moves of @p ucis rated, as the reasons in order
-        eastl::vector<MoveRatingReason> ReasonsOf(eastl::string_view fen, std::initializer_list<eastl::string_view> ucis) {
+        eastl::vector<MoveRatingReason> ReasonsOf(StringView fen, std::initializer_list<StringView> ucis) {
             ChessGameModel model;
             if (!fen.empty()) {
                 model.SetPosition(PositionFromFen(fen));
@@ -826,7 +826,7 @@ namespace BECore::Chess::Tests {
         ChessGameModel grown;
         MoveRater rater;
         rater.SetOn(true);
-        for (const eastl::string_view uci : {"e2e4", "e7e5", "g1f3", "b8c6"}) {
+        for (const StringView uci : {"e2e4", "e7e5", "g1f3", "b8c6"}) {
             ASSERT_TRUE(Play(grown, uci));
             ASSERT_TRUE(UpdateUntil(rater, grown, [&] { return AllRated(rater, grown); })) << DescribeError(rater.GetError()).c_str();
         }

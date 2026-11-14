@@ -17,10 +17,10 @@ namespace BECore::Chess::Tests {
 
         constexpr int kManyUpdates = 1000;
         constexpr AnalysisScore kScore{AnalysisScoreKind::Centipawns, 35};
-        constexpr eastl::string_view kMateInOneFen = "6k1/5ppp/8/8/8/8/8/R3K3 w - - 0 1";  // Ra8#
-        constexpr eastl::string_view kMatedBlackFen = "7k/6Q1/6K1/8/8/8/8/8 b - - 0 1";
+        constexpr StringView kMateInOneFen = "6k1/5ppp/8/8/8/8/8/R3K3 w - - 0 1";  // Ra8#
+        constexpr StringView kMatedBlackFen = "7k/6Q1/6K1/8/8/8/8/8 b - - 0 1";
 
-        bool Play(ChessGameModel& model, eastl::string_view uci) {
+        bool Play(ChessGameModel& model, StringView uci) {
             const auto move = MoveGenerator::ParseUci(model.GetPosition(), uci);
             return move.has_value() && model.TryMove(*move).has_value();
         }

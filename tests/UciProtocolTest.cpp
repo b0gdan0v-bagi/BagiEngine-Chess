@@ -11,7 +11,7 @@ namespace BECore::Chess::Tests {
 
         constexpr SearchLimits kAnyLimits{100, 0};
 
-        SearchRequest RequestOf(eastl::string_view fen, std::initializer_list<const char*> moves) {
+        SearchRequest RequestOf(StringView fen, std::initializer_list<const char*> moves) {
             SearchRequest request;
             request.startFen = eastl::string(fen.data(), fen.size());
             for (const char* move : moves) {
@@ -21,22 +21,22 @@ namespace BECore::Chess::Tests {
             return request;
         }
 
-        void ExpectBestMove(eastl::string_view line, const char* move, bool isNone) {
+        void ExpectBestMove(StringView line, const char* move, bool isNone) {
             const auto parsed = UciProtocol::ParseBestMove(line);
             ASSERT_TRUE(parsed.has_value()) << eastl::string(line.data(), line.size()).c_str();
             EXPECT_EQ(parsed->move, move);
             EXPECT_EQ(parsed->IsNone(), isNone);
         }
 
-        void ExpectNotBestMove(eastl::string_view line) {
+        void ExpectNotBestMove(StringView line) {
             EXPECT_FALSE(UciProtocol::ParseBestMove(line).has_value()) << eastl::string(line.data(), line.size()).c_str();
         }
 
-        Optional<UciProtocol::Info> ParsedInfo(eastl::string_view line) {
+        Optional<UciProtocol::Info> ParsedInfo(StringView line) {
             return UciProtocol::ParseInfo(line);
         }
 
-        void ExpectNotInfo(eastl::string_view line) {
+        void ExpectNotInfo(StringView line) {
             EXPECT_FALSE(UciProtocol::ParseInfo(line).has_value()) << eastl::string(line.data(), line.size()).c_str();
         }
 
@@ -330,7 +330,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(UciProtocolTest, AnInfoLineIsNotABestMove) {
-        const eastl::string_view line = "info depth 1 score cp 10 pv e2e4";
+        const StringView line = "info depth 1 score cp 10 pv e2e4";
 
         EXPECT_TRUE(UciProtocol::ParseInfo(line).has_value());
         EXPECT_FALSE(UciProtocol::ParseBestMove(line).has_value());
@@ -530,16 +530,16 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(UciProtocolTest, TrimLineTakesSpacesAndLineEndsFromBothEnds) {
-        EXPECT_EQ(UciProtocol::TrimLine("uciok"), eastl::string_view("uciok"));
-        EXPECT_EQ(UciProtocol::TrimLine("uciok\n"), eastl::string_view("uciok"));
-        EXPECT_EQ(UciProtocol::TrimLine("uciok\r\n"), eastl::string_view("uciok"));
-        EXPECT_EQ(UciProtocol::TrimLine("  readyok  "), eastl::string_view("readyok"));
-        EXPECT_EQ(UciProtocol::TrimLine(" \r\n bestmove e2e4 \r\n "), eastl::string_view("bestmove e2e4"));
+        EXPECT_EQ(UciProtocol::TrimLine("uciok"), StringView("uciok"));
+        EXPECT_EQ(UciProtocol::TrimLine("uciok\n"), StringView("uciok"));
+        EXPECT_EQ(UciProtocol::TrimLine("uciok\r\n"), StringView("uciok"));
+        EXPECT_EQ(UciProtocol::TrimLine("  readyok  "), StringView("readyok"));
+        EXPECT_EQ(UciProtocol::TrimLine(" \r\n bestmove e2e4 \r\n "), StringView("bestmove e2e4"));
     }
 
     TEST(UciProtocolTest, TrimLineLeavesTheInsideAlone) {
-        EXPECT_EQ(UciProtocol::TrimLine("a  b"), eastl::string_view("a  b"));
-        EXPECT_EQ(UciProtocol::TrimLine(" a \r\n b "), eastl::string_view("a \r\n b"));
+        EXPECT_EQ(UciProtocol::TrimLine("a  b"), StringView("a  b"));
+        EXPECT_EQ(UciProtocol::TrimLine(" a \r\n b "), StringView("a \r\n b"));
     }
 
     TEST(UciProtocolTest, TrimLineOfNothingIsEmpty) {

@@ -34,9 +34,9 @@ namespace BECore::Chess::Tests {
         }
 
     private:
-        static eastl::string_view View(const eastl::vector<eastl::string>& words, size_t round) {
+        static StringView View(const eastl::vector<eastl::string>& words, size_t round) {
             const eastl::string& word = words[round % words.size()];
-            return eastl::string_view(word.data(), word.size());
+            return StringView(word);
         }
     };
 
@@ -48,7 +48,7 @@ namespace BECore::Chess::Tests {
             }
         }
 
-        inline void Play(ChessGameModel& model, eastl::string_view uci) {
+        inline void Play(ChessGameModel& model, StringView uci) {
             const auto move = MoveGenerator::ParseUci(model.GetPosition(), uci);
             EXPECT_TRUE(move.has_value() && model.TryMove(*move).has_value()) << "a move of the scratch game: " << std::string(uci.data(), uci.size());
         }

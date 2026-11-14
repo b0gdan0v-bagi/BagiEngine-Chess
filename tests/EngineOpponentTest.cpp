@@ -25,15 +25,15 @@ namespace BECore::Chess::Tests {
         constexpr int kManyUpdates = 1000;
         constexpr const char* kLogName = "fake.log";
         constexpr const char* kThinksUntilStopped = "60000";  // the fake thinks for a minute unless it is sent `stop`
-        constexpr eastl::string_view kGoCommand = "go movetime 50";
-        constexpr eastl::string_view kMatedBlackFen = "7k/6Q1/6K1/8/8/8/8/8 b - - 0 1";
+        constexpr StringView kGoCommand = "go movetime 50";
+        constexpr StringView kMatedBlackFen = "7k/6Q1/6K1/8/8/8/8/8 b - - 0 1";
 #if !CHESS_HAS_UCI_PROCESS
         constexpr EngineErrorKind kMissingProgramError = EngineErrorKind::Unsupported;
 #else
         constexpr EngineErrorKind kMissingProgramError = EngineErrorKind::LaunchFailed;
 #endif
 
-        bool Play(ChessGameModel& model, eastl::string_view uci) {
+        bool Play(ChessGameModel& model, StringView uci) {
             const auto move = MoveGenerator::ParseUci(model.GetPosition(), uci);
             return move.has_value() && model.TryMove(*move).has_value();
         }
@@ -69,7 +69,7 @@ namespace BECore::Chess::Tests {
         }
 
         /// The fake UCI engine with @p flags, as the engine of an opponent
-        eastl::shared_ptr<UciEngine> MakeFakeEngine(std::initializer_list<eastl::string_view> flags) {
+        eastl::shared_ptr<UciEngine> MakeFakeEngine(std::initializer_list<StringView> flags) {
             UciEngineSettings settings;
             settings.launch = FakeEngineLaunch(flags);
             return eastl::make_shared<UciEngine>(std::move(settings));
@@ -97,8 +97,8 @@ namespace BECore::Chess::Tests {
         /// An engine with no process that answers a script, one move per call and without looking at its token. A gated one waits for Open() before it answers
         class ScriptedEngine final : public IChessEngine {
         public:
-            ScriptedEngine(std::initializer_list<eastl::string_view> moves, bool gated) : _open(!gated) {
-                for (const eastl::string_view move : moves) {
+            ScriptedEngine(std::initializer_list<StringView> moves, bool gated) : _open(!gated) {
+                for (const StringView move : moves) {
                     _moves.push_back(Mv(move));
                 }
             }
@@ -129,7 +129,7 @@ namespace BECore::Chess::Tests {
             std::atomic<bool> _open;
         };
 
-        eastl::shared_ptr<ScriptedEngine> MakeScripted(std::initializer_list<eastl::string_view> moves, bool gated = false) {
+        eastl::shared_ptr<ScriptedEngine> MakeScripted(std::initializer_list<StringView> moves, bool gated = false) {
             return eastl::make_shared<ScriptedEngine>(moves, gated);
         }
 
@@ -434,8 +434,8 @@ namespace BECore::Chess::Tests {
 
     TEST_F(EngineOpponentTest, AGameInARowEndsLikeTheSameMovesPlayedByHand) {
         SKIP_WITHOUT_FAKE_ENGINE();
-        constexpr eastl::string_view kWhiteMoves[] = {"e2e4", "g1f3", "f1b5"};
-        constexpr eastl::string_view kBlackMoves[] = {"e7e5", "b8c6", "a7a6"};
+        constexpr StringView kWhiteMoves[] = {"e2e4", "g1f3", "f1b5"};
+        constexpr StringView kBlackMoves[] = {"e7e5", "b8c6", "a7a6"};
         ChessGameModel model;
         EngineOpponent opponent(MakeFakeEngine({"--moves", "e7e5,b8c6,a7a6"}), PieceColor::Black, kLimits);
         ChessGameModel byHand;

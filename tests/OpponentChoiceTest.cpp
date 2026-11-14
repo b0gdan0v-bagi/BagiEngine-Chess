@@ -10,18 +10,18 @@ namespace BECore::Chess::Tests {
 
     namespace {
 
-        constexpr eastl::string_view kHardId = "hard";
-        constexpr eastl::string_view kMediumId = "medium";
-        constexpr eastl::string_view kOwnId = "own";
-        constexpr eastl::string_view kStockfishId = "stockfish";
-        constexpr eastl::string_view kDefaultEngineId = kStockfishAvailable ? kStockfishId : kOwnId;  // the engine a game starts with in this build
+        constexpr StringView kHardId = "hard";
+        constexpr StringView kMediumId = "medium";
+        constexpr StringView kOwnId = "own";
+        constexpr StringView kStockfishId = "stockfish";
+        constexpr StringView kDefaultEngineId = kStockfishAvailable ? kStockfishId : kOwnId;  // the engine a game starts with in this build
         constexpr Optional<PieceColor> kNobody = std::nullopt;
 
         EngineError NoStockfish() {
             return EngineError{EngineErrorKind::LaunchFailed, "no Stockfish in the test"};
         }
 
-        eastl::string Text(eastl::string_view text) {
+        eastl::string Text(StringView text) {
             return eastl::string(text.data(), text.size());
         }
 
@@ -195,7 +195,7 @@ namespace BECore::Chess::Tests {
             const uint64_t revision = seat.controller.GetRevision();
 
             for (const eastl::string& id : BadIds()) {
-                const eastl::string_view view(id.data(), id.size());
+                const StringView view(id.data(), id.size());
                 const std::expected<void, ChoiceError> results[] = {seat.choice.SetMode(view), seat.choice.SetColor(view), seat.choice.SetEngine(view), seat.choice.SetLevel(view)};
                 for (const auto& result : results) {
                     ASSERT_FALSE(result.has_value()) << "'" << id.c_str() << "' was taken";

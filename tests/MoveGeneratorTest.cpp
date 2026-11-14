@@ -12,7 +12,7 @@ namespace BECore::Chess::Tests {
     namespace {
 
         /// Number of legal moves of the piece standing on @p from.
-        size_t CountFrom(const Position& position, eastl::string_view from) {
+        size_t CountFrom(const Position& position, StringView from) {
             size_t count = 0;
             for (const Move move : MoveGenerator::GenerateLegal(position)) {
                 if (move.From() == Sq(from)) {
@@ -22,7 +22,7 @@ namespace BECore::Chess::Tests {
             return count;
         }
 
-        bool Has(const Position& position, eastl::string_view uci) {
+        bool Has(const Position& position, StringView uci) {
             return MoveGenerator::ParseUci(position, uci).has_value();
         }
 
@@ -256,7 +256,7 @@ namespace BECore::Chess::Tests {
         for (const auto fen : {Position::kStartFen, kKiwipeteFen, kPosition3Fen, kPosition4Fen}) {
             const Position position = PositionFromFen(fen);
             for (const Move move : MoveGenerator::GenerateLegal(position)) {
-                const auto parsed = MoveGenerator::ParseUci(position, eastl::string_view(move.ToUci().c_str()));
+                const auto parsed = MoveGenerator::ParseUci(position, StringView(move.ToUci().c_str()));
                 ASSERT_TRUE(parsed.has_value()) << move.ToUci().c_str();
                 EXPECT_TRUE(*parsed == move) << move.ToUci().c_str();
             }

@@ -17,8 +17,8 @@ namespace BECore::Chess::Tests {
 
     namespace {
 
-        constexpr eastl::string_view kMateInOneFen = "6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1";
-        constexpr eastl::string_view kPromotionFen = "8/P6k/8/8/8/8/8/K7 w - - 0 1";
+        constexpr StringView kMateInOneFen = "6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1";
+        constexpr StringView kPromotionFen = "8/P6k/8/8/8/8/8/K7 w - - 0 1";
 
         std::string ErrorCodeOf(const ControlError& error) {
             return std::string(error.code.c_str(), error.code.size());
@@ -31,13 +31,13 @@ namespace BECore::Chess::Tests {
             return action;
         }
 
-        Json FenState(eastl::string_view fen) {
+        Json FenState(StringView fen) {
             Json state = Json::object();
             state["fen"] = MakeJsonString(fen);
             return state;
         }
 
-        std::string StringMember(const Json& json, eastl::string_view key) {
+        std::string StringMember(const Json& json, StringView key) {
             const auto value = GetJsonString(json, key);
             return value ? std::string(value->c_str(), value->size()) : std::string("<missing>");
         }
@@ -105,7 +105,7 @@ namespace BECore::Chess::Tests {
                 return outcome ? *outcome : Json();
             }
 
-            void SetFen(eastl::string_view fen) {
+            void SetFen(StringView fen) {
                 const auto result = control.SetState(FenState(fen));
                 ASSERT_TRUE(result.has_value()) << result.error().message.c_str();
             }
@@ -396,13 +396,13 @@ namespace BECore::Chess::Tests {
         }
         const Json state = State();
 
-        auto replayed = Position::FromFen(eastl::string_view(StringMember(state, "startFen").c_str()));
+        auto replayed = Position::FromFen(StringView(StringMember(state, "startFen").c_str()));
         ASSERT_TRUE(replayed.has_value());
         const Json* moves = FindJsonMember(state, "moves");
         ASSERT_NE(moves, nullptr);
         for (size_t index = 0; index < moves->size(); ++index) {
             const std::string& uci = (*moves)[index].get_ref<const std::string&>();
-            const auto move = MoveGenerator::ParseUci(*replayed, eastl::string_view(uci.c_str(), uci.size()));
+            const auto move = MoveGenerator::ParseUci(*replayed, StringView(uci.c_str(), uci.size()));
             ASSERT_TRUE(move.has_value()) << uci;
             replayed->DoMove(*move);
         }
@@ -836,7 +836,7 @@ namespace BECore::Chess::Tests {
         // Stockfish is missing, the own engine is not: the factory fails only for the first
         eastl::vector<eastl::string> asked;
         opponent.SetEngineFactory([&asked](OpponentEngine engine, const OpponentLevel&) -> MadeEngine {
-            const eastl::string_view id = OpponentEngineId(engine);
+            const StringView id = OpponentEngineId(engine);
             asked.emplace_back(id.data(), id.size());
             if (engine == OpponentEngine::Stockfish) {
                 return std::unexpected(EngineError{EngineErrorKind::LaunchFailed, "no Stockfish in the test"});
@@ -872,7 +872,7 @@ namespace BECore::Chess::Tests {
     TEST_F(ChessGameControlTest, AFailedSwitchFromTheOwnEngineToStockfishIsRefusedAndTheOpponentStaysAsItWas) {
         eastl::vector<eastl::string> asked;
         opponent.SetEngineFactory([&asked](OpponentEngine engine, const OpponentLevel&) -> MadeEngine {
-            const eastl::string_view id = OpponentEngineId(engine);
+            const StringView id = OpponentEngineId(engine);
             asked.emplace_back(id.data(), id.size());
             if (engine == OpponentEngine::Stockfish) {
                 return std::unexpected(EngineError{EngineErrorKind::LaunchFailed, "no Stockfish in the test"});
@@ -1842,7 +1842,7 @@ namespace BECore::Chess::Tests {
 
             EngineFactory AsFactory() {
                 return [this](OpponentEngine kind, const OpponentLevel& level) -> MadeEngine {
-                    const eastl::string_view id = OpponentEngineId(kind);
+                    const StringView id = OpponentEngineId(kind);
                     asked.push_back(Format("{}/{}", id, level.id));
                     if (kind == OpponentEngine::Stockfish) {
                         return std::unexpected(EngineError{EngineErrorKind::LaunchFailed, "no Stockfish in the test"});

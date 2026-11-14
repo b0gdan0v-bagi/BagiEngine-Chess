@@ -16,7 +16,7 @@ namespace BECore::Chess::Tests {
         constexpr ProgramSides kBoth{true, true};
         constexpr ProgramSides kNobody{};
 
-        bool Play(ChessGameModel& model, eastl::string_view uci) {
+        bool Play(ChessGameModel& model, StringView uci) {
             const auto move = MoveGenerator::ParseUci(model.GetPosition(), uci);
             return move.has_value() && model.TryMove(*move).has_value();
         }
@@ -34,13 +34,13 @@ namespace BECore::Chess::Tests {
             return EngineError{EngineErrorKind::LaunchFailed, "no Stockfish in the test"};
         }
 
-        size_t LevelIndex(eastl::string_view id) {
+        size_t LevelIndex(StringView id) {
             const Optional<size_t> index = FindOpponentLevel(id);
             EXPECT_TRUE(index.has_value()) << id.data();
             return index.value_or(kDefaultOpponentLevel);
         }
 
-        SeatChoice Choice(OpponentEngine engine, eastl::string_view level) {
+        SeatChoice Choice(OpponentEngine engine, StringView level) {
             return SeatChoice{engine, LevelIndex(level)};
         }
 
@@ -691,8 +691,8 @@ namespace BECore::Chess::Tests {
         // The known gap: the mode enum has no Watch yet, so two programs read as Two; the color is the remembered one (White) and nothing crashes
         EXPECT_EQ(choice.Mode(), OpponentMode::Two);
         EXPECT_EQ(choice.Color(), PieceColor::White);
-        EXPECT_EQ(choice.ModeId(), eastl::string_view("two"));
-        EXPECT_EQ(choice.ColorId(), eastl::string_view("white"));
+        EXPECT_EQ(choice.ModeId(), StringView("two"));
+        EXPECT_EQ(choice.ColorId(), StringView("white"));
 
         ASSERT_TRUE(choice.SetColor("black").has_value());
         EXPECT_TRUE(controller.IsWatching()) << "a color picked while no one program plays is only remembered";

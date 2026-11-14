@@ -18,8 +18,8 @@ namespace BECore::Chess::Tests {
         constexpr auto kHandshakeTimeout = std::chrono::seconds(10);
         constexpr auto kLineTimeout = std::chrono::seconds(5);
 
-        constexpr eastl::string_view kMateFen = "7k/6Q1/6K1/8/8/8/8/8 b - - 0 1";
-        constexpr eastl::string_view kStalemateFen = "7k/5Q2/6K1/8/8/8/8/8 b - - 0 1";
+        constexpr StringView kMateFen = "7k/6Q1/6K1/8/8/8/8/8 b - - 0 1";
+        constexpr StringView kStalemateFen = "7k/5Q2/6K1/8/8/8/8/8 b - - 0 1";
 
         constexpr uint64_t kWalkSeed = 0x9E3779B97F4A7C15ULL;
         constexpr int kWalkGames = 3;
@@ -43,7 +43,7 @@ namespace BECore::Chess::Tests {
         }
 
         /// The number in @p text (white space around it allowed), or nothing for anything else
-        Optional<uint64_t> ParseCount(eastl::string_view text) {
+        Optional<uint64_t> ParseCount(StringView text) {
             while (!text.empty() && text.front() == ' ') {
                 text.remove_prefix(1);
             }
@@ -59,14 +59,14 @@ namespace BECore::Chess::Tests {
         }
 
         /// A move as UCI spells it: e2e4, e7e8q
-        bool IsMoveText(eastl::string_view text) {
+        bool IsMoveText(StringView text) {
             const auto file = [](char c) { return c >= 'a' && c <= 'h'; };
             const auto rank = [](char c) { return c >= '1' && c <= '8'; };
             if (text.size() != 4 && text.size() != 5) {
                 return false;
             }
             const bool squares = file(text[0]) && rank(text[1]) && file(text[2]) && rank(text[3]);
-            return squares && (text.size() == 4 || eastl::string_view("qrbn").find(text[4]) != eastl::string_view::npos);
+            return squares && (text.size() == 4 || StringView("qrbn").find(text[4]) != StringView::npos);
         }
 
         /// A Stockfish child, spoken to in lines; a failure is reported with ADD_FAILURE and names the FEN it happened on
@@ -96,7 +96,7 @@ namespace BECore::Chess::Tests {
             }
 
             /// `go perft @p depth` from @p fen; nothing on a failure (reported, with the FEN)
-            Optional<PerftResult> Perft(eastl::string_view fen, int depth) {
+            Optional<PerftResult> Perft(StringView fen, int depth) {
                 const eastl::string where(fen.data(), fen.size());
                 if (!Send(Format("position fen {}", fen), where) || !Send(Format("go perft {}", depth), where)) {
                     return std::nullopt;
@@ -108,8 +108,8 @@ namespace BECore::Chess::Tests {
                         ADD_FAILURE() << "no answer to go perft " << depth << " for " << where.c_str() << ": " << Describe(line.error()).c_str();
                         return std::nullopt;
                     }
-                    const eastl::string_view text(line->data(), line->size());
-                    constexpr eastl::string_view kTotal = "Nodes searched:";
+                    const StringView text(line->data(), line->size());
+                    constexpr StringView kTotal = "Nodes searched:";
                     if (text.substr(0, kTotal.size()) == kTotal) {
                         const Optional<uint64_t> total = ParseCount(text.substr(kTotal.size()));
                         if (!total) {
@@ -120,7 +120,7 @@ namespace BECore::Chess::Tests {
                         return result;
                     }
                     const size_t colon = text.find(": ");
-                    if (colon != eastl::string_view::npos && IsMoveText(text.substr(0, colon))) {
+                    if (colon != StringView::npos && IsMoveText(text.substr(0, colon))) {
                         const Optional<uint64_t> count = ParseCount(text.substr(colon + 2));
                         if (!count) {
                             ADD_FAILURE() << "no count in '" << line->c_str() << "' for " << where.c_str();
@@ -132,7 +132,7 @@ namespace BECore::Chess::Tests {
             }
 
             /// The legal moves of @p fen as Stockfish counts them, sorted; nothing on a failure
-            Optional<eastl::vector<eastl::string>> Moves(eastl::string_view fen) {
+            Optional<eastl::vector<eastl::string>> Moves(StringView fen) {
                 const Optional<PerftResult> result = Perft(fen, 1);
                 if (!result) {
                     return std::nullopt;
@@ -151,7 +151,7 @@ namespace BECore::Chess::Tests {
                 return written.has_value();
             }
 
-            bool WaitFor(eastl::string_view expected) {
+            bool WaitFor(StringView expected) {
                 while (true) {
                     const auto line = _process->ReadLine(kHandshakeTimeout);
                     if (!line) {
@@ -221,7 +221,7 @@ namespace BECore::Chess::Tests {
         }
 
         /// Our perft divide of @p fen at @p depth against Stockfish's: every root move has the same count, and the totals agree
-        void ExpectSamePerft(StockfishReferee& referee, eastl::string_view fen, int depth, uint64_t expectedNodes) {
+        void ExpectSamePerft(StockfishReferee& referee, StringView fen, int depth, uint64_t expectedNodes) {
             const Optional<PerftResult> theirs = referee.Perft(fen, depth);
             ASSERT_TRUE(theirs.has_value());
             EXPECT_EQ(theirs->nodes, expectedNodes) << "Stockfish at depth " << depth << " of " << eastl::string(fen.data(), fen.size()).c_str();
@@ -252,7 +252,7 @@ namespace BECore::Chess::Tests {
         const auto referee = StockfishReferee::Start(*path);
         ASSERT_NE(referee, nullptr);
 
-        for (const eastl::string_view fen : {Position::kStartFen, kKiwipeteFen, kPosition3Fen, kPosition4Fen, kPosition5Fen, kPosition6Fen}) {
+        for (const StringView fen : {Position::kStartFen, kKiwipeteFen, kPosition3Fen, kPosition4Fen, kPosition5Fen, kPosition6Fen}) {
             SCOPED_TRACE(eastl::string(fen.data(), fen.size()).c_str());
             const Position position = PositionFromFen(fen);
             EXPECT_TRUE(ExpectSameMoves(*referee, position));
@@ -294,7 +294,7 @@ namespace BECore::Chess::Tests {
         const auto referee = StockfishReferee::Start(*path);
         ASSERT_NE(referee, nullptr);
 
-        for (const eastl::string_view fen : {kMateFen, kStalemateFen}) {
+        for (const StringView fen : {kMateFen, kStalemateFen}) {
             SCOPED_TRACE(eastl::string(fen.data(), fen.size()).c_str());
             const Optional<eastl::vector<eastl::string>> theirs = referee->Moves(fen);
             ASSERT_TRUE(theirs.has_value());

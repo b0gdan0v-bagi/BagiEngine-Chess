@@ -27,8 +27,8 @@ namespace BECore::Chess::Tests {
         /// The words a server line may begin with
         constexpr const char* kKnownKeywords[] = {"id", "option", "uciok", "readyok", "bestmove", "info"};
 
-        bool StartsWith(const eastl::string& text, eastl::string_view prefix) {
-            return eastl::string_view(text.data(), text.size()).starts_with(prefix);
+        bool StartsWith(const eastl::string& text, StringView prefix) {
+            return StringView(text).starts_with(prefix);
         }
 
         /// An engine of the tests: records every limit it is asked with, answers the legal move numbered by the depth (so the answer of each depth is told apart), and
@@ -122,12 +122,12 @@ namespace BECore::Chess::Tests {
         class Session {
         public:
             explicit Session(eastl::shared_ptr<IChessEngine> engine = eastl::make_shared<OwnEngine>())
-                : _server(std::move(engine), [this](eastl::string_view line) {
+                : _server(std::move(engine), [this](StringView line) {
                       const std::lock_guard lock(_mutex);
                       _lines.emplace_back(line.data(), line.size());
                   }) {}
 
-            void Send(eastl::string_view line) {
+            void Send(StringView line) {
                 _server.HandleLine(line);
             }
 
@@ -145,11 +145,11 @@ namespace BECore::Chess::Tests {
                 return _lines;
             }
 
-            [[nodiscard]] bool WaitForLine(eastl::string_view prefix) const {
+            [[nodiscard]] bool WaitForLine(StringView prefix) const {
                 return ScriptedEngine::WaitUntil([&] { return CountOf(prefix) > 0; });
             }
 
-            [[nodiscard]] size_t CountOf(eastl::string_view prefix) const {
+            [[nodiscard]] size_t CountOf(StringView prefix) const {
                 size_t count = 0;
                 for (const eastl::string& line : Lines()) {
                     count += StartsWith(line, prefix) ? 1 : 0;
@@ -161,7 +161,7 @@ namespace BECore::Chess::Tests {
             [[nodiscard]] eastl::vector<eastl::string> BestMoves() const {
                 eastl::vector<eastl::string> moves;
                 for (const eastl::string& line : Lines()) {
-                    if (const auto parsed = UciProtocol::ParseBestMove(eastl::string_view(line.data(), line.size()))) {
+                    if (const auto parsed = UciProtocol::ParseBestMove(StringView(line))) {
                         moves.push_back(parsed->move.empty() ? eastl::string("(none)") : parsed->move);
                     }
                 }
@@ -205,7 +205,7 @@ namespace BECore::Chess::Tests {
 
         bool IsLegalIn(const SearchRequest& request, const eastl::string& uci) {
             const auto position = request.FinalPosition();
-            return position && MoveGenerator::ParseUci(*position, eastl::string_view(uci.data(), uci.size())).has_value();
+            return position && MoveGenerator::ParseUci(*position, StringView(uci)).has_value();
         }
 
         eastl::shared_ptr<ScriptedEngine> MakeScripted() {
@@ -251,7 +251,7 @@ namespace BECore::Chess::Tests {
         session.Play({"position startpos moves e2e4", "go depth 1"});
         const eastl::vector<eastl::string> lines = session.Lines();
         ASSERT_EQ(lines.size(), 1u);
-        const auto parsed = UciProtocol::ParseBestMove(eastl::string_view(lines[0].data(), lines[0].size()));
+        const auto parsed = UciProtocol::ParseBestMove(StringView(lines[0]));
         ASSERT_TRUE(parsed.has_value());
         EXPECT_FALSE(parsed->IsNone());
     }

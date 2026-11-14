@@ -25,13 +25,13 @@ namespace BECore::Chess::Tests {
 #else
         constexpr const char* kWrapperName = "stockfish-wrapper.sh";
 #endif
-        constexpr eastl::string_view kMissingPath = "/no/such/file";
-        constexpr eastl::string_view kTildePath = "~/bin/stockfish";
+        constexpr StringView kMissingPath = "/no/such/file";
+        constexpr StringView kTildePath = "~/bin/stockfish";
         constexpr std::filesystem::perms kScriptPermissions = std::filesystem::perms::owner_all | std::filesystem::perms::group_read | std::filesystem::perms::group_exec |
                                                               std::filesystem::perms::others_read | std::filesystem::perms::others_exec;  // 755
-        constexpr eastl::string_view kHardLevelId = "hard";
+        constexpr StringView kHardLevelId = "hard";
 
-        bool Play(ChessGameModel& model, eastl::string_view uci) {
+        bool Play(ChessGameModel& model, StringView uci) {
             const auto move = MoveGenerator::ParseUci(model.GetPosition(), uci);
             return move.has_value() && model.TryMove(*move).has_value();
         }
@@ -49,13 +49,13 @@ namespace BECore::Chess::Tests {
             return EngineError{EngineErrorKind::LaunchFailed, "no Stockfish in the test"};
         }
 
-        size_t LevelIndex(eastl::string_view id) {
+        size_t LevelIndex(StringView id) {
             const Optional<size_t> index = FindOpponentLevel(id);
             EXPECT_TRUE(index.has_value()) << id.data();
             return index.value_or(kDefaultOpponentLevel);
         }
 
-        bool Contains(const eastl::string& text, eastl::string_view part) {
+        bool Contains(const eastl::string& text, StringView part) {
             return text.find(part.data(), 0, part.size()) != eastl::string::npos;
         }
 
@@ -764,7 +764,7 @@ namespace BECore::Chess::Tests {
     namespace {
 
         /// A shell script that runs the fake UCI engine with @p flags, as the "Stockfish" of a test: stockfishPath points at it
-        std::filesystem::path WriteWrapper(const TempDirectory& directory, eastl::string_view flags) {
+        std::filesystem::path WriteWrapper(const TempDirectory& directory, StringView flags) {
             const std::filesystem::path script = directory.File(kWrapperName);
             {
                 std::ofstream out(script);
@@ -1159,7 +1159,7 @@ namespace BECore::Chess::Tests {
             }
 
             /// The premoves of the person, each a click on the from and on the to square
-            void Queue(eastl::string_view from, eastl::string_view to) {
+            void Queue(StringView from, StringView to) {
                 model.OnPremoveClicked(PieceColor::White, Sq(from));
                 EXPECT_TRUE(model.OnPremoveClicked(PieceColor::White, Sq(to)));
             }
