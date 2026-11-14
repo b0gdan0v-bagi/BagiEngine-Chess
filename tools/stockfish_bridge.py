@@ -2,9 +2,9 @@
 """Plays a Chess game of the engine against Stockfish: reads the position over the control API, asks Stockfish over UCI and
 sends the move back. Stockfish is a separate process, never linked into the engine. Standard library only.
 
-    python tools/stockfish_bridge.py --exe build/ClangmacOS/BagiChess --side both          # Stockfish plays both sides
+    python tools/stockfish_bridge.py --exe build/macos-debug/bin/BagiChess --side both          # Stockfish plays both sides
     python tools/stockfish_bridge.py --side white                                          # a game already running with --control
-    python tools/stockfish_bridge.py --exe build/ClangmacOS/BagiChess --side white --opponent random --cross-check
+    python tools/stockfish_bridge.py --exe build/macos-debug/bin/BagiChess --side white --opponent random --cross-check
 
 --side picks the sides Stockfish plays. The other side is a person at the window (waited for) or, with --opponent random, a
 random legal move. --cross-check asks Stockfish for the legal moves of every position (`go perft 1`) and fails when they differ

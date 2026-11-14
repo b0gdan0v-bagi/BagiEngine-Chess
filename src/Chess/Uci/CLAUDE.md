@@ -58,7 +58,7 @@ A stray log line would break a tournament tool. Every line `BagiChessUci` writes
 
 ```bash
 cmake --build --preset macos-debug --target BagiChessUci
-printf 'uci\nisready\nposition startpos moves e2e4\ngo depth 2\nquit\n' | build/ClangmacOS/BagiChessUci
+printf 'uci\nisready\nposition startpos moves e2e4\ngo depth 2\nquit\n' | build/macos-debug/bin/BagiChessUci
 ```
 
 prints

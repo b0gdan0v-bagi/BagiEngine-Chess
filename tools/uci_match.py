@@ -2,9 +2,9 @@
 """Measures the strength of the own engine: plays `BagiChessUci` against another UCI engine (Stockfish) at fixed Elo steps, with the
 game as referee, and prints an Elo with a 95 % error bar for every step of the own engine. Standard library only.
 
-    python tools/uci_match.py --referee build/ClangmacOS/BagiChess --own build/ClangmacOS/BagiChessUci --opponent /usr/local/bin/stockfish
+    python tools/uci_match.py --referee build/macos-debug/bin/BagiChess --own build/macos-debug/bin/BagiChessUci --opponent /usr/local/bin/stockfish
     python tools/uci_match.py --referee ... --own ... --own-step hard --own-step depth=4,blunder=10 --opponent-elo 1500 --opponent-elo 1800 --games 10 --out match.json
-    python tools/uci_match.py --referee build/ClangmacOS/BagiChess --verify-openings
+    python tools/uci_match.py --referee build/macos-debug/bin/BagiChess --verify-openings
 
 A match is a set of pairs: one step of the own engine (a level `easy|medium|hard|max`, or `depth=N[,blunder=P]`) against one Elo step of
 the opponent (`UCI_LimitStrength` and `UCI_Elo`), `--games` games per pair, every opening from both sides. The referee is `BagiChess`
