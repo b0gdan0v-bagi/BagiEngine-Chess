@@ -52,8 +52,10 @@ namespace BECore::Chess {
         void Apply(const Premove& premove);
 
     private:
+        static constexpr size_t kColorCount = 2;
+
         eastl::array<Piece, kSquareCount> _cells{};
-        eastl::array<Bitboard, 2> _byColor{};
+        eastl::array<Bitboard, kColorCount> _byColor{};
     };
 
 }  // namespace BECore::Chess

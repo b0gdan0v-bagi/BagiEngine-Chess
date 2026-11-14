@@ -1249,6 +1249,19 @@ namespace BECore::Chess::Tests {
         EXPECT_TRUE(controller.PlaysFor(PieceColor::Black)) << "the old opponent stays";
     }
 
+    TEST_F(OpponentControllerTest, APickOfTwoPlayersDropsTheQueueAndAHalfMadePremove) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        PremoveGame game(eastl::make_shared<GatedEngine>(true));
+        game.Queue("d2", "d4");
+        game.model.OnPremoveClicked(PieceColor::White, Sq("g1"));
+        ASSERT_TRUE(game.model.HasSelection());
+
+        ASSERT_TRUE(game.controller.SetSide(std::nullopt).has_value());
+
+        EXPECT_TRUE(game.model.GetPremoves().empty());
+        EXPECT_FALSE(game.model.HasSelection()) << "no premove target stays drawn for a program that no longer plays";
+    }
+
     TEST_F(OpponentControllerTest, ShutdownDropsTheQueue) {
         SKIP_WITHOUT_WORKER_THREADS();
         PremoveGame game(eastl::make_shared<GatedEngine>(true));
