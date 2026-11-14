@@ -40,7 +40,7 @@ namespace BECore::Chess {
      *
      * Windows (UciProcessWindows.cpp): the child inherits exactly its three handles, its stderr is NUL, and it gets no console window. Its stdout is read with
      * overlapped I/O, so ReadLine() waits with a timeout like poll(); a read in flight is kept between calls. There are no signals: a write to a
-     * child that is gone is ERROR_NO_DATA / ERROR_BROKEN_PIPE, so ProcessDied, and Close() goes from the grace straight to TerminateProcess. The process id
+     * child that is gone is ERROR_NO_DATA / ERROR_BROKEN_PIPE, so ProcessDied, and Close() goes from the grace straight to ending the job (the process itself when there is none). The process id
      * stays valid until Close() lets go of the process handle. The texts of the system errors are the system's, in its language, with the number: "(error 2)".
      *
      * Where CHESS_HAS_UCI_PROCESS is 0 (CHESS_NO_STOCKFISH, Emscripten) Start(), WriteLine() and ReadLine() answer Unsupported with a sentence for the case,
@@ -78,7 +78,7 @@ namespace BECore::Chess {
          * @brief Ends the child and waits for it, whatever it does; the child is reaped when this returns. A second call does nothing.
          *
          * Closes its stdin (the end of input is the polite request, a caller that speaks a protocol sends its goodbye, for UCI `quit`, first),
-         * waits up to @p grace for it to leave, then sends SIGTERM and waits a little, then SIGKILL (on Windows: TerminateProcess right after the grace).
+         * waits up to @p grace for it to leave, then sends SIGTERM and waits a little, then SIGKILL (on Windows: the job, or the process, is terminated right after the grace).
          */
         void Close(std::chrono::milliseconds grace = kDefaultCloseGrace);
 
