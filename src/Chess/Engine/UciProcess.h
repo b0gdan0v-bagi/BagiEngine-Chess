@@ -51,7 +51,7 @@ namespace BECore::Chess {
         /// The longest line ReadLine() takes; a child that writes more without an end of line gives ProtocolError
         static constexpr size_t kMaxLineBytes = 1024 * 1024;
 
-        /// How long the destructor gives a child to leave after its input is closed, before it sends signals (on Windows: before TerminateProcess)
+        /// How long the destructor gives a child to leave after its input is closed, before it ends it (signals; on Windows the job, or the process, is terminated)
         static constexpr std::chrono::milliseconds kDefaultCloseGrace{500};
 
         /// Starts @p launch. The program is started when this returns: a missing file or one that cannot be executed is LaunchFailed with the reason from the system in `detail`
