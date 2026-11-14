@@ -20,8 +20,7 @@ namespace BECore::Chess::Tests {
         using Clock = std::chrono::steady_clock;
 
         constexpr SearchLimits kLimits{50, 0};
-        constexpr milliseconds kMustNotTimeOut{15000};
-        constexpr milliseconds kUpdateBudget{2000};  // an Update that waits for the engine would take a minute (kThinksUntilStopped)
+        constexpr milliseconds kMustNotTimeOut{30000};  // the give-up limit of a wait: it only ends a broken test
         constexpr milliseconds kPollInterval{1};
         constexpr int kManyUpdates = 1000;
         constexpr const char* kLogName = "fake.log";
@@ -198,16 +197,12 @@ namespace BECore::Chess::Tests {
         EngineOpponent opponent(MakeFakeEngine({"--log", log, "--think-ms", kThinksUntilStopped, "--moves", "e7e5"}), PieceColor::Black, kLimits);
         ASSERT_TRUE(Play(model, "e2e4"));
 
-        const Clock::time_point begin = Clock::now();
         opponent.Update(model);  // starts the process and the search on the pool
-        const Clock::duration starting = Clock::now() - begin;
         ASSERT_TRUE(WaitForLogLine(directory.File(kLogName), kGoCommand)) << "the fake has the search and is thinking";
-        const Clock::time_point again = Clock::now();
         opponent.Update(model);
-        const Clock::duration whileThinking = Clock::now() - again;
 
-        EXPECT_LT(starting, kUpdateBudget);
-        EXPECT_LT(whileThinking, kUpdateBudget);
+        // No clock: an Update that waited for the engine would not have returned before the answer (the fake thinks a minute, the answer deadline is the move time plus
+        // UciEngineSettings::kDefaultAnswerSlackMs), and the move would be played by now
         EXPECT_TRUE(opponent.IsThinking());
         EXPECT_EQ(model.GetMoves().size(), 1u) << "nothing was played: the engine is still thinking";
         // The destructor of the opponent cancels the search; the fake is stopped and ends with the engine

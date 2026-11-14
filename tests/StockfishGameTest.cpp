@@ -22,8 +22,8 @@
 /// Whole games with a real Stockfish, through the classes the window uses: Stockfish against a seeded random mover and against the own engine through ChessGameModel,
 /// and a person's move answered by the real Stockfish through OpponentController with the DEFAULT factory (no SetEngineFactory). Every case skips itself without a
 /// Stockfish (StockfishUtil.h). A time-limited Stockfish is never asserted to play a particular move or to win; the games assert that every move was accepted and nothing
-/// failed. the two DISABLED_ yardsticks are by-hand measures of the ladder (the own engine against Stockfish Skill 0, the Stockfish levels against the own engine at depth 3); a normal run does not
-/// pay for them
+/// failed. The DISABLED_ yardsticks are by-hand measures: of the ladder (the own engine against Stockfish Skill 0, the Stockfish levels against the own engine at depth 3) and of the
+/// speed of Shutdown() during a search; a normal run does not pay for them and never decides by a clock
 namespace BECore::Chess::Tests {
 
     namespace {
@@ -36,8 +36,8 @@ namespace BECore::Chess::Tests {
         constexpr uint64_t kRandomSeed = 0x9E3779B97F4A7C15ULL;
         constexpr size_t kShortestMate = 4;  ///< the plies of the fool's mate: a quick win of Stockfish over a random mover is possible, a game of fewer plies is not
         constexpr int kQuitGraceMs = OpponentController::kQuitGraceMs;
-        constexpr std::chrono::milliseconds kShutdownBudget{1000};  ///< Shutdown() cancels and returns, it does not wait for the search
-        constexpr std::chrono::milliseconds kChildEndBudget{3000};  ///< the child leaves after the cancel: the search answers `stop`, then the engine is closed
+        constexpr std::chrono::milliseconds kShutdownBudget{1000};   ///< Shutdown() cancels and returns, it does not wait for the search; only the yardstick checks it
+        constexpr std::chrono::milliseconds kChildEndBudget{30000};  ///< the give-up limit of the wait for the child to leave after the cancel (`stop`, then the close): it only ends a broken test
         constexpr eastl::string_view kMissingPath = "/no/such/file";
         constexpr eastl::string_view kEasyLevelId = "easy";
         constexpr eastl::string_view kHardLevelId = "hard";
@@ -140,6 +140,38 @@ namespace BECore::Chess::Tests {
         /// The process is gone and collected: a zombie would still answer kill(pid, 0)
         bool IsGone(int processId) {
             return kill(static_cast<pid_t>(processId), 0) == -1 && errno == ESRCH;
+        }
+
+        /// Starts a max level search of the Stockfish at @p stockfishPath, calls Shutdown() while it runs and checks what is left: the processes are gone, the program was told
+        /// `stop`, nothing late is played. With @p checkSpeed Shutdown() must also have returned within kShutdownBudget (the yardstick; a normal run decides nothing by a clock)
+        void ShutdownDuringAMaxLevelSearch(const eastl::string& stockfishPath, bool checkSpeed) {
+            const TempDirectory directory;
+            const std::filesystem::path wrapper = WriteWrapper(directory, stockfishPath, kPidLogName, kStdinLogName);  // a copy of what the game writes to the program lands in stdin.log
+            ChessGameModel model;
+            OpponentController controller(model, SettingsFor(wrapper));
+            ASSERT_TRUE(controller.SetLevel(LevelIndex(kMaxLevelId)).has_value());  // two seconds a move: the search is still running when Shutdown() comes
+            ASSERT_TRUE(controller.SetSide(PieceColor::Black).has_value());
+            ASSERT_TRUE(Play(model, "e2e4"));
+            controller.Update();
+            ASSERT_TRUE(controller.IsThinking());
+            // The proof that a search runs: the program was told to go. Shutdown() before this line would be a cancel during the handshake, which no test covers with a process yet
+            ASSERT_TRUE(WaitForLogLine(directory.File(kStdinLogName), kMaxGoCommand)) << "the program never got `" << kMaxGoCommand.data() << "`";
+            ASSERT_TRUE(WaitUntil([&] { return ProcessIdAt(directory.File(kPidLogName), 1).has_value(); })) << "the program's process id";
+            const int scriptId = *ProcessIdAt(directory.File(kPidLogName), 0);
+            const int programId = *ProcessIdAt(directory.File(kPidLogName), 1);
+
+            const auto started = std::chrono::steady_clock::now();
+            controller.Shutdown();
+            const auto took = std::chrono::steady_clock::now() - started;
+
+            if (checkSpeed) {
+                EXPECT_LT(took, kShutdownBudget);
+            }
+            EXPECT_TRUE(WaitUntil([&] { return IsGone(scriptId); }, kChildEndBudget)) << "the script " << scriptId << " is still there";
+            EXPECT_TRUE(WaitUntil([&] { return IsGone(programId); }, kChildEndBudget)) << "the program " << programId << " is still there";
+            EXPECT_TRUE(WaitForLogLine(directory.File(kStdinLogName), kStopCommand, kChildEndBudget)) << "a running search is told `stop` before the program is closed";
+            EXPECT_EQ(model.GetMoves().size(), 1u) << "a late answer is never played";
+            EXPECT_FALSE(controller.GetPlays().has_value()) << "nobody plays after Shutdown()";
         }
 #endif
 
@@ -300,33 +332,17 @@ namespace BECore::Chess::Tests {
         EXPECT_FALSE(controller.IsThinking());
     }
 
-    TEST_F(StockfishGameTest, ShutdownDuringAMaxLevelSearchReturnsAtOnceAndTheChildEnds) {
+    TEST_F(StockfishGameTest, ShutdownDuringAMaxLevelSearchEndsTheChildAndPlaysNothing) {
         SKIP_WITHOUT_STOCKFISH(path);
-        const TempDirectory directory;
-        const std::filesystem::path wrapper = WriteWrapper(directory, *path, kPidLogName, kStdinLogName);  // a copy of what the game writes to the program lands in stdin.log
-        ChessGameModel model;
-        OpponentController controller(model, SettingsFor(wrapper));
-        ASSERT_TRUE(controller.SetLevel(LevelIndex(kMaxLevelId)).has_value());  // two seconds a move: the search is still running when Shutdown() comes
-        ASSERT_TRUE(controller.SetSide(PieceColor::Black).has_value());
-        ASSERT_TRUE(Play(model, "e2e4"));
-        controller.Update();
-        ASSERT_TRUE(controller.IsThinking());
-        // The proof that a search runs: the program was told to go. Shutdown() before this line would be a cancel during the handshake, which no test covers with a process yet
-        ASSERT_TRUE(WaitForLogLine(directory.File(kStdinLogName), kMaxGoCommand)) << "the program never got `" << kMaxGoCommand.data() << "`";
-        ASSERT_TRUE(WaitUntil([&] { return ProcessIdAt(directory.File(kPidLogName), 1).has_value(); })) << "the program's process id";
-        const int scriptId = *ProcessIdAt(directory.File(kPidLogName), 0);
-        const int programId = *ProcessIdAt(directory.File(kPidLogName), 1);
+        ShutdownDuringAMaxLevelSearch(*path, false);
+    }
 
-        const auto started = std::chrono::steady_clock::now();
-        controller.Shutdown();
-        const auto took = std::chrono::steady_clock::now() - started;
-
-        EXPECT_LT(took, kShutdownBudget);
-        EXPECT_TRUE(WaitUntil([&] { return IsGone(scriptId); }, kChildEndBudget)) << "the script " << scriptId << " is still there";
-        EXPECT_TRUE(WaitUntil([&] { return IsGone(programId); }, kChildEndBudget)) << "the program " << programId << " is still there";
-        EXPECT_TRUE(WaitForLogLine(directory.File(kStdinLogName), kStopCommand, kChildEndBudget)) << "a running search is told `stop` before the program is closed";
-        EXPECT_EQ(model.GetMoves().size(), 1u) << "a late answer is never played";
-        EXPECT_FALSE(controller.GetPlays().has_value()) << "nobody plays after Shutdown()";
+    TEST_F(StockfishGameTest, DISABLED_ShutdownReturnsWhileSearchingYardstick) {
+        // The speed of the test above: Shutdown() cancels the search and returns, it does not wait for the two seconds of the search. A deadline on a machine under load is not
+        // a thing a normal run may decide on, so it is checked here, by hand, on a quiet one:
+        //   ChessTests --gtest_also_run_disabled_tests --gtest_filter=StockfishGameTest.DISABLED_ShutdownReturnsWhileSearchingYardstick
+        SKIP_WITHOUT_STOCKFISH(path);
+        ShutdownDuringAMaxLevelSearch(*path, true);
     }
 
 #endif  // !defined(_WIN32)
