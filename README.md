@@ -204,10 +204,12 @@ The ladder (`OpponentLevels`, `ownDepth`) is retuned only by the owner, from num
 |------|------|
 | `src/Chess/` | the game: rules (`Game/`), scene components, the control adapter. `CLAUDE.md` describes it |
 | `uci/` | `main.cpp` of `BagiChessUci`, the own engine as a UCI program (the server is `src/Chess/Uci/`) |
+| `dev.json` | what the `bagi-dev` panel of VS Code and `engine/tools/dev/dev.py` build and run: the game, `BagiChessUci`, the tests and the browser page, and the tools (the Stockfish bridge, the match, the screenshots, format, the docs budget). The browser page has not been run with emsdk (see "Browser build") |
 | `config/`, `assets/` | scene, texture library, application config, piece atlas |
 | `cmake/` | `ChessWeb.cmake`: the files of the browser package (see "Browser build") |
 | `tests/` | gtest cases, `control_smoke.py`, `uci_smoke.py` and `match_smoke.py` |
-| `tools/` | the Stockfish bridge and its pytest tests (`engine/.venv/bin/python -m pytest tools/tests`), the match tool `uci_match.py` (with `elo_rating.py` and `match_steps.py`) and its unit tests (`python3 -m unittest discover -s tools/tests -p "test_match_*.py"`) |
+| `tools/` | the Stockfish bridge and its pytest tests (`engine/.venv/bin/python -m pytest tools/tests`), the match tool `uci_match.py` (with `elo_rating.py` and `match_steps.py`) and its unit tests (`python3 -m unittest discover -s tools/tests -p "test_match_*.py"`), and `ui_shots.py`, the screenshot command (`python tools/ui_shots.py --list`) |
+| `.claude/rules/qa-project.md` | the screenshot set of the game (scenes, sizes) that the todo reviewer takes with `engine/tools/shots/shots.py`; the command is `tools/ui_shots.py` |
 | `todo/`, `TODO.md` | known problems, worked by the `todo-loop` skill (`todo/README.md`) |
 | `CI/` | environment setup (`setup_venv.*`) and the VS Code workspace `BagiChess.code-workspace` (CMake Tools on the engine's presets, CodeLLDB / MSVC launch, build tasks) |
 | `engine/` | the engine (submodule); not edited from here |

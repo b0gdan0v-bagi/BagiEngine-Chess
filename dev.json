@@ -1,0 +1,71 @@
+{
+  "products": [
+    {
+      "name": "game",
+      "label": "BagiChess",
+      "kind": "desktop",
+      "target": "BagiChess",
+      "run": ["{bin}/BagiChess{exe}"]
+    },
+    {
+      "name": "uci",
+      "label": "BagiChessUci (built with BagiChess, for the match tool)",
+      "kind": "desktop",
+      "prefer": "release",
+      "targets": ["BagiChessUci", "BagiChess"],
+      "run": ["{bin}/BagiChessUci{exe}"]
+    },
+    {
+      "name": "tests",
+      "label": "ChessTests and the smokes",
+      "kind": "desktop",
+      "targets": ["ChessTests", "BagiChess", "BagiChessUci"],
+      "run": ["ctest", "--preset", "{preset}", "--output-on-failure"]
+    },
+    {
+      "name": "web",
+      "label": "Browser build (not run with emsdk yet)",
+      "kind": "web",
+      "prefer": "release",
+      "target": "BagiChess",
+      "after": [["{python}", "{root}/engine/tools/web/package.py", "{bin}", "{root}/dist", "--game", "BagiChess"]],
+      "run": ["{python}", "{root}/engine/tools/web/serve.py", "--root", "{root}/dist"],
+      "url": "http://localhost:8080"
+    }
+  ],
+  "tools": [
+    {
+      "name": "stockfish-bridge",
+      "build": "game",
+      "command": ["{python}", "{root}/tools/stockfish_bridge.py", "--exe", "{bin}/BagiChess{exe}"]
+    },
+    {
+      "name": "uci-match",
+      "build": "uci",
+      "command": ["{python}", "{root}/tools/uci_match.py", "--referee", "{bin}/BagiChess{exe}", "--own", "{bin}/BagiChessUci{exe}"]
+    },
+    {
+      "name": "ui-shots",
+      "build": "game",
+      "command": ["{python}", "{root}/tools/ui_shots.py", "--exe", "{bin}/BagiChess{exe}", "--engine", "{root}/engine"]
+    },
+    {
+      "name": "format",
+      "command": ["{python}", "{root}/engine/CI/scripts/format_sources.py", "--changed", "--root", "{root}"]
+    },
+    {
+      "name": "docs-budget",
+      "command": ["{python}", "{root}/engine/CI/scripts/check_doc_budget.py", "--root", "{root}"]
+    }
+  ],
+  "flags": [
+    {"name": "BE_WITH_EDITOR", "label": "editor panels (also in Release)"},
+    {"name": "ENGINE_PROFILER", "label": "profiler zones and frames"},
+    {"name": "ENGINE_PROFILER_ALLOC", "label": "allocation counting (needs the profiler)"},
+    {"name": "ENGINE_FUZZ", "label": "AddressSanitizer + UBSan on every target"},
+    {"name": "ENGINE_SINGLE_THREAD", "label": "task system without worker threads"},
+    {"name": "ENGINE_ENABLE_ASSERTS", "label": "ASSERT macros", "default": "ON"},
+    {"name": "ENGINE_CCACHE", "label": "compile through ccache", "default": "ON"},
+    {"name": "CHESS_NO_STOCKFISH", "label": "no Stockfish: the own engine only, as in the web build"}
+  ]
+}
