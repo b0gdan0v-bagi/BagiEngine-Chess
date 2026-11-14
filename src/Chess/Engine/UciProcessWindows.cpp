@@ -19,23 +19,25 @@ namespace BECore::Chess {
         constexpr DWORD kPipeBytes = 64 * 1024;    // the size the system is asked for, for both pipes (a hint: it may round it)
         constexpr UINT kTerminatedExitCode = 1;    // the exit code of a child that TerminateProcess ended
         constexpr wchar_t kNullDevice[] = L"NUL";  // the child's stderr
-        constexpr wchar_t kPipeNamePrefix[] = L"\\\\.\\pipe\\BagiChess-uci-";
+        constexpr StringView kPipeNamePrefix = "\\\\.\\pipe\\BagiChess-uci-";
 
         std::unexpected<EngineError> Fail(EngineErrorKind kind, String detail) {
             return std::unexpected(EngineError{kind, std::move(detail)});
         }
 
-        /// UTF-16 of UTF-8 text, nothing for text that is not UTF-8
-        Optional<std::wstring> Widen(StringView text) {  //-NoStd: Win32 wide API
-            if (text.empty()) {
-                return std::wstring();  //-NoStd: Win32 wide API
+        /// UTF-16 of UTF-8 text, nothing for text that is not UTF-8. **The terminating L'\0' is the last element of the vector** (empty text gives only it), so `data()` is a
+        /// C string for the wide Win32 calls and the text itself is `size() - 1` characters
+        Optional<Vector<wchar_t>> Widen(StringView text) {
+            Vector<wchar_t> wide;
+            if (!text.empty()) {
+                const int length = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text.data(), static_cast<int>(text.size()), nullptr, 0);
+                if (length <= 0) {
+                    return std::nullopt;
+                }
+                wide.resize(static_cast<size_t>(length));
+                MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text.data(), static_cast<int>(text.size()), wide.data(), length);
             }
-            const int length = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text.data(), static_cast<int>(text.size()), nullptr, 0);
-            if (length <= 0) {
-                return std::nullopt;
-            }
-            std::wstring wide(static_cast<size_t>(length), L'\0');  //-NoStd: Win32 wide API
-            MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text.data(), static_cast<int>(text.size()), wide.data(), length);
+            wide.push_back(L'\0');
             return wide;
         }
 
@@ -149,12 +151,14 @@ namespace BECore::Chess {
         };
 
         /// @p argument quoted so that the C runtime of the child (CommandLineToArgvW, the MSVC CRT) gives it back as it is: backslashes are literal except before a quote
-        void AppendQuoted(std::wstring& line, const std::wstring& argument) {                       //-NoStd: Win32 wide API
-            if (!argument.empty() && argument.find_first_of(L" \t\n\v\"") == std::wstring::npos) {  //-NoStd: Win32 wide API
-                line += argument;
+        /// (@p argument is the text without its terminator, @p line has none either)
+        void AppendQuoted(Vector<wchar_t>& line, Span<const wchar_t> argument) {
+            const auto triggersQuotes = [](wchar_t character) { return character == L' ' || character == L'\t' || character == L'\n' || character == L'\v' || character == L'"'; };
+            if (!argument.empty() && std::none_of(argument.begin(), argument.end(), triggersQuotes)) {
+                line.insert(line.end(), argument.begin(), argument.end());
                 return;
             }
-            line += L'"';
+            line.push_back(L'"');
             for (auto it = argument.begin();; ++it) {
                 size_t backslashes = 0;
                 while (it != argument.end() && *it == L'\\') {
@@ -162,23 +166,24 @@ namespace BECore::Chess {
                     ++backslashes;
                 }
                 if (it == argument.end()) {
-                    line.append(backslashes * 2, L'\\');  // the closing quote must stay a quote
+                    line.insert(line.end(), backslashes * 2, L'\\');  // the closing quote must stay a quote
                     break;
                 }
                 if (*it == L'"') {
-                    line.append(backslashes * 2 + 1, L'\\');
+                    line.insert(line.end(), backslashes * 2 + 1, L'\\');
                 } else {
-                    line.append(backslashes, L'\\');
+                    line.insert(line.end(), backslashes, L'\\');
                 }
-                line += *it;
+                line.push_back(*it);
             }
-            line += L'"';
+            line.push_back(L'"');
         }
 
-        /// A name no other pipe of this machine has: the id of this process and a counter
-        std::wstring UniquePipeName() {  //-NoStd: Win32 wide API
+        /// A name no other pipe of this machine has: the id of this process and a counter. With the terminator, like Widen's
+        Vector<wchar_t> UniquePipeName() {
             static std::atomic<uint32_t> counter{0};
-            return std::wstring(kPipeNamePrefix) + std::to_wstring(GetCurrentProcessId()) + L"-" + std::to_wstring(counter.fetch_add(1));  //-NoStd: Win32 wide API
+            // ASCII, so always valid UTF-8 for Widen
+            return *Widen(Format("{}{}-{}", kPipeNamePrefix, GetCurrentProcessId(), counter.fetch_add(1)));
         }
 
         /// A job whose processes are killed when its last handle closes; none when the system refuses one
@@ -240,21 +245,26 @@ namespace BECore::Chess {
         }
         const auto cannotStart = [&launch](StringView reason) { return Fail(EngineErrorKind::LaunchFailed, Format("cannot start {}: {}", launch.path, reason)); };
 
-        Optional<std::wstring> application = Widen(launch.path);  //-NoStd: Win32 wide API
+        Optional<Vector<wchar_t>> application = Widen(launch.path);
         if (!application) {
             return cannotStart("the path is not UTF-8");
         }
         std::replace(application->begin(), application->end(), L'/', L'\\');
-        // argv[0] is read by other rules (no escapes, quotes only), and a path holds no quote: it is always quoted
-        std::wstring commandLine = L"\"" + *application + L"\"";  //-NoStd: Win32 wide API
+        // argv[0] is read by other rules (no escapes, quotes only), and a path holds no quote: it is always quoted. The vectors of Widen end with a terminator: the text is
+        // all but the last element
+        Vector<wchar_t> commandLine;
+        commandLine.push_back(L'"');
+        commandLine.insert(commandLine.end(), application->begin(), application->end() - 1);
+        commandLine.push_back(L'"');
         for (const String& argument : launch.args) {
-            const Optional<std::wstring> wide = Widen(argument);  //-NoStd: Win32 wide API
+            const Optional<Vector<wchar_t>> wide = Widen(argument);
             if (!wide) {
                 return cannotStart("an argument is not UTF-8");
             }
-            commandLine += L' ';
-            AppendQuoted(commandLine, *wide);
+            commandLine.push_back(L' ');
+            AppendQuoted(commandLine, Span<const wchar_t>(wide->data(), wide->size() - 1));
         }
+        commandLine.push_back(L'\0');  // CreateProcessW writes into the buffer: it stays a mutable vector
 
         auto state = MakeUnique<WindowsState>();
         SECURITY_ATTRIBUTES inheritable{sizeof(SECURITY_ATTRIBUTES), nullptr, TRUE};
@@ -272,13 +282,13 @@ namespace BECore::Chess {
         }
 
         // stdout: a named pipe, because an anonymous one cannot be read with a timeout; the child's end is an ordinary synchronous handle
-        const std::wstring pipeName = UniquePipeName();  //-NoStd: Win32 wide API
-        state->output = UniqueHandle(CreateNamedPipeW(pipeName.c_str(), PIPE_ACCESS_INBOUND | FILE_FLAG_OVERLAPPED | FILE_FLAG_FIRST_PIPE_INSTANCE,
+        const Vector<wchar_t> pipeName = UniquePipeName();
+        state->output = UniqueHandle(CreateNamedPipeW(pipeName.data(), PIPE_ACCESS_INBOUND | FILE_FLAG_OVERLAPPED | FILE_FLAG_FIRST_PIPE_INSTANCE,
                                                       PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT | PIPE_REJECT_REMOTE_CLIENTS, 1, 0, kPipeBytes, 0, nullptr));
         if (!state->output) {
             return cannotStart(Format("no pipe: {}", ErrorText(GetLastError())));
         }
-        const UniqueHandle childOutput(CreateFileW(pipeName.c_str(), GENERIC_WRITE | FILE_READ_ATTRIBUTES, 0, &inheritable, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+        const UniqueHandle childOutput(CreateFileW(pipeName.data(), GENERIC_WRITE | FILE_READ_ATTRIBUTES, 0, &inheritable, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
         if (!childOutput) {
             return cannotStart(Format("no pipe: {}", ErrorText(GetLastError())));
         }
@@ -311,8 +321,8 @@ namespace BECore::Chess {
         PROCESS_INFORMATION created{};
         // CREATE_NO_WINDOW: a console program started from the game (a window, no console) would open a console window of its own. Suspended until it is in the job,
         // so that nothing it starts is outside
-        if (!CreateProcessW(application->c_str(), commandLine.data(), nullptr, nullptr, TRUE, EXTENDED_STARTUPINFO_PRESENT | CREATE_NO_WINDOW | CREATE_SUSPENDED, nullptr, nullptr,
-                            &startup.StartupInfo, &created)) {
+        if (!CreateProcessW(application->data(), commandLine.data(), nullptr, nullptr, TRUE, EXTENDED_STARTUPINFO_PRESENT | CREATE_NO_WINDOW | CREATE_SUSPENDED, nullptr, nullptr, &startup.StartupInfo,
+                            &created)) {
             return cannotStart(ErrorText(GetLastError()));
         }
         state->process = UniqueHandle(created.hProcess);
