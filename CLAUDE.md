@@ -27,7 +27,7 @@ cmake/ChessWeb.cmake          the web build: which files of config/ and assets/ 
 | `src/Chess/Engine/CLAUDE.md` | the opponent: the engine interface, UCI and Stockfish, the own engine, the levels and the handicap, the settings file, the controller and the choice, the analysis |
 | `src/Chess/Uci/CLAUDE.md` | `BagiChessUci`: the commands and options, the `stop` and clock rules, how to run it and its smoke |
 | `src/Chess/Components/CLAUDE.md` | the scene and the UI: pieces, board, hint, HUD, opponent panel, promotion picker, draw order; **read it before changing `config/SceneConfig.xml`** |
-| `tests/CLAUDE.md` | the test files, the control smoke, the fake UCI engine, the test helpers |
+| `tests/CLAUDE.md` | where a test goes, the helpers, the fake UCI engine, the smokes, the build variants |
 
 ## Control API
 
@@ -66,4 +66,4 @@ New rule code goes into `Game/` with a gtest case; do not patch around the gener
 
 ## Tests
 
-`tests/`, executable `ChessTests`, plus the control smoke `BagiChessControlSmoke` (`tests/control_smoke.py`) and the recorded scenarios `BagiChessScenario.*` (`tests/scenarios/`) under ctest. What each test file covers, the fake UCI engine and the helpers are in `tests/CLAUDE.md`: read it before adding or changing a test. Tests that need Stockfish skip themselves without one.
+`tests/`, executable `ChessTests`, plus the control smoke `BagiChessControlSmoke` (`tests/control_smoke.py`) and the recorded scenarios `BagiChessScenario.*` (`tests/scenarios/`) under ctest. Where a test goes, the helpers, the fake UCI engine and the build variants are in `tests/CLAUDE.md`: read it before adding or changing a test. Tests that need Stockfish skip themselves without one.
