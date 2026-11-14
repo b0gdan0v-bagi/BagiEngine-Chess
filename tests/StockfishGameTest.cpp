@@ -18,11 +18,9 @@
 #include <unistd.h>
 #endif
 
-/// Whole games with a real Stockfish, through the classes the window uses: Stockfish against a seeded random mover and against the own engine through ChessGameModel,
-/// and a person's move answered by the real Stockfish through OpponentController with the DEFAULT factory (no SetEngineFactory). Every case skips itself without a
-/// Stockfish (StockfishUtil.h). A time-limited Stockfish is never asserted to play a particular move or to win; the games assert that every move was accepted and nothing
-/// failed. The DISABLED_ yardsticks are by-hand measures: of the ladder (the own engine against Stockfish Skill 0, the Stockfish levels against the own engine at depth 3) and of the
-/// speed of Shutdown() during a search; a normal run does not pay for them and never decides by a clock
+/// Whole games with a real Stockfish, through the classes the window uses (the controller cases with the DEFAULT factory, no SetEngineFactory). Every case skips itself
+/// without a Stockfish (StockfishUtil.h). A time-limited Stockfish is never asserted to play a particular move or to win; the games assert that every move was accepted and
+/// nothing failed. The DISABLED_ cases are by-hand yardsticks (the commands are at their tests): a normal run never decides by a clock
 namespace BECore::Chess::Tests {
 
     namespace {
@@ -47,8 +45,8 @@ namespace BECore::Chess::Tests {
         constexpr StringView kMaxGoCommand = "go movetime 2000";  ///< what the Max level sends (kMaxMoveTimeMs of OpponentLevels.cpp)
         constexpr StringView kStopCommand = "stop";
         constexpr const char* kWrapperName = "stockfish-wrapper.sh";
-        constexpr std::filesystem::perms kScriptPermissions = std::filesystem::perms::owner_all | std::filesystem::perms::group_read | std::filesystem::perms::group_exec |
-                                                              std::filesystem::perms::others_read | std::filesystem::perms::others_exec;  // 755
+        constexpr std::filesystem::perms kScriptPermissions =
+            std::filesystem::perms::owner_all | std::filesystem::perms::group_read | std::filesystem::perms::group_exec | std::filesystem::perms::others_read | std::filesystem::perms::others_exec;
 
         // The yardstick: N games per level of the own engine, the colors alternating. CHESS_YARDSTICK_GAMES in the environment replaces N for a quick look
         constexpr int kYardstickGames = 4;
@@ -108,9 +106,9 @@ namespace BECore::Chess::Tests {
         }
 
 #if !defined(_WIN32)
-        /// A shell script that notes its start in @p launches, its process id in @p pidFile and, when @p stdinLog is given, a copy of every line the game sends in that file
-        /// (tee), then becomes the Stockfish at @p stockfish. Without @p stdinLog the script `exec`s the program, so its id is the engine's. With it the script stays the
-        /// parent of a pipe `tee | program`: the second line of @p pidFile is the id of the program itself (a shell that `exec`s it), the first is the script's
+        /// A shell script that notes its start and its process id in @p pidFile, then becomes the Stockfish at @p stockfish. Without @p stdinLog it `exec`s the program, so the
+        /// id is the engine's. With it the script stays the parent of a pipe `tee | program` that copies every line the game sends into @p stdinLog: the first line of
+        /// @p pidFile is then the script's id and the second the program's own
         std::filesystem::path WriteWrapper(const TempDirectory& directory, const String& stockfish, const char* pidFile, const char* stdinLog = nullptr) {
             const std::filesystem::path script = directory.File(kWrapperName);
             {
@@ -145,10 +143,10 @@ namespace BECore::Chess::Tests {
         /// `stop`, nothing late is played. With @p checkSpeed Shutdown() must also have returned within kShutdownBudget (the yardstick; a normal run decides nothing by a clock)
         void ShutdownDuringAMaxLevelSearch(const String& stockfishPath, bool checkSpeed) {
             const TempDirectory directory;
-            const std::filesystem::path wrapper = WriteWrapper(directory, stockfishPath, kPidLogName, kStdinLogName);  // a copy of what the game writes to the program lands in stdin.log
+            const std::filesystem::path wrapper = WriteWrapper(directory, stockfishPath, kPidLogName, kStdinLogName);
             ChessGameModel model;
             OpponentController controller(model, SettingsFor(wrapper));
-            ASSERT_TRUE(controller.SetLevel(LevelIndex(kMaxLevelId)).has_value());  // two seconds a move: the search is still running when Shutdown() comes
+            ASSERT_TRUE(controller.SetLevel(LevelIndex(kMaxLevelId)).has_value());  // the longest search of the levels: it is still running when Shutdown() comes
             ASSERT_TRUE(controller.SetSide(PieceColor::Black).has_value());
             ASSERT_TRUE(Play(model, "e2e4"));
             controller.Update();
@@ -337,7 +335,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(StockfishGameTest, DISABLED_ShutdownReturnsWhileSearchingYardstick) {
-        // The speed of the test above: Shutdown() cancels the search and returns, it does not wait for the two seconds of the search. A deadline on a machine under load is not
+        // The speed of the test above: Shutdown() cancels the search and returns, it does not wait for the search to end. A deadline on a machine under load is not
         // a thing a normal run may decide on, so it is checked here, by hand, on a quiet one:
         //   ChessTests --gtest_also_run_disabled_tests --gtest_filter=StockfishGameTest.DISABLED_ShutdownReturnsWhileSearchingYardstick
         SKIP_WITHOUT_STOCKFISH(path);
