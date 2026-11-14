@@ -54,9 +54,10 @@ namespace BECore::Chess {
      *
      * A pick asks the factory for every seat that plays and is new, has another choice or whose opponent has failed, all BEFORE it changes anything. A pick that finds no engine is REFUSED as a whole:
      * nothing changes (the sides, the choices, the running opponents and their searches stay), the error is kept in GetError(), the revision grows and one warning is logged. Nothing falls back to the
-     * other engine: the person picks it (SetEngine(), which clears the error), then a side. While nobody plays, SetEngine() only changes the choice and cannot be refused. A change destroys the old
-     * EngineOpponent of a changed seat first (it cancels its search and returns at once, and a late answer is never played); a seat whose color and choice are unchanged keeps its opponent and its
-     * search. A pick that changes nothing does nothing, except that it clears a standing refusal and remakes an opponent whose search failed (the retry).
+     * other engine: the person picks it (SetEngine(), which clears the error), then a side. While nobody plays, SetEngine() only changes the choice and cannot be refused (except a pick of Stockfish
+     * in a CHESS_NO_STOCKFISH build, below). A change destroys the old EngineOpponent of a changed seat first (it cancels its search and returns at once, and a late answer is never played); a seat
+     * whose color and choice are unchanged keeps its opponent and its search. A pick that changes nothing does nothing, except that it clears a standing refusal and remakes an opponent whose search
+     * failed (the retry).
      *
      * In a build without Stockfish (CHESS_NO_STOCKFISH) a pick of Stockfish is refused the same way (`Unsupported`), for any seat and also while nobody plays it, as long as the controller uses its
      * default factory: a factory given by SetEngineFactory() is the caller's own world and is asked as before.
@@ -133,14 +134,15 @@ namespace BECore::Chess {
         /// Side and strength in one pick, the engine kept: the rules of SetSide() and SetLevel()
         std::expected<void, EngineError> Choose(Optional<PieceColor> computer, size_t level);
 
-        /// Side, strength and engine in one pick
+        /// Side, strength and engine in one pick; BadRequest for a level outside GetOpponentLevels(), as the other picks
         std::expected<void, EngineError> Choose(Optional<PieceColor> computer, size_t level, OpponentEngine engine);
 
-        /// The engine, for both seats; with nobody playing it only changes the choice and clears a standing pick error
+        /// The engine, for both seats; with nobody playing it only changes the choice and clears a standing pick error (a pick of Stockfish is still refused in a CHESS_NO_STOCKFISH build)
         std::expected<void, EngineError> SetEngine(OpponentEngine engine);
 
         std::expected<void, EngineError> CycleEngine();
 
+        /// The next level, the first one after the last
         std::expected<void, EngineError> CycleLevel();
 
         /// One step per frame; it never waits for the engine

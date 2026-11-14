@@ -12,9 +12,10 @@ namespace BECore::Chess {
 
     [[nodiscard]] StringView OpponentModeId(OpponentMode mode);
 
-    /// The mode or the color with this id (exactly as written: ids are lower case), or nothing
+    /// The mode with this id (exactly as written: ids are lower case), or nothing when it is not in the table
     [[nodiscard]] Optional<OpponentMode> ParseMode(StringView id);
 
+    /// The color with this id (exactly as written: ids are lower case), or nothing when it is not in the table
     [[nodiscard]] Optional<PieceColor> ParseColor(StringView id);
 
     /// BadId: the id is not in the table; nothing changed and no engine was asked. Engine: the controller refused the pick (ChoiceError::engine)
@@ -58,6 +59,7 @@ namespace BECore::Chess {
 
         std::expected<void, ChoiceError> SetMode(StringView id);
 
+        /// The person's color. While the program plays it moves to the opposite side (a refused pick keeps the old color); while nobody plays only the remembered color changes
         std::expected<void, ChoiceError> SetColor(StringView id);
 
         /// An engine id of the control API ("stockfish", "own")
