@@ -133,7 +133,10 @@ def first_cpp_difference(old: str, new: str) -> tuple[int, str] | None:
                         f"the code moved from its marker `{marker}` (the next token is {new_gap.group(1)} lines below it, was {old_gap.group(1)})"
                     )
                 # Only one side has a gap: the marker is alone on its line with code after it in one text and not in the other
-                what = "is no longer alone on its line with code after it" if old_gap else "is alone on its line with code after it now"
+                if old_gap:
+                    what = "has no code after it now" if index == len(new_tokens) - 1 else "is no longer alone on its line with code after it"
+                else:
+                    what = "is alone on its line with code after it now"
                 return new_tokens[index].line, f"the marker `{marker}` {what}"
             return new_tokens[index].line, f"{describe(new_text)} instead of {describe(old_text)}"
     if len(new_tokens) > len(old_tokens):

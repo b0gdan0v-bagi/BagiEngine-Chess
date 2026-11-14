@@ -150,7 +150,7 @@ class CppDifferenceTest(unittest.TestCase):
         found = first_cpp_difference("int a;\n// NOLINTNEXTLINE\nint b;\n", "int a;\n// NOLINTNEXTLINE\n")
         self.assertIsNotNone(found)
         self.assertEqual(found[0], 2)
-        self.assertIn("no longer alone", found[1])
+        self.assertIn("has no code after it now", found[1])
 
     def test_a_marker_at_the_end_of_the_file_has_no_gap(self):
         self.assertIsNone(first_cpp_difference("int a;\n// NOLINTNEXTLINE\n", "int a;\n// NOLINTNEXTLINE\n\n"))
