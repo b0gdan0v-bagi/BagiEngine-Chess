@@ -5,7 +5,7 @@
 namespace BECore::Chess {
 
     /// The pieces a pawn can become on the last rank, queen first (the order of the buttons of the promotion panel)
-    [[nodiscard]] eastl::span<const PieceType> PromotionPieces();
+    [[nodiscard]] Span<const PieceType> PromotionPieces();
 
     /// The name of a promotion piece in the scene and in the actions: "queen", "rook", "bishop", "knight" (lower case); empty for any other piece
     [[nodiscard]] StringView PromotionId(PieceType type);

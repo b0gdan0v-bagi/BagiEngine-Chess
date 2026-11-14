@@ -40,7 +40,7 @@ namespace BECore::Chess {
     /// A save that Validate() has checked completely: everything Apply() needs, already parsed
     struct RestorePlan {
         Position start = Position::Start();  ///< the position the game began from
-        eastl::vector<Move> moves;           ///< legal in their turn, one after the other, from @p start
+        Vector<Move> moves;                  ///< legal in their turn, one after the other, from @p start
         bool finished = false;               ///< the game of the file is over: Apply() restores the opponent choice only
         ProgramSides plays;
         SeatChoice white;

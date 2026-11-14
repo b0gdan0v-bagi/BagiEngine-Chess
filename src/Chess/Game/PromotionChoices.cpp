@@ -10,14 +10,14 @@ namespace BECore::Chess {
             StringView label;
         };
 
-        constexpr eastl::array<PromotionEntry, 4> kPromotions{{
+        constexpr Array<PromotionEntry, 4> kPromotions{{
             {PieceType::Queen, "queen", "Queen"},
             {PieceType::Rook, "rook", "Rook"},
             {PieceType::Bishop, "bishop", "Bishop"},
             {PieceType::Knight, "knight", "Knight"},
         }};
 
-        constexpr eastl::array<PieceType, 4> kPromotionPieces{kPromotions[0].type, kPromotions[1].type, kPromotions[2].type, kPromotions[3].type};
+        constexpr Array<PieceType, 4> kPromotionPieces{kPromotions[0].type, kPromotions[1].type, kPromotions[2].type, kPromotions[3].type};
 
         const PromotionEntry* Find(PieceType type) {
             for (const PromotionEntry& entry : kPromotions) {
@@ -30,7 +30,7 @@ namespace BECore::Chess {
 
     }  // namespace
 
-    eastl::span<const PieceType> PromotionPieces() {
+    Span<const PieceType> PromotionPieces() {
         return kPromotionPieces;
     }
 

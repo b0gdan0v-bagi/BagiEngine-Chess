@@ -14,7 +14,7 @@ namespace BECore::Chess {
     inline constexpr int kRatingLines = 2;
 
     /// One entry per played move, in the order of ChessGameModel::GetMoves(); an empty one is a move that is not rated (yet)
-    using MoveRatings = eastl::vector<Optional<MoveRating>>;
+    using MoveRatings = Vector<Optional<MoveRating>>;
 
     /**
      * @brief Rates the moves of a ChessGameModel in the background: for every played move, an analysis of the position BEFORE it, and RateMove() over that analysis (MoveRating.h has the definition).
@@ -122,10 +122,10 @@ namespace BECore::Chess {
         bool _on = false;
 
         String _startFen;  ///< the game the ratings belong to: its start position and the moves seen so far
-        eastl::vector<Move> _moves;
-        MoveRatings _ratings;         ///< aligned with _moves
-        eastl::vector<bool> _failed;  ///< aligned with _moves: the search for this move failed and is not retried
-        uint64_t _generation = 0;     ///< grows when the held history is dropped; a search of an older one is thrown away
+        Vector<Move> _moves;
+        MoveRatings _ratings;      ///< aligned with _moves
+        Vector<bool> _failed;      ///< aligned with _moves: the search for this move failed and is not retried
+        uint64_t _generation = 0;  ///< grows when the held history is dropped; a search of an older one is thrown away
 
         eastl::shared_ptr<Search> _search;  ///< the search under way, null when none; main thread only
         size_t _searchPly = 0;              ///< the move _search rates

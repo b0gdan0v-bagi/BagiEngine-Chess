@@ -232,7 +232,7 @@ namespace BECore::Chess {
 
     }  // namespace
 
-    std::expected<eastl::unique_ptr<UciProcess>, EngineError> UciProcess::Start(const ProcessLaunch&) {
+    std::expected<UniquePtr<UciProcess>, EngineError> UciProcess::Start(const ProcessLaunch&) {
         return Fail(EngineErrorKind::Unsupported, kNoProcessDetail);
     }
 
@@ -262,7 +262,7 @@ namespace BECore::Chess {
         Close(kDefaultCloseGrace);
     }
 
-    std::expected<eastl::unique_ptr<UciProcess>, EngineError> UciProcess::Start(const ProcessLaunch& launch) {
+    std::expected<UniquePtr<UciProcess>, EngineError> UciProcess::Start(const ProcessLaunch& launch) {
         if (launch.path.empty()) {
             return Fail(EngineErrorKind::LaunchFailed, "no program to start");
         }
@@ -285,7 +285,7 @@ namespace BECore::Chess {
             return Fail(EngineErrorKind::LaunchFailed, Format("cannot start {}: {}", launch.path, ErrnoText(error)));
         }
 
-        eastl::vector<char*> argv;  // posix_spawn takes char* const[] but does not change the strings
+        Vector<char*> argv;  // posix_spawn takes char* const[] but does not change the strings
         argv.push_back(const_cast<char*>(launch.path.c_str()));
         for (const String& argument : launch.args) {
             argv.push_back(const_cast<char*>(argument.c_str()));
@@ -302,7 +302,7 @@ namespace BECore::Chess {
         // Only the child holds its ends now; with ours open here it would never see the end of the input, and we never the end of its output
         childInput.Reset();
         childOutput.Reset();
-        return eastl::unique_ptr<UciProcess>(new UciProcess(static_cast<int>(processId), inputToChild.Release(), outputFromChild.Release()));
+        return UniquePtr<UciProcess>(new UciProcess(static_cast<int>(processId), inputToChild.Release(), outputFromChild.Release()));
     }
 
     std::expected<void, EngineError> UciProcess::WriteLine(StringView text) {

@@ -9,17 +9,16 @@ namespace BECore::Chess {
             int dRank;
         };
 
-        constexpr eastl::array<Direction, 4> kRookDirections{Direction{1, 0}, Direction{-1, 0}, Direction{0, 1}, Direction{0, -1}};
-        constexpr eastl::array<Direction, 4> kBishopDirections{Direction{1, 1}, Direction{1, -1}, Direction{-1, 1}, Direction{-1, -1}};
-        constexpr eastl::array<Direction, 8> kKnightSteps{Direction{1, 2},  Direction{2, 1},  Direction{-1, 2},  Direction{-2, 1},
-                                                          Direction{1, -2}, Direction{2, -1}, Direction{-1, -2}, Direction{-2, -1}};
-        constexpr eastl::array<Direction, 8> kKingSteps{Direction{1, 0}, Direction{-1, 0}, Direction{0, 1}, Direction{0, -1}, Direction{1, 1}, Direction{1, -1}, Direction{-1, 1}, Direction{-1, -1}};
+        constexpr Array<Direction, 4> kRookDirections{Direction{1, 0}, Direction{-1, 0}, Direction{0, 1}, Direction{0, -1}};
+        constexpr Array<Direction, 4> kBishopDirections{Direction{1, 1}, Direction{1, -1}, Direction{-1, 1}, Direction{-1, -1}};
+        constexpr Array<Direction, 8> kKnightSteps{Direction{1, 2}, Direction{2, 1}, Direction{-1, 2}, Direction{-2, 1}, Direction{1, -2}, Direction{2, -1}, Direction{-1, -2}, Direction{-2, -1}};
+        constexpr Array<Direction, 8> kKingSteps{Direction{1, 0}, Direction{-1, 0}, Direction{0, 1}, Direction{0, -1}, Direction{1, 1}, Direction{1, -1}, Direction{-1, 1}, Direction{-1, -1}};
 
         constexpr int kBoardSide = 8;
         constexpr size_t kMaxBlockerPatterns = 1u << 12;  // a rook in a corner: 12 ray squares that can hold a blocker
 
         // One seed per rank for the magic search; any seed works, these only make the build repeatable.
-        constexpr eastl::array<uint64_t, kBoardSide> kMagicSeeds{728, 10316, 55013, 32803, 12281, 15100, 16645, 255};
+        constexpr Array<uint64_t, kBoardSide> kMagicSeeds{728, 10316, 55013, 32803, 12281, 15100, 16645, 255};
         constexpr uint64_t kZobristSeed = 1070372;
 
         // A magic whose product leaves fewer than this many bits set in the top byte is too weak to be worth testing.
@@ -48,7 +47,7 @@ namespace BECore::Chess {
         };
 
         template <size_t N>
-        Bitboard StepAttacks(int sq, const eastl::array<Direction, N>& steps) {
+        Bitboard StepAttacks(int sq, const Array<Direction, N>& steps) {
             Bitboard attacks = 0;
             const int file = sq % kBoardSide;
             const int rank = sq / kBoardSide;
@@ -101,10 +100,10 @@ namespace BECore::Chess {
         }
     }
 
-    void AttackTables::InitSliders(PieceType slider, eastl::array<Magic, kSquareCount>& magics, eastl::vector<Bitboard>& table) {
-        eastl::array<Bitboard, kMaxBlockerPatterns> occupancy{};
-        eastl::array<Bitboard, kMaxBlockerPatterns> reference{};
-        eastl::array<int, kMaxBlockerPatterns> epoch{};
+    void AttackTables::InitSliders(PieceType slider, Array<Magic, kSquareCount>& magics, Vector<Bitboard>& table) {
+        Array<Bitboard, kMaxBlockerPatterns> occupancy{};
+        Array<Bitboard, kMaxBlockerPatterns> reference{};
+        Array<int, kMaxBlockerPatterns> epoch{};
 
         for (int sq = 0; sq < kSquareCount; ++sq) {
             const int file = sq % kBoardSide;

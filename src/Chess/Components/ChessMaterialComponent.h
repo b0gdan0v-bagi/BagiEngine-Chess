@@ -42,8 +42,8 @@ namespace BECore::Chess {
         Optional<PieceColor> _publishedBottom;            ///< the bottom color the display was published for, none before the first draw
         const ChessGameModel* _publishedModel = nullptr;  ///< the model it was published for
         uint64_t _publishedVersion = 0;                   ///< and the model version
-        eastl::array<int, kRowCount> _counts{};           ///< the pieces gone per row (group * 5 + the index in CapturableTypes()) as last published
-        eastl::array<bool, kRowCount> _rowShown{};        ///< what SyncRows() last set: the rows start hidden in the scene
+        Array<int, kRowCount> _counts{};                  ///< the pieces gone per row (group * 5 + the index in CapturableTypes()) as last published
+        Array<bool, kRowCount> _rowShown{};               ///< what SyncRows() last set: the rows start hidden in the scene
     };
 
 }  // namespace BECore::Chess

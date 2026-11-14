@@ -93,7 +93,7 @@ namespace BECore::Chess {
         AttackTables();
 
         void InitLeapers();
-        void InitSliders(PieceType slider, eastl::array<Magic, kSquareCount>& magics, eastl::vector<Bitboard>& table);
+        void InitSliders(PieceType slider, Array<Magic, kSquareCount>& magics, Vector<Bitboard>& table);
         void InitLines();
         void InitZobrist();
 
@@ -101,21 +101,21 @@ namespace BECore::Chess {
             return static_cast<size_t>(index);
         }
 
-        eastl::array<Bitboard, kSquareCount> _knight{};
-        eastl::array<Bitboard, kSquareCount> _king{};
-        eastl::array<eastl::array<Bitboard, kSquareCount>, 2> _pawn{};
+        Array<Bitboard, kSquareCount> _knight{};
+        Array<Bitboard, kSquareCount> _king{};
+        Array<Array<Bitboard, kSquareCount>, 2> _pawn{};
 
-        eastl::array<Magic, kSquareCount> _rookMagics{};
-        eastl::array<Magic, kSquareCount> _bishopMagics{};
-        eastl::vector<Bitboard> _rookTable;
-        eastl::vector<Bitboard> _bishopTable;
+        Array<Magic, kSquareCount> _rookMagics{};
+        Array<Magic, kSquareCount> _bishopMagics{};
+        Vector<Bitboard> _rookTable;
+        Vector<Bitboard> _bishopTable;
 
-        eastl::array<eastl::array<Bitboard, kSquareCount>, kSquareCount> _between{};
-        eastl::array<eastl::array<Bitboard, kSquareCount>, kSquareCount> _line{};
+        Array<Array<Bitboard, kSquareCount>, kSquareCount> _between{};
+        Array<Array<Bitboard, kSquareCount>, kSquareCount> _line{};
 
-        eastl::array<eastl::array<eastl::array<ZobristKey, kSquareCount>, 7>, 2> _pieceKeys{};
-        eastl::array<ZobristKey, kCastlingStates> _castlingKeys{};
-        eastl::array<ZobristKey, kFiles> _enPassantKeys{};
+        Array<Array<Array<ZobristKey, kSquareCount>, 7>, 2> _pieceKeys{};
+        Array<ZobristKey, kCastlingStates> _castlingKeys{};
+        Array<ZobristKey, kFiles> _enPassantKeys{};
         ZobristKey _sideKey = 0;
     };
 

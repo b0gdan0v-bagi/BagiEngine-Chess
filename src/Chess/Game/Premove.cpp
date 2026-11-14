@@ -50,8 +50,8 @@ namespace BECore::Chess {
         return square.IsInside() && (_byColor[Index(color)] & SquareBB(square)) != 0;
     }
 
-    eastl::vector<Square> PremoveBoard::Targets(Square from, PieceColor color) const {
-        eastl::vector<Square> result;
+    Vector<Square> PremoveBoard::Targets(Square from, PieceColor color) const {
+        Vector<Square> result;
         const Piece piece = GetPieceAt(from);
         if (piece.IsEmpty() || piece.color != color) {
             return result;

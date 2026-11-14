@@ -60,7 +60,7 @@ namespace BECore::Chess {
     }
 
     MoveRatings MoveRater::GetRatings(const ChessGameModel& model) const {
-        const eastl::vector<Move>& moves = model.GetMoves();
+        const Vector<Move>& moves = model.GetMoves();
         MoveRatings ratings(moves.size());
         if (Extends(model)) {
             eastl::copy(_ratings.begin(), _ratings.end(), ratings.begin());
@@ -79,7 +79,7 @@ namespace BECore::Chess {
     }
 
     void MoveRater::SyncHistory(const ChessGameModel& model) {
-        const eastl::vector<Move>& moves = model.GetMoves();
+        const Vector<Move>& moves = model.GetMoves();
         if (!Extends(model)) {
             DropHistory();
             _startFen = model.GetStartFen();
@@ -92,7 +92,7 @@ namespace BECore::Chess {
     }
 
     bool MoveRater::Extends(const ChessGameModel& model) const {
-        const eastl::vector<Move>& moves = model.GetMoves();
+        const Vector<Move>& moves = model.GetMoves();
         return _startFen == model.GetStartFen() && moves.size() >= _moves.size() && eastl::equal(_moves.begin(), _moves.end(), moves.begin());
     }
 

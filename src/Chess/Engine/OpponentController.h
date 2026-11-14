@@ -236,7 +236,7 @@ namespace BECore::Chess {
         /// One color's place: what it plays with and the opponent that plays it (null: nobody)
         struct Seat {
             SeatChoice choice;
-            eastl::unique_ptr<EngineOpponent> opponent;
+            UniquePtr<EngineOpponent> opponent;
             bool errorNoted = false;  ///< the error in `opponent` has been counted in the revision
         };
 
@@ -255,7 +255,7 @@ namespace BECore::Chess {
 
         [[nodiscard]] std::expected<eastl::shared_ptr<IChessEngine>, EngineError> MakeEngine(OpponentEngine engine, const OpponentLevel& level) const;
         /// The color of the first seat (White's first) whose picked engine this build cannot run, while the default factory is in use; nothing for a factory given by a test
-        [[nodiscard]] Optional<PieceColor> FindUnavailableSeat(const eastl::array<SeatChoice, kSeatCount>& picked) const;
+        [[nodiscard]] Optional<PieceColor> FindUnavailableSeat(const Array<SeatChoice, kSeatCount>& picked) const;
         /// A pick of @p plays with @p level in both seats, the engines kept
         std::expected<void, EngineError> ChooseLevel(ProgramSides plays, size_t level);
         void FailPick(EngineError error, PieceColor computer, OpponentEngine engine, const OpponentLevel& level);
@@ -265,7 +265,7 @@ namespace BECore::Chess {
         ChessGameModel& _model;
         OpponentSettings _settings;
         EngineFactory _factory;  ///< empty: the Stockfish of _settings, the OwnEngine, each wrapped by WithHandicap
-        eastl::array<Seat, kSeatCount> _seats;
+        Array<Seat, kSeatCount> _seats;
         Optional<EngineError> _pickError;  ///< the factory's failure of the last pick; the old opponents (if any) go on playing while it stands
         uint64_t _errorVersion = 0;        ///< GetVersion() of the model when the standing error came
         uint64_t _revision = 0;

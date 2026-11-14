@@ -143,8 +143,8 @@ namespace BECore::Chess {
     }
 
     std::expected<void, EngineError> OpponentController::ChooseSeats(ProgramSides plays, SeatChoice white, SeatChoice black) {
-        const eastl::span<const OpponentLevel> levels = GetOpponentLevels();
-        const eastl::array<SeatChoice, kSeatCount> picked = {white, black};
+        const Span<const OpponentLevel> levels = GetOpponentLevels();
+        const Array<SeatChoice, kSeatCount> picked = {white, black};
         for (const SeatChoice& choice : picked) {
             if (choice.level >= levels.size()) {
                 return std::unexpected(EngineError{EngineErrorKind::BadRequest, Format("there is no level {}, the levels are 0 to {}", choice.level, levels.size() - 1)});
@@ -176,8 +176,8 @@ namespace BECore::Chess {
         }
 
         // The engines first: a pick that finds none for any seat is refused and everything stays as it was, the running opponents and their searches included
-        eastl::array<bool, kSeatCount> remake = {};
-        eastl::array<eastl::shared_ptr<IChessEngine>, kSeatCount> made;
+        Array<bool, kSeatCount> remake = {};
+        Array<eastl::shared_ptr<IChessEngine>, kSeatCount> made;
         for (const PieceColor color : EnumUtils<PieceColor>::Values()) {
             const size_t index = SeatIndex(color);
             const Seat& seat = _seats[index];
@@ -241,7 +241,7 @@ namespace BECore::Chess {
         return std::unexpected(EngineError{EngineErrorKind::BadRequest, "unknown engine"});
     }
 
-    Optional<PieceColor> OpponentController::FindUnavailableSeat(const eastl::array<SeatChoice, kSeatCount>& picked) const {
+    Optional<PieceColor> OpponentController::FindUnavailableSeat(const Array<SeatChoice, kSeatCount>& picked) const {
         if (_factory) {
             return std::nullopt;
         }

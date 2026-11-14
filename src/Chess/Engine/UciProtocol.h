@@ -72,11 +72,11 @@ namespace BECore::Chess {
             void Offer(StringView line);
 
             /// The kept lines, in the order of their `multipv` index (Info::multiPv, from 1), the indices that had no usable line left out
-            [[nodiscard]] eastl::vector<Info> Lines() const;
+            [[nodiscard]] Vector<Info> Lines() const;
 
         private:
-            eastl::vector<Optional<Info>> _exact;  ///< by index - 1
-            eastl::vector<Optional<Info>> _bound;
+            Vector<Optional<Info>> _exact;  ///< by index - 1
+            Vector<Optional<Info>> _bound;
         };
 
     }  // namespace UciProtocol

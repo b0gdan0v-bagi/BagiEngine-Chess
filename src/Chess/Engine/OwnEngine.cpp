@@ -40,7 +40,7 @@ namespace BECore::Chess {
         CancellationToken token;
         size_t lineCount;
         /// The best moves of the lines found, which the next line leaves out at the root
-        eastl::vector<Move> excluded;
+        Vector<Move> excluded;
         Analysis analysis;
         /// The search of the line being worked on; none once the answer or the error is ready
         Optional<SearchJob> job;
@@ -110,7 +110,7 @@ namespace BECore::Chess {
         }
     };
 
-    OwnSearch::OwnSearch(eastl::unique_ptr<Impl> impl) noexcept : _impl(std::move(impl)) {}
+    OwnSearch::OwnSearch(UniquePtr<Impl> impl) noexcept : _impl(std::move(impl)) {}
     OwnSearch::~OwnSearch() = default;
     OwnSearch::OwnSearch(OwnSearch&&) noexcept = default;
     OwnSearch& OwnSearch::operator=(OwnSearch&&) noexcept = default;

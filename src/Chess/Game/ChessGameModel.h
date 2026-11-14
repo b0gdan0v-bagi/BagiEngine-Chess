@@ -72,7 +72,7 @@ namespace BECore::Chess {
             return _startFen;
         }
         /// The moves played since the game began, in order.
-        [[nodiscard]] const eastl::vector<Move>& GetMoves() const noexcept {
+        [[nodiscard]] const Vector<Move>& GetMoves() const noexcept {
             return _moves;
         }
         [[nodiscard]] uint64_t GetVersion() const noexcept {
@@ -106,18 +106,18 @@ namespace BECore::Chess {
         }
 
         /// Squares the selected piece can legally move to (each once, even when a pawn can promote there). Empty if no selection.
-        [[nodiscard]] const eastl::vector<Square>& GetLegalMoves() const noexcept {
+        [[nodiscard]] const Vector<Square>& GetLegalMoves() const noexcept {
             return _legalTargets;
         }
 
         /// Helper for tests / UI: legal target squares for the piece on an arbitrary square.
-        [[nodiscard]] eastl::vector<Square> GetLegalMovesFor(Square from) const;
+        [[nodiscard]] Vector<Square> GetLegalMovesFor(Square from) const;
 
         /// Drops the selection and its legal targets and any pending promotion, for an owner that takes over the turn (the computer opponent); the version does not move.
         void ClearSelection();
 
         /// The queued premoves, the next to play first
-        [[nodiscard]] const eastl::vector<Premove>& GetPremoves() const noexcept {
+        [[nodiscard]] const Vector<Premove>& GetPremoves() const noexcept {
             return _premoves;
         }
         /// The color that premoves (the person's); empty while the queue is empty
@@ -263,16 +263,16 @@ namespace BECore::Chess {
 
         Position _position = Position::Start();
         String _startFen;
-        eastl::vector<Move> _moves;
+        Vector<Move> _moves;
         uint64_t _version = 0;
         GameStatus _status = GameStatus::Ongoing;
         bool _hasSelected = false;
         Square _selected{};
         MoveList _selectedMoves;
-        eastl::vector<Square> _legalTargets;
+        Vector<Square> _legalTargets;
         bool _hasPendingPromotion = false;
         Square _promotionTarget{};
-        eastl::vector<Premove> _premoves;
+        Vector<Premove> _premoves;
         Optional<PieceColor> _premoveColor;
 
         eastl::hash_map<PieceHandle, PieceTrack> _pieces;

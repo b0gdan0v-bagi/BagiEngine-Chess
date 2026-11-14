@@ -19,10 +19,10 @@ namespace BECore::Chess {
         // The interned names of the variables and of the elements of the canvas, built on the first use (an interned name is not made per frame). A row is group * 5 + the index of its piece in
         // CapturableTypes()
         struct MaterialNames {
-            eastl::array<PoolString, kMaterialGroupCount * kMaterialRowsPerGroup> vars;   // materialTopQueen ..
-            eastl::array<PoolString, kMaterialGroupCount * kMaterialRowsPerGroup> rows;   // MaterialTopQueenRow ..
-            eastl::array<PoolString, kMaterialGroupCount * kMaterialRowsPerGroup> icons;  // MaterialTopQueenIcon ..
-            eastl::array<PoolString, kMaterialGroupCount> balanceVars;                    // materialTopBalance, materialBottomBalance
+            Array<PoolString, kMaterialGroupCount * kMaterialRowsPerGroup> vars;   // materialTopQueen ..
+            Array<PoolString, kMaterialGroupCount * kMaterialRowsPerGroup> rows;   // MaterialTopQueenRow ..
+            Array<PoolString, kMaterialGroupCount * kMaterialRowsPerGroup> icons;  // MaterialTopQueenIcon ..
+            Array<PoolString, kMaterialGroupCount> balanceVars;                    // materialTopBalance, materialBottomBalance
         };
 
         const char* GroupWord(size_t group) {

@@ -87,7 +87,7 @@ namespace BECore::Chess {
     }
 
     std::expected<Position, FenError> Position::FromFen(StringView fen) {
-        eastl::array<StringView, kFenMaxFields> fields{};
+        Array<StringView, kFenMaxFields> fields{};
         size_t fieldCount = 0;
         size_t cursor = 0;
         while (cursor < fen.size()) {

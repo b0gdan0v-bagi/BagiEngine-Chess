@@ -31,7 +31,7 @@ namespace BECore::Chess {
         constexpr int kHardOwnDepth = 3;
         constexpr int kMaxOwnDepth = 5;
 
-        constexpr eastl::array<OpponentLevel, 4> kLevels{
+        constexpr Array<OpponentLevel, 4> kLevels{
             OpponentLevel{"easy", "Easy", kEasySkillLevel, kEasyMoveTimeMs, kEasyOwnDepth, kEasyBlunderPercent},
             OpponentLevel{"medium", "Medium", kMediumSkillLevel, kMediumMoveTimeMs, kMediumOwnDepth, kMediumBlunderPercent},
             OpponentLevel{"hard", "Hard", kHardSkillLevel, kHardMoveTimeMs, kHardOwnDepth, kHardBlunderPercent},
@@ -44,8 +44,8 @@ namespace BECore::Chess {
 
     }  // namespace
 
-    eastl::span<const OpponentLevel> GetOpponentLevels() {
-        return eastl::span<const OpponentLevel>(kLevels.data(), kLevels.size());
+    Span<const OpponentLevel> GetOpponentLevels() {
+        return Span<const OpponentLevel>(kLevels.data(), kLevels.size());
     }
 
     Optional<size_t> FindOpponentLevel(StringView id) {
@@ -74,8 +74,8 @@ namespace BECore::Chess {
         return SearchLimits{};
     }
 
-    eastl::vector<eastl::pair<String, String>> EngineOptionsOf(const OpponentLevel& level) {
-        eastl::vector<eastl::pair<String, String>> options;
+    Vector<eastl::pair<String, String>> EngineOptionsOf(const OpponentLevel& level) {
+        Vector<eastl::pair<String, String>> options;
         options.emplace_back(String(kSkillLevelOption.data(), kSkillLevelOption.size()), Format("{}", level.skillLevel));
         return options;
     }

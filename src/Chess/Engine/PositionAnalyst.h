@@ -172,7 +172,7 @@ namespace BECore::Chess {
         /// The lines of the answer for the position of @p model, best first (the best one is what GetEvaluation() and GetHint() give, then the second best when the position has a second legal move),
         /// as the engine gave them (the side to move's view). Empty unless the evaluation is on or a hint was asked at this version, and the answer for this very version has come: no line is
         /// shown for another position, another engine pick or a search nobody wants, with the same drop rules as the hint
-        [[nodiscard]] eastl::vector<AnalysisLine> GetLines(const ChessGameModel& model) const;
+        [[nodiscard]] Vector<AnalysisLine> GetLines(const ChessGameModel& model) const;
 
         /// Why the last search failed (any EngineError, an engine that could not be made included); empty when none did or after it went with a new version, pick or request
         [[nodiscard]] const Optional<EngineError>& GetError() const noexcept {

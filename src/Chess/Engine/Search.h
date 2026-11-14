@@ -36,7 +36,7 @@ namespace BECore::Chess {
         /// the table, the killers and the history are not touched, so an empty list is the search of before, bit for bit. The caller leaves at least one
         /// legal move (the list may name moves that are not legal, they are ignored); a position whose every legal move is excluded has nothing to search
         /// and the result is not complete
-        eastl::vector<Move> excludedRootMoves;
+        Vector<Move> excludedRootMoves;
     };
 
     /// When to stop. A search with the default control runs to SearchSettings::maxDepth.
@@ -172,7 +172,7 @@ namespace BECore::Chess {
 
     private:
         struct Impl;
-        eastl::unique_ptr<Impl> _impl;
+        UniquePtr<Impl> _impl;
     };
 
 }  // namespace BECore::Chess

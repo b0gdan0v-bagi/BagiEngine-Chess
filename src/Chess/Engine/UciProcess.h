@@ -16,7 +16,7 @@ namespace BECore::Chess {
     /// A program to start: the path of its executable (taken as it is, `PATH` is not searched) and the arguments after it
     struct ProcessLaunch {
         String path;
-        eastl::vector<String> args;
+        Vector<String> args;
     };
 
     /**
@@ -56,7 +56,7 @@ namespace BECore::Chess {
         static constexpr std::chrono::milliseconds kDefaultCloseGrace{500};
 
         /// Starts @p launch. The program is started when this returns: a missing file or one that cannot be executed is LaunchFailed with the reason from the system in `detail`
-        [[nodiscard]] static std::expected<eastl::unique_ptr<UciProcess>, EngineError> Start(const ProcessLaunch& launch);
+        [[nodiscard]] static std::expected<UniquePtr<UciProcess>, EngineError> Start(const ProcessLaunch& launch);
 
         /// Close(kDefaultCloseGrace): the child never outlives the object, and is not left as a zombie
         ~UciProcess();
@@ -97,9 +97,9 @@ namespace BECore::Chess {
 #if CHESS_HAS_UCI_PROCESS && defined(_WIN32)
         struct WindowsState;  ///< the handles and the read in flight (UciProcessWindows.cpp: no <windows.h> in this header)
 
-        UciProcess(int processId, eastl::unique_ptr<WindowsState> state);
+        UciProcess(int processId, UniquePtr<WindowsState> state);
 
-        eastl::unique_ptr<WindowsState> _windows;
+        UniquePtr<WindowsState> _windows;
 #else
         UciProcess(int processId, int inputDescriptor, int outputDescriptor);
 

@@ -163,8 +163,8 @@ namespace BECore::Chess {
         return _result;
     }
 
-    eastl::vector<AnalysisLine> PositionAnalyst::GetLines(const ChessGameModel& model) const {
-        eastl::vector<AnalysisLine> lines;
+    Vector<AnalysisLine> PositionAnalyst::GetLines(const ChessGameModel& model) const {
+        Vector<AnalysisLine> lines;
         if ((!_evaluationOn && !IsHintRequested(model)) || !_result || _resultVersion != model.GetVersion()) {
             return lines;
         }

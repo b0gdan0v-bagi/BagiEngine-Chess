@@ -24,7 +24,7 @@ namespace BECore::Chess::Uci {
         /// Position::kStartFen for `startpos`; for `fen` the fields up to `moves`, as they came (fewer than six fields too)
         String startFen;
 
-        eastl::vector<String> moves;
+        Vector<String> moves;
     };
 
     /// `setoption name <name> value <value>`; the name may hold spaces, the value is the rest of the line

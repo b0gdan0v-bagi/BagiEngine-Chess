@@ -41,7 +41,7 @@ namespace BECore::Chess {
      * not forced to fall: an engine that searches each line on its own (OwnEngine) may give line 2 a score a little above line 1's.
      */
     struct Analysis {
-        eastl::vector<AnalysisLine> lines;
+        Vector<AnalysisLine> lines;
 
         /// The first line. Only for an analysis that came back from an engine with a value (it has at least one line)
         [[nodiscard]] const AnalysisLine& Best() const {

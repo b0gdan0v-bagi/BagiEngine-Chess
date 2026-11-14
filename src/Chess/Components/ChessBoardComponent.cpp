@@ -56,8 +56,8 @@ namespace BECore::Chess {
 
         // The interned names of the variables of the labels at the edges of the board, built on the first use (an interned name is not made per frame)
         struct CoordinateVars {
-            eastl::array<PoolString, kLastBoardIndex + 1> files;  // coordFile0..7, by column
-            eastl::array<PoolString, kLastBoardIndex + 1> ranks;  // coordRank0..7, by row from the top
+            Array<PoolString, kLastBoardIndex + 1> files;  // coordFile0..7, by column
+            Array<PoolString, kLastBoardIndex + 1> ranks;  // coordRank0..7, by row from the top
         };
 
         const CoordinateVars& GetCoordinateVars() {

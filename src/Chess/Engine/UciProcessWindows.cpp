@@ -144,7 +144,7 @@ namespace BECore::Chess {
             }
 
         private:
-            eastl::vector<char> _storage;
+            Vector<char> _storage;
             bool _initialized = false;
         };
 
@@ -228,13 +228,13 @@ namespace BECore::Chess {
         }
     };
 
-    UciProcess::UciProcess(int processId, eastl::unique_ptr<WindowsState> state) : _windows(std::move(state)), _pid(processId) {}
+    UciProcess::UciProcess(int processId, UniquePtr<WindowsState> state) : _windows(std::move(state)), _pid(processId) {}
 
     UciProcess::~UciProcess() {
         Close(kDefaultCloseGrace);
     }
 
-    std::expected<eastl::unique_ptr<UciProcess>, EngineError> UciProcess::Start(const ProcessLaunch& launch) {
+    std::expected<UniquePtr<UciProcess>, EngineError> UciProcess::Start(const ProcessLaunch& launch) {
         if (launch.path.empty()) {
             return Fail(EngineErrorKind::LaunchFailed, "no program to start");
         }
@@ -323,7 +323,7 @@ namespace BECore::Chess {
         CloseHandle(created.hThread);
 
         // The child's ends close here as the handles above go out of scope: only the child holds them now, so we see the end of its output, and it the end of its input
-        return eastl::unique_ptr<UciProcess>(new UciProcess(static_cast<int>(created.dwProcessId), std::move(state)));
+        return UniquePtr<UciProcess>(new UciProcess(static_cast<int>(created.dwProcessId), std::move(state)));
     }
 
     std::expected<void, EngineError> UciProcess::WriteLine(StringView text) {

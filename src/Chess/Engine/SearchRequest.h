@@ -14,7 +14,7 @@ namespace BECore::Chess {
      */
     struct SearchRequest {
         String startFen;
-        eastl::vector<Move> moves;
+        Vector<Move> moves;
         SearchLimits limits;
         /// How many lines IChessEngine::Analyse() returns (1..kMaxAnalysisLines, best first); FindMove() always gives one move, but still validates it. The factories give 1
         int lines = 1;

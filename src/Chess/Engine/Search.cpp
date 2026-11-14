@@ -53,7 +53,7 @@ namespace BECore::Chess {
             Move move;
             int score = 0;
         };
-        using ScoredMoves = eastl::fixed_vector<ScoredMove, kMaxMoves, false>;
+        using ScoredMoves = FixedVector<ScoredMove, kMaxMoves>;
 
         bool IsCapture(const Position& position, Move move) noexcept {
             return move.Kind() == MoveKind::EnPassant || !position.PieceAt(move.ToIndex()).IsEmpty();
@@ -243,7 +243,7 @@ namespace BECore::Chess {
             int _depth = 1;
             /// The best move of the last finished iteration, tried first by the next one
             Move _best;
-            eastl::vector<eastl::unique_ptr<Frame>> _frames;
+            Vector<UniquePtr<Frame>> _frames;
             /// The ply of the frame whose moves are being tried, -1 between iterations. Each frame below it has a move made on the position
             int _top = -1;
             /// A child has answered with _value and the move that led to it is still made: Loop() takes it back and gives the value to the top frame

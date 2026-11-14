@@ -10,7 +10,7 @@ namespace BECore::Chess {
     [[nodiscard]] int MaterialPoints(PieceType type);
 
     /// The pieces that can be taken, in the order of the rows of the material display: queen, rook, bishop, knight, pawn
-    [[nodiscard]] eastl::span<const PieceType> CapturableTypes();
+    [[nodiscard]] Span<const PieceType> CapturableTypes();
 
     /// The name of a capturable piece in the scene and in the control API: "queen", "rook", "bishop", "knight", "pawn" (lower case); empty for any other piece
     [[nodiscard]] StringView CapturedId(PieceType type);
@@ -40,8 +40,8 @@ namespace BECore::Chess {
     private:
         friend MaterialSummary SummarizeMaterial(const Position& position);
 
-        eastl::array<eastl::array<int, 7>, 2> _missing{};
-        eastl::array<int, 2> _points{};
+        Array<Array<int, 7>, 2> _missing{};
+        Array<int, 2> _points{};
     };
 
     /// The material of @p position: the pieces each side started with minus those on the board, promotions counted right

@@ -49,8 +49,8 @@ namespace BECore::Chess {
         }
 
         /// The moves of the file, played in their turn on a scratch model; an error names the number of the move, never its text
-        std::expected<eastl::vector<Move>, SaveError> ReplayMoves(const String& text, ChessGameModel& scratch) {
-            eastl::vector<Move> moves;
+        std::expected<Vector<Move>, SaveError> ReplayMoves(const String& text, ChessGameModel& scratch) {
+            Vector<Move> moves;
             if (text.empty()) {
                 return moves;
             }
@@ -120,7 +120,7 @@ namespace BECore::Chess {
 
         ChessGameModel scratch;
         scratch.SetPosition(plan.start);
-        std::expected<eastl::vector<Move>, SaveError> moves = ReplayMoves(state.moves, scratch);
+        std::expected<Vector<Move>, SaveError> moves = ReplayMoves(state.moves, scratch);
         if (!moves) {
             return std::unexpected(std::move(moves.error()));
         }

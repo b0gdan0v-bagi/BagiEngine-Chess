@@ -17,7 +17,7 @@ namespace BECore::Chess {
 
     /// The levels, weakest first: a ladder for a casual person, from a beginner (Easy) to the full strength of each engine (Max). Stockfish at `Skill Level` 0 is about a
     /// 1300-1400 player, which is the floor of the engine, so the two lowest levels add the handicap of blunderPercent. Every number is a first guess, to be tuned by playing
-    [[nodiscard]] eastl::span<const OpponentLevel> GetOpponentLevels();
+    [[nodiscard]] Span<const OpponentLevel> GetOpponentLevels();
 
     /// The index in GetOpponentLevels() of the level a game starts with ("medium")
     inline constexpr size_t kDefaultOpponentLevel = 1;
@@ -39,6 +39,6 @@ namespace BECore::Chess {
 
     /// The UCI options of this level for UciEngineSettings::options (the Skill Level only; no UCI_Elo, it has the same floor as Skill Level 0): name and value of `setoption name <first> value
     /// <second>`
-    [[nodiscard]] eastl::vector<eastl::pair<String, String>> EngineOptionsOf(const OpponentLevel& level);
+    [[nodiscard]] Vector<eastl::pair<String, String>> EngineOptionsOf(const OpponentLevel& level);
 
 }  // namespace BECore::Chess

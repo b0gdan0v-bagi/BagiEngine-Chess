@@ -32,7 +32,7 @@ namespace BECore::Chess::Uci {
         constexpr StringView kInfiniteToken = "infinite";
         constexpr StringView kPonderToken = "ponder";
 
-        using Tokens = eastl::vector<StringView>;
+        using Tokens = Vector<StringView>;
 
         /// The words of @p line, views into it
         Tokens Split(StringView line) {

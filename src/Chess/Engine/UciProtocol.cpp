@@ -171,8 +171,8 @@ namespace BECore::Chess {
             }
         }
 
-        eastl::vector<Info> LineCollector::Lines() const {
-            eastl::vector<Info> lines;
+        Vector<Info> LineCollector::Lines() const {
+            Vector<Info> lines;
             for (size_t slot = 0; slot < _exact.size(); ++slot) {
                 if (const Optional<Info>& kept = _exact[slot] ? _exact[slot] : _bound[slot]) {
                     lines.push_back(*kept);
