@@ -5,7 +5,6 @@
 
 namespace BECore::Chess {
 
-    /// Why no Stockfish was found; names the path that was tried when the settings gave one, else the three places that are looked at
     String NoStockfishDetail(const String& path) {
         if (!path.empty()) {
             return Format(
@@ -23,7 +22,6 @@ namespace BECore::Chess {
 
     namespace {
 
-        /// The default factory: a UciEngine over the Stockfish that FindStockfish() finds for the settings, with the Skill Level of the level, under the handicap of the level (WithHandicap)
         std::expected<SharedPtr<IChessEngine>, EngineError> MakeStockfishEngine(const OpponentSettings& settings, const OpponentLevel& level) {
             if (!IsOpponentEngineAvailable(OpponentEngine::Stockfish)) {
                 return std::unexpected(UnavailableEngineError(OpponentEngine::Stockfish));
@@ -56,7 +54,6 @@ namespace BECore::Chess {
     }
 
     std::expected<void, EngineError> OpponentController::SetSide(Optional<PieceColor> computer) {
-        // A side takes the choice of its seat for both; nobody keeps the choices as they are
         const SeatChoice white = computer ? _seats[SeatIndex(*computer)].choice : _seats[kWhite].choice;
         const SeatChoice black = computer ? _seats[SeatIndex(*computer)].choice : _seats[kBlack].choice;
         return ChooseSeats(ProgramSides::Of(computer), white, black);
@@ -115,12 +112,12 @@ namespace BECore::Chess {
                 seat.opponent->Update(_model);
             }
         }
-        // The answer of the program is on the board now: the person's next premove plays in this very frame. Before the error bookkeeping, since the premove moves the version like any move
+        // Before the error bookkeeping below: the premove moves the version like any move
         if (!PlaysFor(_model.GetTurn())) {
             _model.PlayPremove();
         }
         if (_pickError && _errorVersion == version) {
-            // Only an opponent or the premove after its answer can have moved the game in the calls above, and a refused pick that left it playing must not lose its sentence to the program's own move
+            // The program's own move (or the premove after it) moved the version: a refused pick's error follows it instead of being dropped as stale
             _errorVersion = _model.GetVersion();
         }
         for (Seat& seat : _seats) {
@@ -175,7 +172,7 @@ namespace BECore::Chess {
             return {};
         }
 
-        // The engines first: a pick that finds none for any seat is refused and everything stays as it was, the running opponents and their searches included
+        // The engines first, so that a refused pick changes nothing, running searches included
         Array<bool, kSeatCount> remake = {};
         Array<SharedPtr<IChessEngine>, kSeatCount> made;
         for (const PieceColor color : EnumUtils<PieceColor>::Values()) {
@@ -197,7 +194,7 @@ namespace BECore::Chess {
             made[index] = std::move(*engine);
         }
 
-        // Past this point nothing can fail. The old opponents of the changed seats go first: they cancel their searches and return at once; a late answer stays with the worker
+        // Past this point nothing can fail
         for (const PieceColor color : EnumUtils<PieceColor>::Values()) {
             const size_t index = SeatIndex(color);
             if (remake[index] || !plays.Plays(color)) {
