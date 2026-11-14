@@ -26,15 +26,15 @@ namespace BECore::Chess {
         }
 
         /// UTF-16 of UTF-8 text, nothing for text that is not UTF-8
-        Optional<std::wstring> Widen(StringView text) {
+        Optional<std::wstring> Widen(StringView text) {  //-NoStd: Win32 wide API
             if (text.empty()) {
-                return std::wstring();
+                return std::wstring();  //-NoStd: Win32 wide API
             }
             const int length = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text.data(), static_cast<int>(text.size()), nullptr, 0);
             if (length <= 0) {
                 return std::nullopt;
             }
-            std::wstring wide(static_cast<size_t>(length), L'\0');
+            std::wstring wide(static_cast<size_t>(length), L'\0');  //-NoStd: Win32 wide API
             MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text.data(), static_cast<int>(text.size()), wide.data(), length);
             return wide;
         }
@@ -149,8 +149,8 @@ namespace BECore::Chess {
         };
 
         /// @p argument quoted so that the C runtime of the child (CommandLineToArgvW, the MSVC CRT) gives it back as it is: backslashes are literal except before a quote
-        void AppendQuoted(std::wstring& line, const std::wstring& argument) {
-            if (!argument.empty() && argument.find_first_of(L" \t\n\v\"") == std::wstring::npos) {
+        void AppendQuoted(std::wstring& line, const std::wstring& argument) {                       //-NoStd: Win32 wide API
+            if (!argument.empty() && argument.find_first_of(L" \t\n\v\"") == std::wstring::npos) {  //-NoStd: Win32 wide API
                 line += argument;
                 return;
             }
@@ -176,9 +176,9 @@ namespace BECore::Chess {
         }
 
         /// A name no other pipe of this machine has: the id of this process and a counter
-        std::wstring UniquePipeName() {
+        std::wstring UniquePipeName() {  //-NoStd: Win32 wide API
             static std::atomic<uint32_t> counter{0};
-            return std::wstring(kPipeNamePrefix) + std::to_wstring(GetCurrentProcessId()) + L"-" + std::to_wstring(counter.fetch_add(1));
+            return std::wstring(kPipeNamePrefix) + std::to_wstring(GetCurrentProcessId()) + L"-" + std::to_wstring(counter.fetch_add(1));  //-NoStd: Win32 wide API
         }
 
         /// A job whose processes are killed when its last handle closes; none when the system refuses one
@@ -240,15 +240,15 @@ namespace BECore::Chess {
         }
         const auto cannotStart = [&launch](StringView reason) { return Fail(EngineErrorKind::LaunchFailed, Format("cannot start {}: {}", launch.path, reason)); };
 
-        Optional<std::wstring> application = Widen(launch.path);
+        Optional<std::wstring> application = Widen(launch.path);  //-NoStd: Win32 wide API
         if (!application) {
             return cannotStart("the path is not UTF-8");
         }
         std::replace(application->begin(), application->end(), L'/', L'\\');
         // argv[0] is read by other rules (no escapes, quotes only), and a path holds no quote: it is always quoted
-        std::wstring commandLine = L"\"" + *application + L"\"";
+        std::wstring commandLine = L"\"" + *application + L"\"";  //-NoStd: Win32 wide API
         for (const String& argument : launch.args) {
-            const Optional<std::wstring> wide = Widen(argument);
+            const Optional<std::wstring> wide = Widen(argument);  //-NoStd: Win32 wide API
             if (!wide) {
                 return cannotStart("an argument is not UTF-8");
             }
@@ -272,7 +272,7 @@ namespace BECore::Chess {
         }
 
         // stdout: a named pipe, because an anonymous one cannot be read with a timeout; the child's end is an ordinary synchronous handle
-        const std::wstring pipeName = UniquePipeName();
+        const std::wstring pipeName = UniquePipeName();  //-NoStd: Win32 wide API
         state->output = UniqueHandle(CreateNamedPipeW(pipeName.c_str(), PIPE_ACCESS_INBOUND | FILE_FLAG_OVERLAPPED | FILE_FLAG_FIRST_PIPE_INSTANCE,
                                                       PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT | PIPE_REJECT_REMOTE_CLIENTS, 1, 0, kPipeBytes, 0, nullptr));
         if (!state->output) {
