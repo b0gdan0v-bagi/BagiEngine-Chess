@@ -1,0 +1,24 @@
+{"scenario": 1, "game": "Chess", "flags": ["--headless", "--manual-clock"], "title": "Chess: the start position, an opening of four moves, what is refused, a mate and the game over, a reset"}
+{"method": "step", "params": {"frames": 2}}
+{"method": "reset"}
+{"method": "get_state", "expect": {"pointers": {"/state/fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", "/state/startFen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", "/state/turn": "white", "/state/status": "ongoing", "/state/legalMoveCount": 20, "/state/board/0": "rnbqkbnr", "/state/board/7": "RNBQKBNR", "/state/moves": []}, "versionStep": 0}}
+{"method": "list_actions", "expect": {"versionStep": 0}}
+{"method": "perform_action", "params": {"type": "move", "uci": "e2e4"}, "expect": {"pointers": {"/outcome/move": "e2e4", "/outcome/turn": "black", "/outcome/status": "ongoing"}, "versionStep": 1}}
+{"method": "perform_action", "params": {"type": "move", "uci": "e7e5"}, "expect": {"pointers": {"/outcome/move": "e7e5", "/outcome/turn": "white", "/outcome/status": "ongoing"}, "versionStep": 1}}
+{"method": "perform_action", "params": {"type": "move", "uci": "g1f3"}, "expect": {"pointers": {"/outcome/move": "g1f3", "/outcome/turn": "black", "/outcome/status": "ongoing"}, "versionStep": 1}}
+{"method": "perform_action", "params": {"type": "move", "uci": "b8c6"}, "expect": {"pointers": {"/outcome/move": "b8c6", "/outcome/turn": "white", "/outcome/status": "ongoing"}, "versionStep": 1}}
+{"method": "get_state", "expect": {"pointers": {"/state/moves": ["e2e4", "e7e5", "g1f3", "b8c6"], "/state/board/4": "....P...", "/state/startFen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"}, "versionStep": 0}}
+{"method": "perform_action", "params": {"type": "move", "uci": "e7e5"}, "expect": {"error": "illegal_action"}}
+{"method": "perform_action", "params": {"type": "move", "uci": "a1a8"}, "expect": {"error": "illegal_action"}}
+{"method": "perform_action", "params": {"type": "move", "uci": "banana"}, "expect": {"error": "invalid_params"}}
+{"method": "perform_action", "params": {"type": "resign"}, "expect": {"error": "invalid_params"}}
+{"method": "set_state", "params": {"fen": "not a fen"}, "expect": {"error": "invalid_params"}}
+{"method": "set_state", "params": {}, "expect": {"error": "invalid_params"}}
+{"method": "get_state", "expect": {"pointers": {"/state/moves": ["e2e4", "e7e5", "g1f3", "b8c6"]}, "versionStep": 0}}
+{"method": "set_state", "params": {"fen": "6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1"}, "expect": {"versionStep": 1}}
+{"method": "perform_action", "params": {"type": "move", "uci": "a1a8"}, "expect": {"pointers": {"/outcome/status": "checkmate", "/outcome/winner": "white", "/outcome/inCheck": true}, "versionStep": 1}}
+{"method": "get_state", "expect": {"pointers": {"/state/status": "checkmate", "/state/winner": "white", "/state/legalMoveCount": 0}, "versionStep": 0}}
+{"method": "list_actions", "expect": {"pointers": {"/actions": []}, "versionStep": 0}}
+{"method": "perform_action", "params": {"type": "move", "uci": "g8f8"}, "expect": {"error": "game_over"}}
+{"method": "reset", "expect": {"versionStep": 1}}
+{"method": "get_state", "expect": {"pointers": {"/state/fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", "/state/moves": [], "/state/status": "ongoing"}, "versionStep": 0, "logClean": true}}

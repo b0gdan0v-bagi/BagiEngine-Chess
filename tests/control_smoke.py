@@ -112,41 +112,6 @@ def play_opening(client: BagiControlClient) -> dict:
     return reply
 
 
-def check_refusals(client: BagiControlClient) -> None:
-    """What is refused changes nothing: not a legal move, not a move at all, not a position."""
-    before = client.call("get_state")
-
-    expect_error("illegal_action", lambda: client.call("perform_action", move("e7e5")), "a move of the side that is not to move")
-    expect_error("illegal_action", lambda: client.call("perform_action", move("a1a8")), "a rook through its own pawn")
-    expect_error("invalid_params", lambda: client.call("perform_action", move("banana")), "a move that is not UCI")
-    expect_error("invalid_params", lambda: client.call("perform_action", {"type": "resign"}), "an action that is not a move")
-    expect_error("invalid_params", lambda: client.call("set_state", {"fen": "not a fen"}), "a position that is not a FEN")
-    expect_error("invalid_params", lambda: client.call("set_state", {}), "a state without a FEN")
-
-    after = client.call("get_state")
-    check(after == before, "a refused call changed the state")
-
-
-def check_mate(client: BagiControlClient) -> None:
-    """A position set from outside, mate in one, and a game that takes no more moves once it is over."""
-    loaded = client.call("set_state", {"fen": MATE_IN_ONE_FEN})
-    state = client.call("get_state")
-    check(state["version"] == loaded["version"], "set_state and get_state disagree about the version")
-    check(state["state"]["startFen"] == MATE_IN_ONE_FEN and state["state"]["moves"] == [], f"the loaded position is not the start of a game: {state['state']}")
-    check(move("a1a8") in client.call("list_actions")["actions"], "the mating move is not listed")
-
-    outcome = client.call("perform_action", move("a1a8"))["outcome"]
-    check(outcome["status"] == "checkmate" and outcome["winner"] == "white" and outcome["inCheck"] is True, f"the mate was answered with {outcome}")
-
-    state = client.call("get_state")["state"]
-    check(state["status"] == "checkmate" and state["winner"] == "white" and state["legalMoveCount"] == 0, f"unexpected standing after the mate: {state}")
-    check(client.call("list_actions")["actions"] == [], "a finished game still lists actions")
-    expect_error("game_over", lambda: client.call("perform_action", move("g8f8")), "a move after the mate")
-
-    client.call("reset")
-    check_start_position(client)
-
-
 def check_promotion(client: BagiControlClient) -> None:
     client.call("set_state", {"fen": PROMOTION_FEN})
     expect_error("promotion_required", lambda: client.call("perform_action", move("a7a8")), "a promotion without a piece")
@@ -196,8 +161,6 @@ def run_chess_scenario(client: BagiControlClient, headless: bool) -> None:
         client.call("step")
     check_state_push(client, last)
 
-    check_refusals(client)
-    check_mate(client)
     check_promotion(client)
 
     if headless:

@@ -85,6 +85,8 @@ if(ENGINE_BUILD_TESTS)
 
     # Starts BagiChess with the control API and plays a few moves, a mate and a promotion over WebSocket
     be_add_game_control_tests(BagiChess SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/tests/control_smoke.py)
+    # One ctest entry per recorded control scenario of tests/scenarios/ (BagiChessScenario.<file>), played on the manual clock
+    be_add_game_scenario_tests(BagiChess DIR tests/scenarios)
 
     if(Python3_FOUND)
         if(NOT ENGINE_TARGET_WEB)
