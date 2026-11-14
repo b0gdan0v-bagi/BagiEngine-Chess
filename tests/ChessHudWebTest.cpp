@@ -22,8 +22,7 @@ namespace BECore::Tests {
         constexpr float kViewWidth = 840.0f;   ///< viewWidth of ChessScene
         constexpr float kViewHeight = 800.0f;  ///< viewHeight of ChessScene
 
-        // The HUD of Chess written in HTML + CSS, the authoring format of the engine's web front-end (UIWebCompiler). The test below checks
-        // that it lays out like the HUD in config/SceneConfig.xml, the one the game ships.
+        // The HUD of Chess in HTML + CSS (the engine's web front-end, UIWebCompiler); the test below checks that it lays out like the HUD of config/SceneConfig.xml.
         constexpr const char* kChessHudHtml = R"(
 <span id="Turn">{turn}</span>
 <button id="Menu" data-action="ChessOpenMenu">Menu</button>
@@ -37,9 +36,8 @@ namespace BECore::Tests {
 #Status { anchor: bottom-right; right: 12px; bottom: 12px; width: 48%; height: 56px; font-size: 28px; text-align: right; vertical-align: middle; }
 )";
 
-        // The plate of the opponent panel of Chess written in HTML + CSS with the engine's choice-group form (a div with data-widget="segmented" is a UISegmented, data-bind names the
-        // variable, data-value the id of a segment, :checked the look of the selected one). The test below checks that it lays out like the plate in config/SceneConfig.xml. The dim
-        // behind the plate is not written here: it is a full-screen element of the XML that the web form has no use for.
+        // The plate of the opponent panel in HTML + CSS with the engine's choice-group form (a div with data-widget="segmented" is a UISegmented, data-bind names the variable,
+        // data-value the id of a segment). The dim behind the plate is not written: it is a full-screen element of the XML that the web form has no use for.
         constexpr const char* kChessPanelHtml = R"(
 <div id="Plate">
   <span id="Title">Opponent</span>
@@ -92,8 +90,7 @@ namespace BECore::Tests {
 #OpponentClose { flex: 1; height: 56px; font-size: 26px; background: rgb(110, 60, 60); }
 )";
 
-        // The plate of the list of the menu (the node MenuPanel) in the same form: a title, one button per section of the table and Close. The dim is left out as above. The buttons
-        // have no flex: they are rows of a vertical stack, 56 units high each
+        // The plate of the list of the menu (the node MenuPanel) in the same form, without the dim. The buttons have no flex: they are rows of a vertical stack, 56 units high each
         constexpr const char* kChessMenuHtml = R"(
 <div id="MenuPlate">
   <span id="MenuTitle">Menu</span>
@@ -138,9 +135,9 @@ namespace BECore::Tests {
         }
 
         /// The plate named @p plateName of the canvas on the node @p nodeName of the shipped scene (without the dim), as the content of a screen, with ONE difference from the file: every
-        /// UISegmented gets `blocksInput="true"`. The HTML front-end writes it on every element with a background (a filled box takes clicks in a web page), so the compiled
-        /// group has it; the shipped file does without, because the plate behind the group blocks input already and the only place the group would take a click is the 4-unit
-        /// gap between two segments, where the result is the same (the modal canvas takes it). The engine's own UIWebTest makes the same step for its panel (kPanelXml).
+        /// UISegmented gets `blocksInput="true"`. The HTML front-end writes it on every element with a background (a filled box takes clicks in a web page); the shipped file does
+        /// without, because the plate behind the group blocks input already and the group would only take a click in the 4-unit gap between two segments, where the modal canvas
+        /// takes it all the same. The engine's UIWebTest does the same in its kPanelXml.
         String ShippedPlateXml(const char* nodeName, const char* plateName) {
             pugi::xml_document document;
             if (!document.load_file(ShippedSceneConfig().string().c_str())) {
