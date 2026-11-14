@@ -26,7 +26,7 @@ Doxygen on the public API stays, one or two sentences; `@param` and `@return` on
 1. Read the `CLAUDE.md` of the folder first.
 2. A fact that a cut comment carried, that no other doc carries and that a reader cannot get from the code goes into that `CLAUDE.md` in one sentence (`python engine/CI/scripts/check_doc_budget.py --root .` stays green); otherwise it is dropped.
 3. A comment the code contradicts is fixed or removed, and the developer reports it as `stale: <file>:<line> <what>`.
-4. Only comments change: no name, no include, no code line. Prove it with `python tools/check_comment_only.py --base <rev> --root . <paths>` (exit 0), then build and run the tests.
+4. Only comments change: no name, no include, no code line. Prove it with `python tools/check_comment_only.py --base <rev> --root . <paths>` (exit 0: C++ and Python files compared without comments and whitespace; a `//-NoStd:`, `NOLINT` or `clang-format off/on` marker is code to it), then build and run the tests.
 
 ## Temporary
 
