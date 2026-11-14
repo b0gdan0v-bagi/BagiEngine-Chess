@@ -7,24 +7,20 @@
 namespace BECore::Chess {
 
     /**
-     * @brief Keeps the game between runs: reads the save once at the start, writes it when the game changes, and always when the game stops. Owned by ChessGame.
+     * @brief Keeps the game between runs: reads the save once in Start(), writes it when the game changes and always when the game stops. Owned by ChessGame. Main thread only. Not copyable.
      *
-     * **The gate.** Start() asks ResolveSaveDirectory() (SaveSettings.h) with the command line and `rememberGame`; with no folder the keeper is off and every call does nothing and touches no file. A
-     * folder that cannot be made is one warning and the same: the game runs without a memory.
+     * Start() asks ResolveSaveDirectory() (SaveSettings.h); with no folder, or one that cannot be made (one warning), the keeper is off: every call does nothing and touches no file. A save is loaded
+     * into a temporary (ChessSaveState), checked completely and only then applied, so a refused file changes nothing. A file that is not there is silent (the first run); any other refusal is one
+     * warning with the slot and the reason, never the contents, and the file is left alone: only the game's own next change rewrites it.
      *
-     * **The restore.** One read in Start(): the slot is loaded into a temporary (ChessSaveState), checked completely (Validate()) and only then applied, so a refused file changes nothing. A file that
-     * is not there is silent (the first run); any other refusal is one warning with the slot and the reason, never the contents, and **the file is left alone**: the game starts fresh and the file is
-     * rewritten only by the game's own next change.
+     * What the game would write is told from a key of three numbers, with no allocation: the model's GetVersion(), the controller's GetRevision() and the person's color. Start() takes the key of
+     * the game as it leaves it (restored or fresh) as already written.
      *
-     * **The key.** What the game would write is known from three numbers, with no allocation: the model's GetVersion(), the controller's GetRevision() and the person's color. Update() compares them
-     * every frame. Start() takes the key of the game it leaves (restored or fresh) as already written, so a restored game and a first start write nothing until something changes.
+     * Update() writes when the key moved, no sooner than kSaveDebounceSeconds of game time (CoreManager::GetTime()) after the last write; the first write of a run waits for nothing. Flush() writes
+     * now when the key moved since the last write (ChessGame::Stop() calls it; a browser tab that closes does not, which is why the debounced write exists). A failed write is logged once and tried
+     * again at the next change; Flush() tries it even without one.
      *
-     * **When it writes.** Update(): when the key moved, no sooner than kSaveDebounceSeconds of game time (CoreManager::GetTime()) after the last write; the first write of a run waits for nothing, and
-     * a pending change waits for the clock, so a watch of two fast programs writes about once a second and a clock that does not move writes nothing more. Flush(): now, when the key moved since the
-     * last write (ChessGame::Stop() calls it; the browser tab that closes does not, which is why the debounced write exists). A failed write is logged once and tried again at the next change; Flush()
-     * tries it even without one.
-     *
-     * Not saved: see ChessSaveState. Main thread only. Not copyable.
+     * Not saved: see ChessSaveState.
      */
     class ChessSaveKeeper {
     public:

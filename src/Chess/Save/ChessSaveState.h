@@ -54,10 +54,9 @@ namespace BECore::Chess {
     /**
      * @brief The first half of a restore: checks the whole state and changes nothing.
      *
-     * The FEN goes through Position::FromFen(), every move is parsed and played in its turn on a scratch model (the same rules as a game: nothing after the end), and every id is looked up in its
-     * table (the colors the program plays, the engine, the level, the person's color; a person's color that is the program's one is a contradiction). Nothing of the live game is touched, and the file
-     * is not either: this class has no file system. A refusal is a `Corrupt` with one sentence that names the reason and the field or the move number, never the contents of the file. A file that is a
-     * finished game passes (`finished`).
+     * Every move is played in its turn on a scratch model, so a move after the end is a refusal; a person's color that is the program's one is a contradiction. Nothing of the live game is touched
+     * and there is no file system here. A refusal is a `Corrupt` with one sentence that names the reason and the field or the move number, never the contents of the file. A file that is a finished
+     * game passes (`finished`).
      */
     [[nodiscard]] std::expected<RestorePlan, SaveError> Validate(const ChessSaveState& state);
 
@@ -67,8 +66,8 @@ namespace BECore::Chess {
      * The position is started from the plan's start and every move is played through ChessGameModel::TryMove() (a finished game is not played: the model keeps what it has). Then the
      * opponent: one ChooseSeats() with the sides and the seats' choices, and the person's color when the program plays no single side (the color of one side derives from it). A pick the
      * controller refuses (Stockfish saved, none found now) is not a failure of the restore: the position stands, the program plays nobody, GetError() has the reason through the usual
-     * route, nothing falls back to the other engine, and one warning says the saved opponent was not restored. Meant for a game that has just started (nobody plays); the selection, the
-     * analysis and its switches are left as they are.
+     * route, nothing falls back to the other engine, and one warning says the saved opponent was not restored. Meant for a game that has just started (nobody plays); the analysis and its
+     * switches are not touched.
      */
     void Apply(const RestorePlan& plan, ChessGameModel& model, OpponentController& controller, OpponentChoice& choice);
 
