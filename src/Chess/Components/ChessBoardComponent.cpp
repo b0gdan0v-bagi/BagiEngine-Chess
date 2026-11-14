@@ -112,6 +112,7 @@ namespace BECore::Chess {
         game->GetOpponent().Update();
         game->GetAnalyst().Update(game->GetModel(), game->GetOpponent().GetEngine());  // the engine search for the evaluation and the hint, on the pool; never waits
         static_cast<void>(game->GetChoice().Color());  // reading it remembers the person's color of a side set from outside (the control API) before that side is cleared
+        game->UpdateKeeper();                          // after the opponent and the choice: a move the program just played is saved in this frame's key
         LogResultOnce(game->GetModel());
         // A reset, a set_state, a move of the program or of the control API drops a pending promotion without a click on the board
         SyncPromotionPanel(game->GetModel());
