@@ -16,8 +16,8 @@ namespace BECore::Chess::Tests {
     namespace {
 
         constexpr int kManyUpdates = 1000;
-        constexpr std::chrono::milliseconds kShutdownBudget{
-            3000};  // well under the 5 s a UciEngine gives a stubborn child by default (UciEngineSettings::kDefaultQuitGraceMs); only the yardstick uses it
+        /// Well under the 5 s a UciEngine gives a stubborn child by default (UciEngineSettings::kDefaultQuitGraceMs); only the yardstick uses it
+        constexpr std::chrono::milliseconds kShutdownBudget{3000};
         constexpr const char* kLogName = "fake.log";
 #if defined(_WIN32)
         constexpr const char* kWrapperName = "stockfish-wrapper.cmd";  // CreateProcess runs a .cmd through cmd.exe

@@ -729,13 +729,14 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(OwnEngineTest, DISABLED_StopLatencyYardstick) {
-        SKIP_WITHOUT_WORKER_THREADS();
         const SearchRequest deep = SearchRequest::FromPosition(PositionFromFen(kKiwipeteFen), Depth(kDepthThatNeverEnds));
 
         EXPECT_LT(TimeCancelledSearch([&](const CancellationToken& token) { Ask(_engine, deep, token); }), kStopBudget) << "a cancelled FindMove";
         EXPECT_LT(TimeCancelledSearch([&](const CancellationToken& token) { Analyse(_engine, deep, token); }), kStopBudget) << "a cancelled Analyse";
         EXPECT_LT(TimeCancelledSearch([&](const CancellationToken& token) { Analyse(_engine, WithLines(deep, 3), token); }), kStopBudget) << "a cancelled search of three lines";
 
+        // The controller part needs the pool's worker beside this thread
+        SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
         ASSERT_TRUE(Play(model, "e2e4"));
         const auto engine = eastl::make_shared<LimitedEngine>(eastl::make_shared<OwnEngine>(), Depth(kDepthThatNeverEnds));
@@ -747,6 +748,7 @@ namespace BECore::Chess::Tests {
         const auto started = std::chrono::steady_clock::now();
         controller.Shutdown();
         EXPECT_LT(std::chrono::steady_clock::now() - started, kStopBudget) << "Shutdown with a deep search in flight";
+        EXPECT_TRUE(WaitUntil([&] { return engine->Answered() == 1; })) << "the cancelled search ends";
     }
 
 }  // namespace BECore::Chess::Tests

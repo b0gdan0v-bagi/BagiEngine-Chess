@@ -201,8 +201,8 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(WaitForLogLine(directory.File(kLogName), kGoCommand)) << "the fake has the search and is thinking";
         opponent.Update(model);
 
-        // No clock: an Update that waited for the engine would not have returned before the answer (the fake thinks a minute, the answer deadline is the move time plus
-        // UciEngineSettings::kDefaultAnswerSlackMs), and the move would be played by now
+        // No clock: the fake thinks a minute and the answer deadline is the move time plus UciEngineSettings::kDefaultAnswerSlackMs, so the search is still running when
+        // Update returns and IsThinking() is true; an Update that had waited for the engine would have come back after the search ended, with IsThinking() false
         EXPECT_TRUE(opponent.IsThinking());
         EXPECT_EQ(model.GetMoves().size(), 1u) << "nothing was played: the engine is still thinking";
         // The destructor of the opponent cancels the search; the fake is stopped and ends with the engine
