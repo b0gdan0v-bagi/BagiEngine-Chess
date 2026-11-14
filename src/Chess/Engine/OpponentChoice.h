@@ -59,7 +59,8 @@ namespace BECore::Chess {
 
         std::expected<void, ChoiceError> SetMode(StringView id);
 
-        /// The person's color. While the program plays it moves to the opposite side (a refused pick keeps the old color); while nobody plays only the remembered color changes
+        /// The person's color. While the program plays it moves to the opposite side (a refused pick keeps the old color); otherwise (nobody plays, or two programs: GetPlays() is nothing) only the
+        /// remembered color changes
         std::expected<void, ChoiceError> SetColor(StringView id);
 
         /// An engine id of the control API ("stockfish", "own")

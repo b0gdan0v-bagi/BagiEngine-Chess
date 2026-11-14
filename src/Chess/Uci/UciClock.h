@@ -12,7 +12,7 @@ namespace BECore::Chess::Uci {
     /// Milliseconds always left on the clock after a move for the pipe, the process and the GUI: a move that takes the whole clock loses on time
     inline constexpr int kClockMarginMs = 100;
 
-    /// One move never takes more than 1 over this of the remaining time: the last move of a control must not spend the whole clock
+    /// One move never takes more than remainingMs / kMaxClockShareDivisor: the last move of a control must not spend the whole clock
     inline constexpr int kMaxClockShareDivisor = 2;
 
     /// The least time of a move: a search asks for at least one millisecond

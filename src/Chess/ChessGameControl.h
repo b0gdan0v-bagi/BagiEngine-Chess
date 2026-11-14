@@ -60,7 +60,7 @@ namespace BECore::Chess {
      * opponent.error; it belongs to the position and the engine, and goes with the next move, the next pick of the engine or a new hint request.
      * ratingsOn is whether the moves are being rated (off at the start of every game, it costs CPU; a reset keeps the switch). ratings has one entry per move of "moves", in the same
      * order: null while the move is not rated, else {"brilliant": bool, "reason": "brilliant"|"not_best"|"forced"|"obvious"} (MoveRater, MoveRating.h). A move is brilliant when it is the
-     * best move of the own engine at depth 5 in the position it was played in and it was a choice: "forced" is a position with one legal move,
+     * best move of the own engine at depth 5 in the position it was played in (the engine's first line before the move) and it was a choice: "forced" is a position with one legal move,
      * "obvious" one where the second line is 200 centipawns or more behind (a forced recapture, a mate in one); "not_best" is any other move. Rated in the background, the oldest move first, always by
      * the own engine, whatever opponent.engine is, so the same game gets the same ratings twice; the ratings of earlier moves stay after a new move and go with a reset or a set_state of a fen.
      * Independent of hintRequested, of the evaluation and of the turn of the person. The rater's failure (an engine that cannot be made, a search
