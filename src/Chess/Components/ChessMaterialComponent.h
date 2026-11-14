@@ -11,16 +11,12 @@ namespace BECore::Chess {
     /**
      * @brief Gives the canvas of the node `Material` (the captured pieces and the balance in the left margin) its words and its sprites from the game. Keeps no game state.
      *
-     * The canvas has two groups, mirrored about the center of the board: the lower one shows what the color at the bottom of the board has taken, the upper one what the other color has taken
-     * (`BottomColor` of Game/BoardOrientation.h, the same function the board draws with, so the groups swap when the board turns). A group is a list of five rows (queen, rook, bishop, knight,
-     * pawn) and a balance box. In OnDraw(), which runs before the canvas on the same node draws, it reads the model and the opponent and, only when the model, its version or the bottom color
-     * changed, publishes the twelve `UIVars` (`material<Top|Bottom><Queen|Rook|Bishop|Knight|Pawn>`: "x3" or "", and `material<Top|Bottom>Balance`: "+N" for the group that is ahead, else ""),
-     * and, when the bottom color changed (also at the first draw), gives each of the ten icons the sprite `<Color><Type>` of the pieces its group has taken (the other color than the group's). With no
-     * game active the variables are empty and no row is shown.
+     * The lower group shows what the color at the bottom of the board has taken, the upper one what the other color has taken, so the groups swap when the board turns. OnDraw() runs before
+     * the canvas on the same node draws: only when the model, its version or the bottom color changed it publishes the twelve `UIVars`, and when the bottom color changed (also at the first
+     * draw) it gives the ten icons their sprites. With no game active the variables are empty and no row is shown.
      *
-     * A row is shown when its count is above 0 and the lists fit: Game/MaterialLayout.h says whether the box of the lists lies inside the safe area of the canvas, and this is asked on every
-     * draw (the safe area changes with the window, not with the model). Before the canvas has been laid out once the safe area is not known and the rows stay hidden, so nothing flashes for
-     * one frame. The balance boxes are not hidden by this rule.
+     * A row is shown when its count is above 0 and the lists fit: Game/MaterialLayout.h says whether their box lies inside the safe area of the canvas, asked on every draw (the safe area
+     * changes with the window, not with the model). Before the canvas has been laid out once the rows stay hidden, so nothing flashes. The balance boxes are not hidden by this rule.
      */
     class ChessMaterialComponent : public IComponent {
         BE_CLASS(ChessMaterialComponent)
@@ -39,11 +35,11 @@ namespace BECore::Chess {
         /// Shows or hides the rows after their counts and the safe area of the canvas; only the rows whose state differs from what was set last
         void SyncRows();
 
-        Optional<PieceColor> _publishedBottom;            ///< the bottom color the display was published for, none before the first draw
-        const ChessGameModel* _publishedModel = nullptr;  ///< the model it was published for
-        uint64_t _publishedVersion = 0;                   ///< and the model version
-        Array<int, kRowCount> _counts{};                  ///< the pieces gone per row (group * 5 + the index in CapturableTypes()) as last published
-        Array<bool, kRowCount> _rowShown{};               ///< what SyncRows() last set: the rows start hidden in the scene
+        Optional<PieceColor> _publishedBottom;
+        const ChessGameModel* _publishedModel = nullptr;
+        uint64_t _publishedVersion = 0;
+        Array<int, kRowCount> _counts{};     ///< the pieces gone per row (a row is group * 5 + the index in CapturableTypes()), as last published
+        Array<bool, kRowCount> _rowShown{};  ///< the rows start hidden in the scene
     };
 
 }  // namespace BECore::Chess

@@ -15,11 +15,10 @@ namespace BECore::Chess {
 
     namespace {
 
-        // Off-screen position used to hide captured pieces without removing the node.
         constexpr float kHiddenX = -10000.0f;
         constexpr float kHiddenY = -10000.0f;
 
-        // The sprite of a piece is named after its color and type in TextureLibrary.xml: "WhiteQueen", "BlackKnight", ...
+        // The sprites of TextureLibrary.xml are named after the color and the type: "WhiteQueen", "BlackKnight", ...
         PoolString SpriteIdOf(Piece piece) {
             return PoolString::Intern(Format("{}{}", EnumUtils<PieceColor>::ToString(piece.color), EnumUtils<PieceType>::ToString(piece.type)));
         }
@@ -36,7 +35,6 @@ namespace BECore::Chess {
     }
 
     void ChessPieceComponent::OnUpdate(const SceneEvents::SceneUpdateEvent& event) {
-        // Late-register if the model wasn't ready at OnAttached time.
         if (!_registered) {
             RegisterWithModel();
         }
@@ -137,7 +135,7 @@ namespace BECore::Chess {
         _slideFrom = from;
         _slideTo = to;
         _slideProgress = 0.0f;
-        // The tween first moves in the next frame (stage 2b), so this frame still draws the old square. A new slide replaces the one under way.
+        // The tween first moves in the next frame, so this frame still draws the old square. A new slide replaces the one under way
         _slide.Reset(CoreManager::GetTweens().Start<float>(0.0f, 1.0f, {.duration = _slideDuration, .ease = EaseType::QuadOut}, [this](const float& progress) { _slideProgress = progress; }));
     }
 
@@ -170,7 +168,6 @@ namespace BECore::Chess {
         if (!sprite) {
             return;
         }
-        // A promotion changes the pawn into another piece; a reset changes it back.
         sprite->_spriteId = SpriteIdOf(piece);
         sprite->ReloadTexture();
         _shownType = piece.type;

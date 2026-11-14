@@ -16,13 +16,12 @@ namespace BECore::Chess {
         constexpr size_t kTopGroup = 0;  // the group of the color that is not at the bottom of the board
         constexpr size_t kBottomGroup = 1;
 
-        // The interned names of the variables and of the elements of the canvas, built on the first use (an interned name is not made per frame). A row is group * 5 + the index of its piece in
-        // CapturableTypes()
+        // Interned on the first use, not per frame; indexed by row like the counts of the component
         struct MaterialNames {
-            Array<PoolString, kMaterialGroupCount * kMaterialRowsPerGroup> vars;   // materialTopQueen ..
-            Array<PoolString, kMaterialGroupCount * kMaterialRowsPerGroup> rows;   // MaterialTopQueenRow ..
-            Array<PoolString, kMaterialGroupCount * kMaterialRowsPerGroup> icons;  // MaterialTopQueenIcon ..
-            Array<PoolString, kMaterialGroupCount> balanceVars;                    // materialTopBalance, materialBottomBalance
+            Array<PoolString, kMaterialGroupCount * kMaterialRowsPerGroup> vars;
+            Array<PoolString, kMaterialGroupCount * kMaterialRowsPerGroup> rows;
+            Array<PoolString, kMaterialGroupCount * kMaterialRowsPerGroup> icons;
+            Array<PoolString, kMaterialGroupCount> balanceVars;
         };
 
         const char* GroupWord(size_t group) {
