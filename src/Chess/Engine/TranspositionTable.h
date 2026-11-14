@@ -47,8 +47,8 @@ namespace BECore::Chess {
      * The slot of a key is the key masked by the size (a power of two), so two keys may share one; the entry holds the
      * whole key and Probe() answers only for an equal one. A new result evicts the old one of another key only when it is
      * as deep or deeper (depth-preferred); a result for the key already in the slot always replaces it. The memory is
-     * allocated once in the constructor and never grows. No clock, no randomness, no state beyond the slots: the same
-     * stores give the same table on every platform.
+     * allocated once in the constructor and never grows. Deterministic: the same stores give the same table on every
+     * platform.
      *
      * Not thread safe: one table belongs to one search.
      */
@@ -63,7 +63,7 @@ namespace BECore::Chess {
         /**
          * @brief Records a result for @p key.
          *
-         * @p score is already in the form of ScoreToTable() and must fit 16 bits; @p depth is brought into 0..127. An entry of
+         * @p score is already in the form of ScoreToTable() and must fit 16 bits; @p depth is clamped to what an entry holds. An entry of
          * another key is kept when it is deeper than @p depth. An entry of the same key is always replaced, but its move is
          * kept when @p move is the null move.
          */
