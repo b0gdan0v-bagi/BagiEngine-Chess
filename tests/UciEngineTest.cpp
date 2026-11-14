@@ -1087,7 +1087,7 @@ namespace BECore::Chess::Tests {
             const ScopedEnvironment variable("STOCKFISH", file.c_str());
             const Optional<String> found = FindStockfish({});
             ASSERT_TRUE(found.has_value());
-            EXPECT_EQ(*found, String(file.c_str(), file.size()));
+            EXPECT_EQ(*found, file);
             EXPECT_FALSE(FindStockfish(StringView(missing)).has_value()) << "an explicit path that is not there does not fall back";
         }
         {
@@ -1114,7 +1114,7 @@ namespace BECore::Chess::Tests {
             const Optional<String> found = FindStockfish({});
             ASSERT_TRUE(found.has_value());
             const String expected = FromStdString((withExecutable / "stockfish").string());
-            EXPECT_EQ(*found, String(expected.c_str(), expected.size()));
+            EXPECT_EQ(*found, expected);
         }
         {
             const ScopedEnvironment path("PATH", withPlainFile.string().c_str());
