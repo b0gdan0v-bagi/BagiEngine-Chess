@@ -58,7 +58,7 @@ namespace BECore::Chess {
         [[nodiscard]] StringView TrimLine(StringView text);
 
         /**
-         * @brief Keeps, from the `info` lines an engine sends while it searches, the line of each `multipv` index 1..N that an analysis is read from. Pure: no process.
+         * @brief Keeps, from the `info` lines an engine sends while it searches, the line of each `multipv` index 1..N that an analysis is read from.
          *
          * Offer() every line that is not `bestmove` (any line, in the order it came: what is not an `info` line, has no score, is `info string` text or has an index above N is
          * ignored). Per index the latest exact score wins (the engine deepens: a later line is the deeper one); a bound (`lowerbound` / `upperbound`) is the answer for an index only

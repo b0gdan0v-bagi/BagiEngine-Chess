@@ -40,7 +40,7 @@ namespace BECore::Chess {
 #if CHESS_UCI_PROCESS_POSIX
 
         constexpr size_t kReadChunkBytes = 4096;
-        constexpr std::chrono::milliseconds kTerminateGrace{500};  // how long a child gets after SIGTERM before SIGKILL
+        constexpr std::chrono::milliseconds kTerminateGrace{500};
         constexpr std::chrono::milliseconds kExitPollInterval{2};  // waitpid has no timeout: the exit is looked for at this pace
         constexpr int kFirstFreeDescriptor = STDERR_FILENO + 1;    // the pipes live above the three the child gets
         constexpr int kPipeReadEnd = 0;
@@ -51,7 +51,6 @@ namespace BECore::Chess {
             return FromStdString(std::system_category().message(code));
         }
 
-        /// A file descriptor closed with the object
         class Descriptor {
         public:
             Descriptor() = default;
@@ -190,7 +189,7 @@ namespace BECore::Chess {
     Optional<String> UciProcess::TakeBufferedLine() {
         constexpr char kLineEnd = '\n';
         constexpr char kCarriageReturn = '\r';
-        constexpr size_t kCompactBytes = 64 * 1024;  // the consumed front of the line buffer is dropped once it is this big and half of the buffer
+        constexpr size_t kCompactBytes = 64 * 1024;
 
         const size_t lineEnd = _buffer.find(kLineEnd, _head + _scanned);
         if (lineEnd == String::npos) {

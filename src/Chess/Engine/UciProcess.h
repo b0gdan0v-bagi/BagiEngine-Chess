@@ -29,8 +29,8 @@ namespace BECore::Chess {
      * One thread at a time: the class has no lock. UciEngine owns its process and touches it only while it holds its mutex (one search at a time,
      * on whatever thread it runs); any other user of a UciProcess keeps to one thread or locks it.
      *
-     * The child gets the pipes as stdin and stdout, /dev/null as stderr, and no other descriptor of the game: a control socket or the pipe of
-     * another engine would stay open in it otherwise (the pipes here are close-on-exec; on macOS the child closes everything else, with glibc 2.34 or later too).
+     * The child gets no other descriptor of the game than its three: a control socket or the pipe of another engine would stay open in it otherwise
+     * (the pipes are close-on-exec; on macOS the child closes everything else, with glibc 2.34 or later too).
      *
      * SIGPIPE: a write to a child that is gone must come back as ProcessDied, not kill the game. On macOS the write end carries F_SETNOSIGPIPE,
      * set per descriptor, which touches nothing else in the process. Elsewhere (and on macOS if that fcntl fails) every Start() sets the disposition of
@@ -38,14 +38,13 @@ namespace BECore::Chess {
      * it after the last Start(), because UciEngine starts the process again after an error: a host that needs its own SIGPIPE handler off Apple
      * cannot share its process with this class. The child gets the default disposition back.
      *
-     * Windows (UciProcessWindows.cpp): CreateProcessW with the path as the application (no search) and a command line quoted for the C runtime of the child; the child
-     * inherits exactly its three handles (PROC_THREAD_ATTRIBUTE_HANDLE_LIST), its stderr is NUL, and it gets no console window. Its stdout is a named pipe
-     * read with overlapped I/O, so ReadLine() waits with a timeout like poll(); a read in flight is kept between calls. There are no signals: a write to a
+     * Windows (UciProcessWindows.cpp): the child inherits exactly its three handles, its stderr is NUL, and it gets no console window. Its stdout is read with
+     * overlapped I/O, so ReadLine() waits with a timeout like poll(); a read in flight is kept between calls. There are no signals: a write to a
      * child that is gone is ERROR_NO_DATA / ERROR_BROKEN_PIPE, so ProcessDied, and Close() goes from the grace straight to TerminateProcess. The process id
      * stays valid until Close() lets go of the process handle. The texts of the system errors are the system's, in its language, with the number: "(error 2)".
      *
-     * Where CHESS_HAS_UCI_PROCESS is 0 (CHESS_NO_STOCKFISH, Emscripten) Start() answers Unsupported with a sentence for the case, the other calls answer it too,
-     * and no system header is included. (The Emscripten case has not been compiled yet: it needs emsdk.)
+     * Where CHESS_HAS_UCI_PROCESS is 0 (CHESS_NO_STOCKFISH, Emscripten) Start(), WriteLine() and ReadLine() answer Unsupported with a sentence for the case,
+     * Close() does nothing, IsRunning() is false, and no system header is included.
      */
     class UciProcess {
     public:
