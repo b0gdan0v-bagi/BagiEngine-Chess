@@ -390,7 +390,7 @@ MATE_IN_ONE_FEN = "6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1"  # Ra8#
 def find_chess_exe() -> Path | None:
     if os.environ.get("BAGI_CHESS_EXE"):
         return Path(os.environ["BAGI_CHESS_EXE"])
-    found = sorted(glob.glob(str(REPO_ROOT / "build" / "*" / "BagiChess")) + glob.glob(str(REPO_ROOT / "build" / "*" / "BagiChess.exe")))
+    found = sorted(glob.glob(str(REPO_ROOT / "build" / "*" / "bin" / "BagiChess")) + glob.glob(str(REPO_ROOT / "build" / "*" / "bin" / "BagiChess.exe")))
     return Path(found[0]) if found else None
 
 
@@ -401,7 +401,7 @@ def real_game():
         pytest.skip("Stockfish is not installed (put it on PATH or set STOCKFISH)")
     exe = find_chess_exe()
     if exe is None or not exe.is_file():
-        pytest.skip("BagiChess is not built (set BAGI_CHESS_EXE or build into build/<preset>/)")
+        pytest.skip("BagiChess is not built (set BAGI_CHESS_EXE or build into build/<preset>/bin/)")
     exe = exe.resolve()
     port = free_port()
     with GameProcess(build_game_command(exe, port), cwd=exe.parent) as process:

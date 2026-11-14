@@ -99,7 +99,7 @@ The presets for Windows are in `engine/CMakePresets.json`. `windows-clang-debug`
   - `windows-vs2022`: the Visual Studio 2022 generator, x64, MSVC; it needs no developer prompt. The build and test presets are `windows-vs2022-debug` and `windows-vs2022-release`. `windows-vs2022-clangcl` (build presets `windows-vs2022-clangcl-debug` / `-release`) is there too.
   - MSVC is not the default because its debug information (`/Zi`, a PDB per module beside the shared PCH, one `mspdbsrv` for every build on the machine) breaks a parallel build now and then (`LNK1103`, `LNK4020 ... pdb is corrupted`, `C1090`); a second run passes.
 - Step 6: the executable is `build/windows-clang-debug/bin/BagiChess.exe` (the folder of the preset for MSVC too; a Visual Studio configuration adds `Debug/` or `Release/` below `bin/`).
-- Stockfish does not play on Windows yet, only the own engine does (see "Playing against the computer").
+- Stockfish plays on Windows as on macOS: install it yourself and point `STOCKFISH` (or `stockfishPath`) at the `.exe` (see "Playing against the computer").
 
 ### VS Code
 
@@ -131,7 +131,7 @@ The game starts with "Stockfish" picked and never switches the engine for you. W
 
 A value that is set but names no file is not skipped: a wrong `stockfishPath` does not fall through to `$STOCKFISH` or `PATH`, and a wrong `$STOCKFISH` does not fall through to `PATH`. The game then says "Engine not found" and the log explains: for a wrong `stockfishPath` it names the path it tried, for a wrong `$STOCKFISH` it says the variable must name a file. Fix the value or remove it.
 
-With none of the three the game still runs as two people, and picking Computer with "Stockfish" says "Engine not found" and changes nothing else (the panel stays on Two players). The way out is the **Engine** row of the panel: pick "Own engine" (that clears the message), then Computer again. The game starts Stockfish as a child process, which is only written for macOS and Linux so far (macOS is what it is tested on); on Windows Stockfish cannot play yet (the status line says "Engine not supported here"), but the own engine can. The choice is not remembered between runs.
+With none of the three the game still runs as two people, and picking Computer with "Stockfish" says "Engine not found" and changes nothing else (the panel stays on Two players). The way out is the **Engine** row of the panel: pick "Own engine" (that clears the message), then Computer again. The game starts Stockfish as a child process on macOS, Linux and Windows (checked on macOS and Windows; on Windows point `stockfishPath` or `STOCKFISH` at the `.exe`, for example a release unpacked under `%LOCALAPPDATA%\Programs\Stockfish`). The choice is not remembered between runs.
 
 ## Browser build
 
