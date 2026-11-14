@@ -21,7 +21,7 @@ namespace BECore::Chess::Tests {
     inline Player EnginePlayer(IChessEngine& engine, SearchLimits limits) {
         return [&engine, limits](const ChessGameModel& model) {
             const auto move = engine.FindMove(SearchRequest::FromModel(model, limits), CancellationToken::Create());
-            EXPECT_TRUE(move.has_value()) << DescribeError(move ? std::nullopt : std::optional<EngineError>(move.error())).c_str();
+            EXPECT_TRUE(move.has_value()) << DescribeError(move ? std::nullopt : Optional<EngineError>(move.error())).c_str();
             return move.value_or(Move{});
         };
     }

@@ -19,7 +19,7 @@ namespace BECore::Chess::Tests {
                 if (end == eastl::string_view::npos) {
                     end = line.size();
                 }
-                const std::optional<Move> move = MoveGenerator::ParseUci(model.GetPosition(), line.substr(begin, end - begin));
+                const Optional<Move> move = MoveGenerator::ParseUci(model.GetPosition(), line.substr(begin, end - begin));
                 ASSERT_TRUE(move.has_value()) << "not a legal move: " << std::string(line.substr(begin, end - begin).data(), end - begin);
                 ASSERT_TRUE(model.TryMove(*move).has_value());
                 begin = end + 1;
@@ -36,7 +36,7 @@ namespace BECore::Chess::Tests {
         }
 
         SeatChoice Seat(OpponentEngine engine, eastl::string_view level) {
-            const std::optional<size_t> index = FindOpponentLevel(level);
+            const Optional<size_t> index = FindOpponentLevel(level);
             EXPECT_TRUE(index.has_value());
             return SeatChoice{engine, index.value_or(kDefaultOpponentLevel)};
         }

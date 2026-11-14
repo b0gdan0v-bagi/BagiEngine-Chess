@@ -22,7 +22,7 @@ namespace BECore::Chess::Tests {
             Position position = PositionFromFen(fen);
             eastl::vector<Move> moves;
             for (const eastl::string_view uci : line) {
-                const std::optional<Move> move = MoveGenerator::ParseUci(position, uci);
+                const Optional<Move> move = MoveGenerator::ParseUci(position, uci);
                 if (!move) {
                     ADD_FAILURE() << "Not a legal move: " << eastl::string(uci).c_str() << " in " << position.ToFen().c_str();
                     break;

@@ -24,8 +24,8 @@ namespace BECore::Chess::Tests {
         }
 
         /// The move of an answer, or nothing for an error: a form that EXPECT_EQ can compare and print
-        std::optional<Move> Found(const std::expected<Move, EngineError>& answer) {
-            return answer ? std::optional<Move>(*answer) : std::nullopt;
+        Optional<Move> Found(const std::expected<Move, EngineError>& answer) {
+            return answer ? Optional<Move>(*answer) : std::nullopt;
         }
 
         eastl::string Uci(const std::expected<Move, EngineError>& answer) {
@@ -55,7 +55,7 @@ namespace BECore::Chess::Tests {
         /// What one request did to a BlunderEngine over an InstantEngine: whether the wrapped engine was asked, and the answer
         struct Decision {
             bool blundered = false;
-            std::optional<Move> move;
+            Optional<Move> move;
         };
 
         Decision Decide(IChessEngine& engine, InstantEngine& inner, const SearchRequest& request) {
@@ -116,7 +116,7 @@ namespace BECore::Chess::Tests {
         for (size_t i = 0; i < requests.size(); ++i) {
             const auto answer = Ask(engine, requests[i]);
 
-            ASSERT_TRUE(answer.has_value()) << i << " " << DescribeError(answer ? std::nullopt : std::optional<EngineError>(answer.error())).c_str();
+            ASSERT_TRUE(answer.has_value()) << i << " " << DescribeError(answer ? std::nullopt : Optional<EngineError>(answer.error())).c_str();
             EXPECT_TRUE(IsLegalIn(*requests[i].FinalPosition(), *answer)) << i;
             differentFromFirst += *answer != *FirstLegalMove(requests[i]) ? 1 : 0;
         }
@@ -261,12 +261,12 @@ namespace BECore::Chess::Tests {
         const auto inner = eastl::make_shared<InstantEngine>();
         BlunderEngine engine(inner, 50);
         const eastl::vector<SearchRequest> requests = SeededRequests(kGamePlies);
-        eastl::vector<std::optional<Move>> alone;
+        eastl::vector<Optional<Move>> alone;
         for (const SearchRequest& request : requests) {
             alone.push_back(Found(Ask(engine, request)));
         }
-        eastl::vector<std::optional<Move>> a;
-        eastl::vector<std::optional<Move>> b;
+        eastl::vector<Optional<Move>> a;
+        eastl::vector<Optional<Move>> b;
 
         std::thread other([&] {
             for (size_t i = requests.size(); i-- > 0;) {

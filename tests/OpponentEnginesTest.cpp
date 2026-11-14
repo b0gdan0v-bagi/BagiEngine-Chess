@@ -59,8 +59,8 @@ namespace BECore::Chess::Tests {
             ASSERT_TRUE(found.has_value()) << Text(OpponentEngineId(engine));
             EXPECT_EQ(*found, engine);
         }
-        EXPECT_EQ(FindOpponentEngine("stockfish"), std::optional<OpponentEngine>(OpponentEngine::Stockfish));
-        EXPECT_EQ(FindOpponentEngine("own"), std::optional<OpponentEngine>(OpponentEngine::Own));
+        EXPECT_EQ(FindOpponentEngine("stockfish"), Optional<OpponentEngine>(OpponentEngine::Stockfish));
+        EXPECT_EQ(FindOpponentEngine("own"), Optional<OpponentEngine>(OpponentEngine::Own));
     }
 
     TEST(OpponentEnginesTest, FindOpponentEngineMissesWhatIsNotAnId) {

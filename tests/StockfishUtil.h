@@ -7,7 +7,7 @@
 
 // A test against a real Stockfish begins with this: it declares `path` (the Stockfish executable) or skips the test
 #define SKIP_WITHOUT_STOCKFISH(path)                                                                                                                                                                   \
-    const std::optional<eastl::string> path = ::BECore::Chess::Tests::StockfishPath();                                                                                                                 \
+    const BECore::Optional<eastl::string> path = ::BECore::Chess::Tests::StockfishPath();                                                                                                              \
     if (!path.has_value()) {                                                                                                                                                                           \
         GTEST_SKIP() << "no Stockfish (or no process code in this build): set STOCKFISH to its executable or put stockfish on PATH";                                                                   \
     }
@@ -16,7 +16,7 @@
 namespace BECore::Chess::Tests {
 
     /// Where Stockfish is, or nothing; nothing too where the process code is not there (CHESS_NO_STOCKFISH, the web)
-    inline std::optional<eastl::string> StockfishPath() {
+    inline Optional<eastl::string> StockfishPath() {
 #if !CHESS_HAS_UCI_PROCESS
         return std::nullopt;
 #else

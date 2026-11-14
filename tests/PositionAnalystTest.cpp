@@ -40,7 +40,7 @@ namespace BECore::Chess::Tests {
             }
         }
 
-        eastl::shared_ptr<AnalysingEngine> MakeEngine(AnalysisScore score = kScore, std::optional<Move> move = std::nullopt) {
+        eastl::shared_ptr<AnalysingEngine> MakeEngine(AnalysisScore score = kScore, Optional<Move> move = std::nullopt) {
             return eastl::make_shared<AnalysingEngine>(score, move);
         }
 
@@ -93,7 +93,7 @@ namespace BECore::Chess::Tests {
         EXPECT_FALSE(analyst.GetEvaluation(model).has_value()) << "nothing before the engine has answered";
         ASSERT_TRUE(UpdateUntil(analyst, model, OpponentEngine::Stockfish, [&] { return analyst.GetEvaluation(model).has_value(); })) << DescribeError(analyst.GetError()).c_str();
 
-        const std::optional<AnalysisLine> line = analyst.GetEvaluation(model);
+        const Optional<AnalysisLine> line = analyst.GetEvaluation(model);
         EXPECT_EQ(line->score, kScore);
         EXPECT_EQ(line->move, Mv("e2e4"));
         EXPECT_EQ(line->depth, 7);
@@ -165,7 +165,7 @@ namespace BECore::Chess::Tests {
         engine->Open();  // the old worker answers now, for the position before the move
         ASSERT_TRUE(UpdateUntil(analyst, model, OpponentEngine::Stockfish, [&] { return analyst.GetEvaluation(model).has_value(); })) << DescribeError(analyst.GetError()).c_str();
 
-        const std::optional<AnalysisLine> line = analyst.GetEvaluation(model);
+        const Optional<AnalysisLine> line = analyst.GetEvaluation(model);
         EXPECT_TRUE(MoveGenerator::ParseUci(model.GetPosition(), line->move.ToUci()).has_value()) << "a move of Black, from the new search, not the White move of the old one";
         EXPECT_EQ(engine->Calls(), 2);
         EXPECT_EQ(engine->LastRequest().moves.size(), 1u);
@@ -842,7 +842,7 @@ namespace BECore::Chess::Tests {
 
         ASSERT_TRUE(UpdateUntil(analyst, model, OpponentEngine::Own, [&] { return analyst.GetHint(model).has_value(); })) << DescribeError(analyst.GetError()).c_str();
 
-        const std::optional<AnalysisLine> hint = analyst.GetHint(model);
+        const Optional<AnalysisLine> hint = analyst.GetHint(model);
         EXPECT_EQ(hint->move, Mv("a1a8"));
         EXPECT_EQ(hint->score, (AnalysisScore{AnalysisScoreKind::Mate, 1}));
         EXPECT_EQ(analyst.GetEvaluation(model)->score, hint->score);
@@ -892,7 +892,7 @@ namespace BECore::Chess::Tests {
         /// Every move of @p model is rated
         bool AllRated(const PositionAnalyst& analyst, const ChessGameModel& model) {
             const MoveRatings ratings = analyst.GetRatings(model);
-            return !ratings.empty() && eastl::all_of(ratings.begin(), ratings.end(), [](const std::optional<MoveRating>& rating) { return rating.has_value(); });
+            return !ratings.empty() && eastl::all_of(ratings.begin(), ratings.end(), [](const Optional<MoveRating>& rating) { return rating.has_value(); });
         }
 
     }  // namespace

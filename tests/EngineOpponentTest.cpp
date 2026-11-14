@@ -60,7 +60,7 @@ namespace BECore::Chess::Tests {
             });
         }
 
-        eastl::string Describe(const std::optional<EngineError>& error) {
+        eastl::string Describe(const Optional<EngineError>& error) {
             return error ? Format("{}: {}", EnumUtils<EngineErrorKind>::ToString(error->kind), error->detail) : eastl::string("no error");
         }
 

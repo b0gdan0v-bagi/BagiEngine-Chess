@@ -49,7 +49,7 @@ namespace BECore::Chess::Tests {
         /// Every move of the model is rated
         bool AllRated(const MoveRater& rater, const ChessGameModel& model) {
             const MoveRatings ratings = rater.GetRatings(model);
-            return ratings.size() == model.GetMoves().size() && eastl::all_of(ratings.begin(), ratings.end(), [](const std::optional<MoveRating>& rating) { return rating.has_value(); });
+            return ratings.size() == model.GetMoves().size() && eastl::all_of(ratings.begin(), ratings.end(), [](const Optional<MoveRating>& rating) { return rating.has_value(); });
         }
 
         bool RatedAt(const MoveRater& rater, const ChessGameModel& model, size_t ply) {
@@ -82,7 +82,7 @@ namespace BECore::Chess::Tests {
             }
 
             /// Every search fails with @p error, or only the one for the request of @p ply moves
-            void FailWith(EngineError error, std::optional<size_t> ply = std::nullopt) {
+            void FailWith(EngineError error, Optional<size_t> ply = std::nullopt) {
                 _error = std::move(error);
                 _failPly = ply;
             }
@@ -160,8 +160,8 @@ namespace BECore::Chess::Tests {
             int _gap;
             bool _gated = false;
             bool _honorsToken = false;
-            std::optional<EngineError> _error;
-            std::optional<size_t> _failPly;
+            Optional<EngineError> _error;
+            Optional<size_t> _failPly;
             mutable std::mutex _mutex;  ///< guards _requests
             eastl::vector<SearchRequest> _requests;
             std::atomic<bool> _open{false};
@@ -751,7 +751,7 @@ namespace BECore::Chess::Tests {
             }
             EXPECT_TRUE(PlayAll(model, ucis));
             eastl::vector<MoveRatingReason> reasons;
-            for (const std::optional<MoveRating>& rating : RateWithTheOwnEngine(model)) {
+            for (const Optional<MoveRating>& rating : RateWithTheOwnEngine(model)) {
                 EXPECT_TRUE(rating.has_value());
                 reasons.push_back(rating ? rating->reason : MoveRatingReason::NotBest);
             }
@@ -816,7 +816,7 @@ namespace BECore::Chess::Tests {
 
         ASSERT_EQ(first.size(), 6u);
         EXPECT_TRUE(first == second) << "a fixed depth and no clock: the same game, the same ratings";
-        for (const std::optional<MoveRating>& rating : first) {
+        for (const Optional<MoveRating>& rating : first) {
             EXPECT_TRUE(rating.has_value());
         }
     }

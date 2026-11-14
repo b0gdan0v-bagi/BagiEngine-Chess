@@ -60,7 +60,7 @@ namespace BECore::Chess::Tests {
                 if (end == eastl::string_view::npos) {
                     end = line.size();
                 }
-                const std::optional<Move> move = MoveGenerator::ParseUci(model.GetPosition(), line.substr(begin, end - begin));
+                const Optional<Move> move = MoveGenerator::ParseUci(model.GetPosition(), line.substr(begin, end - begin));
                 ASSERT_TRUE(move.has_value());
                 ASSERT_TRUE(model.TryMove(*move).has_value());
                 begin = end + 1;
@@ -136,7 +136,7 @@ namespace BECore::Chess::Tests {
             GTEST_SKIP() << "a browser build: the folder is the page's";
         }
 
-        const std::optional<std::filesystem::path> on = ResolveSaveDirectory(LineOf({}), true, &StubDefaultDirectory);
+        const Optional<std::filesystem::path> on = ResolveSaveDirectory(LineOf({}), true, &StubDefaultDirectory);
         ASSERT_TRUE(on.has_value());
         EXPECT_EQ(*on, StubDefaultDirectory());
         EXPECT_FALSE(ResolveSaveDirectory(LineOf({}), false, &StubDefaultDirectory).has_value());
@@ -162,11 +162,11 @@ namespace BECore::Chess::Tests {
         const Vector<String> control = {"--control", "--headless", "--manual-clock", "--control-port=0", "--save-dir=somewhere"};
 
         for (const bool remembered : {true, false}) {
-            const std::optional<std::filesystem::path> folder = ResolveSaveDirectory(LineOf(control), remembered, &StubDefaultDirectory);
+            const Optional<std::filesystem::path> folder = ResolveSaveDirectory(LineOf(control), remembered, &StubDefaultDirectory);
             ASSERT_TRUE(folder.has_value());
             EXPECT_EQ(*folder, std::filesystem::path("somewhere"));
         }
-        const std::optional<std::filesystem::path> plain = ResolveSaveDirectory(LineOf({"--save-dir=elsewhere"}), false, &StubDefaultDirectory);
+        const Optional<std::filesystem::path> plain = ResolveSaveDirectory(LineOf({"--save-dir=elsewhere"}), false, &StubDefaultDirectory);
         ASSERT_TRUE(plain.has_value());
         EXPECT_EQ(*plain, std::filesystem::path("elsewhere"));
     }
@@ -245,7 +245,7 @@ namespace BECore::Chess::Tests {
         }
 
         /// What reached the file; nothing when there is none or it cannot be read
-        std::optional<ChessSaveState> Saved() const {
+        Optional<ChessSaveState> Saved() const {
             FileSystem fileSystem;
             SaveGameService service(fileSystem);
             if (!service.Initialize(_saves)) {
@@ -341,7 +341,7 @@ namespace BECore::Chess::Tests {
 
         game.Flush();
 
-        const std::optional<ChessSaveState> saved = Saved();
+        const Optional<ChessSaveState> saved = Saved();
         ASSERT_TRUE(saved.has_value());
         EXPECT_EQ(saved->moves, "e2e4 e7e5");
         EXPECT_EQ(saved->plays, "black");
@@ -464,7 +464,7 @@ namespace BECore::Chess::Tests {
         PlayLine(game.model, "d2d4");
         game.Flush();
 
-        const std::optional<ChessSaveState> saved = Saved();
+        const Optional<ChessSaveState> saved = Saved();
         ASSERT_TRUE(saved.has_value()) << "the game's own change did not replace the damaged file";
         EXPECT_EQ(saved->moves, "d2d4");
     }

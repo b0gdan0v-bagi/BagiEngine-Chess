@@ -383,7 +383,7 @@ namespace BECore::Chess::Tests {
         Write(*process, "go");
 
         // Nothing here reads the child: it is the write that finds the pipe broken, once the child has exited
-        std::optional<EngineError> failure;
+        Optional<EngineError> failure;
         const Clock::time_point deadline = Clock::now() + kMustNotTimeOut;
         while (!failure && Clock::now() < deadline) {
             const auto written = process->WriteLine("ucinewgame");

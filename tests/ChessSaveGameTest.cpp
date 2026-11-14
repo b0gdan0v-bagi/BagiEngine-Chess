@@ -47,7 +47,7 @@ namespace BECore::Chess::Tests {
                 if (end == eastl::string_view::npos) {
                     end = line.size();
                 }
-                const std::optional<Move> move = MoveGenerator::ParseUci(model.GetPosition(), line.substr(begin, end - begin));
+                const Optional<Move> move = MoveGenerator::ParseUci(model.GetPosition(), line.substr(begin, end - begin));
                 if (!move || !model.TryMove(*move).has_value()) {
                     return false;
                 }
@@ -183,7 +183,7 @@ namespace BECore::Chess::Tests {
             ASSERT_TRUE(service.Save(kChessSaveSlot, kChessSaveSchema, state).has_value());
         }
 
-        std::optional<ChessSaveState> Saved() const {
+        Optional<ChessSaveState> Saved() const {
             FileSystem fileSystem;
             SaveGameService service(fileSystem);
             ChessSaveState state;
@@ -344,7 +344,7 @@ namespace BECore::Chess::Tests {
 
         Frame();  // the first write of a run waits for nothing, and it is not the end of the game that writes it
 
-        const std::optional<ChessSaveState> saved = Saved();
+        const Optional<ChessSaveState> saved = Saved();
         ASSERT_TRUE(saved.has_value());
         EXPECT_EQ(saved->moves, "e2e4 e7e5");
     }
@@ -362,7 +362,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(Play(Game().GetModel(), "e7e5"));
         Frames(static_cast<int>(1.0 / kFrame) + 8);
 
-        const std::optional<ChessSaveState> saved = Saved();
+        const Optional<ChessSaveState> saved = Saved();
         ASSERT_TRUE(saved.has_value());
         EXPECT_EQ(saved->moves, "e2e4");
         EXPECT_EQ(saved->plays, "black");

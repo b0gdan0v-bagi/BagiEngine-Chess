@@ -24,8 +24,8 @@ namespace BECore::Chess::Tests {
         }
 
         /// Only the fields named by the caller may be set: the rest of `go` is empty
-        void ExpectGo(const GoParams& go, std::optional<int> depth, std::optional<int> moveTime, std::optional<int> wTime, std::optional<int> bTime, std::optional<int> wInc, std::optional<int> bInc,
-                      std::optional<int> movesToGo, bool infinite) {
+        void ExpectGo(const GoParams& go, Optional<int> depth, Optional<int> moveTime, Optional<int> wTime, Optional<int> bTime, Optional<int> wInc, Optional<int> bInc, Optional<int> movesToGo,
+                      bool infinite) {
             EXPECT_EQ(go.depth, depth);
             EXPECT_EQ(go.moveTime, moveTime);
             EXPECT_EQ(go.wTime, wTime);

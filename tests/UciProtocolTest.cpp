@@ -32,7 +32,7 @@ namespace BECore::Chess::Tests {
             EXPECT_FALSE(UciProtocol::ParseBestMove(line).has_value()) << eastl::string(line.data(), line.size()).c_str();
         }
 
-        std::optional<UciProtocol::Info> ParsedInfo(eastl::string_view line) {
+        Optional<UciProtocol::Info> ParsedInfo(eastl::string_view line) {
             return UciProtocol::ParseInfo(line);
         }
 

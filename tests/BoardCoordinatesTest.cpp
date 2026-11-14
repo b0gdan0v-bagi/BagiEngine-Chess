@@ -106,7 +106,7 @@ namespace BECore::Chess::Tests {
             for (int column = 0; column < kBoardSize; ++column) {
                 // The rule ChessBoardComponent paints with, for the square drawn in this cell
                 for (const PieceColor bottom : {kWhite, kBlack}) {
-                    const std::optional<Square> square = SquareAt(column, row, bottom);
+                    const Optional<Square> square = SquareAt(column, row, bottom);
                     ASSERT_TRUE(square.has_value());
                     EXPECT_EQ(IsLightCell(column, row), ((square->file + square->rank) % 2) != 0) << column << "," << row;
                 }

@@ -63,13 +63,13 @@ namespace BECore::Chess::Tests {
         }
 
         /// The kind of an error, or nothing for a value: a form that EXPECT_EQ can compare and print
-        std::optional<EngineErrorKind> KindOf(const std::expected<Analysis, EngineError>& answer) {
-            return answer ? std::nullopt : std::optional<EngineErrorKind>(answer.error().kind);
+        Optional<EngineErrorKind> KindOf(const std::expected<Analysis, EngineError>& answer) {
+            return answer ? std::nullopt : Optional<EngineErrorKind>(answer.error().kind);
         }
 
         /// The move of an answer, or nothing for an error: a form that EXPECT_EQ can compare and print
-        std::optional<Move> Found(const std::expected<Move, EngineError>& answer) {
-            return answer ? std::optional<Move>(*answer) : std::nullopt;
+        Optional<Move> Found(const std::expected<Move, EngineError>& answer) {
+            return answer ? Optional<Move>(*answer) : std::nullopt;
         }
 
         /// @p request asking for @p lines lines
@@ -229,7 +229,7 @@ namespace BECore::Chess::Tests {
         const auto answer = Ask(_engine, request);
         const auto took = std::chrono::steady_clock::now() - started;
 
-        ASSERT_TRUE(answer.has_value()) << DescribeError(answer ? std::nullopt : std::optional<EngineError>(answer.error())).c_str();
+        ASSERT_TRUE(answer.has_value()) << DescribeError(answer ? std::nullopt : Optional<EngineError>(answer.error())).c_str();
         EXPECT_TRUE(IsLegalIn(*request.FinalPosition(), *answer));
         EXPECT_GE(took, std::chrono::milliseconds(kMoveTimeMs) / 2) << "a search that has the time uses it";
     }
@@ -302,7 +302,7 @@ namespace BECore::Chess::Tests {
             const Player mover = RandomPlayer(random);
             PlayGame(model, engineIsWhite ? engine : mover, engineIsWhite ? mover : engine);
 
-            const std::optional<PieceColor> winner = model.GetWinner();
+            const Optional<PieceColor> winner = model.GetWinner();
             const PieceColor engineColor = engineIsWhite ? PieceColor::White : PieceColor::Black;
             EXPECT_TRUE(winner.has_value() && *winner == engineColor) << "game " << game << " ended " << EnumUtils<GameStatus>::ToString(model.GetStatus()).data();
             won += winner.has_value() && *winner == engineColor ? 1 : 0;

@@ -76,7 +76,7 @@ namespace BECore::Chess::Tests {
         }
 
         /// The best line of the analysis, or a failure that says why not
-        std::optional<AnalysisLine> BestLine(const eastl::string& path, eastl::string_view fen, SearchLimits limits = kDepth10) {
+        Optional<AnalysisLine> BestLine(const eastl::string& path, eastl::string_view fen, SearchLimits limits = kDepth10) {
             const auto result = Analyse(path, RequestFor(fen, limits));
             if (!result) {
                 ADD_FAILURE() << Describe(result.error()).c_str();
@@ -101,7 +101,7 @@ namespace BECore::Chess::Tests {
         }
 
         /// The move Stockfish gives for @p request, or a failure that says why not
-        std::optional<Move> Answer(const eastl::string& path, const SearchRequest& request) {
+        Optional<Move> Answer(const eastl::string& path, const SearchRequest& request) {
             const auto result = Ask(path, request);
             if (!result) {
                 ADD_FAILURE() << Describe(result.error()).c_str();

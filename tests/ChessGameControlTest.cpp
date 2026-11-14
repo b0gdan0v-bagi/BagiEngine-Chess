@@ -197,7 +197,7 @@ namespace BECore::Chess::Tests {
             }
 
             /// {"analysis": {..}}; an empty @p evaluation or @p hint leaves the member out
-            static Json AnalysisRequest(std::optional<bool> evaluation, std::optional<bool> hint) {
+            static Json AnalysisRequest(Optional<bool> evaluation, Optional<bool> hint) {
                 Json analysis = Json::object();
                 if (evaluation) {
                     analysis["evaluation"] = *evaluation;
@@ -211,7 +211,7 @@ namespace BECore::Chess::Tests {
             }
 
             /// set_state with the analysis; the test fails when it is refused
-            void AnalyseWith(std::optional<bool> evaluation, std::optional<bool> hint = std::nullopt) {
+            void AnalyseWith(Optional<bool> evaluation, Optional<bool> hint = std::nullopt) {
                 const auto result = control.SetState(AnalysisRequest(evaluation, hint));
                 ASSERT_TRUE(result.has_value()) << result.error().message.c_str();
             }
@@ -1277,7 +1277,7 @@ namespace BECore::Chess::Tests {
 
         constexpr AnalysisScore kPawnUp{AnalysisScoreKind::Centipawns, 35};
 
-        eastl::shared_ptr<AnalysingEngine> Analyser(AnalysisScore score = kPawnUp, std::optional<Move> move = std::nullopt) {
+        eastl::shared_ptr<AnalysingEngine> Analyser(AnalysisScore score = kPawnUp, Optional<Move> move = std::nullopt) {
             return eastl::make_shared<AnalysingEngine>(score, move);
         }
 

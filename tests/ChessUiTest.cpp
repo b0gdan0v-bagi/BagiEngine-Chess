@@ -1045,7 +1045,7 @@ namespace BECore::Chess::Tests {
         }
 
         /// What the board holds in the pointer now: none when no piece is lifted
-        static std::optional<ChessBoardComponent::LiftedPiece> Lifted() {
+        static Optional<ChessBoardComponent::LiftedPiece> Lifted() {
             const ChessBoardComponent* board = ChessBoardComponent::GetActive();
             EXPECT_NE(board, nullptr);
             return board ? board->GetLiftedPiece() : std::nullopt;
@@ -1115,7 +1115,7 @@ namespace BECore::Chess::Tests {
         }
 
         /// The middle, in output pixels, of the fill that a button was drawn with in the last frame; none when no fill of that color was drawn (a hidden button draws nothing)
-        std::optional<std::pair<float, float>> DrawnCenter(const Color& fill) const {
+        Optional<std::pair<float, float>> DrawnCenter(const Color& fill) const {
             const auto fills = RectCalls(fill);
             if (fills.empty()) {
                 return std::nullopt;
@@ -1426,7 +1426,7 @@ namespace BECore::Chess::Tests {
         /// The color at the bottom of the board as the opponent says it: Black exactly when the program plays White (taken from the controller, as the board does)
         bool BlackIsAtTheBottom() const {
             const OpponentController* opponent = ChessGame::GetActiveOpponent();
-            return opponent != nullptr && opponent->GetPlays() == std::optional<PieceColor>(PieceColor::White);
+            return opponent != nullptr && opponent->GetPlays() == Optional<PieceColor>(PieceColor::White);
         }
 
         /// The top left corner of a cell of the board in view units: @p column from the left, @p rowFromTop from the top
@@ -1776,7 +1776,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(Opponent().GetLevel(), *FindOpponentLevel("max"));
         PressWith(kSetColorAction, "black");
         PressWith(kSetModeAction, "computer");
-        EXPECT_EQ(Opponent().GetPlays(), std::optional<PieceColor>(PieceColor::White));
+        EXPECT_EQ(Opponent().GetPlays(), Optional<PieceColor>(PieceColor::White));
 
         for (const PanelSegment& segment : ExpectedPanelSegments()) {
             const PoolString action = ClickerOf(PanelButton(segment.name.c_str()))->action;
@@ -2024,7 +2024,7 @@ namespace BECore::Chess::Tests {
         const Rect h8 = SquareRect("h8");
         EXPECT_GT(a1.x, h8.x);
         EXPECT_LT(a1.y, h8.y);
-        const auto fillOf = [this](const Rect& cell) -> std::optional<Color> {
+        const auto fillOf = [this](const Rect& cell) -> Optional<Color> {
             for (const DrawCall& call : _renderer->calls) {
                 if (call.kind == DrawKind::Rect && SameRect(call.rect, cell)) {
                     return call.color;
@@ -2136,10 +2136,10 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, APromotionInTheTurnedBoardAsksInAPlateThatDoesNotMove) {
-        const auto plateOf = [this]() -> std::optional<Rect> {
+        const auto plateOf = [this]() -> Optional<Rect> {
             Draw();
             const auto plate = RectCalls(kPromotionPlateColor);
-            return plate.empty() ? std::nullopt : std::optional<Rect>(plate.front()->rect);
+            return plate.empty() ? std::nullopt : Optional<Rect>(plate.front()->rect);
         };
 
         // Two people: the plate as it is drawn with White at the bottom
@@ -2175,10 +2175,10 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheDimAndTheResultBarCoverTheTurnedBoardTheSame) {
-        const auto dimOf = [this]() -> std::optional<Rect> {
+        const auto dimOf = [this]() -> Optional<Rect> {
             Draw();
             const auto dim = RectCalls(kBoardDimColor);
-            return dim.empty() ? std::nullopt : std::optional<Rect>(dim.front()->rect);
+            return dim.empty() ? std::nullopt : Optional<Rect>(dim.front()->rect);
         };
 
         CountingFactory factory({eastl::make_shared<InstantEngine>()});
@@ -2190,7 +2190,7 @@ namespace BECore::Chess::Tests {
         ClickMove("a8", "a1");
 
         ASSERT_TRUE(Model().IsGameOver());
-        EXPECT_EQ(Model().GetWinner(), std::optional<PieceColor>(PieceColor::Black));
+        EXPECT_EQ(Model().GetWinner(), Optional<PieceColor>(PieceColor::Black));
         const auto dim = dimOf();
         ASSERT_TRUE(dim.has_value());
         const ViewTransform fit = ViewTransform::Fit(kViewWidth, kViewHeight, _renderer->width, _renderer->height);
@@ -3124,7 +3124,7 @@ namespace BECore::Chess::Tests {
         ClickCell(3, 4);  // the cell where e5 is drawn on this board
         ASSERT_EQ(Model().GetPremoves().size(), 1u);
         EXPECT_EQ(Model().GetPremoves()[0], (Premove{Sq("e7"), Sq("e5")}));
-        EXPECT_EQ(Model().GetPremoveColor(), std::optional<PieceColor>(PieceColor::Black));
+        EXPECT_EQ(Model().GetPremoveColor(), Optional<PieceColor>(PieceColor::Black));
         Draw();
         const auto marks = RectCalls(kPremoveColor);
         ASSERT_EQ(marks.size(), 2u);
@@ -3189,7 +3189,7 @@ namespace BECore::Chess::Tests {
 
         ASSERT_TRUE(FramesUntil([&] { return Model().IsGameOver(); }));
         EXPECT_EQ(Model().GetStatus(), GameStatus::Checkmate);
-        EXPECT_EQ(Model().GetWinner(), std::optional<PieceColor>(PieceColor::White));
+        EXPECT_EQ(Model().GetWinner(), Optional<PieceColor>(PieceColor::White));
         ASSERT_EQ(Model().GetMoves().size(), 1u);
         EXPECT_EQ(Model().GetMoves()[0].ToUci(), "a1a8") << "the program's move";
         EXPECT_FALSE(Opponent().GetError().has_value());
@@ -3491,7 +3491,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(Var("opponentEngine"), "own");
         ASSERT_EQ(factory.Calls(), 2) << "the program plays: a new engine for the new choice";
         EXPECT_EQ(factory.Engines()[1], "own");
-        EXPECT_EQ(Opponent().GetPlays(), std::optional<PieceColor>(PieceColor::Black)) << "the side stays";
+        EXPECT_EQ(Opponent().GetPlays(), Optional<PieceColor>(PieceColor::Black)) << "the side stays";
     }
 
     TEST_F(ChessUiTest, WhileTheProgramThinksTheTurnSaysSoAndTheAnswerBringsTheUsualWordsBack) {
@@ -3624,10 +3624,10 @@ namespace BECore::Chess::Tests {
         EXPECT_TRUE(CoreManager::GetUIInput().DispatchMouseButtonDown(Button(at.first, at.second, true))) << "the segment takes the click";
         EXPECT_FALSE(Opponent().GetPlays().has_value()) << "a press alone does nothing";
         EXPECT_TRUE(CoreManager::GetUIInput().DispatchMouseButtonUp(Button(at.first, at.second, false)));
-        EXPECT_EQ(Opponent().GetPlays(), std::optional<PieceColor>(PieceColor::Black));
+        EXPECT_EQ(Opponent().GetPlays(), Optional<PieceColor>(PieceColor::Black));
 
         EXPECT_TRUE(ClickPanel("ColorBlack").Both());
-        EXPECT_EQ(Opponent().GetPlays(), std::optional<PieceColor>(PieceColor::White));
+        EXPECT_EQ(Opponent().GetPlays(), Optional<PieceColor>(PieceColor::White));
 
         EXPECT_TRUE(ClickPanel("ModeTwo").Both());
         EXPECT_FALSE(Opponent().GetPlays().has_value());
@@ -3663,7 +3663,7 @@ namespace BECore::Chess::Tests {
         EXPECT_TRUE(PanelButton("EngineStockfish").selected);
         ASSERT_EQ(factory.Calls(), 2);
         EXPECT_EQ(factory.Engines()[1], "stockfish");
-        EXPECT_EQ(Opponent().GetPlays(), std::optional<PieceColor>(PieceColor::Black)) << "the side stays";
+        EXPECT_EQ(Opponent().GetPlays(), Optional<PieceColor>(PieceColor::Black)) << "the side stays";
     }
 
     TEST_F(ChessUiTest, APressOnASegmentDoesNotChangeTheBoardSelection) {
@@ -3688,7 +3688,7 @@ namespace BECore::Chess::Tests {
     TEST_F(ChessUiTest, TheOwnEngineOfTheDefaultFactoryPlaysThroughThePanel) {
         // Was TheOwnEngineOfTheDefaultFactoryPlaysThroughTheButtons. No factory is set: the controller makes the real OwnEngine (no process, no settings) at the easy level, so the
         // test needs no Stockfish and no fake program
-        const std::optional<size_t> easy = FindOpponentLevel("easy");
+        const Optional<size_t> easy = FindOpponentLevel("easy");
         ASSERT_TRUE(easy.has_value());
         ASSERT_TRUE(OpenThePanel());
         ASSERT_TRUE(ClickPanel("EngineOwn").Both());
@@ -3727,7 +3727,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(Model().GetPosition().ToFen(), eastl::string(Position::kStartFen));
         EXPECT_EQ(Opponent().GetEngine(), OpponentEngine::Own) << "a new game keeps the engine";
         EXPECT_EQ(Var("opponentEngine"), "own");
-        EXPECT_EQ(Opponent().GetPlays(), std::optional<PieceColor>(PieceColor::Black));
+        EXPECT_EQ(Opponent().GetPlays(), Optional<PieceColor>(PieceColor::Black));
     }
 
     TEST_F(ChessUiTest, TheResetButtonStillResetsWithTheMenuButtonAround) {
@@ -3744,7 +3744,7 @@ namespace BECore::Chess::Tests {
         EXPECT_TRUE(ClickButton(kResetColor));
 
         EXPECT_EQ(Model().GetPosition().ToFen(), eastl::string(Position::kStartFen));
-        EXPECT_EQ(Opponent().GetPlays(), std::optional<PieceColor>(PieceColor::Black)) << "a new game keeps the opponent";
+        EXPECT_EQ(Opponent().GetPlays(), Optional<PieceColor>(PieceColor::Black)) << "a new game keeps the opponent";
         Draw();
         EXPECT_EQ(ShownText(*HudElement("Menu")), "Menu");
     }
@@ -3804,7 +3804,7 @@ namespace BECore::Chess::Tests {
 
         // Computer: the program plays the color the person does not, with the engine and the level that were picked, one engine made
         PressWith("ChessSetMode", "computer");
-        EXPECT_EQ(Opponent().GetPlays(), std::optional<PieceColor>(PieceColor::White)) << "the person has Black";
+        EXPECT_EQ(Opponent().GetPlays(), Optional<PieceColor>(PieceColor::White)) << "the person has Black";
         EXPECT_EQ(Var("opponentMode"), "computer");
         EXPECT_EQ(Var("opponentColor"), "black");
         ASSERT_EQ(factory.Calls(), 1);
@@ -3822,7 +3822,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(Var("opponentLevel"), "easy");
         PressWith("ChessSetColor", "white");
         ASSERT_EQ(factory.Calls(), 4);
-        EXPECT_EQ(Opponent().GetPlays(), std::optional<PieceColor>(PieceColor::Black));
+        EXPECT_EQ(Opponent().GetPlays(), Optional<PieceColor>(PieceColor::Black));
         EXPECT_EQ(Var("opponentColor"), "white");
 
         PressWith("ChessSetMode", "two");
@@ -3860,7 +3860,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(Var("opponentMode"), "two");
         EXPECT_EQ(Var("opponentColor"), "black") << "the program is gone and the person still has the color";
         PressWith("ChessSetMode", "computer");
-        EXPECT_EQ(Opponent().GetPlays(), std::optional<PieceColor>(PieceColor::White));
+        EXPECT_EQ(Opponent().GetPlays(), Optional<PieceColor>(PieceColor::White));
         EXPECT_EQ(Var("opponentColor"), "black");
     }
 
@@ -3897,7 +3897,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(factory.Calls(), 1) << "no engine is asked for an id that is in no table";
         EXPECT_EQ(Opponent().GetRevision(), revision);
         EXPECT_EQ(Model().GetVersion(), version);
-        EXPECT_EQ(Opponent().GetPlays(), std::optional<PieceColor>(PieceColor::Black));
+        EXPECT_EQ(Opponent().GetPlays(), Optional<PieceColor>(PieceColor::Black));
         EXPECT_EQ(Var("opponentMode"), "computer");
         EXPECT_EQ(Var("opponentColor"), "white");
         EXPECT_EQ(Var("opponentEngine"), "stockfish");
@@ -4125,7 +4125,7 @@ namespace BECore::Chess::Tests {
                 if (std::string_view(group) == "ModeGroup") {
                     EXPECT_EQ(Opponent().GetPlays().has_value(), segment.id == "computer");
                 } else if (std::string_view(group) == "ColorGroup") {
-                    EXPECT_EQ(Opponent().GetPlays(), std::optional<PieceColor>(segment.id == "white" ? PieceColor::Black : PieceColor::White)) << "the program plays the other color";
+                    EXPECT_EQ(Opponent().GetPlays(), Optional<PieceColor>(segment.id == "white" ? PieceColor::Black : PieceColor::White)) << "the program plays the other color";
                 } else if (std::string_view(group) == "EngineGroup") {
                     EXPECT_EQ(Opponent().GetEngine(), *FindOpponentEngine(segment.id));
                 } else {
@@ -4211,7 +4211,7 @@ namespace BECore::Chess::Tests {
         Draw();
         ASSERT_EQ(working.Calls(), 1);
         EXPECT_EQ(working.Levels()[0], "max");
-        EXPECT_EQ(Opponent().GetPlays(), std::optional<PieceColor>(PieceColor::White));
+        EXPECT_EQ(Opponent().GetPlays(), Optional<PieceColor>(PieceColor::White));
         EXPECT_EQ(ControlOpponentString("plays"), "white");
         EXPECT_EQ(ControlOpponentString("level"), "max");
         EXPECT_TRUE(PanelButton("LevelMax").selected);
@@ -4283,7 +4283,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(ClickPanel("LevelHard").Both());
         ASSERT_TRUE(ClickPanel("ModeComputer").Both());
         Draw();
-        ASSERT_EQ(Opponent().GetPlays(), std::optional<PieceColor>(PieceColor::Black));
+        ASSERT_EQ(Opponent().GetPlays(), Optional<PieceColor>(PieceColor::Black));
         ASSERT_EQ(asked.size(), 1u);
 
         ASSERT_TRUE(ClickPanel("EngineStockfish").Both());
@@ -4400,19 +4400,19 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(ClickPanel("ModeComputer").Both());
         Draw();
         EXPECT_EQ(ShownText(*HudElement("Menu")), "Menu") << "the button is not a state: the panel shows the pick";
-        EXPECT_EQ(Opponent().GetPlays(), std::optional<PieceColor>(PieceColor::Black)) << "the person has White, the program Black";
+        EXPECT_EQ(Opponent().GetPlays(), Optional<PieceColor>(PieceColor::Black)) << "the person has White, the program Black";
         EXPECT_EQ(Var("opponentColor"), "white");
 
         ASSERT_TRUE(ClickPanel("ColorBlack").Both());
         Draw();
         EXPECT_EQ(ShownText(*HudElement("Menu")), "Menu");
-        EXPECT_EQ(Opponent().GetPlays(), std::optional<PieceColor>(PieceColor::White));
+        EXPECT_EQ(Opponent().GetPlays(), Optional<PieceColor>(PieceColor::White));
         EXPECT_EQ(Var("opponentColor"), "black");
 
         ASSERT_TRUE(ClickPanel("ColorWhite").Both());
         Draw();
         EXPECT_EQ(ShownText(*HudElement("Menu")), "Menu");
-        EXPECT_EQ(Opponent().GetPlays(), std::optional<PieceColor>(PieceColor::Black));
+        EXPECT_EQ(Opponent().GetPlays(), Optional<PieceColor>(PieceColor::Black));
         EXPECT_EQ(Var("opponentColor"), "white");
 
         ASSERT_TRUE(ClickPanel("ModeTwo").Both());
@@ -4799,7 +4799,7 @@ namespace BECore::Chess::Tests {
 
         EXPECT_FALSE(PromotionShown());
         EXPECT_EQ(Model().GetStatus(), GameStatus::Checkmate);
-        EXPECT_EQ(Model().GetWinner(), std::optional<PieceColor>(PieceColor::White));
+        EXPECT_EQ(Model().GetWinner(), Optional<PieceColor>(PieceColor::White));
         EXPECT_EQ(Var("turn"), "White wins");
         EXPECT_EQ(Var("status"), "Checkmate");
 
@@ -5023,7 +5023,7 @@ namespace BECore::Chess::Tests {
             EXPECT_EQ(ShownText(button), eastl::string(label.data(), label.size()));
             EXPECT_EQ(eastl::string(clicker->value.ToStringView().data(), clicker->value.ToStringView().size()), eastl::string(id.data(), id.size()));
             EXPECT_EQ(clicker->action, PoolString::Intern(kPromoteAction));
-            EXPECT_EQ(FindPromotion(clicker->value.ToStringView()), std::optional<PieceType>(piece)) << "the value is an id the board accepts";
+            EXPECT_EQ(FindPromotion(clicker->value.ToStringView()), Optional<PieceType>(piece)) << "the value is an id the board accepts";
         }
 
         const UIElement& cancel = PromotionButton("PromotionCancel");
@@ -6656,7 +6656,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(Opponent().ChooseSeats(ProgramSides{true, false}, {}, {}).has_value());  // the person takes Black over
         _manager->UpdateAll();
         EXPECT_FALSE(Opponent().IsWatching());
-        EXPECT_EQ(Opponent().GetPlays(), std::optional<PieceColor>(PieceColor::White));
+        EXPECT_EQ(Opponent().GetPlays(), Optional<PieceColor>(PieceColor::White));
         EXPECT_TRUE(BlackIsAtTheBottom()) << "one program: the board is turned for the person";
         EXPECT_FALSE(white->WasCancelled()) << "White's seat is unchanged: its search stays";
 

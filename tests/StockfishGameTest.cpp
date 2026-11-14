@@ -58,10 +58,10 @@ namespace BECore::Chess::Tests {
         constexpr int kYardstickReferenceDepth = 3;  ///< the own engine that the Stockfish levels play against
         constexpr const char* kYardstickGamesVariable = "CHESS_YARDSTICK_GAMES";
 
-        std::optional<int> ParseInt(const char* text, size_t length) {
+        Optional<int> ParseInt(const char* text, size_t length) {
             int value = 0;
             const auto [end, error] = std::from_chars(text, text + length, value);
-            return error == std::errc{} && end == text + length ? std::optional<int>(value) : std::nullopt;
+            return error == std::errc{} && end == text + length ? Optional<int>(value) : std::nullopt;
         }
 
         bool Play(ChessGameModel& model, eastl::string_view uci) {
@@ -79,7 +79,7 @@ namespace BECore::Chess::Tests {
         }
 
         size_t LevelIndex(eastl::string_view id) {
-            const std::optional<size_t> index = FindOpponentLevel(id);
+            const Optional<size_t> index = FindOpponentLevel(id);
             EXPECT_TRUE(index.has_value()) << id.data();
             return index.value_or(kDefaultOpponentLevel);
         }
@@ -105,7 +105,7 @@ namespace BECore::Chess::Tests {
             if (!model.IsGameOver()) {
                 return "unfinished";
             }
-            const std::optional<PieceColor> winner = model.GetWinner();
+            const Optional<PieceColor> winner = model.GetWinner();
             return winner ? Format("{} wins ({})", PieceColorId(*winner), EnumUtils<GameStatus>::ToString(model.GetStatus())) : Format("draw ({})", EnumUtils<GameStatus>::ToString(model.GetStatus()));
         }
 
@@ -132,7 +132,7 @@ namespace BECore::Chess::Tests {
         }
 
         /// The process id on line @p index (from 0) of @p pidFile, once the script has written it
-        std::optional<int> ProcessIdAt(const std::filesystem::path& pidFile, size_t index) {
+        Optional<int> ProcessIdAt(const std::filesystem::path& pidFile, size_t index) {
             const eastl::vector<eastl::string> lines = ReadFileLines(pidFile);
             return index < lines.size() ? ParseInt(lines[index].c_str(), lines[index].size()) : std::nullopt;
         }
@@ -194,7 +194,7 @@ namespace BECore::Chess::Tests {
 
                 PlayGame(model, subjectIsWhite ? subjectPlayer : referencePlayer, subjectIsWhite ? referencePlayer : subjectPlayer, kYardstickPlies);
 
-                const std::optional<PieceColor> winner = model.GetWinner();
+                const Optional<PieceColor> winner = model.GetWinner();
                 const PieceColor subjectColor = subjectIsWhite ? PieceColor::White : PieceColor::Black;
                 if (winner.has_value()) {
                     ++(*winner == subjectColor ? result.wins : result.losses);
@@ -219,7 +219,7 @@ namespace BECore::Chess::Tests {
 
         int YardstickGames() {
             const char* value = std::getenv(kYardstickGamesVariable);
-            const std::optional<int> games = value != nullptr ? ParseInt(value, std::strlen(value)) : std::nullopt;
+            const Optional<int> games = value != nullptr ? ParseInt(value, std::strlen(value)) : std::nullopt;
             return games.has_value() && *games > 0 ? *games : kYardstickGames;
         }
 
@@ -248,7 +248,7 @@ namespace BECore::Chess::Tests {
             // Every move was accepted (PlayGame); the one claim about the result is that the random side did not win
             EXPECT_TRUE(model.IsGameOver() || model.GetMoves().size() == kRandomGamePlies) << "game " << game;
             EXPECT_GE(moves.size(), kShortestMate) << "a game, not a stop at the first move";
-            const std::optional<PieceColor> winner = model.GetWinner();
+            const Optional<PieceColor> winner = model.GetWinner();
             const PieceColor randomColor = stockfishIsWhite ? PieceColor::Black : PieceColor::White;
             EXPECT_FALSE(winner.has_value() && *winner == randomColor) << "game " << game << " was won by the random mover: " << ResultOf(model).c_str();
         }

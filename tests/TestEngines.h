@@ -34,7 +34,7 @@ namespace BECore::Chess::Tests {
     }
 
     /// An error as a sentence for a failed test ("no error" when there is none)
-    inline eastl::string DescribeError(const std::optional<EngineError>& error) {
+    inline eastl::string DescribeError(const Optional<EngineError>& error) {
         return error ? Format("{}: {}", EnumUtils<EngineErrorKind>::ToString(error->kind), error->detail) : eastl::string("no error");
     }
 
@@ -134,7 +134,7 @@ namespace BECore::Chess::Tests {
      */
     class GatedEngine final : public RecordingEngine {
     public:
-        explicit GatedEngine(bool honorsToken = false, std::optional<Move> answer = std::nullopt) : _honorsToken(honorsToken), _answer(answer) {}
+        explicit GatedEngine(bool honorsToken = false, Optional<Move> answer = std::nullopt) : _honorsToken(honorsToken), _answer(answer) {}
 
         void Open() {
             _open.store(true);
@@ -160,7 +160,7 @@ namespace BECore::Chess::Tests {
 
     private:
         bool _honorsToken;
-        std::optional<Move> _answer;
+        Optional<Move> _answer;
         std::atomic<bool> _open{false};
         std::atomic<bool> _cancelled{false};
     };
@@ -190,7 +190,7 @@ namespace BECore::Chess::Tests {
      */
     class AnalysingEngine final : public IChessEngine {
     public:
-        explicit AnalysingEngine(AnalysisScore score = {AnalysisScoreKind::Centipawns, 35}, std::optional<Move> move = std::nullopt, int depth = 7) : _score(score), _move(move), _depth(depth) {}
+        explicit AnalysingEngine(AnalysisScore score = {AnalysisScoreKind::Centipawns, 35}, Optional<Move> move = std::nullopt, int depth = 7) : _score(score), _move(move), _depth(depth) {}
 
         /// From now on Analyse() waits for Open() before it answers; @p honorsToken: a cancelled token ends the wait with Cancelled
         void Gate(bool honorsToken) {
@@ -291,13 +291,13 @@ namespace BECore::Chess::Tests {
         }
 
         AnalysisScore _score;
-        std::optional<Move> _move;
+        Optional<Move> _move;
         int _depth;
         AnalysisScore _secondScore{AnalysisScoreKind::Centipawns, 10};
         int _secondDepth = 6;
         bool _gated = false;
         bool _honorsToken = false;
-        std::optional<EngineError> _error;
+        Optional<EngineError> _error;
         mutable std::mutex _mutex;  ///< guards _lastRequest
         SearchRequest _lastRequest;
         std::atomic<bool> _open{false};
@@ -345,7 +345,7 @@ namespace BECore::Chess::Tests {
         }
 
         eastl::vector<eastl::shared_ptr<IChessEngine>> _engines;
-        std::optional<EngineError> _error;
+        Optional<EngineError> _error;
         eastl::vector<eastl::string> _engineIds;
     };
 
@@ -395,7 +395,7 @@ namespace BECore::Chess::Tests {
         }
 
         eastl::vector<eastl::shared_ptr<IChessEngine>> _engines;
-        std::optional<EngineError> _error;
+        Optional<EngineError> _error;
         eastl::vector<eastl::string> _levels;
         eastl::vector<eastl::string> _engineIds;
     };

@@ -174,8 +174,8 @@ namespace BECore::Chess::Tests {
             ASSERT_TRUE(found.has_value()) << Text(levels[index].id);
             EXPECT_EQ(*found, index);
         }
-        EXPECT_EQ(FindOpponentLevel("easy"), std::optional<size_t>(0));
-        EXPECT_EQ(FindOpponentLevel("max"), std::optional<size_t>(levels.size() - 1));
+        EXPECT_EQ(FindOpponentLevel("easy"), Optional<size_t>(0));
+        EXPECT_EQ(FindOpponentLevel("max"), Optional<size_t>(levels.size() - 1));
     }
 
     TEST(OpponentLevelsTest, FindOpponentLevelMissesWhatIsNotAnId) {

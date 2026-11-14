@@ -50,7 +50,7 @@ namespace BECore::Chess::Tests {
         }
 
         size_t LevelIndex(eastl::string_view id) {
-            const std::optional<size_t> index = FindOpponentLevel(id);
+            const Optional<size_t> index = FindOpponentLevel(id);
             EXPECT_TRUE(index.has_value()) << id.data();
             return index.value_or(kDefaultOpponentLevel);
         }
@@ -120,8 +120,8 @@ namespace BECore::Chess::Tests {
 
         const auto picked = controller.SetSide(PieceColor::Black);
 
-        ASSERT_TRUE(picked.has_value()) << DescribeError(picked ? std::nullopt : std::optional<EngineError>(picked.error())).c_str();
-        EXPECT_EQ(controller.GetPlays(), std::optional<PieceColor>(PieceColor::Black));
+        ASSERT_TRUE(picked.has_value()) << DescribeError(picked ? std::nullopt : Optional<EngineError>(picked.error())).c_str();
+        EXPECT_EQ(controller.GetPlays(), Optional<PieceColor>(PieceColor::Black));
         EXPECT_TRUE(controller.PlaysFor(PieceColor::Black));
         EXPECT_FALSE(controller.PlaysFor(PieceColor::White));
         EXPECT_EQ(controller.GetRevision(), 1u);
@@ -179,10 +179,10 @@ namespace BECore::Chess::Tests {
         CountingFactory factory({eastl::make_shared<InstantEngine>()});
         OpponentController controller(model);
         controller.SetEngineFactory(factory.AsFactory());
-        const std::optional<PieceColor> expected[] = {PieceColor::Black, PieceColor::White, std::nullopt, PieceColor::Black};
+        const Optional<PieceColor> expected[] = {PieceColor::Black, PieceColor::White, std::nullopt, PieceColor::Black};
 
         uint64_t revision = controller.GetRevision();
-        for (const std::optional<PieceColor>& plays : expected) {
+        for (const Optional<PieceColor>& plays : expected) {
             ASSERT_TRUE(controller.CycleSide().has_value());
             EXPECT_EQ(controller.GetPlays(), plays);
             EXPECT_EQ(controller.GetRevision(), revision + 1) << "every step is a change";
@@ -363,7 +363,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(refused.error().kind, EngineErrorKind::LaunchFailed);
         EXPECT_EQ(controller.GetEngine(), OpponentEngine::Own) << "an engine that cannot be had cannot be saved";
         EXPECT_EQ(controller.GetLevel(), easy);
-        EXPECT_EQ(controller.GetPlays(), std::optional<PieceColor>(PieceColor::Black));
+        EXPECT_EQ(controller.GetPlays(), Optional<PieceColor>(PieceColor::Black));
         EXPECT_TRUE(controller.PlaysFor(PieceColor::Black));
         EXPECT_TRUE(controller.IsThinking()) << "the search of the old opponent runs on";
         EXPECT_FALSE(own->WasCancelled());
@@ -408,7 +408,7 @@ namespace BECore::Chess::Tests {
         const auto refused = controller.Choose(PieceColor::White, LevelIndex(kHardLevelId), OpponentEngine::Stockfish);
 
         ASSERT_FALSE(refused.has_value());
-        EXPECT_EQ(controller.GetPlays(), std::optional<PieceColor>(PieceColor::Black)) << "not the side";
+        EXPECT_EQ(controller.GetPlays(), Optional<PieceColor>(PieceColor::Black)) << "not the side";
         EXPECT_EQ(controller.GetLevel(), easy) << "not the level";
         EXPECT_EQ(controller.GetEngine(), OpponentEngine::Own) << "not the engine";
         EXPECT_TRUE(controller.GetError().has_value());
@@ -944,7 +944,7 @@ namespace BECore::Chess::Tests {
         EXPECT_FALSE(controller.IsThinking()) << "cancelled at once, though the worker is still inside the old engine";
         EXPECT_EQ(controller.GetEngine(), OpponentEngine::Own);
         EXPECT_GT(controller.GetRevision(), revision);
-        EXPECT_EQ(controller.GetPlays(), std::optional<PieceColor>(PieceColor::Black)) << "the side is not touched by an engine change";
+        EXPECT_EQ(controller.GetPlays(), Optional<PieceColor>(PieceColor::Black)) << "the side is not touched by an engine change";
         EXPECT_TRUE(controller.PlaysFor(PieceColor::Black));
         EXPECT_FALSE(controller.PlaysFor(PieceColor::White));
         EXPECT_EQ(controller.GetLevel(), level);

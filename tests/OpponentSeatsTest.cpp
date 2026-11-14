@@ -35,7 +35,7 @@ namespace BECore::Chess::Tests {
         }
 
         size_t LevelIndex(eastl::string_view id) {
-            const std::optional<size_t> index = FindOpponentLevel(id);
+            const Optional<size_t> index = FindOpponentLevel(id);
             EXPECT_TRUE(index.has_value()) << id.data();
             return index.value_or(kDefaultOpponentLevel);
         }
@@ -344,11 +344,11 @@ namespace BECore::Chess::Tests {
 
         ASSERT_TRUE(controller.SetSide(PieceColor::Black).has_value());
         EXPECT_FALSE(controller.IsWatching());
-        EXPECT_EQ(controller.GetPlays(), std::optional<PieceColor>(PieceColor::Black));
+        EXPECT_EQ(controller.GetPlays(), Optional<PieceColor>(PieceColor::Black));
         EXPECT_FALSE(controller.PlaysFor(PieceColor::White));
 
         ASSERT_TRUE(controller.ChooseSeats(ProgramSides{true, false}, {}, {}).has_value());
-        EXPECT_EQ(controller.GetPlays(), std::optional<PieceColor>(PieceColor::White));
+        EXPECT_EQ(controller.GetPlays(), Optional<PieceColor>(PieceColor::White));
         EXPECT_FALSE(controller.IsWatching());
     }
 
@@ -496,7 +496,7 @@ namespace BECore::Chess::Tests {
 
         ASSERT_TRUE(controller.SetSide(PieceColor::White).has_value());
 
-        EXPECT_EQ(controller.GetPlays(), std::optional<PieceColor>(PieceColor::White));
+        EXPECT_EQ(controller.GetPlays(), Optional<PieceColor>(PieceColor::White));
         EXPECT_EQ(controller.GetSeatChoice(PieceColor::White), whiteChoice);
         EXPECT_EQ(controller.GetSeatChoice(PieceColor::Black), whiteChoice) << "the single-seat API writes the choice of the seat into both";
         EXPECT_EQ(controller.GetEngine(), OpponentEngine::Own);
@@ -539,7 +539,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(controller.Choose(PieceColor::White, hard, OpponentEngine::Stockfish).has_value());
         EXPECT_EQ(controller.GetSeatChoice(PieceColor::White), Choice(OpponentEngine::Stockfish, "hard"));
         EXPECT_EQ(controller.GetSeatChoice(PieceColor::Black), Choice(OpponentEngine::Stockfish, "hard"));
-        EXPECT_EQ(controller.GetPlays(), std::optional<PieceColor>(PieceColor::White));
+        EXPECT_EQ(controller.GetPlays(), Optional<PieceColor>(PieceColor::White));
         EXPECT_EQ(factory.Calls(), 2);
 
         ASSERT_TRUE(controller.SetSide(std::nullopt).has_value());
@@ -701,7 +701,7 @@ namespace BECore::Chess::Tests {
 
         ASSERT_TRUE(choice.SetMode("computer").has_value());
         EXPECT_FALSE(controller.IsWatching());
-        EXPECT_EQ(controller.GetPlays(), std::optional<PieceColor>(PieceColor::White)) << "the person has Black, the program plays White";
+        EXPECT_EQ(controller.GetPlays(), Optional<PieceColor>(PieceColor::White)) << "the person has Black, the program plays White";
         EXPECT_EQ(choice.Mode(), OpponentMode::Computer);
 
         ASSERT_TRUE(controller.ChooseSeats(kBoth, {}, {}).has_value());

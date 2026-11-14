@@ -1013,7 +1013,7 @@ namespace BECore::Chess::Tests {
         }
         const std::string text = file.string();
 
-        const std::optional<eastl::string> found = FindStockfish(eastl::string_view(text.data(), text.size()));
+        const Optional<eastl::string> found = FindStockfish(eastl::string_view(text.data(), text.size()));
 
         ASSERT_TRUE(found.has_value());
         EXPECT_EQ(*found, eastl::string(text.c_str(), text.size()));
@@ -1085,7 +1085,7 @@ namespace BECore::Chess::Tests {
 
         {
             const ScopedEnvironment variable("STOCKFISH", file.c_str());
-            const std::optional<eastl::string> found = FindStockfish({});
+            const Optional<eastl::string> found = FindStockfish({});
             ASSERT_TRUE(found.has_value());
             EXPECT_EQ(*found, eastl::string(file.c_str(), file.size()));
             EXPECT_FALSE(FindStockfish(eastl::string_view(missing.data(), missing.size())).has_value()) << "an explicit path that is not there does not fall back";
@@ -1111,7 +1111,7 @@ namespace BECore::Chess::Tests {
             // An empty entry and a directory that is not there come first
             const std::string search = Format("::{}:{}", directory.File("no-such-directory").string(), withExecutable.string()).c_str();
             const ScopedEnvironment path("PATH", search.c_str());
-            const std::optional<eastl::string> found = FindStockfish({});
+            const Optional<eastl::string> found = FindStockfish({});
             ASSERT_TRUE(found.has_value());
             const std::string expected = (withExecutable / "stockfish").string();
             EXPECT_EQ(*found, eastl::string(expected.c_str(), expected.size()));

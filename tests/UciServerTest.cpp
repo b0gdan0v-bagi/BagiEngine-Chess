@@ -115,7 +115,7 @@ namespace BECore::Chess::Tests {
             mutable std::mutex _mutex;
             eastl::vector<SearchLimits> _calls;
             std::atomic<int> _holdFromDepth = 0;
-            std::optional<EngineErrorKind> _failure;
+            Optional<EngineErrorKind> _failure;
         };
 
         /// A server and the lines it printed. The lines are declared first, so that they outlive the server (its worker may still print while it is destroyed)

@@ -670,7 +670,7 @@ namespace BECore::Chess::Tests {
         const SearchResult expected = Search(referencePosition, reference);
         ASSERT_NE(expected.best, excluded);
 
-        std::optional<SearchJob> job;
+        Optional<SearchJob> job;
         {
             // Everything the job was made from is gone at the end of the block
             Position position = PositionFromFen(kKiwipeteFen);
@@ -775,12 +775,12 @@ namespace BECore::Chess::Tests {
         }
 
         /// The kind of an error, or nothing for a value: a form that EXPECT_EQ can compare and print
-        std::optional<EngineErrorKind> KindOf(const std::expected<OwnSearch, EngineError>& begun) {
-            return begun ? std::nullopt : std::optional<EngineErrorKind>(begun.error().kind);
+        Optional<EngineErrorKind> KindOf(const std::expected<OwnSearch, EngineError>& begun) {
+            return begun ? std::nullopt : Optional<EngineErrorKind>(begun.error().kind);
         }
 
-        std::optional<EngineErrorKind> KindOf(const std::expected<Analysis, EngineError>& answer) {
-            return answer ? std::nullopt : std::optional<EngineErrorKind>(answer.error().kind);
+        Optional<EngineErrorKind> KindOf(const std::expected<Analysis, EngineError>& answer) {
+            return answer ? std::nullopt : Optional<EngineErrorKind>(answer.error().kind);
         }
 
         std::string Describe(const AnalysisLine& line) {
@@ -1049,7 +1049,7 @@ namespace BECore::Chess::Tests {
         const auto expected = expectedEngine.Analyse(RequestFor(kKiwipeteFen, kEngineShallowDepth, 2), CancellationToken::Create());
         ASSERT_TRUE(expected.has_value());
 
-        std::optional<OwnSearch> search;
+        Optional<OwnSearch> search;
         {
             // The engine, the request and the token are gone at the end of the block
             OwnEngine engine;

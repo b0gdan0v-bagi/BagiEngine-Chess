@@ -14,7 +14,7 @@ namespace BECore::Chess::Tests {
 
         /// The SAN of the legal move @p uci in @p position; a spelling that is no legal move fails the test
         eastl::string San(const Position& position, eastl::string_view uci) {
-            const std::optional<Move> move = MoveGenerator::ParseUci(position, uci);
+            const Optional<Move> move = MoveGenerator::ParseUci(position, uci);
             if (!move) {
                 ADD_FAILURE() << "Not a legal move: " << eastl::string(uci).c_str() << " in " << position.ToFen().c_str();
                 return {};
@@ -31,7 +31,7 @@ namespace BECore::Chess::Tests {
             Position position = PositionFromFen(fen);
             eastl::string line;
             for (const eastl::string_view uci : moves) {
-                const std::optional<Move> move = MoveGenerator::ParseUci(position, uci);
+                const Optional<Move> move = MoveGenerator::ParseUci(position, uci);
                 if (!move) {
                     ADD_FAILURE() << "Not a legal move: " << eastl::string(uci).c_str() << " in " << position.ToFen().c_str();
                     break;
@@ -159,7 +159,7 @@ namespace BECore::Chess::Tests {
 
     TEST(MoveNotationTest, StalemateHasNoSuffix) {
         const Position position = PositionFromFen("7k/8/6K1/8/8/8/8/5Q2 w - - 0 1");
-        const std::optional<Move> move = MoveGenerator::ParseUci(position, "f1f7");
+        const Optional<Move> move = MoveGenerator::ParseUci(position, "f1f7");
         ASSERT_TRUE(move.has_value());
         Position after = position;
         after.DoMove(*move);

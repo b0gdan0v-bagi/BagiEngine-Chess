@@ -43,7 +43,7 @@ namespace BECore::Chess::Tests {
         }
 
         /// The number in @p text (white space around it allowed), or nothing for anything else
-        std::optional<uint64_t> ParseCount(eastl::string_view text) {
+        Optional<uint64_t> ParseCount(eastl::string_view text) {
             while (!text.empty() && text.front() == ' ') {
                 text.remove_prefix(1);
             }
@@ -96,7 +96,7 @@ namespace BECore::Chess::Tests {
             }
 
             /// `go perft @p depth` from @p fen; nothing on a failure (reported, with the FEN)
-            std::optional<PerftResult> Perft(eastl::string_view fen, int depth) {
+            Optional<PerftResult> Perft(eastl::string_view fen, int depth) {
                 const eastl::string where(fen.data(), fen.size());
                 if (!Send(Format("position fen {}", fen), where) || !Send(Format("go perft {}", depth), where)) {
                     return std::nullopt;
@@ -111,7 +111,7 @@ namespace BECore::Chess::Tests {
                     const eastl::string_view text(line->data(), line->size());
                     constexpr eastl::string_view kTotal = "Nodes searched:";
                     if (text.substr(0, kTotal.size()) == kTotal) {
-                        const std::optional<uint64_t> total = ParseCount(text.substr(kTotal.size()));
+                        const Optional<uint64_t> total = ParseCount(text.substr(kTotal.size()));
                         if (!total) {
                             ADD_FAILURE() << "no count in '" << line->c_str() << "' for " << where.c_str();
                             return std::nullopt;
@@ -121,7 +121,7 @@ namespace BECore::Chess::Tests {
                     }
                     const size_t colon = text.find(": ");
                     if (colon != eastl::string_view::npos && IsMoveText(text.substr(0, colon))) {
-                        const std::optional<uint64_t> count = ParseCount(text.substr(colon + 2));
+                        const Optional<uint64_t> count = ParseCount(text.substr(colon + 2));
                         if (!count) {
                             ADD_FAILURE() << "no count in '" << line->c_str() << "' for " << where.c_str();
                             return std::nullopt;
@@ -132,8 +132,8 @@ namespace BECore::Chess::Tests {
             }
 
             /// The legal moves of @p fen as Stockfish counts them, sorted; nothing on a failure
-            std::optional<eastl::vector<eastl::string>> Moves(eastl::string_view fen) {
-                const std::optional<PerftResult> result = Perft(fen, 1);
+            Optional<eastl::vector<eastl::string>> Moves(eastl::string_view fen) {
+                const Optional<PerftResult> result = Perft(fen, 1);
                 if (!result) {
                     return std::nullopt;
                 }
@@ -194,7 +194,7 @@ namespace BECore::Chess::Tests {
         /// Compares the move sets for @p position; true when equal, else the failure lists the moves only one side has
         bool ExpectSameMoves(StockfishReferee& referee, const Position& position) {
             const eastl::string fen = position.ToFen();
-            const std::optional<eastl::vector<eastl::string>> theirs = referee.Moves(fen);
+            const Optional<eastl::vector<eastl::string>> theirs = referee.Moves(fen);
             if (!theirs) {
                 return false;
             }
@@ -222,7 +222,7 @@ namespace BECore::Chess::Tests {
 
         /// Our perft divide of @p fen at @p depth against Stockfish's: every root move has the same count, and the totals agree
         void ExpectSamePerft(StockfishReferee& referee, eastl::string_view fen, int depth, uint64_t expectedNodes) {
-            const std::optional<PerftResult> theirs = referee.Perft(fen, depth);
+            const Optional<PerftResult> theirs = referee.Perft(fen, depth);
             ASSERT_TRUE(theirs.has_value());
             EXPECT_EQ(theirs->nodes, expectedNodes) << "Stockfish at depth " << depth << " of " << eastl::string(fen.data(), fen.size()).c_str();
 
@@ -296,7 +296,7 @@ namespace BECore::Chess::Tests {
 
         for (const eastl::string_view fen : {kMateFen, kStalemateFen}) {
             SCOPED_TRACE(eastl::string(fen.data(), fen.size()).c_str());
-            const std::optional<eastl::vector<eastl::string>> theirs = referee->Moves(fen);
+            const Optional<eastl::vector<eastl::string>> theirs = referee->Moves(fen);
             ASSERT_TRUE(theirs.has_value());
             EXPECT_TRUE(theirs->empty());
             EXPECT_TRUE(MoveGenerator::GenerateLegal(PositionFromFen(fen)).empty());
