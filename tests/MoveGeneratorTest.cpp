@@ -1,7 +1,6 @@
-#include "ChessTestUtil.h"
-
 #include <Chess/Game/MoveGenerator.h>
 #include <EASTL/algorithm.h>
+#include <tests/ChessTestUtil.h>
 
 /**
  * Legal move generation: how each piece moves and is blocked, and what the rules of check, castling, en passant and

@@ -1,8 +1,7 @@
-#include "ChessTestUtil.h"
-
 #include <Chess/Engine/OpponentEngines.h>
 #include <Chess/Engine/OpponentLevels.h>
 #include <Chess/Engine/OpponentText.h>
+#include <tests/ChessTestUtil.h>
 
 /// The words of the HUD for the computer opponent: pure, they read their arguments and make text
 namespace BECore::Chess::Tests {

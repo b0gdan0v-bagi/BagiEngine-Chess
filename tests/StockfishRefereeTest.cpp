@@ -1,12 +1,11 @@
-#include "ChessTestUtil.h"
-#include "SeededRandom.h"
-#include "StockfishUtil.h"
-
 #include <Chess/Engine/UciProcess.h>
 #include <Chess/Game/MoveGenerator.h>
 #include <Chess/Game/Position.h>
 #include <EASTL/sort.h>
 #include <chrono>
+#include <tests/ChessTestUtil.h>
+#include <tests/SeededRandom.h>
+#include <tests/StockfishUtil.h>
 
 /// Stockfish as the independent referee of our rules: our MoveGenerator and Stockfish's `go perft` list the same moves in the same positions.
 /// This is the in-process twin of `tools/stockfish_bridge.py --cross-check`. The test talks to the process directly through UciProcess

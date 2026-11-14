@@ -1,12 +1,11 @@
-#include "ChessTestUtil.h"
-#include "TestEngines.h"
-
 #include <BECore/Control/Json.h>
 #include <Chess/ChessGameControl.h>
 #include <Chess/Engine/OwnEngine.h>
 #include <Chess/Game/MoveGenerator.h>
 #include <Common/EngineEnvironment.h>
 #include <EASTL/algorithm.h>
+#include <tests/ChessTestUtil.h>
+#include <tests/TestEngines.h>
 
 /**
  * Coverage of ChessGameControl: the state, the actions and the ways to act, on a model and an opponent controller that the test owns.

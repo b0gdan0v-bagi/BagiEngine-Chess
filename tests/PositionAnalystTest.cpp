@@ -1,6 +1,3 @@
-#include "StockfishUtil.h"
-#include "TestEngines.h"
-
 #include <Chess/Engine/OpponentLevels.h>
 #include <Chess/Engine/OwnEngine.h>
 #include <Chess/Engine/PositionAnalyst.h>
@@ -8,6 +5,8 @@
 #include <Chess/Game/MoveGenerator.h>
 #include <Common/EngineEnvironment.h>
 #include <EASTL/algorithm.h>
+#include <tests/StockfishUtil.h>
+#include <tests/TestEngines.h>
 
 /// PositionAnalyst with the real TaskManager and engines made in the test (TestEngines.h, no process), plus the OwnEngine for the mate in one and the default factory, and a
 /// real Stockfish when there is one. Every wait polls a condition with a time limit; none is a fixed sleep

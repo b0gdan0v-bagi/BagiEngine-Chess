@@ -1,4 +1,4 @@
-#include "ChessTestUtil.h"
+#include <tests/ChessTestUtil.h>
 
 /**
  * Game status: checkmate, stalemate and the draws that end a game by themselves (EvaluateStatus), on positions given by FEN

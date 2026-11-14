@@ -1,9 +1,8 @@
-#include "TestEngines.h"
-
 #include <BECore/Save/SaveGame.h>
 #include <Chess/Save/ChessSaveState.h>
 #include <Common/EngineEnvironment.h>
 #include <Common/TempPath.h>
+#include <tests/TestEngines.h>
 
 /// The save of a game and the opponent choice (Chess/Save/ChessSaveState.h): the state a game captures, written and read back through a real SaveGameService on a temp folder, and
 /// checked and applied in two steps. A damaged file is refused as a whole: the live game, the controller and the choice stay exactly as they were, and the file on disk is not touched

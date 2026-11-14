@@ -1,5 +1,3 @@
-#include "GamePlay.h"
-
 #include <Chess/Engine/Analysis.h>
 #include <Chess/Engine/OpponentController.h>
 #include <Chess/Engine/OwnEngine.h>
@@ -7,6 +5,7 @@
 #include <Chess/Game/ChessGameModel.h>
 #include <Common/EngineEnvironment.h>
 #include <chrono>
+#include <tests/GamePlay.h>
 #include <thread>
 
 /// OwnEngine through IChessEngine: the contract of UciEngine::FindMove without a process, a whole game against itself and against a random mover, and

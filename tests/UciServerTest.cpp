@@ -1,5 +1,3 @@
-#include "ChessTestUtil.h"
-
 #include <Chess/Engine/BlunderEngine.h>
 #include <Chess/Engine/OpponentLevels.h>
 #include <Chess/Engine/OwnEngine.h>
@@ -8,6 +6,7 @@
 #include <Chess/Uci/UciClock.h>
 #include <Chess/Uci/UciServer.h>
 #include <chrono>
+#include <tests/ChessTestUtil.h>
 #include <thread>
 
 /// UciServer: the lines it answers, over the real OwnEngine at a shallow depth and over a scripted engine that records its limits and can be held

@@ -1,8 +1,7 @@
-#include "ChessTestUtil.h"
-
 #include <Chess/Engine/SearchRequest.h>
 #include <Chess/Game/ChessGameModel.h>
 #include <Chess/Game/MoveGenerator.h>
+#include <tests/ChessTestUtil.h>
 
 /// The request an engine gets: the start FEN and the moves of a game, kept apart from the model that goes on changing
 namespace BECore::Chess::Tests {

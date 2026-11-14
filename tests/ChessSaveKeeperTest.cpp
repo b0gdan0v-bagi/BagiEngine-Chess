@@ -1,5 +1,3 @@
-#include "TestEngines.h"
-
 #include <BECore/Control/ControlSettings.h>
 #include <BECore/GameManager/CoreManager.h>
 #include <BECore/Save/SaveStorage.h>
@@ -10,6 +8,7 @@
 #include <Common/EngineEnvironment.h>
 #include <Common/TempPath.h>
 #include <iterator>
+#include <tests/TestEngines.h>
 
 /// The settings of the memory of the game, the policy that decides whether a run saves (the gate) and the keeper that restores at the start and writes when the game changes. The clock is
 /// the engine's manual one (Time::Advance), never a sleep; what reached the file is read back through a SaveGameService of its own

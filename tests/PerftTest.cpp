@@ -1,6 +1,5 @@
-#include "ChessTestUtil.h"
-
 #include <Chess/Game/MoveGenerator.h>
+#include <tests/ChessTestUtil.h>
 
 /**
  * Perft counts the leaf nodes of the legal move tree to a fixed depth. The numbers below are the published reference

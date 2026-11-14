@@ -1,12 +1,11 @@
-#include "ChessTestUtil.h"
-#include "StockfishUtil.h"
-
 #include <Chess/Engine/Analysis.h>
 #include <Chess/Engine/OwnEngine.h>
 #include <Chess/Engine/SearchRequest.h>
 #include <Chess/Engine/UciEngine.h>
 #include <Chess/Game/ChessGameModel.h>
 #include <Chess/Game/MoveGenerator.h>
+#include <tests/ChessTestUtil.h>
+#include <tests/StockfishUtil.h>
 
 /// UciEngine against a real Stockfish on positions with one clear answer, among them the ones where our request and our validation could go wrong:
 /// a game with a history, an underpromotion, castling and en passant. Every case skips itself when there is no Stockfish (StockfishUtil.h).

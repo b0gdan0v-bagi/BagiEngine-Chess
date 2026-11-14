@@ -1,6 +1,5 @@
-#include "ChessTestUtil.h"
-
 #include <Chess/Game/MaterialLayout.h>
+#include <tests/ChessTestUtil.h>
 
 /// The rule that hides the lists of captured pieces in a margin that insets have made too thin: pure, nothing to start
 namespace BECore::Chess::Tests {

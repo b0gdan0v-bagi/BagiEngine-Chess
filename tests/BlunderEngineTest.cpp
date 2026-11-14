@@ -1,8 +1,7 @@
-#include "GamePlay.h"
-
 #include <Chess/Engine/BlunderEngine.h>
 #include <Chess/Engine/OwnEngine.h>
 #include <Chess/Game/ChessGameModel.h>
+#include <tests/GamePlay.h>
 #include <thread>
 
 /// BlunderEngine alone, with no table and no controller: the wrapped engines are the doubles of TestEngines.h and OwnEngine, no process and no TaskManager.

@@ -1,8 +1,7 @@
-#include "ChessTestUtil.h"
-#include "FakeEngineUtil.h"
-
 #include <Chess/Engine/UciProcess.h>
 #include <chrono>
+#include <tests/ChessTestUtil.h>
+#include <tests/FakeEngineUtil.h>
 
 #if CHESS_HAS_UCI_PROCESS && defined(_WIN32)
 #if !defined(WIN32_LEAN_AND_MEAN)

@@ -1,12 +1,11 @@
 #pragma once
 
-#include "SeededRandom.h"
-#include "TestEngines.h"
-
 #include <Chess/Engine/ChessEngine.h>
 #include <Chess/Engine/SearchRequest.h>
 #include <Chess/Game/ChessGameModel.h>
 #include <Chess/Game/MoveGenerator.h>
+#include <tests/SeededRandom.h>
+#include <tests/TestEngines.h>
 
 /// Whole games of the tests: who picks the next move (a Player) and the loop that plays two of them against each other through a ChessGameModel
 namespace BECore::Chess::Tests {

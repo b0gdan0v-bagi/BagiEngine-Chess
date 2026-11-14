@@ -6,6 +6,7 @@
 
 ## Helpers and rules
 
+- **Includes:** the helpers below are `<tests/ChessTestUtil.h>` and so on, never `"ChessTestUtil.h"` (`BagiChessIncludeStyle`, `.claude/rules/build-project.md`, "Includes").
 - `ChessTestUtil.h`: `Sq`, `Mv`, `PositionFromFen`, the perft FENs, `MirrorFen`, `PumpTaskFrame()`, `SKIP_WITHOUT_WORKER_THREADS()`. `SeededRandom.h`: a seeded xorshift64. `GamePlay.h`: whole games through a model (`EnginePlayer`, `RandomPlayer`, `PlayGame`). `HudWords.h`: `AllHudWords()`, `Rounds()` / `Publish(round)` for the layout tests.
 - `StockfishUtil.h`: `StockfishPath()`, `StockfishSettings(path)`, `Describe(error)`, `SKIP_WITHOUT_STOCKFISH(path)` (declares `path` or skips; `STOCKFISH=/path/to/stockfish`).
 - `TestEngines.h`, the engine doubles: `InstantEngine`, `MatingEngine`, `GatedEngine` (holds the answer until `Open()`), `FailingEngine`, `CountingFactory`, `AnalysingEngine` (scripted lines, `Gate`, `FailWith`), `CountingAnalysisFactory`, `WaitUntil` (polls; never a fixed sleep) with the give-up limits `kEngineWaitLimit` and `kGateGiveUp`, both 30 s: they only end a broken test.

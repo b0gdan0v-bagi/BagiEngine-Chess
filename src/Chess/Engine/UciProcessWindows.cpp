@@ -1,4 +1,4 @@
-#include "UciProcess.h"
+#include <Chess/Engine/UciProcess.h>
 
 // The Windows process code of UciProcess (the class comment in UciProcess.h); POSIX and the stub are in UciProcess.cpp
 #if CHESS_HAS_UCI_PROCESS && defined(_WIN32)

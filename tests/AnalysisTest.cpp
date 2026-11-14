@@ -1,8 +1,7 @@
-#include "ChessTestUtil.h"
-
 #include <Chess/Engine/Analysis.h>
 #include <Chess/Engine/Evaluation.h>
 #include <Chess/Engine/SearchRequest.h>
+#include <tests/ChessTestUtil.h>
 
 /// The analysis types: pure, no engine. The score of a search as a score of an analysis, its text, and the default of IChessEngine::Analyse()
 namespace BECore::Chess::Tests {

@@ -1,8 +1,7 @@
-#include "ChessTestUtil.h"
-
 #include <Chess/Game/MoveGenerator.h>
 #include <Chess/Game/MoveNotation.h>
 #include <EASTL/algorithm.h>
+#include <tests/ChessTestUtil.h>
 
 /**
  * SanOf as a pure function: the notation of every kind of move, the disambiguation by the legal moves, the suffixes, and a property over the perft

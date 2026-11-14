@@ -76,6 +76,7 @@ if(ENGINE_BUILD_TESTS)
         SOURCES ${CHESS_TEST_SOURCES}
         WHOLE_ARCHIVE ChessModule
     )
+    # Test helpers are included as <tests/ChessTestUtil.h>: be_add_game_tests puts this folder (the game root) on the include path of ChessTests
     # The interpreter that runs tests/fake_uci_engine.py, the stand-in for a UCI engine (the Python3 of BagiEngine.cmake, the one that
     # runs the smoke test below); an empty string makes the tests that start it skip themselves
     if(Python3_FOUND)
@@ -127,6 +128,11 @@ if(ENGINE_BUILD_TESTS)
             SKIP_RETURN_CODE 77
             TIMEOUT 60
         )
+
+        # A quoted include is allowed only for a source file's own header; every other include is <...> from an include root (the engine's
+        # check_includes.py over the whole game: src, tests, uci)
+        add_test(NAME BagiChessIncludeStyle COMMAND ${Python3_EXECUTABLE} ${BAGI_ENGINE_DIR}/CI/scripts/check_includes.py --root ${CMAKE_CURRENT_SOURCE_DIR})
+        set_tests_properties(BagiChessIncludeStyle PROPERTIES TIMEOUT 60)
     endif()
 
     # The files of the preload package of the web build are exactly the game's (cmake/ChessWeb.cmake); a cmake -P script, no Python, no executable

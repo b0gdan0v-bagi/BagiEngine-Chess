@@ -1,7 +1,6 @@
-#include "ChessTestUtil.h"
-
 #include <Chess/Game/Position.h>
 #include <Chess/Uci/UciCommand.h>
+#include <tests/ChessTestUtil.h>
 
 /// The lines a GUI sends, read into commands: pure, no engine and no rules (a move is text here)
 namespace BECore::Chess::Tests {

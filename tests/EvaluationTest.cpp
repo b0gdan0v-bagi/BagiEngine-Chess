@@ -1,6 +1,5 @@
-#include "ChessTestUtil.h"
-
 #include <Chess/Engine/Evaluation.h>
+#include <tests/ChessTestUtil.h>
 
 /// The static evaluation: pure functions of a position, nothing to start
 namespace BECore::Chess::Tests {

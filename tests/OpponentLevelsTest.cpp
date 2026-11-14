@@ -1,9 +1,8 @@
-#include "TestEngines.h"
-
 #include <Chess/Engine/BlunderEngine.h>
 #include <Chess/Engine/OpponentLevels.h>
 #include <Chess/Engine/Search.h>
 #include <Common/Printers.h>
+#include <tests/TestEngines.h>
 
 /// The table of strengths of the computer opponent: pure data, nothing to start
 namespace BECore::Chess::Tests {

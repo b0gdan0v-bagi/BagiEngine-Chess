@@ -1,8 +1,7 @@
-#include "ChessTestUtil.h"
-
 #include <Chess/Engine/Search.h>
 #include <Chess/Game/GameStatus.h>
 #include <Chess/Game/MoveGenerator.h>
+#include <tests/ChessTestUtil.h>
 #include <thread>
 
 /// The alpha-beta search: pure functions of a position (no engine services), the threads in two tests are the test's own
