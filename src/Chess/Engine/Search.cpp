@@ -14,28 +14,27 @@ namespace BECore::Chess {
         /// A check is searched one ply deeper only up to this ply, so a perpetual check cannot grow the tree without end
         constexpr int kMaxExtensionPly = 32;
         /// No line is searched further from the root than this many plies, quiescence included: the deepest full-width line is
-        /// kMaxSearchDepth plus the extensions, and what is left at that ply is judged by the static score. The move lists of the nodes
-        /// are not on the native stack: the search is a loop over frames (one per ply, below) that live on the heap and are made when a
-        /// ply is first reached, so a deep line costs no stack, only the killers and the history (QuietMoves, about 33 KB) are in the Searcher itself
+        /// kMaxSearchDepth plus the extensions, and what is left at that ply is judged by the static score. The move lists live in
+        /// heap frames (one per ply, below), so a deep line costs no stack; only the killers and the history (QuietMoves) are in the Searcher itself
         constexpr int kMaxPly = kMaxSearchDepth + kMaxExtensionPly;
         /// The stack of a Background pool thread (512 KB on macOS); the budget for the Searcher, which Search() puts on the caller's stack
         constexpr size_t kBackgroundStackBytes = 512 * 1024;
-        /// The share of that stack that the killers and the history (QuietMoves) may take: one eighth
+        /// The share of that stack that the killers and the history (QuietMoves) may take
         constexpr size_t kQuietMovesStackShare = 8;
 
-        /// A position that has occurred this many times (itself counted) scores as a draw inside the tree: once before is enough
+        /// A position that has occurred this many times (itself counted) scores as a draw inside the tree
         constexpr int kRepetitionDrawCount = 2;
 
         // Move ordering: bigger is tried first. The bands do not overlap: a capture is worth kCaptureScore plus up to
-        // kVictimWeight * 5 (a queen taken) and a quiet promotion kPromotionScore plus the piece
+        // kVictimWeight * 5 (a queen taken), a quiet promotion kPromotionScore plus the piece
         constexpr int kPreferredMoveScore = 1 << 24;
         constexpr int kCaptureScore = 1 << 20;
         constexpr int kPromotionScore = 1 << 16;
-        /// "Most valuable victim, least valuable attacker": the victim's kind counts kVictimWeight times, the attacker's kind once
+        /// "Most valuable victim, least valuable attacker": the victim's kind counts kVictimWeight times, the attacker's once
         /// (the kinds are 1..6, so the weight is above the largest)
         constexpr int kVictimWeight = 8;
         // Quiet moves, below the promotions: the two killers of the ply, then the history. An entry is halved when a bonus would take it
-        // past kHistoryMax, so it stays in the band below the killers (a single bonus at a depth over 90 can overshoot kHistoryMax, still
+        // past kHistoryMax, so it stays in the band below the killers (a bonus can overshoot kHistoryMax after the halving, still
         // far under kSecondKillerScore)
         constexpr int kFirstKillerScore = 1 << 15;
         constexpr int kSecondKillerScore = kFirstKillerScore - 1;
@@ -43,7 +42,7 @@ namespace BECore::Chess {
         static_assert(kHistoryMax < kSecondKillerScore && kSecondKillerScore < kFirstKillerScore && kFirstKillerScore < kPromotionScore);
         /// Order() is given this ply by the nodes that do not use killers and history
         constexpr int kNoKillerPly = -1;
-        /// The table is built only for a search of at least this depth: the levels with fewer plies pay no allocation
+        /// The table is built only for a search of at least this depth
         constexpr int kMinTableDepth = 3;
         constexpr int kKillersPerPly = 2;
         /// The history is kept per color of the mover
@@ -111,8 +110,8 @@ namespace BECore::Chess {
                 return _history[static_cast<size_t>(color)][move.FromIndex()][move.ToIndex()];
             }
 
-            /// A quiet @p move cut off a node of @p depth plies at @p ply: it becomes the first killer (the one it pushes aside
-            /// the second) and its history grows by depth squared
+            /// A quiet @p move cut off a node of @p depth plies at @p ply: it becomes the first killer (the old first becomes
+            /// the second) and its history grows with the depth
             void Reward(Move move, PieceColor color, int ply, int depth) noexcept {
                 Move* killers = _killers[ply];
                 if (killers[0] != move) {
@@ -128,7 +127,7 @@ namespace BECore::Chess {
             }
 
         private:
-            /// Keeps the order of the entries (up to ties, which halving makes) and makes room: the whole table, so the entries stay comparable
+            /// Halves the whole table, so the entries keep their order (up to the ties halving makes) and there is room again
             void Halve() noexcept {
                 for (auto& perColor : _history) {
                     for (auto& perFrom : perColor) {
@@ -149,8 +148,7 @@ namespace BECore::Chess {
 
         /// One ply of the line being searched, the state that a recursive call kept in its locals: the moves of the node in the order
         /// they are tried, the one being searched, and the window. The frame of ply p is _frames[p]; it is made when the ply is first reached
-        /// and reused by every node of that ply, so a search pays for the depth it reaches (a search of 1 or 2 plies makes the frames of the
-        /// quiescence it runs, not 96 of them)
+        /// and reused by every node of that ply, so a search pays for the depth it reaches
         struct Frame {
             ScoredMoves moves;
             /// The index in @ref moves of the next move to try
@@ -178,9 +176,7 @@ namespace BECore::Chess {
         /// The iterative deepening search as a loop over the frames, run on a position; SearchJob and Search() are this class. Loop() is the
         /// whole search: a node is entered by EnterFull() or EnterQuiet(), which either answer at once (a leaf: the value is left in _value) or
         /// push a frame, and a finished frame hands its value to the frame below it (_returning). The order of every check, count and update is
-        /// that of a plain recursive negamax, which the pinned node counts of the tests hold.
-        /// Loop() keeps the window and the best of the frame it is in in locals and writes them to the frame only when it leaves it (to descend,
-        /// to pause or to finish), so the moves of a node cost no reads of the frame for them
+        /// that of a plain recursive negamax, so the node counts are the same.
         class Searcher {
         public:
             Searcher(Position& position, const SearchSettings& settings, const SearchControl& control) : _position(position), _settings(settings), _control(control) {}
@@ -541,8 +537,8 @@ namespace BECore::Chess {
                     StartIteration();
                 }
                 Frame& frame = *_frames[static_cast<size_t>(_top)];
-                // The state of the frame lives in locals while its moves are tried (registers) and goes back to the
-                // frame when the loop leaves it: to descend into a child that has moves of its own, to pause, or to finish
+                // The state of the frame lives in locals while its moves are tried (registers, no reads of the frame per move) and goes
+                // back to the frame when the loop leaves it: to descend into a child that has moves of its own, to pause, or to finish
                 const int ply = _top;
                 const FrameKind kind = frame.kind;
                 const int depth = frame.depth;
@@ -555,7 +551,7 @@ namespace BECore::Chess {
                 bool currentQuiet = frame.currentQuiet;
                 size_t next = frame.next;
 
-                // Takes the score of the move just searched, from the mover's side; true when it cuts the node off
+                // Takes the score of the move just searched; true when it cuts the node off
                 const auto absorb = [&](int score) {
                     if (score > best) {
                         best = score;
@@ -581,7 +577,6 @@ namespace BECore::Chess {
                     frame.next = next;
                 };
 
-                // Whether the frame is over: it cut off, or has no move left to try
                 bool over = false;
                 if (_returning) {
                     _position.UndoMove();
@@ -592,7 +587,7 @@ namespace BECore::Chess {
                     _returning = false;
                     over = absorb(-_value);
                 }
-                // The moves of the frame; a child that is a leaf is taken back and scored right here
+                // A child that is a leaf is taken back and scored right here
                 bool descended = false;
                 while (!over && next < count) {
                     // The only place a slice ends: before a child is entered (and counted), so a pause changes no count
