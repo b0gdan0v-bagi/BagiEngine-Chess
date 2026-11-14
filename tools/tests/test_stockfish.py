@@ -211,7 +211,7 @@ def test_stockfish_plays_white_against_a_scripted_opponent(make_game, fake_engin
     lines = received(log)
     assert lines.count("ucinewgame") == 1
     assert START_POSITION in lines and "go movetime 33" in lines
-    assert len([line for line in lines if line.startswith("go movetime")]) == 2
+    assert len([line for line in lines if line.startswith("go movetime")]) == 2  # plies 1 and 3 only: the opponent has the black ones
 
 
 @needs_shebang
