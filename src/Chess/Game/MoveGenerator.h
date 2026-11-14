@@ -12,10 +12,9 @@ namespace BECore::Chess {
     /**
      * @brief Legal move generation for the side to move: the standard rules of chess, Chess960 excluded.
      *
-     * Moves are produced per piece type from the attack tables (pawn pushes and captures by bitboard shifts), restricted
-     * to the squares that answer a check when the king is attacked, and then filtered by Position::IsLegal() for pins,
-     * king safety and the castling path. Castling, en passant and promotion (four moves per promoting pawn, queen first)
-     * are included.
+     * Pseudo-legal moves (restricted to the answers to a check) are filtered by Position::IsLegal() for pins, king
+     * safety and the castling path. Castling, en passant and promotion (four moves per promoting pawn, queen first) are
+     * included.
      */
     class MoveGenerator {
     public:
