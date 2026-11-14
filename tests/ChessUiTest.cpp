@@ -2,6 +2,7 @@
 #include "HudWords.h"
 #include "TestEngines.h"
 
+#include <BECore/Control/Json.h>
 #include <BECore/GameManager/CoreManager.h>
 #include <BECore/Reflection/XmlDeserializer.h>
 #include <BECore/Renderer/ViewTransform.h>
@@ -11,15 +12,15 @@
 #include <BECore/Scene/SceneManager.h>
 #include <BECore/Scene/SceneNode.h>
 #include <BECore/Text/FontAtlasLibrary.h>
-#include <BECore/UI/UIButton.h>
 #include <BECore/UI/UICanvasComponent.h>
 #include <BECore/UI/UIElement.h>
-#include <BECore/UI/UIImage.h>
-#include <BECore/UI/UILabel.h>
+#include <BECore/UI/UIImageComponent.h>
+#include <BECore/UI/UIInputClicker.h>
 #include <BECore/UI/UIPreview.h>
 #include <BECore/UI/UIScreenContent.h>
 #include <BECore/UI/UISegmented.h>
 #include <BECore/UI/UIStack.h>
+#include <BECore/UI/UITextComponent.h>
 #include <Chess/ChessGame.h>
 #include <Chess/ChessGameControl.h>
 #include <Chess/Components/ChessBoardComponent.h>
@@ -131,16 +132,33 @@ namespace BECore::Chess::Tests {
             return left.x < right.x + right.w + gap && right.x < left.x + left.w + gap && left.y < right.y + right.h + gap && right.y < left.y + left.h + gap;
         }
 
-        /// The text a label or a button shows (UIElement::Cast is an exact match, and a button is a label)
+        /// The text component of a label or a button (both are a UIElement with a UITextComponent; a button also has a UIInputClicker); null for anything else
+        UITextComponent* TextOf(const UIElement& element) {
+            return element.GetComponent<UITextComponent>();
+        }
+
+        /// The clicker of a button; null for an element that is no button
+        UIInputClicker* ClickerOf(const UIElement& element) {
+            return element.GetComponent<UIInputClicker>();
+        }
+
+        /// A button: an element with a clicker
+        bool IsButton(const UIElement& element) {
+            return ClickerOf(element) != nullptr;
+        }
+
+        /// A label: an element with a text and no clicker
+        bool IsLabel(const UIElement& element) {
+            return TextOf(element) != nullptr && !IsButton(element);
+        }
+
+        /// The text a label or a button shows
         eastl::string ShownText(const UIElement& element) {
-            const UILabel* label = element.Cast<UILabel>();
-            if (!label) {
-                label = element.Cast<UIButton>();
-            }
-            if (!label) {
+            const UITextComponent* text = TextOf(element);
+            if (!text) {
                 return {};
             }
-            const eastl::string_view shown = label->GetDisplayText();
+            const eastl::string_view shown = text->GetDisplayText(element);
             return eastl::string(shown.data(), shown.size());
         }
 
@@ -246,7 +264,7 @@ namespace BECore::Chess::Tests {
 
         /// Every control with text in the tree, depth first (a stack and a choice group have none of their own)
         void CollectControls(const UIElement& element, eastl::vector<const UIElement*>& found) {
-            if (element.Cast<UILabel>() || element.Cast<UIButton>()) {
+            if (TextOf(element) != nullptr) {
                 found.push_back(&element);
             }
             for (const auto& child : element.children) {
@@ -281,13 +299,13 @@ namespace BECore::Chess::Tests {
                     }
                     continue;
                 }
-                const float air = control->interactive ? kButtonAir : 0.0f;
+                const float air = control->IsInteractive() ? kButtonAir : 0.0f;
                 const UIContentFit fit = control->CheckContent(control->rect.w - 2.0f * air, control->rect.h, scale);
                 if (fit.hasContent && !fit.fits) {
                     problems += Format("{} cuts '{}': {:.1f} units wide with {:.1f} of air each side, at scale {:.3f}\n", control->name.ToStringView(), ShownText(*control).c_str(), control->rect.w,
                                        air, scale);
                 }
-                if (control->interactive && control->rect.h < kSegmentHeight - kPixelTolerance) {
+                if (control->IsInteractive() && control->rect.h < kSegmentHeight - kPixelTolerance) {
                     problems += Format("{} is {:.1f} units high, under {:.0f}\n", control->name.ToStringView(), control->rect.h, kSegmentHeight);
                 }
             }
@@ -419,7 +437,7 @@ namespace BECore::Chess::Tests {
                     problems += Format("{} ({:.1f}, {:.1f}, {:.1f}, {:.1f}) is not in the corner x {:.1f}..{:.1f}, y {:.1f}..{:.1f} of its cell\n", spec.name.c_str(), rect.x, rect.y, rect.w, rect.h,
                                        low, high, top, bottom);
                 }
-                const UILabel* label = element->Cast<UILabel>();
+                const UITextComponent* label = IsLabel(*element) ? TextOf(*element) : nullptr;
                 const Color& expected = ContrastColor(spec.column, spec.row);
                 if (label == nullptr || !SameColor(label->textColor, expected)) {
                     problems += Format("{} has not the color {},{},{} that reads on its cell\n", spec.name.c_str(), expected.r, expected.g, expected.b);
@@ -535,8 +553,8 @@ namespace BECore::Chess::Tests {
                     if (icon != nullptr && count != nullptr && icon->rect.x + icon->rect.w > count->rect.x + kPixelTolerance) {
                         problems += Format("{} and {} overlap\n", icon->name.ToStringView(), count->name.ToStringView());
                     }
-                    if (icon != nullptr && icon->Cast<UIImage>() == nullptr) {
-                        problems += Format("{} is not a UIImage\n", icon->name.ToStringView());
+                    if (icon != nullptr && icon->GetComponent<UIImageComponent>() == nullptr) {
+                        problems += Format("{} has no UIImageComponent\n", icon->name.ToStringView());
                     }
                     if (count != nullptr) {
                         fits(*count);
@@ -569,7 +587,7 @@ namespace BECore::Chess::Tests {
                     continue;
                 }
                 for (const UIElement* control : AllElements(*other.root)) {
-                    if ((control->Cast<UILabel>() || control->Cast<UIButton>()) && !control->rect.IsEmpty() && Touch(element->rect, control->rect, gap)) {
+                    if (TextOf(*control) != nullptr && !control->rect.IsEmpty() && Touch(element->rect, control->rect, gap)) {
                         problems += Format("{} ({:.1f}, {:.1f}, {:.1f}, {:.1f}) and {} ({:.1f}, {:.1f}, {:.1f}, {:.1f}) are closer than {:.0f} units\n", element->name.ToStringView(), element->rect.x,
                                            element->rect.y, element->rect.w, element->rect.h, control->name.ToStringView(), control->rect.x, control->rect.y, control->rect.w, control->rect.h, gap);
                     }
@@ -642,12 +660,14 @@ namespace BECore::Chess::Tests {
             return {};
         }
 
-        UILabel& Label(const char* name) const {
+        UIElement& Label(const char* name) const {
             UIElement* element = Hud()->GetRoot().FindByName(PoolString::Intern(name));
             EXPECT_NE(element, nullptr) << name;
-            UILabel* label = element ? element->Cast<UILabel>() : nullptr;
-            EXPECT_NE(label, nullptr) << name;
-            return *label;
+            if (element == nullptr || !IsLabel(*element)) {
+                ADD_FAILURE() << name << " is not a label of the HUD";
+                std::abort();  // a reference to nothing cannot be returned; the failure above is printed first
+            }
+            return *element;
         }
 
         /// The canvas of a modal panel of the scene: the node of that name, a canvas that starts hidden
@@ -692,6 +712,26 @@ namespace BECore::Chess::Tests {
                 std::abort();  // a reference to nothing cannot be returned; the failure above is printed first
             }
             return *typed;
+        }
+
+        /// A button of the panel by name: an element with a text and a clicker (the test fails when it is not there)
+        UIElement& PanelButton(const char* name) const {
+            UIElement& element = PanelElement(name);
+            if (!IsButton(element) || TextOf(element) == nullptr) {
+                ADD_FAILURE() << name << " is not a button";
+                std::abort();
+            }
+            return element;
+        }
+
+        /// A label of the panel by name: an element with a text and no clicker (the test fails when it is not there)
+        UIElement& PanelLabel(const char* name) const {
+            UIElement& element = PanelElement(name);
+            if (!IsLabel(element)) {
+                ADD_FAILURE() << name << " is not a label";
+                std::abort();
+            }
+            return element;
         }
 
         /// The middle of an element as it was laid out in the last draw, in output pixels (the view is fitted into the output)
@@ -768,6 +808,16 @@ namespace BECore::Chess::Tests {
                 std::abort();
             }
             return *typed;
+        }
+
+        /// A button of the promotion panel by name: an element with a text and a clicker (the test fails when it is not there)
+        UIElement& PromotionButton(const char* name) const {
+            UIElement& element = PromotionElement(name);
+            if (!IsButton(element) || TextOf(element) == nullptr) {
+                ADD_FAILURE() << name << " is not a button";
+                std::abort();
+            }
+            return element;
         }
 
         /// A click on a control of the promotion panel where it is laid out
@@ -1113,7 +1163,7 @@ namespace BECore::Chess::Tests {
                 if (element.rect.IsEmpty()) {
                     continue;
                 }
-                const float air = element.interactive ? kButtonAir : 0.0f;
+                const float air = element.IsInteractive() ? kButtonAir : 0.0f;
                 const UIContentFit fit = element.CheckContent(element.rect.w - 2.0f * air, element.rect.h, scale);
                 if (fit.hasContent && !fit.fits) {
                     problems +=
@@ -1253,9 +1303,9 @@ namespace BECore::Chess::Tests {
 
         /// The sprite the icon of a row has been given
         eastl::string MaterialSprite(const char* group, const char* piece) const {
-            const UIImage* icon = MaterialElement(Format("Material{}{}Icon", group, piece).c_str()).Cast<UIImage>();
+            const UIImageComponent* icon = MaterialElement(Format("Material{}{}Icon", group, piece).c_str()).GetComponent<UIImageComponent>();
             if (icon == nullptr) {
-                ADD_FAILURE() << group << piece << " has no UIImage icon";
+                ADD_FAILURE() << group << piece << " has no UIImageComponent icon";
                 return {};
             }
             const eastl::string_view name = icon->sprite.ToStringView();
@@ -1300,10 +1350,10 @@ namespace BECore::Chess::Tests {
         }
 
         /// A label of the board coordinates by name; null, with a failure recorded, when it is not a label (the caller stops with `ASSERT_NE`, so one test fails and the rest run)
-        UILabel* CoordinateLabel(const char* name) const {
+        UIElement* CoordinateLabel(const char* name) const {
             const auto canvas = Coordinate();
             UIElement* element = canvas ? canvas->GetRoot().FindByName(PoolString::Intern(name)) : nullptr;
-            UILabel* label = element != nullptr ? element->Cast<UILabel>() : nullptr;
+            UIElement* label = element != nullptr && IsLabel(*element) ? element : nullptr;
             if (label == nullptr) {
                 ADD_FAILURE() << name << " is not a label of BoardCoordinates";
             }
@@ -1499,11 +1549,11 @@ namespace BECore::Chess::Tests {
         Draw();
         const UIElement* element = HudElement("Menu");
         ASSERT_NE(element, nullptr);
-        const UIButton* menu = element->Cast<UIButton>();
-        ASSERT_NE(menu, nullptr) << "the Menu button is a UIButton";
-        EXPECT_EQ(menu->text, "Menu") << "a literal: not bound to a variable";
+        const UIElement* menu = element;
+        ASSERT_TRUE(IsButton(*menu) && TextOf(*menu) != nullptr) << "the Menu button is a button: a text and a clicker";
+        EXPECT_EQ(TextOf(*menu)->text, "Menu") << "a literal: not bound to a variable";
         EXPECT_EQ(ShownText(*menu), "Menu");
-        EXPECT_EQ(menu->action, PoolString::Intern("ChessOpenOpponent"));
+        EXPECT_EQ(ClickerOf(*menu)->action, PoolString::Intern("ChessOpenOpponent"));
         EXPECT_NEAR(menu->rect.w, 110.0f, 0.5f) << "as wide as Reset";
         EXPECT_NEAR(menu->rect.h, 56.0f, 0.5f);
         EXPECT_EQ(HudElement("Opponent"), nullptr) << "the button was called Opponent when it showed the state; the name is not used any more";
@@ -1585,7 +1635,7 @@ namespace BECore::Chess::Tests {
         const float minTouch = CoreManager::GetUIEnvironment().GetSettings().minTouchSize;
         size_t segments = 0;
         for (const PanelSegment& segment : ExpectedPanelSegments()) {
-            const UIButton& button = PanelControl<UIButton>(segment.name.c_str());
+            const UIElement& button = PanelButton(segment.name.c_str());
             ++segments;
             EXPECT_GE(button.rect.h, kSegmentHeight - kPixelTolerance) << segment.name.c_str();
             EXPECT_GE(std::min(button.rect.w, button.rect.h) * layout.GetResolved().scale, minTouch - kPixelTolerance) << segment.name.c_str() << " is a touch target on the smallest window";
@@ -1602,7 +1652,7 @@ namespace BECore::Chess::Tests {
         panel->UpdateLayout(1280.0f, 720.0f);
         UICanvasLayout& layout = panel->GetLayout();
         LayOutInTheNarrowestWindow(layout);
-        const UILabel& line = PanelControl<UILabel>("OpponentError");
+        const UIElement& line = PanelLabel("OpponentError");
         ASSERT_FALSE(line.rect.IsEmpty());
         const float scale = layout.GetResolved().scale;
 
@@ -1638,7 +1688,7 @@ namespace BECore::Chess::Tests {
             if (std::string_view(segment.group) != "LevelGroup") {
                 continue;
             }
-            const UIElement& button = PanelControl<UIButton>(segment.name.c_str());
+            const UIElement& button = PanelButton(segment.name.c_str());
             EXPECT_NEAR(button.rect.x, left, kPixelTolerance) << segment.name.c_str();
             width = width < 0.0f ? button.rect.w : width;
             EXPECT_NEAR(button.rect.w, width, kPixelTolerance) << segment.name.c_str() << ": equal shares by flex";
@@ -1655,10 +1705,11 @@ namespace BECore::Chess::Tests {
 
         for (const PanelSegment& want : expected) {
             SCOPED_TRACE(want.name.c_str());
-            const UIButton& button = PanelControl<UIButton>(want.name.c_str());
+            const UIElement& button = PanelButton(want.name.c_str());
             EXPECT_EQ(ShownText(button), want.word) << "the word on the segment is the one of the table";
-            EXPECT_EQ(eastl::string(button.value.ToStringView().data(), button.value.ToStringView().size()), want.id);
-            EXPECT_EQ(button.action, PoolString::Intern(want.action));
+            const eastl::string_view value = ClickerOf(button)->value.ToStringView();
+            EXPECT_EQ(eastl::string(value.data(), value.size()), want.id);
+            EXPECT_EQ(ClickerOf(button)->action, PoolString::Intern(want.action));
             EXPECT_EQ(button.selected, false) << "nothing is selected before a frame";
         }
 
@@ -1671,7 +1722,7 @@ namespace BECore::Chess::Tests {
             }
             size_t buttons = 0;
             for (const auto& child : group.children) {
-                const UIButton* button = child->Cast<UIButton>();
+                const UIInputClicker* button = ClickerOf(*child);
                 ASSERT_NE(button, nullptr) << groupName << ": only segments";
                 ++buttons;
                 const eastl::string_view value = button->value.ToStringView();
@@ -1728,13 +1779,13 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(Opponent().GetPlays(), std::optional<PieceColor>(PieceColor::White));
 
         for (const PanelSegment& segment : ExpectedPanelSegments()) {
-            const PoolString action = PanelControl<UIButton>(segment.name.c_str()).action;
+            const PoolString action = ClickerOf(PanelButton(segment.name.c_str()))->action;
             const bool known = action == PoolString::Intern(kSetModeAction) || action == PoolString::Intern(kSetColorAction) || action == PoolString::Intern(kSetEngineAction) ||
                                action == PoolString::Intern(kSetLevelAction);
             EXPECT_TRUE(known) << segment.name.c_str() << " emits " << action.CStr() << ", which the board does not answer";
         }
-        EXPECT_EQ(PanelControl<UIButton>("Ok").action, PoolString::Intern("ChessCloseOpponent"));
-        EXPECT_EQ(HudElement("Menu")->Cast<UIButton>()->action, PoolString::Intern("ChessOpenOpponent"));
+        EXPECT_EQ(ClickerOf(PanelButton("Ok"))->action, PoolString::Intern("ChessCloseOpponent"));
+        EXPECT_EQ(ClickerOf(*HudElement("Menu"))->action, PoolString::Intern("ChessOpenOpponent"));
     }
 
     // ---- the opponent panel: broken copies, so that the checks can fail --------------------------------------------------------------
@@ -1743,7 +1794,7 @@ namespace BECore::Chess::Tests {
     TEST_F(ChessUiTest, AWordCutByAFontThatIsTooBigIsCaughtByTheFitCheckAndNotByTheValidator) {
         std::string xml = ShippedElementsXml("OpponentPanel");
         ASSERT_FALSE(xml.empty());
-        ASSERT_NO_FATAL_FAILURE(Replace(xml, R"(text="Own engine" fontSize="24")", R"(text="Own engine" fontSize="44")"));
+        ASSERT_NO_FATAL_FAILURE(Replace(xml, R"(name="EngineOwn" flex="1" height="56" fontSize="24")", R"(name="EngineOwn" flex="1" height="56" fontSize="44")"));
         CanvasCopy copy(xml);
 
         EXPECT_FALSE(HasIssue(ValidateWithWords(copy.layout), UILayoutIssueKind::TextDoesNotFit)) << "an ellipsis label can shrink: the validator does not report it";
@@ -1752,7 +1803,8 @@ namespace BECore::Chess::Tests {
 
         // With the clip the validator reports it too
         std::string clipped = ShippedElementsXml("OpponentPanel");
-        ASSERT_NO_FATAL_FAILURE(Replace(clipped, R"(text="Own engine" fontSize="24")", R"(text="Own engine" fontSize="44" overflow="Clip")"));
+        ASSERT_NO_FATAL_FAILURE(Replace(clipped, R"(name="EngineOwn" flex="1" height="56" fontSize="24")", R"(name="EngineOwn" flex="1" height="56" fontSize="44")"));
+        ASSERT_NO_FATAL_FAILURE(Replace(clipped, R"(text="Own engine")", R"(text="Own engine" overflow="Clip")"));
         CanvasCopy clippedCopy(clipped);
         EXPECT_TRUE(HasIssue(ValidateWithWords(clippedCopy.layout), UILayoutIssueKind::TextDoesNotFit));
     }
@@ -1813,31 +1865,31 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, TheHudSaysWhoseMoveItIs) {
         Draw();
-        EXPECT_EQ(Label("Turn").GetDisplayText(), "White to move");
-        EXPECT_EQ(Label("Status").GetDisplayText(), "");
+        EXPECT_EQ(ShownText(Label("Turn")), "White to move");
+        EXPECT_EQ(ShownText(Label("Status")), "");
 
         ASSERT_TRUE(Play(Model(), "e2e4"));
         Draw();
-        EXPECT_EQ(Label("Turn").GetDisplayText(), "Black to move");
+        EXPECT_EQ(ShownText(Label("Turn")), "Black to move");
     }
 
     TEST_F(ChessUiTest, TheHudNamesACheckAndTheEnd) {
         Model().SetPosition(PositionFromFen("4k3/4r3/8/8/8/8/8/4K3 w - - 0 1"));
         Draw();
-        EXPECT_EQ(Label("Status").GetDisplayText(), "Check");
+        EXPECT_EQ(ShownText(Label("Status")), "Check");
 
         Model().SetPosition(PositionFromFen("6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1"));
         ASSERT_TRUE(Play(Model(), "a1a8"));
         Draw();
-        EXPECT_EQ(Label("Turn").GetDisplayText(), "White wins");
-        EXPECT_EQ(Label("Status").GetDisplayText(), "Checkmate");
+        EXPECT_EQ(ShownText(Label("Turn")), "White wins");
+        EXPECT_EQ(ShownText(Label("Status")), "Checkmate");
     }
 
     TEST_F(ChessUiTest, TheWordsAreDrawnAsText) {
         Draw();
 
         size_t glyphsInTurn = 0;
-        const UILabel& turn = Label("Turn");
+        const UIElement& turn = Label("Turn");
         const ViewTransform fit = ViewTransform::Fit(kViewWidth, kViewHeight, _renderer->width, _renderer->height);
         const Rect box = fit.ToOutput(turn.rect.x, turn.rect.y, turn.rect.w, turn.rect.h);
         for (const DrawCall& call : _renderer->calls) {
@@ -2419,8 +2471,8 @@ namespace BECore::Chess::Tests {
             ASSERT_NE(element, nullptr) << spec.name.c_str();
             ++labels;
             EXPECT_FALSE(element->blocksInput) << spec.name.c_str();
-            EXPECT_FALSE(element->interactive) << spec.name.c_str();
-            EXPECT_NE(element->Cast<UILabel>(), nullptr) << spec.name.c_str();
+            EXPECT_FALSE(element->IsInteractive()) << spec.name.c_str();
+            EXPECT_TRUE(IsLabel(*element)) << spec.name.c_str();
         }
         EXPECT_EQ(labels, 2 * kBoardEdgeCells);
         EXPECT_EQ(canvas->GetRoot().children.size(), 2 * kBoardEdgeCells) << "nothing else is in the canvas";
@@ -2430,9 +2482,9 @@ namespace BECore::Chess::Tests {
         Draw();
         for (const BoardLabel& spec : ExpectedBoardLabels()) {
             SCOPED_TRACE(spec.name.c_str());
-            const UILabel* found = CoordinateLabel(spec.name.c_str());
+            const UIElement* found = CoordinateLabel(spec.name.c_str());
             ASSERT_NE(found, nullptr);
-            const UILabel& label = *found;
+            const UIElement& label = *found;
             const float cellX = kBoardLeft + static_cast<float>(spec.column) * kCellSize;
             const float cellY = kBoardTop + static_cast<float>(spec.row) * kCellSize;
             const auto [expectedX, expectedY] = CellOrigin(spec.column, spec.row);
@@ -2511,9 +2563,9 @@ namespace BECore::Chess::Tests {
 
             for (const BoardLabel& spec : ExpectedBoardLabels()) {
                 SCOPED_TRACE(spec.name.c_str());
-                const UILabel* found = CoordinateLabel(spec.name.c_str());
+                const UIElement* found = CoordinateLabel(spec.name.c_str());
                 ASSERT_NE(found, nullptr);
-                const UILabel& label = *found;
+                const UIElement& label = *found;
                 const Rect cell = CellRect(spec.column, spec.row);
                 const bool light = (spec.column + spec.row) % 2 == 0;
 
@@ -2528,7 +2580,7 @@ namespace BECore::Chess::Tests {
                 ASSERT_NE(square, nullptr);
                 EXPECT_TRUE(SameColor(square->color, light ? kLightSquareColor : kDarkSquareColor)) << (light ? "a light cell" : "a dark cell");
                 EXPECT_EQ(IsLightCell(spec.column, spec.row), light) << "BoardCoordinates.h says what the board paints";
-                EXPECT_TRUE(SameColor(label.textColor, light ? kDarkSquareColor : kLightSquareColor)) << "dark brown on a light cell, cream on a dark one";
+                EXPECT_TRUE(SameColor(TextOf(label)->textColor, light ? kDarkSquareColor : kLightSquareColor)) << "dark brown on a light cell, cream on a dark one";
 
                 // and the glyph that is drawn in the label's box has that color
                 const Rect box = OutputRect(label.rect);
@@ -2536,7 +2588,7 @@ namespace BECore::Chess::Tests {
                 for (const DrawCall& call : _renderer->calls) {
                     if (call.kind == DrawKind::Texture && LiesIn(call.rect, box, kGlyphTolerance)) {
                         ++inBox;
-                        EXPECT_TRUE(SameColor(call.color, label.textColor));
+                        EXPECT_TRUE(SameColor(call.color, TextOf(label)->textColor));
                         EXPECT_TRUE(LiesIn(call.rect, cell, kGlyphTolerance)) << "inside the cell it labels";
                     }
                 }
@@ -2614,7 +2666,7 @@ namespace BECore::Chess::Tests {
         const auto canvas = Coordinate();
         ASSERT_TRUE(canvas);
         for (const BoardLabel& spec : ExpectedBoardLabels()) {
-            const UILabel* label = CoordinateLabel(spec.name.c_str());
+            const UIElement* label = CoordinateLabel(spec.name.c_str());
             ASSERT_NE(label, nullptr);
             const Rect& rect = label->rect;  // canvas units: the view units of a SceneView canvas
             EXPECT_EQ(canvas->GetLayout().HitTest(rect.x + rect.w * 0.5f, rect.y + rect.h * 0.5f), nullptr) << spec.name.c_str() << " is not found by a hit test";
@@ -2636,7 +2688,7 @@ namespace BECore::Chess::Tests {
             _manager->UpdateAll();
             Model().ClearSelection();
             Draw();
-            const UILabel* label = CoordinateLabel(press.label);
+            const UIElement* label = CoordinateLabel(press.label);
             ASSERT_NE(label, nullptr);
             const auto [x, y] = ScreenCenter(*label);
             EXPECT_FALSE(CoreManager::GetUIInput().DispatchMouseButtonDown(Button(x, y, true))) << "the canvas does not take the press";
@@ -2654,7 +2706,7 @@ namespace BECore::Chess::Tests {
             Draw();
             eastl::string text;
             for (int index = 0; index <= kLastBoardIndex; ++index) {
-                const UILabel* label = CoordinateLabel((files ? "FileLabel{}"_format(index) : "RankLabel{}"_format(index)).c_str());
+                const UIElement* label = CoordinateLabel((files ? "FileLabel{}"_format(index) : "RankLabel{}"_format(index)).c_str());
                 if (label != nullptr) {
                     text += ShownText(*label);
                 }
@@ -2664,7 +2716,7 @@ namespace BECore::Chess::Tests {
         const auto rects = [&] {
             eastl::vector<Rect> found;
             for (const BoardLabel& spec : ExpectedBoardLabels()) {
-                const UILabel* label = CoordinateLabel(spec.name.c_str());
+                const UIElement* label = CoordinateLabel(spec.name.c_str());
                 found.push_back(label != nullptr ? label->rect : Rect{});
             }
             return found;
@@ -2698,18 +2750,18 @@ namespace BECore::Chess::Tests {
         Draw();
         eastl::vector<Color> before;
         for (const BoardLabel& spec : ExpectedBoardLabels()) {
-            const UILabel* label = CoordinateLabel(spec.name.c_str());
+            const UIElement* label = CoordinateLabel(spec.name.c_str());
             ASSERT_NE(label, nullptr);
-            before.push_back(label->textColor);
+            before.push_back(TextOf(*label)->textColor);
         }
         ControlPlays("white");
         _manager->UpdateAll();
         Draw();
         size_t index = 0;
         for (const BoardLabel& spec : ExpectedBoardLabels()) {
-            const UILabel* label = CoordinateLabel(spec.name.c_str());
+            const UIElement* label = CoordinateLabel(spec.name.c_str());
             ASSERT_NE(label, nullptr);
-            EXPECT_TRUE(SameColor(label->textColor, before[index++])) << spec.name.c_str();
+            EXPECT_TRUE(SameColor(TextOf(*label)->textColor, before[index++])) << spec.name.c_str();
         }
     }
 
@@ -2929,7 +2981,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(Model().GetMoves()[0].ToUci(), "a1a8") << "the program's move";
         EXPECT_FALSE(Opponent().GetError().has_value());
         Draw();
-        EXPECT_EQ(Label("Turn").GetDisplayText(), "White wins") << "the HUD says it, whoever played the mate";
+        EXPECT_EQ(ShownText(Label("Turn")), "White wins") << "the HUD says it, whoever played the mate";
 
         const uint64_t version = Model().GetVersion();
         Click("e4");  // the game is over, so this click is the "next game" one even though White is the program
@@ -3209,17 +3261,17 @@ namespace BECore::Chess::Tests {
         StartFromTheStockfishName();
         ASSERT_TRUE(OpenThePanel());
         EXPECT_EQ(Var("opponentEngine"), "stockfish");
-        EXPECT_TRUE(PanelControl<UIButton>("EngineStockfish").selected) << "the default (where Stockfish is available)";
-        EXPECT_FALSE(PanelControl<UIButton>("EngineOwn").selected);
+        EXPECT_TRUE(PanelButton("EngineStockfish").selected) << "the default (where Stockfish is available)";
+        EXPECT_FALSE(PanelButton("EngineOwn").selected);
 
         ASSERT_TRUE(ClickPanel("EngineOwn").Both());
         EXPECT_EQ(Var("opponentEngine"), "own");
         EXPECT_EQ(Opponent().GetEngine(), OpponentEngine::Own);
-        EXPECT_TRUE(PanelControl<UIButton>("EngineOwn").selected);
-        EXPECT_FALSE(PanelControl<UIButton>("EngineStockfish").selected);
+        EXPECT_TRUE(PanelButton("EngineOwn").selected);
+        EXPECT_FALSE(PanelButton("EngineStockfish").selected);
         ASSERT_TRUE(ClickPanel("EngineStockfish").Both());
         EXPECT_EQ(Var("opponentEngine"), "stockfish") << "and back";
-        EXPECT_TRUE(PanelControl<UIButton>("EngineStockfish").selected);
+        EXPECT_TRUE(PanelButton("EngineStockfish").selected);
         EXPECT_EQ(factory.Calls(), 0) << "with nobody as the opponent an engine is only a choice: none is asked for";
 
         ASSERT_TRUE(ClickPanel("ModeComputer").Both());
@@ -3323,7 +3375,7 @@ namespace BECore::Chess::Tests {
             SCOPED_TRACE(state);
             Draw();
             EXPECT_FALSE(PanelControl<UISegmented>("EngineGroup").disabled);
-            EXPECT_FALSE(PanelControl<UIButton>("EngineOwn").rect.IsEmpty());
+            EXPECT_FALSE(PanelButton("EngineOwn").rect.IsEmpty());
             ASSERT_TRUE(ClickPanel("EngineOwn").Both());
             EXPECT_EQ(Opponent().GetEngine(), OpponentEngine::Own);
             if constexpr (kStockfishAvailable) {
@@ -3356,7 +3408,7 @@ namespace BECore::Chess::Tests {
         _manager->UpdateAll();
         ASSERT_TRUE(OpenThePanel());
         Draw();
-        ASSERT_EQ(Label("Turn").GetDisplayText(), "White to move");
+        ASSERT_EQ(ShownText(Label("Turn")), "White to move");
 
         const auto at = ScreenCenter(PanelElement("ModeComputer"));
         EXPECT_TRUE(CoreManager::GetUIInput().DispatchMouseButtonDown(Button(at.first, at.second, true))) << "the segment takes the click";
@@ -3369,7 +3421,7 @@ namespace BECore::Chess::Tests {
 
         EXPECT_TRUE(ClickPanel("ModeTwo").Both());
         EXPECT_FALSE(Opponent().GetPlays().has_value());
-        EXPECT_FALSE(PanelControl<UIButton>("ModeComputer").rect.IsEmpty()) << "the way back to a pick is still there";
+        EXPECT_FALSE(PanelButton("ModeComputer").rect.IsEmpty()) << "the way back to a pick is still there";
     }
 
     TEST_F(ChessUiTest, ClickingAnEngineSegmentOnTheScreenPicksTheEngineAndAPressAloneDoesNothing) {
@@ -3390,7 +3442,7 @@ namespace BECore::Chess::Tests {
         EXPECT_TRUE(CoreManager::GetUIInput().DispatchMouseButtonUp(Button(at.first, at.second, false)));
         EXPECT_EQ(Opponent().GetEngine(), OpponentEngine::Own);
         EXPECT_EQ(Var("opponentEngine"), "own");
-        EXPECT_TRUE(PanelControl<UIButton>("EngineOwn").selected) << "the selected segment follows";
+        EXPECT_TRUE(PanelButton("EngineOwn").selected) << "the selected segment follows";
 
         ASSERT_TRUE(ClickPanel("ModeComputer").Both());  // the program plays Black
         ASSERT_EQ(factory.Calls(), 1);
@@ -3398,7 +3450,7 @@ namespace BECore::Chess::Tests {
         EXPECT_TRUE(ClickPanel("EngineStockfish").Both()) << "also while the program plays";
         EXPECT_EQ(Opponent().GetEngine(), OpponentEngine::Stockfish);
         EXPECT_EQ(Var("opponentEngine"), "stockfish");
-        EXPECT_TRUE(PanelControl<UIButton>("EngineStockfish").selected);
+        EXPECT_TRUE(PanelButton("EngineStockfish").selected);
         ASSERT_EQ(factory.Calls(), 2);
         EXPECT_EQ(factory.Engines()[1], "stockfish");
         EXPECT_EQ(Opponent().GetPlays(), std::optional<PieceColor>(PieceColor::Black)) << "the side stays";
@@ -3759,7 +3811,7 @@ namespace BECore::Chess::Tests {
         // Where a segment will be, the panel takes nothing and the board under it gets the click. Show it once to learn the place, then hide it again
         ASSERT_TRUE(OpenThePanel());
         Draw();
-        const auto place = ScreenCenter(PanelControl<UIButton>("LevelMedium"));
+        const auto place = ScreenCenter(PanelButton("LevelMedium"));
         ASSERT_TRUE(CloseThePanel());
         Draw();
         EXPECT_TRUE(RectCalls(kPlateColor).empty());
@@ -3817,12 +3869,8 @@ namespace BECore::Chess::Tests {
         Draw();
 
         // On a segment, on the plate (its title), on the dim over the board (a1, below the plate) and over the Reset button: all of them are the panel's
-        const std::pair<float, float> points[] = {ScreenCenter(PanelControl<UIButton>("EngineOwn")),
-                                                  ScreenCenter(PanelElement("Title")),
-                                                  SquareCenter("a1"),
-                                                  SquareCenter("h8"),
-                                                  ScreenCenter(*HudElement("Reset")),
-                                                  ScreenCenter(*HudElement("Turn"))};
+        const std::pair<float, float> points[] = {ScreenCenter(PanelButton("EngineOwn")), ScreenCenter(PanelElement("Title")), SquareCenter("a1"), SquareCenter("h8"),
+                                                  ScreenCenter(*HudElement("Reset")),     ScreenCenter(*HudElement("Turn"))};
         for (const auto& [x, y] : points) {
             const Taken taken = ClickAtPixel(x, y);
             EXPECT_TRUE(taken.Both()) << x << "," << y;
@@ -3861,7 +3909,7 @@ namespace BECore::Chess::Tests {
                 Draw();  // the board answered with the variable; the next draw moves the selection
                 for (const PanelSegment& other : segments) {
                     if (std::string_view(other.group) == group && IsShown(other)) {
-                        EXPECT_EQ(PanelControl<UIButton>(other.name.c_str()).selected, other.name == segment.name) << other.name.c_str();
+                        EXPECT_EQ(PanelButton(other.name.c_str()).selected, other.name == segment.name) << other.name.c_str();
                     }
                 }
                 if (std::string_view(group) == "ModeGroup") {
@@ -3883,9 +3931,9 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(ClickPanel("ModeTwo").Both());
         Draw();
         EXPECT_FALSE(Opponent().GetPlays().has_value());
-        EXPECT_TRUE(PanelControl<UIButton>("ModeTwo").selected);
-        EXPECT_TRUE(PanelControl<UIButton>("LevelMax").selected) << "the level that was picked stays shown while two people play";
-        EXPECT_TRUE(PanelControl<UIButton>("ColorBlack").selected) << "and so does the person's color";
+        EXPECT_TRUE(PanelButton("ModeTwo").selected);
+        EXPECT_TRUE(PanelButton("LevelMax").selected) << "the level that was picked stays shown while two people play";
+        EXPECT_TRUE(PanelButton("ColorBlack").selected) << "and so does the person's color";
         EXPECT_EQ(log.Total(), kStockfishAvailable ? 11u : 10u) << "every segment shown (ten, nine without Stockfish), and ModeTwo again";
     }
 
@@ -3896,13 +3944,13 @@ namespace BECore::Chess::Tests {
         _manager->UpdateAll();
         ASSERT_TRUE(OpenThePanel());
         Draw();
-        ASSERT_TRUE(PanelControl<UIButton>("ModeTwo").selected);
+        ASSERT_TRUE(PanelButton("ModeTwo").selected);
 
         ASSERT_TRUE(ClickPanel("ModeComputer").Both());
         Draw();
 
-        EXPECT_TRUE(PanelControl<UIButton>("ModeTwo").selected);
-        EXPECT_FALSE(PanelControl<UIButton>("ModeComputer").selected);
+        EXPECT_TRUE(PanelButton("ModeTwo").selected);
+        EXPECT_FALSE(PanelButton("ModeComputer").selected);
     }
 
     TEST_F(ChessUiTest, NoGroupOfThePanelIsGreyedAndALevelAndAColorPickedForTwoPeopleApplyAtComputer) {
@@ -3920,9 +3968,9 @@ namespace BECore::Chess::Tests {
                 EXPECT_FALSE(PanelControl<UISegmented>(group).disabled) << group;
             }
             for (const char* name : {"ModeTwo", "ModeComputer", "ColorWhite", "ColorBlack", "EngineStockfish", "EngineOwn", "LevelEasy", "LevelMedium", "LevelHard", "LevelMax"}) {
-                const UIButton& button = PanelControl<UIButton>(name);
+                const UIElement& button = PanelButton(name);
                 EXPECT_FALSE(button.groupDisabled) << name;
-                EXPECT_EQ(button.GetCurrentFill().a, 255) << name << " is drawn whole";
+                EXPECT_EQ(button.GetStateLook().fill.a, 255) << name << " is drawn whole";
             }
         };
         expectNoGreying("two people play");
@@ -3935,11 +3983,11 @@ namespace BECore::Chess::Tests {
         Draw();
         EXPECT_EQ(log.Total(), 2u) << "both clicks emitted their action";
         EXPECT_GT(Opponent().GetRevision(), revision);
-        EXPECT_TRUE(PanelControl<UIButton>("LevelMax").selected);
-        EXPECT_FALSE(PanelControl<UIButton>("LevelMedium").selected);
-        EXPECT_TRUE(PanelControl<UIButton>("ColorBlack").selected);
-        EXPECT_FALSE(PanelControl<UIButton>("ColorWhite").selected);
-        EXPECT_TRUE(PanelControl<UIButton>("ModeTwo").selected);
+        EXPECT_TRUE(PanelButton("LevelMax").selected);
+        EXPECT_FALSE(PanelButton("LevelMedium").selected);
+        EXPECT_TRUE(PanelButton("ColorBlack").selected);
+        EXPECT_FALSE(PanelButton("ColorWhite").selected);
+        EXPECT_TRUE(PanelButton("ModeTwo").selected);
         EXPECT_EQ(Var("opponentLevel"), "max");
         EXPECT_EQ(Var("opponentColor"), "black");
         EXPECT_EQ(ShownText(*HudElement("Menu")), "Menu");
@@ -3956,16 +4004,16 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(Opponent().GetPlays(), std::optional<PieceColor>(PieceColor::White));
         EXPECT_EQ(ControlOpponentString("plays"), "white");
         EXPECT_EQ(ControlOpponentString("level"), "max");
-        EXPECT_TRUE(PanelControl<UIButton>("LevelMax").selected);
-        EXPECT_TRUE(PanelControl<UIButton>("ColorBlack").selected);
+        EXPECT_TRUE(PanelButton("LevelMax").selected);
+        EXPECT_TRUE(PanelButton("ColorBlack").selected);
         EXPECT_EQ(ShownText(*HudElement("Menu")), "Menu");
         expectNoGreying("the program plays");
 
         // Back to two people: nothing grey, the choice still shown, and the groups still take clicks
         ASSERT_TRUE(ClickPanel("ModeTwo").Both());
         Draw();
-        EXPECT_TRUE(PanelControl<UIButton>("LevelMax").selected);
-        EXPECT_TRUE(PanelControl<UIButton>("ColorBlack").selected);
+        EXPECT_TRUE(PanelButton("LevelMax").selected);
+        EXPECT_TRUE(PanelButton("ColorBlack").selected);
         expectNoGreying("two people again");
         const size_t total = log.Total();
         ASSERT_TRUE(ClickPanel("LevelEasy").Both());
@@ -3992,19 +4040,19 @@ namespace BECore::Chess::Tests {
         Draw();
         wholePanel();
         EXPECT_EQ(Var("opponentColor"), "white");
-        EXPECT_TRUE(PanelControl<UIButton>("ColorWhite").selected);
+        EXPECT_TRUE(PanelButton("ColorWhite").selected);
 
         ControlPlays("white");
         Draw();
         wholePanel();
         EXPECT_EQ(Var("opponentColor"), "black");
-        EXPECT_TRUE(PanelControl<UIButton>("ColorBlack").selected);
+        EXPECT_TRUE(PanelButton("ColorBlack").selected);
 
         ControlPlays(nullptr);
         Draw();
         wholePanel();
-        EXPECT_TRUE(PanelControl<UIButton>("ModeTwo").selected);
-        EXPECT_TRUE(PanelControl<UIButton>("ColorBlack").selected) << "the person's color is kept when the program leaves";
+        EXPECT_TRUE(PanelButton("ModeTwo").selected);
+        EXPECT_TRUE(PanelButton("ColorBlack").selected) << "the person's color is kept when the program leaves";
     }
 
     TEST_F(ChessUiTest, ARefusedStockfishPickOnThePanelKeepsComputerTheOwnEngineAndTheLevelAndTheProgramStillAnswers) {
@@ -4033,14 +4081,14 @@ namespace BECore::Chess::Tests {
 
         ASSERT_EQ(asked.size(), 2u);
         EXPECT_EQ(asked[1], "stockfish");
-        EXPECT_TRUE(PanelControl<UIButton>("ModeComputer").selected) << "the mode does not move";
-        EXPECT_FALSE(PanelControl<UIButton>("ModeTwo").selected);
-        EXPECT_TRUE(PanelControl<UIButton>("EngineOwn").selected) << "the engine that plays stays picked";
-        EXPECT_FALSE(PanelControl<UIButton>("EngineStockfish").selected);
-        EXPECT_TRUE(PanelControl<UIButton>("LevelHard").selected);
-        EXPECT_TRUE(PanelControl<UIButton>("ColorWhite").selected);
+        EXPECT_TRUE(PanelButton("ModeComputer").selected) << "the mode does not move";
+        EXPECT_FALSE(PanelButton("ModeTwo").selected);
+        EXPECT_TRUE(PanelButton("EngineOwn").selected) << "the engine that plays stays picked";
+        EXPECT_FALSE(PanelButton("EngineStockfish").selected);
+        EXPECT_TRUE(PanelButton("LevelHard").selected);
+        EXPECT_TRUE(PanelButton("ColorWhite").selected);
         EXPECT_EQ(PanelText("OpponentError"), "Engine not found");
-        EXPECT_EQ(Label("Status").GetDisplayText(), "Engine not found");
+        EXPECT_EQ(ShownText(Label("Status")), "Engine not found");
         EXPECT_EQ(ShownText(*HudElement("Menu")), "Menu");
         EXPECT_EQ(ControlOpponentString("engine"), "own");
         EXPECT_EQ(ControlOpponentString("plays"), "black");
@@ -4058,8 +4106,8 @@ namespace BECore::Chess::Tests {
         // The scene file is the same in every build; ChessBoardComponent::HideUnavailableEngines hides the segment once, at the first update or draw
         ASSERT_TRUE(OpenThePanel());
         Draw();
-        const UIButton& stockfish = PanelControl<UIButton>("EngineStockfish");
-        const UIButton& own = PanelControl<UIButton>("EngineOwn");
+        const UIElement& stockfish = PanelButton("EngineStockfish");
+        const UIElement& own = PanelButton("EngineOwn");
         const UISegmented& group = PanelControl<UISegmented>("EngineGroup");
         EXPECT_EQ(stockfish.active.visible, kStockfishAvailable);
         EXPECT_TRUE(own.active.visible);
@@ -4099,9 +4147,9 @@ namespace BECore::Chess::Tests {
         EXPECT_TRUE(problems.empty()) << problems.c_str();
 
         LayOutInTheNarrowestWindow(layout);
-        const UIButton& own = PanelControl<UIButton>("EngineOwn");
+        const UIElement& own = PanelButton("EngineOwn");
         const UIElement& group = PanelControl<UISegmented>("EngineGroup");
-        EXPECT_TRUE(PanelControl<UIButton>("EngineStockfish").rect.IsEmpty());
+        EXPECT_TRUE(PanelButton("EngineStockfish").rect.IsEmpty());
         EXPECT_NEAR(own.rect.x, group.rect.x, kPixelTolerance);
         EXPECT_NEAR(own.rect.w, group.rect.w, kPixelTolerance);
         EXPECT_GE(std::min(own.rect.w, own.rect.h) * layout.GetResolved().scale, CoreManager::GetUIEnvironment().GetSettings().minTouchSize - kPixelTolerance);
@@ -4205,11 +4253,11 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(ClickPanel("ModeComputer").Both());
         Draw();
         EXPECT_EQ(PanelText("OpponentError"), "Engine not found") << "the panel says it where the person looks";
-        EXPECT_EQ(Label("Status").GetDisplayText(), "Engine not found");
-        EXPECT_TRUE(PanelControl<UIButton>("ModeTwo").selected) << "the screen shows the truth: nobody plays";
-        EXPECT_FALSE(PanelControl<UIButton>("ModeComputer").selected);
+        EXPECT_EQ(ShownText(Label("Status")), "Engine not found");
+        EXPECT_TRUE(PanelButton("ModeTwo").selected) << "the screen shows the truth: nobody plays";
+        EXPECT_FALSE(PanelButton("ModeComputer").selected);
         if constexpr (kStockfishAvailable) {
-            EXPECT_TRUE(PanelControl<UIButton>("EngineStockfish").selected) << "the pick failed and the choice is still Stockfish: no silent switch";
+            EXPECT_TRUE(PanelButton("EngineStockfish").selected) << "the pick failed and the choice is still Stockfish: no silent switch";
         }
         EXPECT_EQ(Var("opponentEngine"), "stockfish") << "no silent switch (the segment is hidden without Stockfish)";
         EXPECT_EQ(ShownText(*HudElement("Menu")), "Menu");
@@ -4218,12 +4266,12 @@ namespace BECore::Chess::Tests {
 
         ASSERT_TRUE(ClickPanel("EngineOwn").Both());
         EXPECT_EQ(PanelText("OpponentError"), "") << "a new pick: the person has seen the sentence";
-        EXPECT_TRUE(PanelControl<UIButton>("EngineOwn").selected);
+        EXPECT_TRUE(PanelButton("EngineOwn").selected);
         EXPECT_EQ(asked.size(), 1u) << "with nobody playing the choice only changes";
 
         ASSERT_TRUE(ClickPanel("ModeComputer").Both());
         Draw();
-        EXPECT_TRUE(PanelControl<UIButton>("ModeComputer").selected);
+        EXPECT_TRUE(PanelButton("ModeComputer").selected);
         EXPECT_EQ(PanelText("OpponentError"), "");
         EXPECT_EQ(ShownText(*HudElement("Menu")), "Menu");
         ASSERT_EQ(asked.size(), 2u);
@@ -4243,7 +4291,7 @@ namespace BECore::Chess::Tests {
         ASSERT_NO_FATAL_FAILURE(ProvokeAnEngineError(factory));
         ASSERT_TRUE(OpenThePanel());
         EXPECT_EQ(PanelText("OpponentError"), "Engine not found") << "the first search failed";
-        EXPECT_TRUE(PanelControl<UIButton>("ModeComputer").selected) << "the pick succeeded, only the search failed";
+        EXPECT_TRUE(PanelButton("ModeComputer").selected) << "the pick succeeded, only the search failed";
 
         ASSERT_TRUE(ClickPanel("LevelHard").Both());
 
@@ -4696,7 +4744,7 @@ namespace BECore::Chess::Tests {
         }
         ASSERT_EQ(buttons.size(), 5u) << "four pieces and Cancel";
         for (const eastl::string& name : buttons) {
-            const UIButton& button = PromotionControl<UIButton>(name.c_str());
+            const UIElement& button = PromotionButton(name.c_str());
             EXPECT_GE(button.rect.h, kSegmentHeight - kPixelTolerance) << name.c_str();
             EXPECT_GE(std::min(button.rect.w, button.rect.h) * layout.GetResolved().scale, minTouch - kPixelTolerance) << name.c_str() << " is a touch target on the smallest window";
             const UIContentFit fit = button.CheckContent(button.rect.w - 2.0f * kButtonAir, button.rect.h, layout.GetResolved().scale);
@@ -4756,20 +4804,21 @@ namespace BECore::Chess::Tests {
         for (size_t i = 0; i < pieces.size(); ++i) {
             const PieceType piece = pieces[i];
             SCOPED_TRACE(PromoteButton(piece).c_str());
-            const UIButton* button = row.children[i]->Cast<UIButton>();
-            ASSERT_NE(button, nullptr);
-            EXPECT_EQ(button->name, PoolString::Intern(PromoteButton(piece).c_str())) << "the buttons are in the order of the table";
+            const UIElement& button = *row.children[i];
+            const UIInputClicker* clicker = ClickerOf(button);
+            ASSERT_NE(clicker, nullptr);
+            EXPECT_EQ(button.name, PoolString::Intern(PromoteButton(piece).c_str())) << "the buttons are in the order of the table";
             const eastl::string_view label = PromotionLabel(piece);
             const eastl::string_view id = PromotionId(piece);
-            EXPECT_EQ(ShownText(*button), eastl::string(label.data(), label.size()));
-            EXPECT_EQ(eastl::string(button->value.ToStringView().data(), button->value.ToStringView().size()), eastl::string(id.data(), id.size()));
-            EXPECT_EQ(button->action, PoolString::Intern(kPromoteAction));
-            EXPECT_EQ(FindPromotion(button->value.ToStringView()), std::optional<PieceType>(piece)) << "the value is an id the board accepts";
+            EXPECT_EQ(ShownText(button), eastl::string(label.data(), label.size()));
+            EXPECT_EQ(eastl::string(clicker->value.ToStringView().data(), clicker->value.ToStringView().size()), eastl::string(id.data(), id.size()));
+            EXPECT_EQ(clicker->action, PoolString::Intern(kPromoteAction));
+            EXPECT_EQ(FindPromotion(clicker->value.ToStringView()), std::optional<PieceType>(piece)) << "the value is an id the board accepts";
         }
 
-        const UIButton& cancel = PromotionControl<UIButton>("PromotionCancel");
+        const UIElement& cancel = PromotionButton("PromotionCancel");
         EXPECT_EQ(ShownText(cancel), "Cancel");
-        EXPECT_EQ(cancel.action, PoolString::Intern(kCancelPromotionAction));
+        EXPECT_EQ(ClickerOf(cancel)->action, PoolString::Intern(kCancelPromotionAction));
     }
 
     TEST_F(ChessUiTest, EveryActionOfThePromotionPanelIsOneTheBoardAnswers) {
@@ -4780,10 +4829,10 @@ namespace BECore::Chess::Tests {
         CollectControls(panel->GetRoot(), controls);
         size_t buttons = 0;
         for (const UIElement* control : controls) {
-            if (const UIButton* button = control->Cast<UIButton>()) {
+            if (const UIInputClicker* button = ClickerOf(*control)) {
                 ++buttons;
                 EXPECT_TRUE(button->action == PoolString::Intern(kPromoteAction) || button->action == PoolString::Intern(kCancelPromotionAction))
-                    << button->name.CStr() << " emits " << button->action.CStr() << ", which the board does not answer";
+                    << control->name.CStr() << " emits " << button->action.CStr() << ", which the board does not answer";
             }
         }
         EXPECT_EQ(buttons, 5u);
@@ -4849,7 +4898,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, APromotionWordCutByAFontThatIsTooBigIsCaught) {
         std::string xml = ShippedElementsXml("PromotionPanel");
-        ASSERT_NO_FATAL_FAILURE(Replace(xml, R"(text="Knight" fontSize="26")", R"(text="Knight" fontSize="60")"));
+        ASSERT_NO_FATAL_FAILURE(Replace(xml, R"(name="PromoteKnight" flex="1" height="56" fontSize="26")", R"(name="PromoteKnight" flex="1" height="56" fontSize="60")"));
         CanvasCopy copy(xml);
         const eastl::string problems = PanelProblemsOnMatrix(copy.layout, kReportedCases, kPromotionPlate);
         EXPECT_NE(problems.find("PromoteKnight cuts 'Knight'"), eastl::string::npos) << problems.c_str();
@@ -4941,7 +4990,7 @@ namespace BECore::Chess::Tests {
         ASSERT_EQ(root.children.size(), 4u) << "two lists and two balances";
         for (const UIElement* element : AllElements(root)) {
             EXPECT_FALSE(element->blocksInput) << element->name.CStr();
-            EXPECT_FALSE(element->interactive) << element->name.CStr();
+            EXPECT_FALSE(element->IsInteractive()) << element->name.CStr();
             if (element != &root) {
                 EXPECT_EQ(std::string(element->name.CStr()).rfind("Material", 0), 0u) << element->name.CStr() << " starts with Material: elements are found by name in every canvas";
             }
@@ -4957,12 +5006,13 @@ namespace BECore::Chess::Tests {
                 EXPECT_EQ(row.name, PoolString::Intern(Format("Material{}{}Row", group, kMaterialPieces[index]).c_str())) << "the order of the rows: queen, rook, bishop, knight, pawn";
                 EXPECT_FALSE(row.style.visible) << row.name.CStr() << " starts hidden";
                 ASSERT_EQ(row.children.size(), 2u);
-                EXPECT_NE(row.children[0]->Cast<UIImage>(), nullptr) << "the icon";
-                const UILabel* count = row.children[1]->Cast<UILabel>();
+                EXPECT_NE(row.children[0]->GetComponent<UIImageComponent>(), nullptr) << "the icon";
+                const UITextComponent* count = IsLabel(*row.children[1]) ? TextOf(*row.children[1]) : nullptr;
                 ASSERT_NE(count, nullptr) << "the count";
                 EXPECT_EQ(count->text, Format("{{material{}{}}}", group, kMaterialPieces[index]));
             }
-            const UILabel* balance = MaterialElement(Format("Material{}Balance", group).c_str()).Cast<UILabel>();
+            const UIElement& balanceElement = MaterialElement(Format("Material{}Balance", group).c_str());
+            const UITextComponent* balance = IsLabel(balanceElement) ? TextOf(balanceElement) : nullptr;
             ASSERT_NE(balance, nullptr);
             EXPECT_EQ(balance->text, Format("{{material{}Balance}}", group));
             EXPECT_EQ(balance->overflow, TextOverflow::AutoFit) << "the sign is shrunk into its box and never cut";
@@ -5305,24 +5355,23 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(Var("materialBottomPawn"), "x1") << "the words are not taken away, only the rows";
         EXPECT_EQ(Var("materialBottomBalance"), "+1") << "the balance is still there";
 
-        const UILabel& balance = *MaterialElement("MaterialBottomBalance").Cast<UILabel>();
+        const UIElement& balance = MaterialElement("MaterialBottomBalance");
+        ASSERT_TRUE(IsLabel(balance));
         EXPECT_EQ(ShownText(balance), "+1");
         EXPECT_GE(balance.rect.x, safe.x) << "inside the safe area";
         EXPECT_LE(balance.rect.x + balance.rect.w, kMaterialMarginRight) << "inside the margin";
         EXPECT_FALSE(balance.rect.IsEmpty());
         EXPECT_TRUE(balance.active.visible);
 
-        // The sign of a big lead is shrunk into its box (AutoFit), not cut: the size drawn is in whole pixels and never under the smallest the label asks for
+        // The sign of a big lead is shrunk into its box (AutoFit), not cut (the text component does not expose its last layout, so the check is the component's own fit)
         const float scale = canvas->GetLayout().GetResolved().scale;
+        EXPECT_EQ(TextOf(balance)->overflow, TextOverflow::AutoFit);
         for (const char* lead : {"+1", "+39", "+99"}) {
             CoreManager::GetUIVars().Set(PoolString::Intern("materialBottomBalance"), lead);
             Draw();
-            const TextLayoutResult& drawn = balance.GetLastLayout();
-            EXPECT_FALSE(drawn.overflowed) << lead;
-            EXPECT_FALSE(drawn.truncated) << lead;
-            EXPECT_LE(drawn.width, balance.rect.w * scale + kPixelTolerance) << lead << " is inside its box";
-            EXPECT_GE(drawn.fontSize, std::ceil(balance.minFontSize * scale)) << lead << " is not under the smallest whole size (AutoFit rounds the smallest up: 7 px for 12 units at 0.571)";
-            EXPECT_LE(drawn.fontSize, std::ceil(balance.GetFontSize() * scale)) << lead;
+            const UIContentFit fit = balance.CheckContent(balance.rect.w, balance.rect.h, scale);
+            EXPECT_TRUE(fit.hasContent) << lead;
+            EXPECT_TRUE(fit.fits) << lead << " is inside its box";
         }
 
         ResizeWithoutInsets(1280.0f, 720.0f);  // and the other way
@@ -5357,8 +5406,8 @@ namespace BECore::Chess::Tests {
 
         size_t checked = 0;
         for (const char* group : {"Top", "Bottom"}) {
-            const UILabel* label = MaterialElement(Format("Material{}Balance", group).c_str()).Cast<UILabel>();
-            ASSERT_NE(label, nullptr);
+            const UIElement* label = &MaterialElement(Format("Material{}Balance", group).c_str());
+            ASSERT_TRUE(IsLabel(*label));
             const PoolString variable = PoolString::Intern(Format("material{}Balance", group).c_str());
             for (int points = 1; points <= 99; ++points) {
                 const eastl::string text = BalanceText(points);
@@ -5414,8 +5463,8 @@ namespace BECore::Chess::Tests {
             const UIElement& element = *elements[index + 1];
             EXPECT_EQ(element.name, PoolString::Intern(expected[index].c_str())) << "element " << index << " in the order of the scene: list, rows (row, icon, count), balance";
             stacks += element.Cast<UIStack>() != nullptr ? 1 : 0;
-            images += element.Cast<UIImage>() != nullptr ? 1 : 0;
-            labels += element.Cast<UILabel>() != nullptr ? 1 : 0;
+            images += element.GetComponent<UIImageComponent>() != nullptr ? 1 : 0;
+            labels += IsLabel(element) ? 1 : 0;
         }
         EXPECT_EQ(stacks, 12u) << "two lists and ten rows";
         EXPECT_EQ(images, 10u);
@@ -5584,13 +5633,13 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, AnIconKeepsTheAspectOfItsAtlasCellCenteredInsideItsRow) {
-        // The library is empty in the test, so every icon is given the atlas of the pieces and a cell of it by hand; UIImage fits the cell into its rect
+        // The library is empty in the test, so every icon is given the atlas of the pieces and a cell of it by hand; UIImageComponent fits the cell into its rect
         StartFrom("4k3/8/8/8/8/8/8/4K3 w - - 0 1");
         const eastl::vector<uint8_t> pixels(static_cast<size_t>(kAtlasWidth) * kAtlasHeight * 4, 0);
         const IntrusivePtr<ITexture> atlas = _renderer->CreateTexture(pixels.data(), kAtlasWidth, kAtlasHeight);
         for (const char* group : kMaterialGroups) {
             for (const char* piece : kMaterialPieces) {
-                UIImage* icon = MaterialElement(Format("Material{}{}Icon", group, piece).c_str()).Cast<UIImage>();
+                UIImageComponent* icon = MaterialElement(Format("Material{}{}Icon", group, piece).c_str()).GetComponent<UIImageComponent>();
                 ASSERT_NE(icon, nullptr) << group << piece;
                 icon->GetSprite().SetTexture(atlas, Rect{kCellX, 0.0f, kCellWidth, kCellHeight});
             }
@@ -5647,7 +5696,7 @@ namespace BECore::Chess::Tests {
         EXPECT_NE(problemsOf(wide).find("MaterialTopList (8.0, 84.0, 104.0"), eastl::string::npos) << "a list that reaches the board leaves the margin";
 
         std::string bigFont = shipped;
-        ASSERT_NO_FATAL_FAILURE(Replace(bigFont, R"(text="{materialTopQueen}" fontSize="20")", R"(text="{materialTopQueen}" fontSize="60")"));
+        ASSERT_NO_FATAL_FAILURE(Replace(bigFont, R"(name="MaterialTopQueenCount" flex="1" fontSize="20")", R"(name="MaterialTopQueenCount" flex="1" fontSize="60")"));
         EXPECT_NE(problemsOf(bigFont).find("MaterialTopQueenCount cuts"), eastl::string::npos) << "a font of 60 does not fit the count box";
 
         std::string smallBox = shipped;

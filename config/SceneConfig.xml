@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<SceneManager>
+<SceneManager contentVersion="5">
   <scenes>
     <scene
       type="Scene"
@@ -27,22 +27,86 @@
           <components>
             <component type="UICanvasComponent" space="SceneView" useSafeArea="false">
               <elements>
-                <element type="UILabel" name="RankLabel0" x="102" y="82" width="13" height="26" text="{coordRank0}" fontSize="18" align="Left" verticalAlign="Top" overflow="Clip" wrap="false" textColor="181,136,99,255" />
-                <element type="UILabel" name="RankLabel1" x="102" y="162" width="13" height="26" text="{coordRank1}" fontSize="18" align="Left" verticalAlign="Top" overflow="Clip" wrap="false" textColor="240,217,181,255" />
-                <element type="UILabel" name="RankLabel2" x="102" y="242" width="13" height="26" text="{coordRank2}" fontSize="18" align="Left" verticalAlign="Top" overflow="Clip" wrap="false" textColor="181,136,99,255" />
-                <element type="UILabel" name="RankLabel3" x="102" y="322" width="13" height="26" text="{coordRank3}" fontSize="18" align="Left" verticalAlign="Top" overflow="Clip" wrap="false" textColor="240,217,181,255" />
-                <element type="UILabel" name="RankLabel4" x="102" y="402" width="13" height="26" text="{coordRank4}" fontSize="18" align="Left" verticalAlign="Top" overflow="Clip" wrap="false" textColor="181,136,99,255" />
-                <element type="UILabel" name="RankLabel5" x="102" y="482" width="13" height="26" text="{coordRank5}" fontSize="18" align="Left" verticalAlign="Top" overflow="Clip" wrap="false" textColor="240,217,181,255" />
-                <element type="UILabel" name="RankLabel6" x="102" y="562" width="13" height="26" text="{coordRank6}" fontSize="18" align="Left" verticalAlign="Top" overflow="Clip" wrap="false" textColor="181,136,99,255" />
-                <element type="UILabel" name="RankLabel7" x="102" y="642" width="13" height="26" text="{coordRank7}" fontSize="18" align="Left" verticalAlign="Top" overflow="Clip" wrap="false" textColor="240,217,181,255" />
-                <element type="UILabel" name="FileLabel0" x="165" y="692" width="13" height="26" text="{coordFile0}" fontSize="18" align="Right" verticalAlign="Bottom" overflow="Clip" wrap="false" textColor="240,217,181,255" />
-                <element type="UILabel" name="FileLabel1" x="245" y="692" width="13" height="26" text="{coordFile1}" fontSize="18" align="Right" verticalAlign="Bottom" overflow="Clip" wrap="false" textColor="181,136,99,255" />
-                <element type="UILabel" name="FileLabel2" x="325" y="692" width="13" height="26" text="{coordFile2}" fontSize="18" align="Right" verticalAlign="Bottom" overflow="Clip" wrap="false" textColor="240,217,181,255" />
-                <element type="UILabel" name="FileLabel3" x="405" y="692" width="13" height="26" text="{coordFile3}" fontSize="18" align="Right" verticalAlign="Bottom" overflow="Clip" wrap="false" textColor="181,136,99,255" />
-                <element type="UILabel" name="FileLabel4" x="485" y="692" width="13" height="26" text="{coordFile4}" fontSize="18" align="Right" verticalAlign="Bottom" overflow="Clip" wrap="false" textColor="240,217,181,255" />
-                <element type="UILabel" name="FileLabel5" x="565" y="692" width="13" height="26" text="{coordFile5}" fontSize="18" align="Right" verticalAlign="Bottom" overflow="Clip" wrap="false" textColor="181,136,99,255" />
-                <element type="UILabel" name="FileLabel6" x="645" y="692" width="13" height="26" text="{coordFile6}" fontSize="18" align="Right" verticalAlign="Bottom" overflow="Clip" wrap="false" textColor="240,217,181,255" />
-                <element type="UILabel" name="FileLabel7" x="725" y="692" width="13" height="26" text="{coordFile7}" fontSize="18" align="Right" verticalAlign="Bottom" overflow="Clip" wrap="false" textColor="181,136,99,255" />
+                <element type="UIElement" name="RankLabel0" x="102" y="82" width="13" height="26" fontSize="18">
+                  <components>
+                    <component type="UITextComponent" text="{coordRank0}" textColor="181,136,99,255" align="Left" verticalAlign="Top" overflow="Clip" wrap="false"/>
+                  </components>
+                </element>
+                <element type="UIElement" name="RankLabel1" x="102" y="162" width="13" height="26" fontSize="18">
+                  <components>
+                    <component type="UITextComponent" text="{coordRank1}" textColor="240,217,181,255" align="Left" verticalAlign="Top" overflow="Clip" wrap="false"/>
+                  </components>
+                </element>
+                <element type="UIElement" name="RankLabel2" x="102" y="242" width="13" height="26" fontSize="18">
+                  <components>
+                    <component type="UITextComponent" text="{coordRank2}" textColor="181,136,99,255" align="Left" verticalAlign="Top" overflow="Clip" wrap="false"/>
+                  </components>
+                </element>
+                <element type="UIElement" name="RankLabel3" x="102" y="322" width="13" height="26" fontSize="18">
+                  <components>
+                    <component type="UITextComponent" text="{coordRank3}" textColor="240,217,181,255" align="Left" verticalAlign="Top" overflow="Clip" wrap="false"/>
+                  </components>
+                </element>
+                <element type="UIElement" name="RankLabel4" x="102" y="402" width="13" height="26" fontSize="18">
+                  <components>
+                    <component type="UITextComponent" text="{coordRank4}" textColor="181,136,99,255" align="Left" verticalAlign="Top" overflow="Clip" wrap="false"/>
+                  </components>
+                </element>
+                <element type="UIElement" name="RankLabel5" x="102" y="482" width="13" height="26" fontSize="18">
+                  <components>
+                    <component type="UITextComponent" text="{coordRank5}" textColor="240,217,181,255" align="Left" verticalAlign="Top" overflow="Clip" wrap="false"/>
+                  </components>
+                </element>
+                <element type="UIElement" name="RankLabel6" x="102" y="562" width="13" height="26" fontSize="18">
+                  <components>
+                    <component type="UITextComponent" text="{coordRank6}" textColor="181,136,99,255" align="Left" verticalAlign="Top" overflow="Clip" wrap="false"/>
+                  </components>
+                </element>
+                <element type="UIElement" name="RankLabel7" x="102" y="642" width="13" height="26" fontSize="18">
+                  <components>
+                    <component type="UITextComponent" text="{coordRank7}" textColor="240,217,181,255" align="Left" verticalAlign="Top" overflow="Clip" wrap="false"/>
+                  </components>
+                </element>
+                <element type="UIElement" name="FileLabel0" x="165" y="692" width="13" height="26" fontSize="18">
+                  <components>
+                    <component type="UITextComponent" text="{coordFile0}" textColor="240,217,181,255" align="Right" verticalAlign="Bottom" overflow="Clip" wrap="false"/>
+                  </components>
+                </element>
+                <element type="UIElement" name="FileLabel1" x="245" y="692" width="13" height="26" fontSize="18">
+                  <components>
+                    <component type="UITextComponent" text="{coordFile1}" textColor="181,136,99,255" align="Right" verticalAlign="Bottom" overflow="Clip" wrap="false"/>
+                  </components>
+                </element>
+                <element type="UIElement" name="FileLabel2" x="325" y="692" width="13" height="26" fontSize="18">
+                  <components>
+                    <component type="UITextComponent" text="{coordFile2}" textColor="240,217,181,255" align="Right" verticalAlign="Bottom" overflow="Clip" wrap="false"/>
+                  </components>
+                </element>
+                <element type="UIElement" name="FileLabel3" x="405" y="692" width="13" height="26" fontSize="18">
+                  <components>
+                    <component type="UITextComponent" text="{coordFile3}" textColor="181,136,99,255" align="Right" verticalAlign="Bottom" overflow="Clip" wrap="false"/>
+                  </components>
+                </element>
+                <element type="UIElement" name="FileLabel4" x="485" y="692" width="13" height="26" fontSize="18">
+                  <components>
+                    <component type="UITextComponent" text="{coordFile4}" textColor="240,217,181,255" align="Right" verticalAlign="Bottom" overflow="Clip" wrap="false"/>
+                  </components>
+                </element>
+                <element type="UIElement" name="FileLabel5" x="565" y="692" width="13" height="26" fontSize="18">
+                  <components>
+                    <component type="UITextComponent" text="{coordFile5}" textColor="181,136,99,255" align="Right" verticalAlign="Bottom" overflow="Clip" wrap="false"/>
+                  </components>
+                </element>
+                <element type="UIElement" name="FileLabel6" x="645" y="692" width="13" height="26" fontSize="18">
+                  <components>
+                    <component type="UITextComponent" text="{coordFile6}" textColor="240,217,181,255" align="Right" verticalAlign="Bottom" overflow="Clip" wrap="false"/>
+                  </components>
+                </element>
+                <element type="UIElement" name="FileLabel7" x="725" y="692" width="13" height="26" fontSize="18">
+                  <components>
+                    <component type="UITextComponent" text="{coordFile7}" textColor="181,136,99,255" align="Right" verticalAlign="Bottom" overflow="Clip" wrap="false"/>
+                  </components>
+                </element>
               </elements>
             </component>
           </components>
@@ -69,72 +133,160 @@
                   <children>
                     <element type="UIStack" name="MaterialTopQueenRow" height="40" direction="Horizontal" spacing="4" padding="2" crossAlign="Stretch" color="232,210,170,255" visible="false">
                       <children>
-                        <element type="UIImage" name="MaterialTopQueenIcon" width="26" />
-                        <element type="UILabel" name="MaterialTopQueenCount" flex="1" text="{materialTopQueen}" fontSize="20" align="Center" verticalAlign="Center" overflow="Clip" wrap="false" textColor="70,45,30,255" />
+                        <element type="UIElement" name="MaterialTopQueenIcon" width="26">
+                          <components>
+                            <component type="UIImageComponent"/>
+                          </components>
+                        </element>
+                        <element type="UIElement" name="MaterialTopQueenCount" flex="1" fontSize="20">
+                          <components>
+                            <component type="UITextComponent" text="{materialTopQueen}" textColor="70,45,30,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                          </components>
+                        </element>
                       </children>
                     </element>
                     <element type="UIStack" name="MaterialTopRookRow" height="40" direction="Horizontal" spacing="4" padding="2" crossAlign="Stretch" color="232,210,170,255" visible="false">
                       <children>
-                        <element type="UIImage" name="MaterialTopRookIcon" width="26" />
-                        <element type="UILabel" name="MaterialTopRookCount" flex="1" text="{materialTopRook}" fontSize="20" align="Center" verticalAlign="Center" overflow="Clip" wrap="false" textColor="70,45,30,255" />
+                        <element type="UIElement" name="MaterialTopRookIcon" width="26">
+                          <components>
+                            <component type="UIImageComponent"/>
+                          </components>
+                        </element>
+                        <element type="UIElement" name="MaterialTopRookCount" flex="1" fontSize="20">
+                          <components>
+                            <component type="UITextComponent" text="{materialTopRook}" textColor="70,45,30,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                          </components>
+                        </element>
                       </children>
                     </element>
                     <element type="UIStack" name="MaterialTopBishopRow" height="40" direction="Horizontal" spacing="4" padding="2" crossAlign="Stretch" color="232,210,170,255" visible="false">
                       <children>
-                        <element type="UIImage" name="MaterialTopBishopIcon" width="26" />
-                        <element type="UILabel" name="MaterialTopBishopCount" flex="1" text="{materialTopBishop}" fontSize="20" align="Center" verticalAlign="Center" overflow="Clip" wrap="false" textColor="70,45,30,255" />
+                        <element type="UIElement" name="MaterialTopBishopIcon" width="26">
+                          <components>
+                            <component type="UIImageComponent"/>
+                          </components>
+                        </element>
+                        <element type="UIElement" name="MaterialTopBishopCount" flex="1" fontSize="20">
+                          <components>
+                            <component type="UITextComponent" text="{materialTopBishop}" textColor="70,45,30,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                          </components>
+                        </element>
                       </children>
                     </element>
                     <element type="UIStack" name="MaterialTopKnightRow" height="40" direction="Horizontal" spacing="4" padding="2" crossAlign="Stretch" color="232,210,170,255" visible="false">
                       <children>
-                        <element type="UIImage" name="MaterialTopKnightIcon" width="26" />
-                        <element type="UILabel" name="MaterialTopKnightCount" flex="1" text="{materialTopKnight}" fontSize="20" align="Center" verticalAlign="Center" overflow="Clip" wrap="false" textColor="70,45,30,255" />
+                        <element type="UIElement" name="MaterialTopKnightIcon" width="26">
+                          <components>
+                            <component type="UIImageComponent"/>
+                          </components>
+                        </element>
+                        <element type="UIElement" name="MaterialTopKnightCount" flex="1" fontSize="20">
+                          <components>
+                            <component type="UITextComponent" text="{materialTopKnight}" textColor="70,45,30,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                          </components>
+                        </element>
                       </children>
                     </element>
                     <element type="UIStack" name="MaterialTopPawnRow" height="40" direction="Horizontal" spacing="4" padding="2" crossAlign="Stretch" color="232,210,170,255" visible="false">
                       <children>
-                        <element type="UIImage" name="MaterialTopPawnIcon" width="26" />
-                        <element type="UILabel" name="MaterialTopPawnCount" flex="1" text="{materialTopPawn}" fontSize="20" align="Center" verticalAlign="Center" overflow="Clip" wrap="false" textColor="70,45,30,255" />
+                        <element type="UIElement" name="MaterialTopPawnIcon" width="26">
+                          <components>
+                            <component type="UIImageComponent"/>
+                          </components>
+                        </element>
+                        <element type="UIElement" name="MaterialTopPawnCount" flex="1" fontSize="20">
+                          <components>
+                            <component type="UITextComponent" text="{materialTopPawn}" textColor="70,45,30,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                          </components>
+                        </element>
                       </children>
                     </element>
                   </children>
                 </element>
-                <element type="UILabel" name="MaterialTopBalance" x="77" y="84" width="23" height="28" text="{materialTopBalance}" fontSize="20" minFontSize="12" align="Center" verticalAlign="Center" overflow="AutoFit" wrap="false" />
+                <element type="UIElement" name="MaterialTopBalance" x="77" y="84" width="23" height="28" fontSize="20">
+                  <components>
+                    <component type="UITextComponent" text="{materialTopBalance}" align="Center" verticalAlign="Center" overflow="AutoFit" wrap="false" minFontSize="12"/>
+                  </components>
+                </element>
                 <element type="UIStack" name="MaterialBottomList" x="8" y="500" width="64" height="216" direction="Vertical" spacing="4" crossAlign="Stretch">
                   <children>
                     <element type="UIStack" name="MaterialBottomQueenRow" height="40" direction="Horizontal" spacing="4" padding="2" crossAlign="Stretch" color="232,210,170,255" visible="false">
                       <children>
-                        <element type="UIImage" name="MaterialBottomQueenIcon" width="26" />
-                        <element type="UILabel" name="MaterialBottomQueenCount" flex="1" text="{materialBottomQueen}" fontSize="20" align="Center" verticalAlign="Center" overflow="Clip" wrap="false" textColor="70,45,30,255" />
+                        <element type="UIElement" name="MaterialBottomQueenIcon" width="26">
+                          <components>
+                            <component type="UIImageComponent"/>
+                          </components>
+                        </element>
+                        <element type="UIElement" name="MaterialBottomQueenCount" flex="1" fontSize="20">
+                          <components>
+                            <component type="UITextComponent" text="{materialBottomQueen}" textColor="70,45,30,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                          </components>
+                        </element>
                       </children>
                     </element>
                     <element type="UIStack" name="MaterialBottomRookRow" height="40" direction="Horizontal" spacing="4" padding="2" crossAlign="Stretch" color="232,210,170,255" visible="false">
                       <children>
-                        <element type="UIImage" name="MaterialBottomRookIcon" width="26" />
-                        <element type="UILabel" name="MaterialBottomRookCount" flex="1" text="{materialBottomRook}" fontSize="20" align="Center" verticalAlign="Center" overflow="Clip" wrap="false" textColor="70,45,30,255" />
+                        <element type="UIElement" name="MaterialBottomRookIcon" width="26">
+                          <components>
+                            <component type="UIImageComponent"/>
+                          </components>
+                        </element>
+                        <element type="UIElement" name="MaterialBottomRookCount" flex="1" fontSize="20">
+                          <components>
+                            <component type="UITextComponent" text="{materialBottomRook}" textColor="70,45,30,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                          </components>
+                        </element>
                       </children>
                     </element>
                     <element type="UIStack" name="MaterialBottomBishopRow" height="40" direction="Horizontal" spacing="4" padding="2" crossAlign="Stretch" color="232,210,170,255" visible="false">
                       <children>
-                        <element type="UIImage" name="MaterialBottomBishopIcon" width="26" />
-                        <element type="UILabel" name="MaterialBottomBishopCount" flex="1" text="{materialBottomBishop}" fontSize="20" align="Center" verticalAlign="Center" overflow="Clip" wrap="false" textColor="70,45,30,255" />
+                        <element type="UIElement" name="MaterialBottomBishopIcon" width="26">
+                          <components>
+                            <component type="UIImageComponent"/>
+                          </components>
+                        </element>
+                        <element type="UIElement" name="MaterialBottomBishopCount" flex="1" fontSize="20">
+                          <components>
+                            <component type="UITextComponent" text="{materialBottomBishop}" textColor="70,45,30,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                          </components>
+                        </element>
                       </children>
                     </element>
                     <element type="UIStack" name="MaterialBottomKnightRow" height="40" direction="Horizontal" spacing="4" padding="2" crossAlign="Stretch" color="232,210,170,255" visible="false">
                       <children>
-                        <element type="UIImage" name="MaterialBottomKnightIcon" width="26" />
-                        <element type="UILabel" name="MaterialBottomKnightCount" flex="1" text="{materialBottomKnight}" fontSize="20" align="Center" verticalAlign="Center" overflow="Clip" wrap="false" textColor="70,45,30,255" />
+                        <element type="UIElement" name="MaterialBottomKnightIcon" width="26">
+                          <components>
+                            <component type="UIImageComponent"/>
+                          </components>
+                        </element>
+                        <element type="UIElement" name="MaterialBottomKnightCount" flex="1" fontSize="20">
+                          <components>
+                            <component type="UITextComponent" text="{materialBottomKnight}" textColor="70,45,30,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                          </components>
+                        </element>
                       </children>
                     </element>
                     <element type="UIStack" name="MaterialBottomPawnRow" height="40" direction="Horizontal" spacing="4" padding="2" crossAlign="Stretch" color="232,210,170,255" visible="false">
                       <children>
-                        <element type="UIImage" name="MaterialBottomPawnIcon" width="26" />
-                        <element type="UILabel" name="MaterialBottomPawnCount" flex="1" text="{materialBottomPawn}" fontSize="20" align="Center" verticalAlign="Center" overflow="Clip" wrap="false" textColor="70,45,30,255" />
+                        <element type="UIElement" name="MaterialBottomPawnIcon" width="26">
+                          <components>
+                            <component type="UIImageComponent"/>
+                          </components>
+                        </element>
+                        <element type="UIElement" name="MaterialBottomPawnCount" flex="1" fontSize="20">
+                          <components>
+                            <component type="UITextComponent" text="{materialBottomPawn}" textColor="70,45,30,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                          </components>
+                        </element>
                       </children>
                     </element>
                   </children>
                 </element>
-                <element type="UILabel" name="MaterialBottomBalance" x="77" y="500" width="23" height="28" text="{materialBottomBalance}" fontSize="20" minFontSize="12" align="Center" verticalAlign="Center" overflow="AutoFit" wrap="false" />
+                <element type="UIElement" name="MaterialBottomBalance" x="77" y="500" width="23" height="28" fontSize="20">
+                  <components>
+                    <component type="UITextComponent" text="{materialBottomBalance}" align="Center" verticalAlign="Center" overflow="AutoFit" wrap="false" minFontSize="12"/>
+                  </components>
+                </element>
               </elements>
             </component>
           </components>
@@ -152,10 +304,28 @@
           <components>
             <component type="UICanvasComponent" space="SceneView" useSafeArea="true">
               <elements>
-                <element type="UILabel" name="Turn" x="12" y="12" width="320" height="56" text="{turn}" fontSize="28" verticalAlign="Center" />
-                <element type="UIButton" name="Menu" anchor="TopRight" x="-134" y="12" width="110" height="56" text="Menu" fontSize="24" action="ChessOpenOpponent" color="45,75,120,255" />
-                <element type="UIButton" name="Reset" anchor="TopRight" x="-12" y="12" width="110" height="56" text="Reset" fontSize="26" action="ChessReset" color="40,90,60,255" />
-                <element type="UILabel" name="Status" anchor="BottomRight" x="-12" y="-12" width="48%" height="56" text="{status}" fontSize="28" align="Right" verticalAlign="Center" />
+                <element type="UIElement" name="Turn" x="12" y="12" width="320" height="56" fontSize="28">
+                  <components>
+                    <component type="UITextComponent" text="{turn}" verticalAlign="Center"/>
+                  </components>
+                </element>
+                <element type="UIElement" name="Menu" anchor="TopRight" x="-134" y="12" width="110" height="56" fontSize="24" color="45,75,120,255">
+                  <components>
+                    <component type="UITextComponent" text="Menu" align="Center" verticalAlign="Center" wrap="false"/>
+                    <component type="UIInputClicker" action="ChessOpenOpponent"/>
+                  </components>
+                </element>
+                <element type="UIElement" name="Reset" anchor="TopRight" x="-12" y="12" width="110" height="56" fontSize="26" color="40,90,60,255">
+                  <components>
+                    <component type="UITextComponent" text="Reset" align="Center" verticalAlign="Center" wrap="false"/>
+                    <component type="UIInputClicker" action="ChessReset"/>
+                  </components>
+                </element>
+                <element type="UIElement" name="Status" anchor="BottomRight" x="-12" y="-12" width="48%" height="56" fontSize="28">
+                  <components>
+                    <component type="UITextComponent" text="{status}" align="Right" verticalAlign="Center"/>
+                  </components>
+                </element>
               </elements>
             </component>
           </components>
@@ -178,55 +348,134 @@
                 <element type="UIElement" name="Dim" anchor="Stretch" ignoreSafeArea="true" color="0,0,0,150" blocksInput="true" />
                 <element type="UIStack" name="Plate" anchor="Center" width="94%" maxWidth="640" height="460" direction="Vertical" spacing="12" padding="16" crossAlign="Stretch" color="36,40,52,255" blocksInput="true">
                   <children>
-                    <element type="UILabel" name="Title" height="44" text="Opponent" fontSize="30" align="Center" />
+                    <element type="UIElement" name="Title" height="44" fontSize="30">
+                      <components>
+                        <component type="UITextComponent" text="Opponent" align="Center"/>
+                      </components>
+                    </element>
                     <element type="UIStack" name="ModeRow" height="56" direction="Horizontal" spacing="8" crossAlign="Stretch">
                       <children>
-                        <element type="UILabel" name="ModeCaption" width="150" height="56" text="Opponent" fontSize="24" verticalAlign="Center" />
+                        <element type="UIElement" name="ModeCaption" width="150" height="56" fontSize="24">
+                          <components>
+                            <component type="UITextComponent" text="Opponent" verticalAlign="Center"/>
+                          </components>
+                        </element>
                         <element type="UISegmented" name="ModeGroup" bind="opponentMode" flex="1" height="56" direction="Horizontal" spacing="4" color="30,30,30,255">
                           <children>
-                            <element type="UIButton" name="ModeTwo" flex="1" height="56" text="Two players" fontSize="24" value="two" action="ChessSetMode" color="70,70,100,255" />
-                            <element type="UIButton" name="ModeComputer" flex="1" height="56" text="Computer" fontSize="24" value="computer" action="ChessSetMode" color="70,70,100,255" />
+                            <element type="UIElement" name="ModeTwo" flex="1" height="56" fontSize="24" color="70,70,100,255">
+                              <components>
+                                <component type="UITextComponent" text="Two players" align="Center" verticalAlign="Center" wrap="false"/>
+                                <component type="UIInputClicker" action="ChessSetMode" value="two"/>
+                              </components>
+                            </element>
+                            <element type="UIElement" name="ModeComputer" flex="1" height="56" fontSize="24" color="70,70,100,255">
+                              <components>
+                                <component type="UITextComponent" text="Computer" align="Center" verticalAlign="Center" wrap="false"/>
+                                <component type="UIInputClicker" action="ChessSetMode" value="computer"/>
+                              </components>
+                            </element>
                           </children>
                         </element>
                       </children>
                     </element>
                     <element type="UIStack" name="ColorRow" height="56" direction="Horizontal" spacing="8" crossAlign="Stretch">
                       <children>
-                        <element type="UILabel" name="ColorCaption" width="150" height="56" text="Play as" fontSize="24" verticalAlign="Center" />
+                        <element type="UIElement" name="ColorCaption" width="150" height="56" fontSize="24">
+                          <components>
+                            <component type="UITextComponent" text="Play as" verticalAlign="Center"/>
+                          </components>
+                        </element>
                         <element type="UISegmented" name="ColorGroup" bind="opponentColor" flex="1" height="56" direction="Horizontal" spacing="4" color="30,30,30,255">
                           <children>
-                            <element type="UIButton" name="ColorWhite" flex="1" height="56" text="White" fontSize="24" value="white" action="ChessSetColor" color="70,70,100,255" />
-                            <element type="UIButton" name="ColorBlack" flex="1" height="56" text="Black" fontSize="24" value="black" action="ChessSetColor" color="70,70,100,255" />
+                            <element type="UIElement" name="ColorWhite" flex="1" height="56" fontSize="24" color="70,70,100,255">
+                              <components>
+                                <component type="UITextComponent" text="White" align="Center" verticalAlign="Center" wrap="false"/>
+                                <component type="UIInputClicker" action="ChessSetColor" value="white"/>
+                              </components>
+                            </element>
+                            <element type="UIElement" name="ColorBlack" flex="1" height="56" fontSize="24" color="70,70,100,255">
+                              <components>
+                                <component type="UITextComponent" text="Black" align="Center" verticalAlign="Center" wrap="false"/>
+                                <component type="UIInputClicker" action="ChessSetColor" value="black"/>
+                              </components>
+                            </element>
                           </children>
                         </element>
                       </children>
                     </element>
                     <element type="UIStack" name="EngineRow" height="56" direction="Horizontal" spacing="8" crossAlign="Stretch">
                       <children>
-                        <element type="UILabel" name="EngineCaption" width="150" height="56" text="Engine" fontSize="24" verticalAlign="Center" />
+                        <element type="UIElement" name="EngineCaption" width="150" height="56" fontSize="24">
+                          <components>
+                            <component type="UITextComponent" text="Engine" verticalAlign="Center"/>
+                          </components>
+                        </element>
                         <element type="UISegmented" name="EngineGroup" bind="opponentEngine" flex="1" height="56" direction="Horizontal" spacing="4" color="30,30,30,255">
                           <children>
-                            <element type="UIButton" name="EngineStockfish" flex="1" height="56" text="Stockfish" fontSize="24" value="stockfish" action="ChessSetEngine" color="70,70,100,255" />
-                            <element type="UIButton" name="EngineOwn" flex="1" height="56" text="Own engine" fontSize="24" value="own" action="ChessSetEngine" color="70,70,100,255" />
+                            <element type="UIElement" name="EngineStockfish" flex="1" height="56" fontSize="24" color="70,70,100,255">
+                              <components>
+                                <component type="UITextComponent" text="Stockfish" align="Center" verticalAlign="Center" wrap="false"/>
+                                <component type="UIInputClicker" action="ChessSetEngine" value="stockfish"/>
+                              </components>
+                            </element>
+                            <element type="UIElement" name="EngineOwn" flex="1" height="56" fontSize="24" color="70,70,100,255">
+                              <components>
+                                <component type="UITextComponent" text="Own engine" align="Center" verticalAlign="Center" wrap="false"/>
+                                <component type="UIInputClicker" action="ChessSetEngine" value="own"/>
+                              </components>
+                            </element>
                           </children>
                         </element>
                       </children>
                     </element>
                     <element type="UIStack" name="LevelRow" height="56" direction="Horizontal" spacing="8" crossAlign="Stretch">
                       <children>
-                        <element type="UILabel" name="LevelCaption" width="150" height="56" text="Level" fontSize="24" verticalAlign="Center" />
+                        <element type="UIElement" name="LevelCaption" width="150" height="56" fontSize="24">
+                          <components>
+                            <component type="UITextComponent" text="Level" verticalAlign="Center"/>
+                          </components>
+                        </element>
                         <element type="UISegmented" name="LevelGroup" bind="opponentLevel" flex="1" height="56" direction="Horizontal" spacing="4" color="30,30,30,255">
                           <children>
-                            <element type="UIButton" name="LevelEasy" flex="1" height="56" text="Easy" fontSize="24" value="easy" action="ChessSetLevel" color="70,70,100,255" />
-                            <element type="UIButton" name="LevelMedium" flex="1" height="56" text="Medium" fontSize="24" value="medium" action="ChessSetLevel" color="70,70,100,255" />
-                            <element type="UIButton" name="LevelHard" flex="1" height="56" text="Hard" fontSize="24" value="hard" action="ChessSetLevel" color="70,70,100,255" />
-                            <element type="UIButton" name="LevelMax" flex="1" height="56" text="Max" fontSize="24" value="max" action="ChessSetLevel" color="70,70,100,255" />
+                            <element type="UIElement" name="LevelEasy" flex="1" height="56" fontSize="24" color="70,70,100,255">
+                              <components>
+                                <component type="UITextComponent" text="Easy" align="Center" verticalAlign="Center" wrap="false"/>
+                                <component type="UIInputClicker" action="ChessSetLevel" value="easy"/>
+                              </components>
+                            </element>
+                            <element type="UIElement" name="LevelMedium" flex="1" height="56" fontSize="24" color="70,70,100,255">
+                              <components>
+                                <component type="UITextComponent" text="Medium" align="Center" verticalAlign="Center" wrap="false"/>
+                                <component type="UIInputClicker" action="ChessSetLevel" value="medium"/>
+                              </components>
+                            </element>
+                            <element type="UIElement" name="LevelHard" flex="1" height="56" fontSize="24" color="70,70,100,255">
+                              <components>
+                                <component type="UITextComponent" text="Hard" align="Center" verticalAlign="Center" wrap="false"/>
+                                <component type="UIInputClicker" action="ChessSetLevel" value="hard"/>
+                              </components>
+                            </element>
+                            <element type="UIElement" name="LevelMax" flex="1" height="56" fontSize="24" color="70,70,100,255">
+                              <components>
+                                <component type="UITextComponent" text="Max" align="Center" verticalAlign="Center" wrap="false"/>
+                                <component type="UIInputClicker" action="ChessSetLevel" value="max"/>
+                              </components>
+                            </element>
                           </children>
                         </element>
                       </children>
                     </element>
-                    <element type="UILabel" name="OpponentError" height="32" text="{opponentError}" fontSize="22" align="Center" verticalAlign="Center" textColor="240,120,120,255" />
-                    <element type="UIButton" name="Ok" height="56" text="OK" fontSize="26" action="ChessCloseOpponent" color="50,115,85,255" />
+                    <element type="UIElement" name="OpponentError" height="32" fontSize="22">
+                      <components>
+                        <component type="UITextComponent" text="{opponentError}" textColor="240,120,120,255" align="Center" verticalAlign="Center"/>
+                      </components>
+                    </element>
+                    <element type="UIElement" name="Ok" height="56" fontSize="26" color="50,115,85,255">
+                      <components>
+                        <component type="UITextComponent" text="OK" align="Center" verticalAlign="Center" wrap="false"/>
+                        <component type="UIInputClicker" action="ChessCloseOpponent"/>
+                      </components>
+                    </element>
                   </children>
                 </element>
               </elements>
@@ -251,16 +500,45 @@
                 <element type="UIElement" name="PromotionDim" anchor="Stretch" ignoreSafeArea="true" color="0,0,0,150" blocksInput="true" />
                 <element type="UIStack" name="PromotionPlate" anchor="Center" width="94%" maxWidth="640" height="224" direction="Vertical" spacing="12" padding="16" crossAlign="Stretch" color="44,38,52,255" blocksInput="true">
                   <children>
-                    <element type="UILabel" name="PromotionTitle" height="44" text="Promote to" fontSize="30" align="Center" />
+                    <element type="UIElement" name="PromotionTitle" height="44" fontSize="30">
+                      <components>
+                        <component type="UITextComponent" text="Promote to" align="Center"/>
+                      </components>
+                    </element>
                     <element type="UIStack" name="PromotionPieces" height="56" direction="Horizontal" spacing="8" crossAlign="Stretch">
                       <children>
-                        <element type="UIButton" name="PromoteQueen" flex="1" height="56" text="Queen" fontSize="26" value="queen" action="ChessPromote" color="70,70,100,255" />
-                        <element type="UIButton" name="PromoteRook" flex="1" height="56" text="Rook" fontSize="26" value="rook" action="ChessPromote" color="70,70,100,255" />
-                        <element type="UIButton" name="PromoteBishop" flex="1" height="56" text="Bishop" fontSize="26" value="bishop" action="ChessPromote" color="70,70,100,255" />
-                        <element type="UIButton" name="PromoteKnight" flex="1" height="56" text="Knight" fontSize="26" value="knight" action="ChessPromote" color="70,70,100,255" />
+                        <element type="UIElement" name="PromoteQueen" flex="1" height="56" fontSize="26" color="70,70,100,255">
+                          <components>
+                            <component type="UITextComponent" text="Queen" align="Center" verticalAlign="Center" wrap="false"/>
+                            <component type="UIInputClicker" action="ChessPromote" value="queen"/>
+                          </components>
+                        </element>
+                        <element type="UIElement" name="PromoteRook" flex="1" height="56" fontSize="26" color="70,70,100,255">
+                          <components>
+                            <component type="UITextComponent" text="Rook" align="Center" verticalAlign="Center" wrap="false"/>
+                            <component type="UIInputClicker" action="ChessPromote" value="rook"/>
+                          </components>
+                        </element>
+                        <element type="UIElement" name="PromoteBishop" flex="1" height="56" fontSize="26" color="70,70,100,255">
+                          <components>
+                            <component type="UITextComponent" text="Bishop" align="Center" verticalAlign="Center" wrap="false"/>
+                            <component type="UIInputClicker" action="ChessPromote" value="bishop"/>
+                          </components>
+                        </element>
+                        <element type="UIElement" name="PromoteKnight" flex="1" height="56" fontSize="26" color="70,70,100,255">
+                          <components>
+                            <component type="UITextComponent" text="Knight" align="Center" verticalAlign="Center" wrap="false"/>
+                            <component type="UIInputClicker" action="ChessPromote" value="knight"/>
+                          </components>
+                        </element>
                       </children>
                     </element>
-                    <element type="UIButton" name="PromotionCancel" height="56" text="Cancel" fontSize="26" action="ChessCancelPromotion" color="110,60,60,255" />
+                    <element type="UIElement" name="PromotionCancel" height="56" fontSize="26" color="110,60,60,255">
+                      <components>
+                        <component type="UITextComponent" text="Cancel" align="Center" verticalAlign="Center" wrap="false"/>
+                        <component type="UIInputClicker" action="ChessCancelPromotion"/>
+                      </components>
+                    </element>
                   </children>
                 </element>
               </elements>

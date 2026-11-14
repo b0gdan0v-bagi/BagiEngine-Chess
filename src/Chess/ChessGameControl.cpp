@@ -1,5 +1,6 @@
 #include "ChessGameControl.h"
 
+#include <BECore/Control/Json.h>
 #include <Chess/Engine/OpponentChoice.h>
 #include <Chess/Game/CapturedMaterial.h>
 

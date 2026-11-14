@@ -2,9 +2,9 @@
 
 #include <BECore/GameManager/CoreManager.h>
 #include <BECore/Reflection/XmlDeserializer.h>
-#include <BECore/UI/UIButton.h>
 #include <BECore/UI/UICanvasComponent.h>
 #include <BECore/UI/UIElement.h>
+#include <BECore/UI/UIInputClicker.h>
 #include <BECore/UI/UIScreenContent.h>
 #include <BECore/UI/UISegmented.h>
 #include <BECore/UI/UIWebCompiler.h>
@@ -330,8 +330,10 @@ namespace BECore::Tests {
             ASSERT_NE(segmented, nullptr) << "a data-widget=\"segmented\" div is a UISegmented";
             EXPECT_EQ(segmented->bind.ToStringView(), group.bind);
             for (const auto& [name, value] : group.segments) {
-                const auto* button = dynamic_cast<UIButton*>(compiled->Element(name));
-                ASSERT_NE(button, nullptr) << name;
+                const UIElement* element = compiled->Element(name);
+                ASSERT_NE(element, nullptr) << name;
+                const auto* button = element->GetComponent<UIInputClicker>();
+                ASSERT_NE(button, nullptr) << name << " is a button";
                 EXPECT_EQ(button->value.ToStringView(), value) << name;
                 EXPECT_EQ(button->action.ToStringView(), group.action) << name;
             }
@@ -364,8 +366,8 @@ namespace BECore::Tests {
     TEST_F(ChessHudWebTest, ThePanelInHtmlFollowsTheVariablesOfTheGame) {
         const auto compiled = Compile(kChessPanelHtml, kChessPanelCss);
         auto* color = dynamic_cast<UISegmented*>(compiled->Element("ColorGroup"));
-        auto* white = dynamic_cast<UIButton*>(compiled->Element("ColorWhite"));
-        auto* black = dynamic_cast<UIButton*>(compiled->Element("ColorBlack"));
+        UIElement* white = compiled->Element("ColorWhite");
+        UIElement* black = compiled->Element("ColorBlack");
         ASSERT_TRUE(color != nullptr && white != nullptr && black != nullptr);
         CoreManager::GetUIVars().Set("opponentColor"_intern, "black");
         color->SyncChildren();
