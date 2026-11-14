@@ -25,6 +25,10 @@ need the fake Stockfish end at once, and the base scenario "without Stockfish" c
 in `engine`, in a seat object and with a side, with the opponent unchanged, the panel has no visible Stockfish segment and Own engine is selected, and the own engine plays);
 in a build with Stockfish that scenario ends at once. Exit code: 0 passed, 1 failed, 77 skipped (the executable does not exist).
 
+The restart ("restart" scenarios, base ones, real and manual clock) starts the game with `--save-dir=<its own temporary folder>` (the flag turns the save on despite the control flags), picks the
+own engine as Black and plays a move, quits, and starts again on the same folder: the position, the moves and the opponent are the same; a reset then a restart keeps the choice with the opening. A start with no `--save-dir`
+is the opening with nobody playing. The person's own save folder is never named.
+
 What a recorded scenario can state moved out of this script into `tests/scenarios/*.jsonl` (ctest `BagiChessScenario.<file>`, the manual clock, played by the engine's
 bagi_play.py): the refusals, the mate and the game over, the reset, promotion, the captured material numbers and the clicks of the opponent panel. What stays here needs a wait
 for the program, a picture, the real clock or an answer that depends on the build; the real clock keeps the start position, the opening, the push and the screenshots.
@@ -996,9 +1000,77 @@ OPPONENT_SCENARIOS = [
 ]
 
 
+SAVED_CHOICE = {"engine": "own", "plays": "black", "level": "easy"}
+
+
+class RestartPhase:
+    """A game that is closed with `quit` and started again on the same `--save-dir` comes back: the position and the opponent choice (the flag turns the save on despite --control and --headless).
+
+    Each step is a game of its own (run_smoke starts one per scenario); `self.before` carries what the first one saw. The folder is the phase's own temporary one, never the person's."""
+
+    def __init__(self, folder: Path, clock_flags: list) -> None:
+        self.folder = folder
+        self.flags = [f"--save-dir={folder}", *clock_flags]
+        self.before = {}
+
+    def scenarios(self, label: str) -> list:
+        return [
+            (f"restart, {label}: play", self.flags, self.play),
+            (f"restart, {label}: the game is back", self.flags, self.come_back),
+            (f"restart, {label}: a reset is kept", self.flags, self.keep_the_fresh_game),
+        ]
+
+    @staticmethod
+    def read(client: BagiControlClient) -> dict:
+        state = client.call("get_state")["state"]
+        return {key: state[key] for key in ("fen", "moves", "startFen", "opponent")}
+
+    def play(self, client: BagiControlClient, headless: bool) -> None:
+        check(not any(self.folder.iterdir()), "the folder of the save is not empty before the first game")
+        if client.call("status")["manualClock"]:
+            client.call("step")
+        client.call("set_state", {"opponent": SAVED_CHOICE})
+        play_against_the_own_engine(client)
+        self.before = self.read(client)
+        check(len(self.before["moves"]) == 2, f"unexpected game {self.before}")
+        # quit (by play()) goes through ChessGame::Stop(), which writes the game
+
+    def come_back(self, client: BagiControlClient, headless: bool) -> None:
+        if client.call("status")["manualClock"]:
+            client.call("step")
+        after = self.read(client)
+        check(after == self.before, f"the game did not come back after a restart: {self.before} then {after}")
+        client.call("reset")  # the exit writes the new game
+
+    def keep_the_fresh_game(self, client: BagiControlClient, headless: bool) -> None:
+        if client.call("status")["manualClock"]:
+            client.call("step")
+        check_start_position(client)
+        opponent = get_opponent(client)
+        check(
+            opponent["plays"] == SAVED_CHOICE["plays"] and opponent["engine"] == SAVED_CHOICE["engine"] and opponent["level"] == SAVED_CHOICE["level"],
+            f"a reset and a restart lost the opponent choice: {opponent}",
+        )
+
+
+def run_without_a_save_folder(client: BagiControlClient, headless: bool) -> None:
+    """The usual smoke run names no folder: a control run never reads a person's game, so the opening comes up with nobody playing."""
+    if client.call("status")["manualClock"]:
+        client.call("step")
+    check_start_position(client)
+    opponent = get_opponent(client)
+    check(opponent["plays"] is None and opponent["error"] is None, f"a game started with no save folder has an opponent: {opponent}")
+
+
 def main() -> int:
     scenarios = list(BASE_SCENARIOS)
+    restart_scenarios = []
     with tempfile.TemporaryDirectory() as temp_dir:
+        for label, clock_flags in (("real clock", []), ("manual clock", ["--manual-clock"])):
+            folder = Path(temp_dir) / ("saves " + label.replace(" ", "_"))
+            folder.mkdir()
+            restart_scenarios += RestartPhase(folder, clock_flags).scenarios(label)
+        restart_scenarios.append(("restart: no save folder", [], run_without_a_save_folder))
         if sys.platform == "win32":
             print("NOTICE: the opponent scenarios are left out on Windows (UciProcess is POSIX only)", flush=True)
         elif local_settings_exist():
@@ -1006,6 +1078,7 @@ def main() -> int:
         else:
             os.environ["STOCKFISH"] = str(write_stockfish_wrapper(Path(temp_dir)))  # the game inherits the environment
             scenarios += OPPONENT_SCENARIOS
+        scenarios += restart_scenarios
         return run_smoke(__doc__, scenarios)
 
 
