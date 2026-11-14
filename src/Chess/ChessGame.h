@@ -103,6 +103,7 @@ namespace BECore::Chess {
         PositionAnalyst _analyst;      ///< after the controller (its factory reads the controller's settings) and before the adapter
         ChessSaveKeeper _keeper;       ///< after everything it reads (it is handed the model, the controller and the choice in each call, and destroyed first)
         ChessGameControl _control;
+        bool _stopped = false;  ///< between Stop() and the next Start(): UpdateKeeper() writes nothing
     };
 
 }  // namespace BECore::Chess

@@ -349,6 +349,25 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(saved->moves, "e2e4 e7e5");
     }
 
+    TEST_F(ChessSaveGameTest, FramesAfterAStopWriteNothing) {
+        SetCommandLine({}, true);
+        StartManager();
+        UseDoubles();
+        ASSERT_TRUE(Play(Game().GetModel(), "e2e4"));
+        ASSERT_TRUE(Game().GetChoice().SetEngine("own").has_value());
+        ASSERT_TRUE(Game().GetChoice().SetMode("computer").has_value());
+        Game().Stop();
+
+        // The window still draws a few frames after Stop(): the opponent is gone (two people), which must not become the saved choice
+        ASSERT_TRUE(Play(Game().GetModel(), "e7e5"));
+        Frames(static_cast<int>(1.0 / kFrame) + 8);
+
+        const std::optional<ChessSaveState> saved = Saved();
+        ASSERT_TRUE(saved.has_value());
+        EXPECT_EQ(saved->moves, "e2e4");
+        EXPECT_EQ(saved->plays, "black");
+    }
+
     TEST_F(ChessSaveGameTest, AResetThenARestartGivesTheFreshGameAndKeepsTheChoice) {
         SetCommandLine({}, true);
         StartManager();

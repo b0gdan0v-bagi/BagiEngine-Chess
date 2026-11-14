@@ -59,9 +59,13 @@ namespace BECore::Chess {
         _analyst.Shutdown();  // nothing is analysed or rated until the evaluation or the ratings are switched on or a hint is asked for
         // Last: the game it restores goes into the fresh model and choice above, and the key it takes is that of the game it leaves
         _keeper.Start(_model, _opponent, _choice);
+        _stopped = false;
     }
 
     void ChessGame::UpdateKeeper() {
+        if (_stopped) {
+            return;  // frames that still run after Stop() must not save what Shutdown() did to the controller (two people)
+        }
         _keeper.Update(_model, _opponent, _choice);
     }
 
@@ -69,6 +73,7 @@ namespace BECore::Chess {
         // Components own their own subscriptions. The choice holds nothing but a reference to the controller and a color. The game is written first, while the opponent still holds what the person
         // picked (Shutdown() forgets it). The opponent goes now, before TaskManager::Shutdown(): a search nobody cancelled would hold the join of the pool
         _keeper.Flush(_model, _opponent, _choice);
+        _stopped = true;
         _opponent.Shutdown();
         _analyst.Shutdown();
     }
