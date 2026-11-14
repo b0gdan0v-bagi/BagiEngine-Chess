@@ -4,6 +4,8 @@
 
 `ChessGame` is an `IGame` (name `Chess`, scene `ChessScene`). Executable `BagiChess`. Infrastructure and how a game is registered: `engine/src/Modules/Games/CLAUDE.md`. Namespace `BECore::Chess`. The content is in `config/` (`ApplicationConfig.xml`, `SceneConfig.xml`, `TextureLibrary.xml`, `ChessSettings.xml`) and `assets/`. `BagiChess` starts in Game mode (`mode="Game"` in its `ApplicationConfig.xml`, no editor); set `mode="Editor"` to open it in the scene editor (a local edit only: `ChessWebConfigTest` fails with it). The game has a web target with the own engine only (CMake switch `CHESS_NO_STOCKFISH`, no control API, no editor there): see "The web build".
 
+Style is the engine's (`engine/CLAUDE.md`); use `BECore::Format`, not `fmt::` (`BagiChessFmtLayerCheck`).
+
 ## Layout
 
 ```
@@ -64,7 +66,7 @@ Standard chess, Chess960 excluded: legal moves only (pins, check, castling, en p
 - A finished game accepts no move. The window shows the end (red king, dimmed board, a result bar), the HUD says who won and why, and the reason goes to the log. A click on the board after the end, or the Reset button, starts a new game.
 - The magic bitboards are searched for on first use with a fixed seed, every candidate checked against the slow ray walk. If that becomes too slow, embed the found numbers as constants.
 
-New rule code goes into `Game/` with a gtest case; do not patch around the generator in the model or the components. Format through `BECore::Format`, not `fmt::` (a boundary: `//-NoStd: <why>`); `BagiChessFmtLayerCheck`.
+New rule code goes into `Game/` with a gtest case; do not patch around the generator in the model or the components.
 
 ## Tests
 
