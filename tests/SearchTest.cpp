@@ -29,7 +29,8 @@ namespace BECore::Chess::Tests {
         /// The nodes after which a search of the tests is stopped: a few polls of the clock, a few iterations of a middlegame
         constexpr uint64_t kNodeBudget = 4000;
         constexpr auto kCancelAfter = std::chrono::milliseconds(50);
-        /// The time a stopped search has to return in. The poll is a thousand nodes, a millisecond; the rest is the machine
+        /// The time a stopped search has to return in. The poll is a thousand nodes, a millisecond; the rest is the machine. Only the
+        /// DISABLED_StopLatencyYardstick uses it: a normal test never compares a duration to an upper bound (tests/CLAUDE.md)
         constexpr auto kStopBudget = std::chrono::milliseconds(1000);
 
         SearchResult SearchDepth(Position& position, int depth) {
@@ -973,12 +974,10 @@ namespace BECore::Chess::Tests {
             token.Cancel();
         });
 
-        const Clock::time_point start = Clock::now();
+        // A depth of 64 never ends: the call returning at all is the proof that the token stopped it
         const SearchResult result = Search(position, settings, control);
-        const Clock::duration elapsed = Clock::now() - start;
         canceller.join();
 
-        EXPECT_LT(elapsed, kCancelAfter + kStopBudget);
         EXPECT_TRUE(result.stopped);
         EXPECT_TRUE(result.complete);
         EXPECT_LT(result.depth, kDeepDepth);
@@ -991,15 +990,50 @@ namespace BECore::Chess::Tests {
         SearchSettings settings;
         settings.maxDepth = kDeepDepth;
         SearchControl control;
-        const Clock::time_point start = Clock::now();
-        control.deadline = start + kCancelAfter;
+        control.deadline = Clock::now() + kCancelAfter;
 
         const SearchResult result = Search(position, settings, control);
-        const Clock::duration elapsed = Clock::now() - start;
 
-        EXPECT_LT(elapsed, kCancelAfter + kStopBudget);
         EXPECT_TRUE(result.stopped);
         EXPECT_TRUE(IsLegalIn(position, result.best));
+    }
+
+    /// By hand, on a quiet machine: ChessTests --gtest_also_run_disabled_tests --gtest_filter=SearchTest.DISABLED_StopLatencyYardstick.
+    /// A stopped deep search returns within kStopBudget of the cancel and of the deadline (OwnEngineTest has the one of the engine and its Shutdown)
+    TEST(SearchTest, DISABLED_StopLatencyYardstick) {
+        {
+            Position position = PositionFromFen(kKiwipeteFen);
+            SearchSettings settings;
+            settings.maxDepth = kDeepDepth;
+            SearchControl control;
+            control.token = CancellationToken::Create();
+            std::thread canceller([token = control.token]() mutable {
+                std::this_thread::sleep_for(kCancelAfter);
+                token.Cancel();
+            });
+
+            const Clock::time_point start = Clock::now();
+            const SearchResult result = Search(position, settings, control);
+            const Clock::duration elapsed = Clock::now() - start;
+            canceller.join();
+
+            EXPECT_TRUE(result.stopped);
+            EXPECT_LT(elapsed, kCancelAfter + kStopBudget) << "a cancelled token";
+        }
+        {
+            Position position = PositionFromFen(kPosition6Fen);
+            SearchSettings settings;
+            settings.maxDepth = kDeepDepth;
+            SearchControl control;
+            const Clock::time_point start = Clock::now();
+            control.deadline = start + kCancelAfter;
+
+            const SearchResult result = Search(position, settings, control);
+            const Clock::duration elapsed = Clock::now() - start;
+
+            EXPECT_TRUE(result.stopped);
+            EXPECT_LT(elapsed, kCancelAfter + kStopBudget) << "a deadline";
+        }
     }
 
     TEST(SearchTest, ChecksThatCanGoOnForeverEndTheSearch) {
@@ -1008,8 +1042,7 @@ namespace BECore::Chess::Tests {
         SearchSettings settings;
         settings.maxDepth = 6;
         SearchControl control;
-        const Clock::time_point start = Clock::now();
-        control.deadline = start + std::chrono::seconds(10);
+        control.deadline = Clock::now() + std::chrono::seconds(30);  // the give-up of a broken search, never reached
 
         const SearchResult result = Search(position, settings, control);
 
