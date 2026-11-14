@@ -8,7 +8,6 @@ namespace BECore::Chess {
 
         constexpr StringView kWhitespace = " \t\r\n";
 
-        /// The path in the root element @p root without the white space around it; empty when the node, the attribute or the value is missing
         String ReadStockfishPath(const XmlNode& root) {
             if (!root) {
                 return {};
