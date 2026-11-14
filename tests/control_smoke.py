@@ -832,6 +832,36 @@ def press_in_the_panel(client: BagiControlClient, name: str, action: str, value:
     return client.call("ui_tree")
 
 
+def check_the_menu_list_is_hidden(tree: dict) -> None:
+    """The list of the menu is a hidden modal canvas (the start, and after Close)."""
+    menu = find_ui_canvas(tree, "MenuPanel")
+    check(menu["visible"] is False and menu["modal"] is True, f"the list of the menu should be hidden and modal: {menu}")
+
+
+def check_the_menu_list_is_shown(tree: dict) -> None:
+    """The list of the menu is shown and modal, and no section panel is shown beside it."""
+    menu = find_ui_canvas(tree, "MenuPanel")
+    check(menu["visible"] is True and menu["modal"] is True, f"the list of the menu should be shown and modal: {menu}")
+    check(find_ui_canvas(tree, "OpponentPanel")["visible"] is False, "a section panel is shown beside the list")
+
+
+def check_the_menu_buttons(tree: dict) -> None:
+    """The buttons of the list: one per section the build has (Opponent) and Close; no Resign, Puzzles or Editor button."""
+    names = []
+
+    def collect(element: dict) -> None:
+        if element.get("action"):
+            names.append(element["name"])
+        for child in element["children"]:
+            collect(child)
+
+    for element in find_ui_canvas(tree, "MenuPanel")["elements"]:
+        collect(element)
+    check(sorted(names) == ["MenuClose", "MenuSectionOpponent"], f"the buttons of the list: {names}")
+    found = find_ui_element({"canvases": [find_ui_canvas(tree, "MenuPanel")]}, "MenuSectionOpponent")
+    check(found["text"] == "Opponent" and found["action"] == "ChessOpenSection" and found["value"] == "opponent", f"the Opponent button of the list: {found}")
+
+
 def check_selected(tree: dict, selected: list, unselected: list) -> None:
     """The segments of the panel that the variables name, and those they do not."""
     for name in selected:
@@ -865,7 +895,23 @@ def run_opponent_panel_scenario(client: BagiControlClient, headless: bool) -> No
     menu_button = find_ui_element({"canvases": [canvas for canvas in tree["canvases"] if canvas["node"] == "Hud"]}, "Menu")
     check(menu_button is not None and menu_button["text"] == "Menu" and menu_button["action"] == "ChessOpenMenu", f"the Menu button: {menu_button}")
 
-    # The HUD button opens the list of the menu and the Opponent button of the list opens the panel, which shows what the game has: two people, White, Stockfish (the own engine in a build without Stockfish, which hides the
+    check_the_menu_list_is_hidden(tree)
+
+    # The HUD button opens the list of the menu and only it; the list has the sections of the build and Close, no feature that does not exist
+    tree = press_in_the_panel(client, "Menu", "ChessOpenMenu", "")
+    check_the_menu_list_is_shown(tree)
+    check_the_menu_buttons(tree)
+
+    # Back and Close: the Opponent button hides the list and opens the panel, Back returns to the list, Close of the list hides it
+    tree = press_in_the_panel(client, "MenuSectionOpponent", "ChessOpenSection", "opponent")
+    check(find_ui_canvas(tree, "OpponentPanel")["visible"] is True and find_ui_canvas(tree, "MenuPanel")["visible"] is False, "the Opponent button did not swap the list for the panel")
+    tree = press_in_the_panel(client, "OpponentBack", "ChessOpenMenu", "")
+    check_the_menu_list_is_shown(tree)
+    tree = press_in_the_panel(client, "MenuClose", "ChessCloseMenu", "")
+    check_the_menu_list_is_hidden(tree)
+    check(find_ui_canvas(tree, "OpponentPanel")["visible"] is False, "Close of the list opened the panel")
+
+    # Again to the panel, which shows what the game has: two people, White, Stockfish (the own engine in a build without Stockfish, which hides the
     # Stockfish segment so that Own engine fills the group), medium
     stockfish = default_engine(client) == "stockfish"
     press_in_the_panel(client, "Menu", "ChessOpenMenu", "")
