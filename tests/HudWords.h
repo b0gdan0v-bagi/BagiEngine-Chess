@@ -1,7 +1,5 @@
 #pragma once
 
-#include "ChessTestUtil.h"
-
 #include <BECore/GameManager/CoreManager.h>
 #include <Chess/Engine/OpponentText.h>
 #include <Chess/Game/ChessGameModel.h>
@@ -9,6 +7,7 @@
 #include <Chess/Game/StatusText.h>
 #include <EASTL/algorithm.h>
 #include <gtest/gtest.h>
+#include <tests/ChessTestUtil.h>
 
 /// Every word the HUD of Chess can show, taken from the code that makes them (StatusText, OpponentText and its tables), never typed again here: a new word, level or kind
 /// of error reaches the tests of the layout by itself. The font is proportional, so the longest word by characters is not always the widest: the layout tests walk all of them

@@ -1,8 +1,7 @@
-#include "ChessTestUtil.h"
-
 #include <Chess/Game/ChessGameModel.h>
 #include <Chess/Game/MoveGenerator.h>
 #include <Chess/Game/StatusText.h>
+#include <tests/ChessTestUtil.h>
 
 /// The words of the HUD: pure, they read a model and make text
 namespace BECore::Chess::Tests {

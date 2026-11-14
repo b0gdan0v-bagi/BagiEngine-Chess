@@ -1,6 +1,3 @@
-#include "ChessTestUtil.h"
-#include "TestEngines.h"
-
 #include <BECore/Animation/Easing.h>
 #include <BECore/Animation/Lerp.h>
 #include <BECore/GameManager/CoreManager.h>
@@ -20,6 +17,8 @@
 #include <Common/RecordingRenderer.h>
 #include <CoreSDL/SDLEvents.h>
 #include <Games/GameManager.h>
+#include <tests/ChessTestUtil.h>
+#include <tests/TestEngines.h>
 
 /**
  * The slide of a piece to its new square (ChessPieceComponent) on the shipped scene, with a clock the test drives: a frame is what OnGameCycle does, the time

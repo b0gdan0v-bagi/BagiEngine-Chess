@@ -1,8 +1,7 @@
-#include "TestEngines.h"
-
 #include <Chess/Engine/OpponentChoice.h>
 #include <Chess/Game/ChessGameModel.h>
 #include <Common/EngineEnvironment.h>
+#include <tests/TestEngines.h>
 
 /// OpponentChoice over a real OpponentController and a CountingFactory (no process, no search is ever waited for): the person's view of the opponent (mode, color, engine, level
 /// by id) against the program's view of it (the color it plays), the color that is remembered while nobody plays, and the ids that are refused

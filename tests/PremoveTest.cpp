@@ -1,6 +1,5 @@
-#include "ChessTestUtil.h"
-
 #include <Chess/Game/Premove.h>
+#include <tests/ChessTestUtil.h>
 
 /// The premove board and its targets: the geometry of a premove (own pieces block, the opponent's never, no check, no pins) and the board after queued premoves. Pure, nothing to start
 namespace BECore::Chess::Tests {

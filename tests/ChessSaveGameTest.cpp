@@ -1,5 +1,3 @@
-#include "TestEngines.h"
-
 #include <BECore/Control/Json.h>
 #include <BECore/GameManager/CoreManager.h>
 #include <BECore/Reflection/XmlDeserializer.h>
@@ -18,6 +16,7 @@
 #include <Common/TempPath.h>
 #include <Games/GameManager.h>
 #include <iterator>
+#include <tests/TestEngines.h>
 
 /**
  * ChessGame with its keeper, on the real GameManager and the shipped scene: what a start restores and what a stop and the frames write. The run's command line decides whether the game

@@ -1,6 +1,5 @@
-#include "ChessTestUtil.h"
-
 #include <Chess/Game/BoardOrientation.h>
+#include <tests/ChessTestUtil.h>
 
 /// Where a square is drawn for each orientation: pure maths, nothing to start
 namespace BECore::Chess::Tests {

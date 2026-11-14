@@ -1,11 +1,10 @@
-#include "TestEngines.h"
-
 #include <Chess/Engine/MoveRater.h>
 #include <Chess/Engine/OwnEngine.h>
 #include <Chess/Engine/PositionAnalyst.h>
 #include <Chess/Game/ChessGameModel.h>
 #include <Chess/Game/MoveGenerator.h>
 #include <Common/EngineEnvironment.h>
+#include <tests/TestEngines.h>
 
 /// MoveRater with the real TaskManager and engines made in the test (no process), then the real OwnEngine at depth 5 on positions found by running it. Every wait polls a condition with a time
 /// limit; none is a fixed sleep

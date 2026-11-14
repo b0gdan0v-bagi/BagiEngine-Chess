@@ -1,7 +1,3 @@
-#include "FakeEngineUtil.h"
-#include "GamePlay.h"
-#include "StockfishUtil.h"
-
 #include <Chess/Engine/OpponentChoice.h>
 #include <Chess/Engine/OpponentController.h>
 #include <Chess/Engine/OpponentLevels.h>
@@ -12,6 +8,9 @@
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <tests/FakeEngineUtil.h>
+#include <tests/GamePlay.h>
+#include <tests/StockfishUtil.h>
 
 #if !defined(_WIN32)
 #include <cerrno>

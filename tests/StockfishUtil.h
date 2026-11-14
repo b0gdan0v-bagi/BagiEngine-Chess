@@ -1,9 +1,8 @@
 #pragma once
 
-#include "TestEngines.h"
-
 #include <Chess/Engine/UciEngine.h>
 #include <gtest/gtest.h>
+#include <tests/TestEngines.h>
 
 // A test against a real Stockfish begins with this: it declares `path` (the Stockfish executable) or skips the test
 #define SKIP_WITHOUT_STOCKFISH(path)                                                                                                                                                                   \

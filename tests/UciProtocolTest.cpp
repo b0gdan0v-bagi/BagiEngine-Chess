@@ -1,8 +1,7 @@
-#include "ChessTestUtil.h"
-
 #include <Chess/Engine/UciProtocol.h>
 #include <Chess/Game/ChessGameModel.h>
 #include <Chess/Game/MoveGenerator.h>
+#include <tests/ChessTestUtil.h>
 
 /// The UCI text: pure, the commands we send and the lines we read (bestmove, info). The texts are those of position_command in tools/stockfish_bridge.py
 namespace BECore::Chess::Tests {

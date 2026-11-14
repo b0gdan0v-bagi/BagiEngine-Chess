@@ -1,5 +1,3 @@
-#include "ChessTestUtil.h"
-
 #include <Chess/Engine/EngineOpponent.h>
 #include <Chess/Engine/OwnEngine.h>
 #include <Chess/Engine/Search.h>
@@ -10,6 +8,7 @@
 #include <TaskSystem/TaskManager.h>
 #include <iomanip>
 #include <iostream>
+#include <tests/ChessTestUtil.h>
 #include <thread>
 #include <vector>
 

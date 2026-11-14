@@ -1,6 +1,5 @@
-#include "ChessTestUtil.h"
-
 #include <Chess/Engine/TranspositionTable.h>
+#include <tests/ChessTestUtil.h>
 
 /// The transposition table: a pure container over a key, nothing to start
 namespace BECore::Chess::Tests {

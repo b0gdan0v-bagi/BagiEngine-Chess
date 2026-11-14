@@ -1,6 +1,3 @@
-#include "ChessTestUtil.h"
-#include "FakeEngineUtil.h"
-
 #include <Chess/Engine/EngineOpponent.h>
 #include <Chess/Engine/OwnEngine.h>
 #include <Chess/Engine/UciEngine.h>
@@ -8,6 +5,8 @@
 #include <Chess/Game/MoveGenerator.h>
 #include <Common/EngineEnvironment.h>
 #include <chrono>
+#include <tests/ChessTestUtil.h>
+#include <tests/FakeEngineUtil.h>
 #include <thread>
 
 /// EngineOpponent with the real TaskManager: against the fake UCI engine (a child process, tests/fake_uci_engine.py) for the whole way from a click to a move, and

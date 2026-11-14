@@ -1,12 +1,11 @@
 #include "UciServer.h"
 
-#include "UciClock.h"
-
 #include <Chess/Engine/BlunderEngine.h>
 #include <Chess/Engine/OpponentLevels.h>
 #include <Chess/Engine/Search.h>
 #include <Chess/Game/MoveGenerator.h>
 #include <Chess/Game/Position.h>
+#include <Chess/Uci/UciClock.h>
 
 namespace BECore::Chess::Uci {
 

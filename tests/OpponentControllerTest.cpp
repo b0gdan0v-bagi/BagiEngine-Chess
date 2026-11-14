@@ -1,13 +1,12 @@
-#include "ChessTestUtil.h"
-#include "FakeEngineUtil.h"
-#include "TestEngines.h"
-
 #include <Chess/Engine/OpponentController.h>
 #include <Chess/Engine/OwnEngine.h>
 #include <Chess/Engine/UciEngine.h>
 #include <Chess/Game/ChessGameModel.h>
 #include <Common/EngineEnvironment.h>
 #include <chrono>
+#include <tests/ChessTestUtil.h>
+#include <tests/FakeEngineUtil.h>
+#include <tests/TestEngines.h>
 
 /// OpponentController with the real TaskManager and engines made in the test (no process): the choice of side and level, the error rule, the click-free
 /// life of the opponent. The default factory is tried against a missing file and against the fake UCI engine (a child process) behind a wrapper script.

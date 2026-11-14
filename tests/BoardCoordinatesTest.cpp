@@ -1,6 +1,5 @@
-#include "ChessTestUtil.h"
-
 #include <Chess/Game/BoardCoordinates.h>
+#include <tests/ChessTestUtil.h>
 
 /// What is written at the edge of a drawn cell, for each orientation: pure maths, nothing to start
 namespace BECore::Chess::Tests {

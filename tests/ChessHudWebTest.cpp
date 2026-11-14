@@ -1,5 +1,3 @@
-#include "HudWords.h"
-
 #include <BECore/GameManager/CoreManager.h>
 #include <BECore/Reflection/XmlDeserializer.h>
 #include <BECore/UI/UICanvasComponent.h>
@@ -14,6 +12,7 @@
 #include <Common/UITreeCompare.h>
 #include <gtest/gtest.h>
 #include <memory>
+#include <tests/HudWords.h>
 
 namespace BECore::Tests {
 

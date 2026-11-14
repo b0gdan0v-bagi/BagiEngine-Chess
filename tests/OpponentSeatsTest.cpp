@@ -1,10 +1,9 @@
-#include "TestEngines.h"
-
 #include <Chess/Engine/OpponentChoice.h>
 #include <Chess/Engine/OpponentController.h>
 #include <Chess/Game/ChessGameModel.h>
 #include <Common/EngineEnvironment.h>
 #include <chrono>
+#include <tests/TestEngines.h>
 
 /// The two seats of OpponentController: a program on both sides, a choice per seat, the pick as a whole (ChooseSeats), the single-seat API as a wrapper over it, and the
 /// OpponentChoice of the person next to two programs. Real TaskManager, engines made in the test (no process); every wait polls a condition with a time limit

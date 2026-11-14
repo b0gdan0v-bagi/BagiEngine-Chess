@@ -1,6 +1,5 @@
-#include "ChessTestUtil.h"
-
 #include <Chess/Uci/UciClock.h>
+#include <tests/ChessTestUtil.h>
 
 /// The time of one move from the clock of a `go`: pure integer arithmetic
 namespace BECore::Chess::Tests {

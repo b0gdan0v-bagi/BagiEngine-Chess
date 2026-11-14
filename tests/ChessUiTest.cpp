@@ -1,7 +1,3 @@
-#include "ChessTestUtil.h"
-#include "HudWords.h"
-#include "TestEngines.h"
-
 #include <BECore/Control/Json.h>
 #include <BECore/GameManager/CoreManager.h>
 #include <BECore/Reflection/XmlDeserializer.h>
@@ -41,6 +37,9 @@
 #include <Events/InputEvents.h>
 #include <Games/GameManager.h>
 #include <chrono>
+#include <tests/ChessTestUtil.h>
+#include <tests/HudWords.h>
+#include <tests/TestEngines.h>
 
 /**
  * The shipped scene of Chess with its HUD: the file is read from the source tree (a game's content is not mounted in the test environment), the game is started

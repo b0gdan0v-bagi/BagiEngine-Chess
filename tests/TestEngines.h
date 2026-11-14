@@ -1,13 +1,12 @@
 #pragma once
 
-#include "ChessTestUtil.h"
-
 #include <Chess/Engine/OpponentController.h>
 #include <Chess/Engine/PositionAnalyst.h>
 #include <Chess/Engine/SearchRequest.h>
 #include <Chess/Game/GameStatus.h>
 #include <Chess/Game/MoveGenerator.h>
 #include <chrono>
+#include <tests/ChessTestUtil.h>
 #include <thread>
 
 /// Engines made of a few lines, for the tests of the things that use an IChessEngine (the opponent controller, the game, the control adapter): no process, no Stockfish,

@@ -1,7 +1,6 @@
-#include "ChessTestUtil.h"
-
 #include <Chess/Engine/Evaluation.h>
 #include <Chess/Engine/MoveRating.h>
+#include <tests/ChessTestUtil.h>
 
 /// The rule that rates a played move against the analysis of the position before it: pure, no engine
 namespace BECore::Chess::Tests {

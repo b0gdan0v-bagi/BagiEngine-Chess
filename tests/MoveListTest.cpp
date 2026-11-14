@@ -1,8 +1,7 @@
-#include "ChessTestUtil.h"
-
 #include <Chess/Game/ChessGameModel.h>
 #include <Chess/Game/MoveGenerator.h>
 #include <Chess/Game/MoveList.h>
+#include <tests/ChessTestUtil.h>
 
 /**
  * BuildMoveList as a pure function: the numbers, White's and Black's move side by side, the ply of each move, the start from a FEN, and the list of a

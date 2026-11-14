@@ -1,9 +1,8 @@
-#include "ChessTestUtil.h"
-
 #include <Chess/Game/CapturedMaterial.h>
 #include <Chess/Game/ChessGameModel.h>
 #include <Chess/Game/MoveGenerator.h>
 #include <Common/Printers.h>
+#include <tests/ChessTestUtil.h>
 
 /// The material of a position: which pieces are gone, the points on the board and the lead. Pure, nothing to start
 namespace BECore::Chess::Tests {

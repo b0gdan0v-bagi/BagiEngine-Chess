@@ -1,11 +1,10 @@
-#include "ChessTestUtil.h"
-#include "FakeEngineUtil.h"
-#include "StockfishUtil.h"
-
 #include <Chess/Engine/Analysis.h>
 #include <Chess/Engine/SearchRequest.h>
 #include <Chess/Engine/UciEngine.h>
 #include <chrono>
+#include <tests/ChessTestUtil.h>
+#include <tests/FakeEngineUtil.h>
+#include <tests/StockfishUtil.h>
 #include <thread>
 
 #if !defined(_WIN32)

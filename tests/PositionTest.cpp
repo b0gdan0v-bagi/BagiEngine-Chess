@@ -1,4 +1,4 @@
-#include "ChessTestUtil.h"
+#include <tests/ChessTestUtil.h>
 
 namespace BECore::Chess::Tests {
 

@@ -1,5 +1,4 @@
 #include <Common/ContentFilesCheck.h>
-#include <filesystem>
 
 /**
  * The content files of the game (`config/SceneConfig.xml` and any node file) are at the engine's content version. An engine update

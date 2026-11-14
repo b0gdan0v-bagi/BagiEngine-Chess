@@ -1,7 +1,6 @@
-#include "ChessTestUtil.h"
-
 #include <Chess/Game/ChessGameModel.h>
 #include <Chess/Game/MoveGenerator.h>
+#include <tests/ChessTestUtil.h>
 
 /**
  * The match model: the click flow, moves, the end of the game and the piece handles the scene follows. It needs no engine
