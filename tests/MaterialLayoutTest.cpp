@@ -10,7 +10,7 @@ namespace BECore::Chess::Tests {
         constexpr float kViewHeight = 800.0f;
         constexpr float kNarrowestSafeLeft = 75.6f;  // a 480 px window with the side insets of a phone held sideways (9 % of the width, at the fit scale 0.571)
         constexpr float kBeyond = 0.01f;
-        constexpr float kBoardLeft = 100.0f;  // where the margin ends
+        constexpr float kBoardLeft = 100.0f;
 
         bool FitsIn(float left, float top, float right, float bottom) {
             return MaterialListFits(left, top, right, bottom);
@@ -32,7 +32,6 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(MaterialLayoutTest, TheEdgesOfTheBoxAreInsideAndOneStepBeyondEachEdgeIsNot) {
-        // exactly the box
         EXPECT_TRUE(FitsIn(kMaterialListLeft, kMaterialListTop, kMaterialListRight, kMaterialListBottom));
         // each edge of the safe area a little inside the box: the box leaves it
         EXPECT_FALSE(FitsIn(kMaterialListLeft + kBeyond, kMaterialListTop, kMaterialListRight, kMaterialListBottom));

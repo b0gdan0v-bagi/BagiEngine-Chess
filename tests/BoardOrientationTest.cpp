@@ -8,7 +8,7 @@ namespace BECore::Chess::Tests {
 
         constexpr PieceColor kWhite = PieceColor::White;
         constexpr PieceColor kBlack = PieceColor::Black;
-        constexpr int kBoardSize = 8;  // files and ranks
+        constexpr int kBoardSize = 8;
 
         BoardCell Cell(const char* name, PieceColor bottom) {
             return CellOf(Sq(name), bottom);
