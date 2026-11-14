@@ -66,6 +66,11 @@ class CppScannerTest(unittest.TestCase):
         self.assertEqual(texts("int a; // c " + BACKSLASH * 2 + "\nint hidden;\nint b;"), expected)
         self.assertEqual(texts("int a; // c " + BACKSLASH + "\n\nint b;"), expected)
 
+    def test_a_backslash_then_spaces_then_a_newline_ends_the_comment(self):
+        # the safe side: the next line is code to the check, so a change in it is seen even where a compiler would splice it into the comment
+        self.assertEqual(texts("int a; // c " + BACKSLASH + "  \nint seen;\n"), ["int", "a", ";", "int", "seen", ";"])
+        self.assertIsNotNone(first_cpp_difference("// c " + BACKSLASH + " \nint a;\n", "// c " + BACKSLASH + " \nint b;\n"))
+
     def test_a_backslash_in_the_middle_of_a_line_comment_ends_nothing(self):
         self.assertEqual(texts("int a; // c " + BACKSLASH + "n d\nint b;"), ["int", "a", ";", "int", "b", ";"])
 
@@ -130,6 +135,22 @@ class CppDifferenceTest(unittest.TestCase):
     def test_a_trailing_marker_has_no_gap(self):
         self.assertIsNone(first_cpp_difference("int a; // NOLINT\n// c\nint b;\n", "int a; // NOLINT\nint b;\n"))
         self.assertIsNone(first_cpp_difference("f(); //-NoStd: why\n\nint b;\n", "f(); //-NoStd: why\nint b;\n"))
+
+    def test_a_lone_marker_that_becomes_a_trailing_one_fails_without_a_crash(self):
+        found = first_cpp_difference("int a;\n// NOLINTNEXTLINE\nf();\n", "int a; // NOLINTNEXTLINE\nf();\n")
+        self.assertIsNotNone(found)
+        self.assertIn("no longer alone", found[1])
+
+    def test_a_trailing_marker_that_becomes_a_lone_one_fails_without_a_crash(self):
+        found = first_cpp_difference("int a; // NOLINTNEXTLINE\nf();\n", "int a;\n// NOLINTNEXTLINE\nf();\n")
+        self.assertIsNotNone(found)
+        self.assertIn("is alone on its line", found[1])
+
+    def test_the_code_after_a_lone_marker_removed_fails_without_a_crash(self):
+        found = first_cpp_difference("int a;\n// NOLINTNEXTLINE\nint b;\n", "int a;\n// NOLINTNEXTLINE\n")
+        self.assertIsNotNone(found)
+        self.assertEqual(found[0], 2)
+        self.assertIn("no longer alone", found[1])
 
     def test_a_marker_at_the_end_of_the_file_has_no_gap(self):
         self.assertIsNone(first_cpp_difference("int a;\n// NOLINTNEXTLINE\n", "int a;\n// NOLINTNEXTLINE\n\n"))
@@ -242,6 +263,16 @@ class CommandTest(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("src/a.cpp:2:", out)
         self.assertIn("the code moved from its marker", out)
+
+    def test_the_code_after_a_lone_marker_removed_fails_with_a_message_not_a_traceback(self):
+        self.write("src/a.cpp", "int a;\n// NOLINTNEXTLINE(x)\nint b = 1;\n")
+        self.git("commit", "-q", "-am", "marker")
+        self.base = self.git("rev-parse", "HEAD").strip()
+        self.write("src/a.cpp", "int a;\n// NOLINTNEXTLINE(x)\n")
+        code, out, _ = self.run_check()
+        self.assertEqual(code, 1)
+        self.assertIn("src/a.cpp:2:", out)
+        self.assertIn("the marker `// NOLINTNEXTLINE(x)`", out)
 
     def test_other_files_are_not_compared(self):
         self.write("notes.md", "two\n")

@@ -41,6 +41,9 @@ MARKER = re.compile(r"^//-NoStd:|NOLINT|clang-format\s+(?:off|on)\b")
 NEXT_LINE_MARKER = re.compile(r"^//-NoStd:|NOLINTNEXTLINE")
 GAP = re.compile(r" \[\+(\d+)\]$")
 
+# A line comment goes on past a newline only when a backslash comes right before it. A backslash, spaces and a newline (which GCC
+# and Clang splice with a warning) end the comment here, so the next line is read as code: the check can fail on a line the
+# compiler hides, never pass a line it sees. Keep such a line out of the files under the check.
 # One alternative per kind, leftmost wins (the same shape as `mask` of engine/CI/scripts/nostd.py, which blanks instead of
 # splitting). A raw string comes before a plain one, and both before an identifier, so that `u8"x"` and `R"x(..)x"` are
 # literals; a number is consumed whole so that the `'` of `1'000` is no character literal.
@@ -123,10 +126,15 @@ def first_cpp_difference(old: str, new: str) -> tuple[int, str] | None:
         if old_tokens[index].text != new_tokens[index].text:
             old_text, new_text = old_tokens[index].text, new_tokens[index].text
             if GAP.sub("", old_text) == GAP.sub("", new_text):
-                return new_tokens[index].line, (
-                    f"the code moved from its marker `{GAP.sub('', new_text)}` "
-                    f"(the next token is {GAP.search(new_text).group(1)} lines below it, was {GAP.search(old_text).group(1)})"
-                )
+                marker = GAP.sub("", new_text)
+                old_gap, new_gap = GAP.search(old_text), GAP.search(new_text)
+                if old_gap and new_gap:
+                    return new_tokens[index].line, (
+                        f"the code moved from its marker `{marker}` (the next token is {new_gap.group(1)} lines below it, was {old_gap.group(1)})"
+                    )
+                # Only one side has a gap: the marker is alone on its line with code after it in one text and not in the other
+                what = "is no longer alone on its line with code after it" if old_gap else "is alone on its line with code after it now"
+                return new_tokens[index].line, f"the marker `{marker}` {what}"
             return new_tokens[index].line, f"{describe(new_text)} instead of {describe(old_text)}"
     if len(new_tokens) > len(old_tokens):
         extra = new_tokens[len(old_tokens)]
