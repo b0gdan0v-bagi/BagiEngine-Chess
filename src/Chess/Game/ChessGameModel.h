@@ -13,29 +13,24 @@ namespace BECore::Chess {
     CORE_ENUM(MoveError, uint8_t, GameOver, IllegalMove)
 
     /**
-     * @brief Stateful match wrapper around Position + MoveGenerator.
-     *
-     * Owns the position, the selected square (the "from" half of a pending move, set by OnSquareClicked() in response to
-     * the user clicking a square), the status of the game and the moves played since it began. Every move goes through
-     * TryMove(): it is checked against the legal moves, applied, and the status is worked out again (EvaluateStatus()).
-     * Once the status is not Ongoing no move is accepted until Reset() or SetPosition().
+     * @brief Stateful match wrapper around Position + MoveGenerator: the position, the selection, the status and the moves
+     * played since the game began. Every move goes through TryMove(); once the status is not Ongoing no move is accepted
+     * until Reset() or SetPosition().
      *
      * GetVersion() grows with every change a controller has to see (a new game, a position set from outside, a played
-     * move, a takeback) and never goes back; selecting a piece does not move it. A click on the last rank does not move the pawn either:
-     * it leaves a promotion pending (HasPendingPromotion()) until the person names the piece (ChoosePromotion()) or drops it
-     * (CancelPromotion()); a pending promotion is not a change of the game, so the version stays.
+     * move, a takeback) and never goes back. A selection, a pending promotion (a click on the last rank leaves it pending
+     * until ChoosePromotion() or CancelPromotion()) and the premove queue are no change of the game: they leave the
+     * version alone, so a search in flight stays valid. The move PlayPremove() plays moves it, as any move.
      *
-     * It also holds the **premoves**: a queue of moves the person made while the program had the move (OnPremoveClicked()),
-     * played one per answer of the program (PlayPremove()). Like a selection, a queue is no change of the game: no call that
-     * only touches it moves the version, so a search in flight stays valid (the move PlayPremove() plays moves it, as any
-     * move). A queue is dropped by a new game (Reset(), SetPosition()), a takeback, the end of the game and a move of the
-     * premoving color that did not come from it, and, in PlayPremove(), whole when its front is not legal in its turn. A
-     * premoved promotion plays as a queen. Who may premove is for the owner of the opponent to decide; the model only keeps the queue.
+     * The premove queue holds the moves the person made while the program had the move (OnPremoveClicked()), played one per
+     * answer of the program (PlayPremove()). It is dropped by a new game (Reset(), SetPosition()), a takeback, the end of
+     * the game and a move of the premoving color that did not come from it, and, in PlayPremove(), whole when its front is
+     * not legal in its turn. A premoved promotion plays as a queen. Who may premove is for the owner of the opponent to
+     * decide; the model only keeps the queue.
      *
-     * Also tracks visual-piece identities through opaque handles so the scene layer can render moves and captures
-     * without re-deriving identity from piece type/color. Each handle is bound at registration time to its starting
-     * square; Reset() sends every handle back to that square. A handle follows its piece through captures, castling,
-     * en passant and promotion (it then reports the promoted type).
+     * Visual pieces are tracked through opaque handles, so the scene can render moves and captures without re-deriving
+     * identity from piece type and color. A handle is bound at registration to its starting square and follows its piece
+     * through captures, castling, en passant and promotion (it then reports the promoted type); Reset() sends it back.
      */
     class ChessGameModel {
     public:
@@ -44,8 +39,7 @@ namespace BECore::Chess {
 
         ChessGameModel();
 
-        /// Restart from the standard opening position; restores all registered
-        /// handles to their start squares; clears selection.
+        /// Restart from the standard opening position.
         void Reset();
 
         /**
@@ -53,13 +47,11 @@ namespace BECore::Chess {
          *
          * Pass a position that came from Position::FromFen(), so that it carries no history. The registered handles are
          * dealt out again: for each color, in the order of their start squares, to the pieces of that color in the order of
-         * the squares; a handle that finds no piece leaves the board. FromFen() allows 16 pieces per color at most, which
-         * is how many handles a color has in the scene. The status is worked out for the new position (a position that is
-         * already mated, stalemated or drawn starts as a finished game); selection is cleared.
+         * the squares; a handle that finds no piece leaves the board (FromFen() allows 16 pieces per color, as many handles
+         * as the scene has). A position already mated, stalemated or drawn starts as a finished game.
          */
         void SetPosition(const Position& position);
 
-        /// Whose turn it is to move.
         [[nodiscard]] PieceColor GetTurn() const noexcept {
             return _position.SideToMove();
         }
@@ -71,7 +63,6 @@ namespace BECore::Chess {
         [[nodiscard]] const String& GetStartFen() const noexcept {
             return _startFen;
         }
-        /// The moves played since the game began, in order.
         [[nodiscard]] const Vector<Move>& GetMoves() const noexcept {
             return _moves;
         }
@@ -110,17 +101,17 @@ namespace BECore::Chess {
             return _legalTargets;
         }
 
-        /// Helper for tests / UI: legal target squares for the piece on an arbitrary square.
+        /// Legal target squares of the piece on any square, not only the selected one.
         [[nodiscard]] Vector<Square> GetLegalMovesFor(Square from) const;
 
-        /// Drops the selection and its legal targets and any pending promotion, for an owner that takes over the turn (the computer opponent); the version does not move.
+        /// Drops the selection and a pending promotion, for an owner that takes over the turn (the computer opponent); the premove queue stays.
         void ClearSelection();
 
-        /// The queued premoves, the next to play first
+        /// The next to play first
         [[nodiscard]] const Vector<Premove>& GetPremoves() const noexcept {
             return _premoves;
         }
-        /// The color that premoves (the person's); empty while the queue is empty
+        /// The person's color; empty while the queue is empty
         [[nodiscard]] Optional<PieceColor> GetPremoveColor() const noexcept {
             return _premoveColor;
         }
@@ -128,11 +119,9 @@ namespace BECore::Chess {
         /**
          * @brief Click handler of a premove, for @p premover while the OTHER side has the move (the program thinks).
          *
-         * On the premove board (the position with the queued premoves lifted over it, `PremoveBoard`): no selection and an
-         * own piece -> select it (GetSelected() and GetLegalMoves() hold its premove targets); a selection and one of its
-         * targets -> the premove is queued and the selection ends; a selection and another own piece -> select that one;
-         * **any other click drops the whole queue** (and the selection). The length of the queue has no cap. Nothing here
-         * moves the version, and ClearSelection() leaves the queue alone.
+         * Works on the premove board (the position with the queued premoves lifted over it): an own piece is selected
+         * (GetLegalMoves() holds its premove targets), one of its targets queues the premove, **any other click drops the
+         * whole queue** and the selection. The queue has no cap.
          *
          * @return true when a premove was queued; false, and nothing done, when the game is over, @p s is outside the board
          * or @p premover is the side to move (that person plays with OnSquareClicked()).
@@ -142,9 +131,8 @@ namespace BECore::Chess {
         /**
          * @brief Plays the front premove when the premoving color is on the move.
          *
-         * The premove is found among the legal moves by `from` and `to` (the queen for a promotion; an en passant capture is
-         * found too) and played through the one place a move is applied, so the version moves as for any move. The rest of the
-         * queue stays for the next answer.
+         * The premove is found among the legal moves by `from` and `to` (the queen for a promotion) and played through
+         * ApplyMove(). The rest of the queue stays for the next answer.
          *
          * @return true when a move was played. False when the queue is empty or its color is not on the move yet (the queue
          * stays), and when no legal move matches the front: then **the whole queue is dropped** (a premove that has become
@@ -152,23 +140,22 @@ namespace BECore::Chess {
          */
         bool PlayPremove();
 
-        /// Drops the queue; the version does not move
+        /// Drops the queue
         void ClearPremoves();
 
         /**
          * @brief Takes back the last @p plies moves in one step (all there are when fewer).
          *
-         * The position goes back (its history of repetitions with it, so the threefold rule stays right), the status is worked
-         * out again (a finished game is on again), the selection and a pending promotion are dropped, and the piece handles
-         * stand where a game that played only the kept moves would have them (a captured piece is back, a promoted one is a
-         * pawn again). The version grows once, whatever the number of plies. The game goes back at most to its start: the
-         * opening position, or the one given to SetPosition() (GetStartFen() does not change).
+         * The position goes back (its history of repetitions with it, so the threefold rule stays right), a finished game is
+         * on again, the selection, a pending promotion and the premove queue are dropped, and the handles stand where a game
+         * that played only the kept moves would have them (a captured piece is back, a promoted one is a pawn again). The
+         * version grows once, whatever the number of plies. The game goes back at most to GetStartFen().
          *
          * @return how many moves were taken back; 0 (no moves, or @p plies is 0) changes nothing, the version included.
          */
         size_t TakeBack(size_t plies = 1);
 
-        /// A selected pawn was clicked onto its last rank and waits for the piece it becomes (ChoosePromotion()); nothing has moved
+        /// A pawn was clicked onto its last rank and waits for the piece it becomes (ChoosePromotion()); nothing has moved
         [[nodiscard]] bool HasPendingPromotion() const noexcept {
             return _hasPendingPromotion;
         }
@@ -189,18 +176,10 @@ namespace BECore::Chess {
         void CancelPromotion();
 
         /**
-         * @brief Click handler. Drives the two-step selection / move flow:
-         *
-         *   1. If no selection and `s` holds a piece of the side-to-move → select it.
-         *   2. If a selection exists and `s` is a legal target of that selection →
-         *      perform the move and switch turns. A pawn that reaches the last rank
-         *      does not move: the promotion is left pending (ChoosePromotion() plays it).
-         *   3. If a selection exists and `s` holds another own-color piece →
-         *      switch selection to it.
-         *   4. Otherwise → clear selection.
-         *
-         * While a promotion is pending any click on a square only drops it (the selection stays).
-         * Clicks are ignored once the game is over.
+         * @brief Click handler of the two-step select / move flow: a piece of the side to move is selected, a legal target of
+         * the selection plays the move, another own piece switches the selection, anything else clears it. A pawn that
+         * reaches the last rank does not move: the promotion is left pending. While one is pending any click only drops it
+         * (the selection stays). Clicks are ignored once the game is over.
          *
          * @return true if the board state changed (move executed).
          */
@@ -209,32 +188,30 @@ namespace BECore::Chess {
         /**
          * @brief Play @p move if it is legal for the side to move.
          *
-         * The one place a move is applied; it does not need a selection. Moves come from MoveGenerator (see
-         * MoveGenerator::ParseUci() for text input), which is the way to play a promotion to a piece other than a queen.
+         * Needs no selection. Moves come from MoveGenerator (MoveGenerator::ParseUci() for text input), which is the way to
+         * play a promotion to a piece other than a queen.
          *
          * @return nothing when the move has been played; GameOver once the game is finished, IllegalMove for any other move.
          */
         std::expected<void, MoveError> TryMove(Move move);
 
-        /// Register a visual identity that lives at @p startSquare of the opening position. Idempotent. Registering into a game
-        /// that has moved on or began from a set position puts the piece where that position has one (see SetPosition()).
+        /// Idempotent. Registering into a game that has moved on or began from a set position puts the piece where that
+        /// position has one (see SetPosition()).
         void RegisterPiece(PieceHandle handle, Square startSquare);
         void UnregisterPiece(PieceHandle handle);
 
-        /// Square currently occupied by @p handle, or {-1,-1} if captured / unknown.
+        /// {-1,-1} if captured / unknown.
         [[nodiscard]] Square GetSquareOf(PieceHandle handle) const;
 
-        /// What @p handle is right now (a promoted pawn reports its new type), or an empty piece if captured / unknown.
+        /// A promoted pawn reports its new type; an empty piece if captured / unknown.
         [[nodiscard]] Piece GetPieceOf(PieceHandle handle) const;
 
-        /// True if @p handle is on the board (registered and not captured).
         [[nodiscard]] bool IsActive(PieceHandle handle) const;
 
     private:
         /// The body of TryMove() and PlayPremove(): checks, applies and works out the status; a game that ends drops the premoves
         std::expected<void, MoveError> ApplyMove(Move move);
 
-        /// The real position with the queued premoves lifted over it
         [[nodiscard]] PremoveBoard MakePremoveBoard() const;
 
         struct PieceTrack {
@@ -252,7 +229,6 @@ namespace BECore::Chess {
 
         void BeginGame(const Position& position);
 
-        /// Sends every handle back to its start square, as the opening position has it
         void PlaceHandlesAtStart();
 
         /// Hands the pieces of @p position out to the registered handles; the handles left over go off the board

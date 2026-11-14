@@ -4,7 +4,7 @@
 
 namespace BECore::Chess {
 
-    /// Plies (half moves) without a capture or a pawn move after which a game is drawn: 50 moves by each side. Position::HalfmoveClock() counts them
+    /// The 50-move draw in plies, as Position::HalfmoveClock() counts them
     inline constexpr int kFiftyMovePlies = 100;
 
     /// How a game stands. Everything but Ongoing ends it.
@@ -13,10 +13,9 @@ namespace BECore::Chess {
     /**
      * @brief The status of a game in @p position, which the side to move is about to play.
      *
-     * Checked in this order: no legal move (checkmate if the king is attacked, otherwise stalemate), so a mate delivered on
-     * the last ply still counts; then dead position by insufficient material; then the third occurrence of the position and
-     * 50 moves by each side without a capture or a pawn move. FIDE makes a player claim those two (it ends a game by itself
-     * only at the fifth occurrence and 75 moves), but the window has no way to claim, so they end the game here.
+     * The order matters: no legal move comes first (checkmate if the king is attacked, otherwise stalemate), so a mate
+     * delivered on the last ply still counts over the 50-move draw. FIDE makes a player claim the repetition and the
+     * 50-move draw; the window has no way to claim, so they end the game here.
      */
     [[nodiscard]] GameStatus EvaluateStatus(const Position& position);
 
