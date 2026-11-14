@@ -12,10 +12,10 @@ play each other (`set_state` with `"plays": "both"` and a seat each), reads the 
 that a reset keeps both seats (and, on the manual clock, plays the same game again), that `"plays": "white"` is a takeover that leaves Black to the person, and that null ends it. The analysis ("analysis" scenarios, base ones too) switches the evaluation of the own engine on, reads it from White's view on a mate in one, asks for a hint and reads it, and
 leaves the game with the analyst running; it also switches the ratings of the moves on (the own engine, in the background), plays a short game, waits until every entry of
 `analysis.ratings` is set and checks its shape and the pinned reasons of the game, and, after a reset and a frame (so that the old ratings are dropped), plays the same game again for the same ratings. The opponent panel ("opponent panel" scenarios, base
-ones too) is driven only by `ui_click` on the buttons and segments found by name, as a person would: open it with the Menu button, pick the own engine,
-Computer, a level and a color, read the pick back from `get_state` and from `ui_tree`, play, close it with OK. The captured material ("captured material"
-scenarios, base ones too, no engine) reads `get_state.material` after a capture, after a position set from outside and after a reset, and, on the headless
-run, compares the left margin of a screenshot (the display of the captured pieces) before and after a capture and after the reset. Stockfish ("opponent" scenarios) is replaced by
+ones too) reads the tree by element name where the build decides (the Stockfish segment, what is selected at the start) and, by `ui_click` on the buttons as a person
+would, picks the own engine and Computer, plays, lets the program open as White and closes with OK; the clicks and their read-back are `tests/scenarios/opponent_panel.jsonl`.
+The captured material ("captured material" scenarios, base ones too, no engine) is a picture check: on the headless run it compares the left margin of a screenshot
+(the display of the captured pieces) before and after a capture and after the reset; the numbers of `get_state.material` are `tests/scenarios/captured_material.jsonl`. Stockfish ("opponent" scenarios) is replaced by
 tests/fake_uci_engine.py: main() writes a wrapper script that starts it into a temporary directory and puts the script in STOCKFISH of the environment,
 which the game inherits. STOCKFISH comes before PATH in the game's search for an engine and the committed config has no path, so a Stockfish installed on
 this machine is never used. A config/ChessSettings.local.xml (a person's own path, which would win over STOCKFISH) leaves the Stockfish scenarios out, as
@@ -24,6 +24,10 @@ recognised by the script itself, with no environment variable: the first get_sta
 need the fake Stockfish end at once, and the base scenario "without Stockfish" checks what that build does instead (the default engine is own, `stockfish` is `engine_unavailable`
 in `engine`, in a seat object and with a side, with the opponent unchanged, the panel has no visible Stockfish segment and Own engine is selected, and the own engine plays);
 in a build with Stockfish that scenario ends at once. Exit code: 0 passed, 1 failed, 77 skipped (the executable does not exist).
+
+What a recorded scenario can state moved out of this script into `tests/scenarios/*.jsonl` (ctest `BagiChessScenario.<file>`, the manual clock, played by the engine's
+bagi_play.py): the refusals, the mate and the game over, the reset, promotion, the captured material numbers and the clicks of the opponent panel. What stays here needs a wait
+for the program, a picture, the real clock or an answer that depends on the build; the real clock keeps the start position, the opening, the push and the screenshots.
 """
 
 import os

@@ -72,7 +72,7 @@ Beyond that, SDL, SDL_image, the Vulkan headers and the Vulkan loader library ar
    ctest --preset macos-debug
    ```
 
-   That is `ChessTests` (the gtest cases, each in its own process) `BagiChessControlSmoke`, a Python script that starts `BagiChess --control --headless` and plays it over the control API, and `BagiChessUciSmoke`, which starts `BagiChessUci` and talks UCI to it over pipes. A smoke test needs its built executable and is **skipped** (exit code 77) when it is missing, so build the default target as in step 5, or add `BagiChess` and `BagiChessUci` to a narrower `--target ChessTests BagiChess BagiChessUci`. Stockfish is not needed: the tests that use a real one skip themselves. To run them against yours:
+   That is `ChessTests` (the gtest cases, each in its own process) `BagiChessControlSmoke`, a Python script that starts `BagiChess --control --headless` and plays it over the control API, `BagiChessScenario.*`, the control sessions recorded in `tests/scenarios/` and played back on the manual clock, and `BagiChessUciSmoke`, which starts `BagiChessUci` and talks UCI to it over pipes. A smoke or scenario test needs its built executable and is **skipped** (exit code 77) when it is missing, so build the default target as in step 5, or add `BagiChess` and `BagiChessUci` to a narrower `--target ChessTests BagiChess BagiChessUci`. Stockfish is not needed: the tests that use a real one skip themselves. To run them against yours:
 
    ```bash
    build/macos-debug/bin/ChessTests --gtest_filter='Stockfish*:UciEngineStockfishTest*'   # STOCKFISH or PATH
@@ -207,7 +207,7 @@ The ladder (`OpponentLevels`, `ownDepth`) is retuned only by the owner, from num
 | `dev.json` | what the `bagi-dev` panel of VS Code and `engine/tools/dev/dev.py` build and run: the game, `BagiChessUci`, the tests and the browser page, and the tools (the Stockfish bridge, the match, the screenshots, format, the docs budget). The browser page has not been run with emsdk (see "Browser build") |
 | `config/`, `assets/` | scene, texture library, application config, piece atlas |
 | `cmake/` | `ChessWeb.cmake`: the files of the browser package (see "Browser build") |
-| `tests/` | gtest cases, `control_smoke.py`, `uci_smoke.py` and `match_smoke.py` |
+| `tests/` | gtest cases, `control_smoke.py`, the recorded control scenarios `scenarios/*.jsonl`, `uci_smoke.py` and `match_smoke.py` |
 | `tools/` | the Stockfish bridge and its pytest tests (`engine/.venv/bin/python -m pytest tools/tests`), the match tool `uci_match.py` (with `elo_rating.py` and `match_steps.py`) and its unit tests (`python3 -m unittest discover -s tools/tests -p "test_match_*.py"`), and `ui_shots.py`, the screenshot command (`python tools/ui_shots.py --list`) |
 | `.claude/rules/qa-project.md` | the screenshot set of the game (scenes, sizes) that the todo reviewer takes with `engine/tools/shots/shots.py`; the command is `tools/ui_shots.py` |
 | `todo/`, `TODO.md` | known problems, worked by the `todo-loop` skill (`todo/README.md`) |
