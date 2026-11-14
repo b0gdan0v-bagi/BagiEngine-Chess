@@ -19,6 +19,7 @@ for _ in $(seq $((2 * $(nproc)))); do python -c "while True: pass" & burners+=($
 for run in 1 2 3; do ctest --preset windows-clang-debug -E "Smoke|Scenario|ToolTests" -j8 --timeout 300 || break; done
 ```
 - After a threading change run `UciServerTest` with `--gtest_repeat=20`. The disabled yardsticks (`OwnEngineTest.DISABLED_*Yardstick`, `SearchTest.DISABLED_StopLatencyYardstick`, `OpponentControllerTest.DISABLED_StubbornChildShortGraceYardstick`, `OpponentOverFramesTest.DISABLED_FrameLengthYardstick`, `StockfishGameTest.DISABLED_*Yardstick` (the ladder and `Shutdown()` during a search; the latter is not compiled on Windows), `SearchSliceBenchmark.DISABLED_NodesPerSecond`, the last in **Release** on a quiet machine) are run by hand with `--gtest_also_run_disabled_tests --gtest_filter=...`; they keep the speed and deadline claims the normal tests dropped, and their numbers are an order, not a strength.
+- **Types:** tests use the engine's aliases like the sources. A `std::` type kept at a real boundary (a stream, nlohmann, gtest names) says `//-NoStd: <why>`; `codemod --family all --fail-on-change` checks it. A test thread keeps raw `std::thread` / `std::mutex`.
 
 ## The fake UCI engine
 
