@@ -28,8 +28,8 @@ namespace BECore::Chess {
 
     }  // namespace
 
-    /// The state of one FindMove() / Analyse(): the request's position and limits, the line being searched (a job) and the lines found. The one place for the
-    /// line loop, the deadlines, the retry and the checks of the answer: the one-call path is this object run to the end
+    /// The state of one FindMove() / Analyse(): the position and limits, the line being searched (a job) and the lines found. The one place for the line loop,
+    /// the deadlines, the retry and the checks of the answer
     struct OwnSearch::Impl {
         /// The position the request leads to, with the history of the game; every line's job searches a copy of it
         Position position;
@@ -53,8 +53,8 @@ namespace BECore::Chess {
         Impl(Position startPosition, MoveList legalMoves, const SearchLimits& searchLimits, std::chrono::steady_clock::time_point begun, const CancellationToken& cancelToken, size_t lines)
             : position(std::move(startPosition)), legal(std::move(legalMoves)), limits(searchLimits), start(begun), token(cancelToken), lineCount(lines) {}
 
-        /// Starts the search of line `excluded.size() + 1`: with the limits and the deadline of the line, or (@p retry) the first iteration alone, which no limit can stop.
-        /// There is no job running (the caller has reset the last one), so the new one never lives beside the old table
+        /// Starts the search of line `excluded.size() + 1` with the limits and the deadline of the line, or (@p retry) the first iteration alone, which no limit
+        /// can stop. The caller has reset the last job, so two tables never live at once
         void StartJob(bool retry) {
             SearchSettings settings;
             settings.maxDepth = retry ? 1 : MaxDepthOf(limits);
@@ -75,8 +75,8 @@ namespace BECore::Chess {
             result = std::unexpected(EngineError{kind, std::move(detail)});
         }
 
-        /// What the end of the job of a line does, the same for every line: Cancelled when the token is cancelled, the retry when no iteration finished, the check of the
-        /// move against the generator, then the line is kept and the next line's job starts, or the analysis is the answer
+        /// The end of a line's job: Cancelled when the token is cancelled, the retry when no iteration finished, the check of the move against the generator, then
+        /// the line is kept and the next job starts, or the analysis is the answer
         void OnJobDone() {
             const SearchResult found = job->GetResult();
             finishedNodes += found.nodes;
@@ -88,7 +88,7 @@ namespace BECore::Chess {
                     return;
                 }
                 if (!found.complete) {
-                    // The deadline had run out before the first node (a tiny move time on a busy machine): the answer is the first iteration, which has no limit
+                    // The deadline ran out before the first node: the answer is the first iteration, which has no limit
                     retrying = true;
                     StartJob(true);
                     return;
@@ -132,7 +132,7 @@ namespace BECore::Chess {
         if (token.IsCancelled()) {
             return Fail(EngineErrorKind::Cancelled, "cancelled before the search started");
         }
-        // A position with fewer legal moves than lines asked for gives as many lines as it has moves
+        // Fewer legal moves than lines asked for: as many lines as moves
         const size_t lineCount = eastl::min(static_cast<size_t>(lines), static_cast<size_t>(legal.size()));
         auto impl = MakeUnique<Impl>(std::move(*found), std::move(legal), request.limits, start, token, lineCount);
         impl->StartJob(false);
@@ -186,7 +186,7 @@ namespace BECore::Chess {
     }
 
     std::expected<OwnSearch, EngineError> OwnEngine::BeginFindMove(const SearchRequest& request, const CancellationToken& token) const {
-        // FindMove() gives one move whatever request.lines says (the request is validated with it all the same)
+        // One move whatever request.lines says (the request is validated with it all the same)
         return OwnSearch::Begin(request, token, 1);
     }
 
@@ -196,7 +196,7 @@ namespace BECore::Chess {
 
     namespace {
 
-        /// The answer of FindMove() from a finished search: the move of the first line, or the error of the search. The one place for the blocking and the async path
+        /// The answer of FindMove() from a finished search: the move of the first line, or the error; shared by the blocking and the async path
         std::expected<Move, EngineError> MoveOf(const OwnSearch& search) {
             auto answer = search.Result();
             if (!answer) {
@@ -225,8 +225,8 @@ namespace BECore::Chess {
         return search->Result();
     }
 
-    // The coroutines start the search with OwnSearch::Begin() and not through the members, so nothing reads `this` once the task runs: the engine may be gone by then.
-    // The yield goes before the work: a task started between two drains of the frame budget is "spent" and must give the frame back at once.
+    // The coroutines call OwnSearch::Begin() and not the members, so nothing reads `this` once the task runs: the engine may be gone by then.
+    // The yield goes before the work, so a task started between two drains of the frame budget gives the frame back at once.
     Task<std::expected<Move, EngineError>> OwnEngine::FindMoveAsync(SearchRequest request, CancellationToken token) {
         auto search = OwnSearch::Begin(request, token, 1);
         if (!search) {
