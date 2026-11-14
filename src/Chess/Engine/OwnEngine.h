@@ -10,8 +10,9 @@ namespace BECore::Chess {
      *
      * Made by OwnEngine::BeginFindMove() / BeginAnalyse(). A caller that must stay responsive (a coroutine on the single-thread web build) calls Advance() with
      * kSearchSliceNodes until IsDone(), giving the thread back between the calls, and then reads Result(); FindMove() and Analyse() are the same object run to the
-     * end in one call. It owns everything it needs (a copy of the position, the limits, the token, the jobs of the lines), so it may outlive the request it was
-     * made from. Moved, never copied; not thread safe: one thread drives it at a time, though not always the same one. The token may be cancelled from any thread.
+     * end in one call. It owns everything it needs (a copy of the position, the limits, the token, the jobs of the lines: one at a time, each with its own table,
+     * freed with its line), so it may outlive the request it was made from. Moved, never copied; not thread safe: one thread drives it at a time, though not always
+     * the same one. The token may be cancelled from any thread.
      */
     class OwnSearch {
     public:
@@ -25,8 +26,8 @@ namespace BECore::Chess {
          * @brief Runs the search for about @p maxNodes more nodes (SearchJob::Advance() says how exactly) and answers whether it is over.
          *
          * `Paused`: call again. `Done`: the answer or the error is ready in Result(); a call after that does nothing. UINT64_MAX runs to the end, 0 counts as 1.
-         * A cancelled token is looked at at the start of every call, so a cancel between two slices ends the search at once (error Cancelled). A slice goes on
-         * from one line of an analysis to the next; a line that ends exactly on the budget may leave the next one for the next call.
+         * A cancelled token is looked at at the start of every call, so a cancel between two slices ends the search at once (error Cancelled, no further node
+         * searched). A slice goes on from one line of an analysis to the next; a line that ends exactly on the budget may leave the next one for the next call.
          * **A move time is a wall-clock deadline counted from OwnEngine::BeginFindMove() / BeginAnalyse()**, so the time a caller spends elsewhere between two slices
          * counts against it (a search with a depth only is not affected).
          */
