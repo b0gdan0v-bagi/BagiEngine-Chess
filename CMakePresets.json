@@ -1,5 +1,29 @@
 {
     "version": 6,
     "cmakeMinimumRequired": { "major": 3, "minor": 31, "patch": 0 },
-    "include": ["engine/CMakePresets.json"]
+    "include": ["engine/CMakePresets.json"],
+    "configurePresets": [
+        {
+            "name": "windows-clang-profile-editor",
+            "displayName": "Windows Clang Ninja Profile with the editor (the ImGui Profiler panel)",
+            "description": "RelWithDebInfo with the engine profiler and its allocation tracking, asserts and expects off, and the editor panels; the Windows twin of the engine's macos-profile-editor. Configured and built through engine/CI/scripts/vs_env.py like windows-clang-debug",
+            "inherits": ["ninja", "host-windows", "vs-env", "clang", "no-module-scan", "editor", "profile"]
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "windows-clang-profile-editor",
+            "displayName": "Windows Clang Ninja Profile with the editor (the ImGui Profiler panel)",
+            "inherits": "build-windows",
+            "configurePreset": "windows-clang-profile-editor"
+        }
+    ],
+    "testPresets": [
+        {
+            "name": "windows-clang-profile-editor",
+            "displayName": "Windows Clang Ninja Profile with the editor (the ImGui Profiler panel)",
+            "inherits": "test-windows",
+            "configurePreset": "windows-clang-profile-editor"
+        }
+    ]
 }
