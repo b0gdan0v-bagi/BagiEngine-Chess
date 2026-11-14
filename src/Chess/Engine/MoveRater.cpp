@@ -71,7 +71,7 @@ namespace BECore::Chess {
     Task<void> MoveRater::RunSearch(SharedPtr<Search> search, SearchRequest request) {
         std::expected<Analysis, EngineError> answer = AnswerOfTask(co_await search->engine->AnalyseAsync(request, search->token));
         {
-            const std::lock_guard lock(search->mutex);
+            const LockGuard lock(search->mutex);
             search->answer = std::move(answer);
         }
         search->done.store(true, std::memory_order_release);
@@ -114,7 +114,7 @@ namespace BECore::Chess {
     void MoveRater::TakeAnswer() {
         std::expected<Analysis, EngineError> answer = std::unexpected(EngineError{});
         {
-            const std::lock_guard lock(_search->mutex);
+            const LockGuard lock(_search->mutex);
             answer = std::move(_search->answer);
         }
         const bool wanted = !_search->token.IsCancelled() && _searchGeneration == _generation;

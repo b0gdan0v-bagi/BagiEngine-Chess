@@ -191,7 +191,7 @@ namespace BECore::Chess {
 
             SharedPtr<IChessEngine> engine;
             CancellationToken token = CancellationToken::Create();
-            std::mutex mutex;  ///< guards `answer`
+            Mutex mutex{BE_LOCK_SITE("PositionAnalyst")};  ///< guards `answer`
             std::expected<Analysis, EngineError> answer = std::unexpected(EngineError{EngineErrorKind::NoMove, "the search has not finished"});
             std::atomic<bool> done{false};
         };

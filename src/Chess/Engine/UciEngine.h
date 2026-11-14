@@ -120,10 +120,10 @@ namespace BECore::Chess {
         void CloseProcess();
 
         UciEngineSettings _settings;
-        std::mutex _mutex;                  ///< held for the whole of FindMove() and Analyse(): everything below is touched under it only
-        UniquePtr<UciProcess> _process;     ///< null until the first search and after an error closed it
-        Optional<SearchRequest> _previous;  ///< the request the running process was last given; none for a process that has had no search
-        int _multiPv = kSingleLine;         ///< the `MultiPV` the running process has been told (1 for a new one, and again once it is closed)
+        Mutex _mutex{BE_LOCK_SITE("UciEngine")};  ///< held for the whole of FindMove() and Analyse(): everything below is touched under it only
+        UniquePtr<UciProcess> _process;           ///< null until the first search and after an error closed it
+        Optional<SearchRequest> _previous;        ///< the request the running process was last given; none for a process that has had no search
+        int _multiPv = kSingleLine;               ///< the `MultiPV` the running process has been told (1 for a new one, and again once it is closed)
     };
 
     /**

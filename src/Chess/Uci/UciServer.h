@@ -89,13 +89,13 @@ namespace BECore::Chess::Uci {
 
         SharedPtr<IChessEngine> _engine;
         Sink _sink;
-        std::mutex _sinkMutex;
+        Mutex _sinkMutex{BE_LOCK_SITE("UciServer sink")};
 
         SearchRequest _game;
         int _depth = 0;
         int _blunderPercent = 0;
 
-        std::thread _worker;
+        Thread _worker;
         CancellationToken _token;
         std::atomic<bool> _searching = false;
         std::atomic<bool> _quit = false;

@@ -156,7 +156,7 @@ namespace BECore::Chess {
     }
 
     std::expected<Move, EngineError> UciEngine::FindMove(const SearchRequest& request, const CancellationToken& token) {
-        const std::lock_guard lock(_mutex);
+        const LockGuard lock(_mutex);
         auto searched = RunSearch(request, kSingleLine, token);
         if (!searched) {
             return std::unexpected(std::move(searched.error()));
@@ -165,7 +165,7 @@ namespace BECore::Chess {
     }
 
     std::expected<Analysis, EngineError> UciEngine::Analyse(const SearchRequest& request, const CancellationToken& token) {
-        const std::lock_guard lock(_mutex);
+        const LockGuard lock(_mutex);
         auto searched = RunSearch(request, request.lines, token);
         if (!searched) {
             return std::unexpected(std::move(searched.error()));

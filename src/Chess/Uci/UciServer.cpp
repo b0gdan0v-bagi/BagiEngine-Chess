@@ -93,7 +93,7 @@ namespace BECore::Chess::Uci {
     }
 
     void UciServer::Say(StringView line) {
-        const std::lock_guard lock(_sinkMutex);
+        const LockGuard lock(_sinkMutex);
         _sink(line);
     }
 
@@ -259,7 +259,7 @@ namespace BECore::Chess::Uci {
 
         _token = job.token;
         _searching.store(true);
-        _worker = std::thread([this, job = std::move(job)]() { RunSearch(job); });
+        _worker = Thread("UciServer search", [this, job = std::move(job)]() { RunSearch(job); });
     }
 
     void UciServer::RunSearch(const SearchJob& job) {
