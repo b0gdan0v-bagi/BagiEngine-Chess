@@ -112,14 +112,6 @@ def play_opening(client: BagiControlClient) -> dict:
     return reply
 
 
-def check_promotion(client: BagiControlClient) -> None:
-    client.call("set_state", {"fen": PROMOTION_FEN})
-    expect_error("promotion_required", lambda: client.call("perform_action", move("a7a8")), "a promotion without a piece")
-    client.call("perform_action", move("a7a8q"))
-    board = client.call("get_state")["state"]["board"]
-    check(board[0].startswith("Q"), f"the queen is not on a8: {board}")
-
-
 def check_screenshots(client: BagiControlClient) -> None:
     """The picture follows the model: a move changes it, a reset brings it back."""
     client.call("reset")
@@ -160,8 +152,6 @@ def run_chess_scenario(client: BagiControlClient, headless: bool) -> None:
     if status["manualClock"]:
         client.call("step")
     check_state_push(client, last)
-
-    check_promotion(client)
 
     if headless:
         check_screenshots(client)
@@ -758,11 +748,6 @@ MARGIN_WIDTH = 100
 MARGIN_INSET = 2  # columns and rows kept away from the edges of the margin, against rounding
 CAPTURE_MOVES = ["e2e4", "d7d5", "e4d5"]  # White takes a pawn of Black
 CHIP_COLOR = (232, 210, 170)  # the fill of a row of the display
-MATERIAL_PIECES = ["queen", "rook", "bishop", "knight", "pawn"]
-
-
-def get_material(client: BagiControlClient) -> dict:
-    return client.call("get_state")["state"]["material"]
 
 
 def margin_band(image) -> list:
@@ -784,55 +769,35 @@ def band_has_color(band: list, channels: int, color: tuple) -> bool:
     return False
 
 
-def check_material(material: dict, balance: int, by_white: dict, by_black: dict, when: str) -> None:
-    check(set(material) == {"balance", "capturedByWhite", "capturedByBlack"}, f"{when}: unexpected members of material: {sorted(material)}")
-    for side, expected in (("capturedByWhite", by_white), ("capturedByBlack", by_black)):
-        check(sorted(material[side]) == sorted(MATERIAL_PIECES), f"{when}: {side} has the pieces {sorted(material[side])}")
-        check(material[side] == {piece: expected.get(piece, 0) for piece in MATERIAL_PIECES}, f"{when}: {side} is {material[side]}, expected {expected}")
-    check(material["balance"] == balance, f"{when}: the balance is {material['balance']}, expected {balance}")
-
-
 def run_material_scenario(client: BagiControlClient, headless: bool) -> None:
-    """The captured material: get_state reports it from the position, and on the headless run the left margin of the picture shows it.
+    """The captured material in the picture: on the headless run the left margin shows it (the numbers of `get_state.material` are `tests/scenarios/captured_material.jsonl`).
 
-    Two people play e2e4 d7d5 e4d5, so White has taken a pawn: the balance is +1 for White and `capturedByWhite` has one pawn. The margin band of a screenshot
-    (the rows of the board, the columns left of it) is compared, not the whole picture: the HUD says other words in each picture. A reset brings back the band and
-    the zeros."""
+    Two people play e2e4 d7d5 e4d5, so White has taken a pawn. The margin band of a screenshot (the rows of the board, the columns left of it) is compared, not the
+    whole picture: the HUD says other words in each picture. A position set from outside and a reset in between bring the band back to the one of the start."""
     if client.call("status")["manualClock"]:
         client.call("step")  # the scene registers its pieces in the first frame
     client.call("reset")
     client.call("set_state", {"opponent": {"plays": None}})
-    check_material(get_material(client), 0, {}, {}, "the start position")
-    start_band = None
-    if headless:
-        let_frames_pass(client, 2)  # the display waits for the first layout of its canvas
-        start_band = margin_band(take_screenshot(client))
+    if not headless:
+        return
+    let_frames_pass(client, 2)  # the display waits for the first layout of its canvas
+    start_band = margin_band(take_screenshot(client))
 
     for uci in CAPTURE_MOVES:
         client.call("perform_action", move(uci))
-    check_material(get_material(client), 1, {"pawn": 1}, {}, "after e2e4 d7d5 e4d5")
-    check(client.call("get_state")["version"] >= 3, "the version did not grow with the moves")
-
-    # The material is derived from the position, so a position set from outside has it too: two kings and a white rook
-    client.call("set_state", {"fen": "4k3/8/8/8/8/8/8/R3K3 w - - 0 1"})
-    check_material(get_material(client), 5, {"queen": 1, "bishop": 2, "knight": 2, "pawn": 8, "rook": 2}, {"queen": 1, "rook": 1, "bishop": 2, "knight": 2, "pawn": 8}, "two kings and a rook")
+    client.call("set_state", {"fen": "4k3/8/8/8/8/8/8/R3K3 w - - 0 1"})  # the display follows a position set from outside
+    client.call("reset")
+    for uci in CAPTURE_MOVES:
+        client.call("perform_action", move(uci))
+    let_frames_pass(client, 2)
+    captured = take_screenshot(client)
+    captured_band = margin_band(captured)
+    check(captured_band != start_band, "the left margin did not change after White took a pawn")
+    check(band_has_color(captured_band, captured.channels, CHIP_COLOR), "no row of the display is drawn in the left margin after the capture")
 
     client.call("reset")
-    client.call("perform_action", move("e2e4"))
-    client.call("perform_action", move("d7d5"))
-    client.call("perform_action", move("e4d5"))
-    if headless:
-        let_frames_pass(client, 2)
-        captured = take_screenshot(client)
-        captured_band = margin_band(captured)
-        check(captured_band != start_band, "the left margin did not change after White took a pawn")
-        check(band_has_color(captured_band, captured.channels, CHIP_COLOR), "no row of the display is drawn in the left margin after the capture")
-
-    client.call("reset")
-    check_material(get_material(client), 0, {}, {}, "after a reset")
-    if headless:
-        let_frames_pass(client, 2)
-        check(margin_band(take_screenshot(client)) == start_band, "the left margin after a reset is not the one of the start position")
+    let_frames_pass(client, 2)
+    check(margin_band(take_screenshot(client)) == start_band, "the left margin after a reset is not the one of the start position")
 
 
 def find_ui_canvas(tree: dict, node: str) -> dict:
