@@ -206,7 +206,7 @@ namespace BECore::Chess::Tests {
         EXPECT_FALSE(model.HasSelection());
         EXPECT_TRUE(model.GetLegalMoves().empty());
         EXPECT_EQ(model.GetVersion(), version);
-        model.ClearSelection();  // nothing selected: nothing to do
+        model.ClearSelection();
         EXPECT_FALSE(model.HasSelection());
         Click(model, "g1");
         EXPECT_TRUE(model.HasSelection()) << "a click selects again";
@@ -351,7 +351,7 @@ namespace BECore::Chess::Tests {
             ASSERT_FALSE(result.has_value());
             EXPECT_EQ(result.error(), MoveError::IllegalMove);
         }
-        Click(model, "a7");  // selected, no target yet
+        Click(model, "a7");
         const auto selected = model.ChoosePromotion(PieceType::Queen);
         ASSERT_FALSE(selected.has_value());
         EXPECT_EQ(selected.error(), MoveError::IllegalMove);
@@ -419,7 +419,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(model.GetSelected(), Sq("a7"));
         EXPECT_FALSE(model.GetLegalMoves().empty());
         EXPECT_EQ(model.GetVersion(), version);
-        model.CancelPromotion();  // nothing pending: nothing to do
+        model.CancelPromotion();
         EXPECT_TRUE(model.HasSelection());
         Click(model, "a8");
         EXPECT_TRUE(model.HasPendingPromotion()) << "the same target opens the choice again";

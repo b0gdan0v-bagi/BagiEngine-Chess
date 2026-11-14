@@ -11,7 +11,7 @@
 // A test that needs a worker thread (a gate that a worker holds while the test thread opens it, a wait for IsThinking()
 // while a search blocks, an engine that only stands in as "never answers") begins with this: under ENGINE_SINGLE_THREAD
 // (BE_SINGLE_THREAD=1) the task system runs a job on the calling thread, so the test would hang, or pass on a Timeout
-// without testing what it claims. The same text as the engine's cases of TaskSystemTest.
+// without testing what it claims.
 #if BE_SINGLE_THREAD
 #define SKIP_WITHOUT_WORKER_THREADS() GTEST_SKIP() << "needs worker threads (BE_SINGLE_THREAD)"
 #else
@@ -36,7 +36,7 @@ namespace BECore::Chess {
 namespace BECore::Chess::Tests {
 
     /// One task frame, for a test that runs no CoreManager frame and waits for a search that may span frames: the same three steps as TaskManager::Update (it takes a
-    /// PassKey, so a test cannot call it; keep the two in step by hand). Single-thread builds only resume a task that yielded here; a threaded build has nothing to resume
+    /// PassKey, so a test cannot call it; keep the two in step by hand). Only a single-thread build has a task that yielded to resume
     inline void PumpTaskFrame() {
 #if BE_SINGLE_THREAD
         TaskScheduler& scheduler = *TaskManager::GetInstance().GetScheduler();
@@ -131,8 +131,7 @@ namespace BECore::Chess::Tests {
 
     }  // namespace MirrorDetail
 
-    /// The same game seen from the other side of the table: ranks flipped, colors swapped, the other side to move,
-    /// the castling rights and the en passant square swapped with them
+    /// The same game seen from the other side of the table: ranks flipped, colors swapped, and the side to move, the castling rights and the en passant square with them
     inline String MirrorFen(StringView fen) {
         const Vector<String> fields = MirrorDetail::SplitOn(String(fen.data(), fen.size()), ' ');
         EXPECT_GE(fields.size(), 4U);
