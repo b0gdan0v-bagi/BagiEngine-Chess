@@ -71,6 +71,7 @@ namespace BECore::Chess::Tests {
         const Color kHintFromColor{60, 130, 230, 110};  // the two squares of the hint: the one the piece leaves and the one it goes to
         const Color kHintToColor{60, 130, 230, 200};
         const Color kLastMoveColor{245, 205, 50, 140};  // the two squares of the last move, one color for both
+        const Color kPremoveColor{150, 90, 200, 150};   // the two squares of each queued premove, one color for all
 
         // The tall cell of a pawn in the piece atlas (TextureLibrary.xml, assets/chess_test.png is 700 x 381).
         // The library is empty in the test environment, so the test gives a sprite its cell.
@@ -2936,7 +2937,7 @@ namespace BECore::Chess::Tests {
         EXPECT_FALSE(Opponent().GetError().has_value());
     }
 
-    TEST_F(ChessUiTest, WhileTheProgramThinksAClickOnTheBoardDoesNothing) {
+    TEST_F(ChessUiTest, WhileTheProgramThinksAClickOnTheBoardNeverMovesTheGameOrCancelsItsSearch) {
         SKIP_WITHOUT_WORKER_THREADS();
         const auto engine = eastl::make_shared<GatedEngine>(true);
         CountingFactory factory({engine});
@@ -2965,6 +2966,219 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(FramesUntil([&] { return Model().GetMoves().size() == 2; })) << "the answer to the search the clicks left alone";
         Click("d2");
         EXPECT_TRUE(Model().HasSelection()) << "white is the person's again: the board takes clicks";
+    }
+
+    // ---- premoves: the clicks of the person while the program thinks ----------------------------------------------------------------
+    // The model's flow is ChessGameModelTest's and the controller's play is OpponentControllerTest's; here the clicks come through the scene
+
+    TEST_F(ChessUiTest, WhileTheProgramThinksAClickOnAnOwnPieceSelectsItAndAClickOnItsTargetQueuesAPremove) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        const auto engine = eastl::make_shared<GatedEngine>(true);
+        CountingFactory factory({engine});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        ASSERT_TRUE(Opponent().SetSide(PieceColor::Black).has_value());
+        ClickMove("e2", "e4");
+        ASSERT_TRUE(FramesUntil([&] { return engine->Calls() == 1; })) << "the program has the search and waits at its gate";
+        const uint64_t version = Model().GetVersion();
+
+        Click("d2");
+        ASSERT_TRUE(Model().HasSelection());
+        EXPECT_EQ(Model().GetSelected(), Sq("d2"));
+        EXPECT_EQ(Model().GetLegalMoves().size(), 4u) << "d3, d4 and the two diagonals, which a premove has with or without a piece there";
+        Draw();
+        EXPECT_EQ(RectCalls(kSelectedColor).size(), 1u) << "the selection is drawn as ever";
+        EXPECT_EQ(RectCalls(kLegalMoveColor).size(), 4u);
+
+        Click("d4");
+        ASSERT_EQ(Model().GetPremoves().size(), 1u);
+        EXPECT_EQ(Model().GetPremoves()[0], (Premove{Sq("d2"), Sq("d4")}));
+        EXPECT_FALSE(Model().HasSelection());
+        Draw();
+        const auto marks = RectCalls(kPremoveColor);
+        ASSERT_EQ(marks.size(), 2u);
+        EXPECT_TRUE(SameRect(marks[0]->rect, SquareRect("d2")) || SameRect(marks[1]->rect, SquareRect("d2")));
+        EXPECT_TRUE(SameRect(marks[0]->rect, SquareRect("d4")) || SameRect(marks[1]->rect, SquareRect("d4")));
+        EXPECT_EQ(Model().GetVersion(), version) << "a premove is no change of the game, so the search is not stale";
+        EXPECT_TRUE(Opponent().IsThinking());
+        EXPECT_FALSE(engine->WasCancelled());
+        EXPECT_EQ(Model().GetMoves().size(), 1u);
+
+        engine->Open();
+        ASSERT_TRUE(FramesUntil([&] { return Model().GetMoves().size() >= 3; })) << "the answer and then the premove";
+        EXPECT_EQ(Model().GetMoves()[2].ToUci(), "d2d4");
+        EXPECT_TRUE(Model().GetPremoves().empty());
+        Draw();
+        EXPECT_TRUE(RectCalls(kPremoveColor).empty()) << "a played premove is not drawn any more";
+    }
+
+    TEST_F(ChessUiTest, ASecondPremoveMovesThePieceTheFirstOneMovedAndAnotherOwnPieceReselects) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        const auto engine = eastl::make_shared<GatedEngine>(true);
+        CountingFactory factory({engine});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        ASSERT_TRUE(Opponent().SetSide(PieceColor::Black).has_value());
+        ClickMove("e2", "e4");
+        ASSERT_TRUE(FramesUntil([&] { return engine->Calls() == 1; }));
+
+        Click("d2");
+        Click("g1");
+        EXPECT_EQ(Model().GetSelected(), Sq("g1")) << "another own piece takes the selection";
+        Click("f3");
+        ASSERT_EQ(Model().GetPremoves().size(), 1u);
+        Click("f3");  // the knight is on f3 on the premove board: this click selects it
+        ASSERT_TRUE(Model().HasSelection());
+        EXPECT_EQ(Model().GetSelected(), Sq("f3"));
+        Click("g5");
+
+        ASSERT_EQ(Model().GetPremoves().size(), 2u);
+        EXPECT_EQ(Model().GetPremoves()[0], (Premove{Sq("g1"), Sq("f3")}));
+        EXPECT_EQ(Model().GetPremoves()[1], (Premove{Sq("f3"), Sq("g5")}));
+    }
+
+    TEST_F(ChessUiTest, WhileTheProgramThinksAClickOnAnEmptyOrAnEnemySquareCancelsTheWholeQueue) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        const auto engine = eastl::make_shared<GatedEngine>(true);
+        CountingFactory factory({engine});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        ASSERT_TRUE(Opponent().SetSide(PieceColor::Black).has_value());
+        ClickMove("e2", "e4");
+        ASSERT_TRUE(FramesUntil([&] { return engine->Calls() == 1; }));
+        const uint64_t version = Model().GetVersion();
+
+        ClickMove("d2", "d4");
+        ClickMove("b1", "c3");
+        ASSERT_EQ(Model().GetPremoves().size(), 2u);
+        Click("e7");  // a piece of the program's
+        EXPECT_TRUE(Model().GetPremoves().empty());
+        EXPECT_FALSE(Model().GetPremoveColor().has_value());
+
+        ClickMove("d2", "d4");
+        ASSERT_EQ(Model().GetPremoves().size(), 1u);
+        Click("a5");  // nothing stands there, and nothing is selected
+        EXPECT_TRUE(Model().GetPremoves().empty());
+
+        ClickMove("d2", "d4");
+        Click("g1");
+        Click("a5");  // a selection and a square that is none of its targets
+        EXPECT_TRUE(Model().GetPremoves().empty());
+        EXPECT_FALSE(Model().HasSelection());
+        Draw();
+        EXPECT_TRUE(RectCalls(kPremoveColor).empty());
+        EXPECT_EQ(Model().GetVersion(), version);
+        EXPECT_TRUE(Opponent().IsThinking());
+        EXPECT_FALSE(engine->WasCancelled());
+    }
+
+    TEST_F(ChessUiTest, APremoveToThePromotionRankAsksNoPieceAndPlaysAsAQueen) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        const auto engine = eastl::make_shared<GatedEngine>(true);
+        CountingFactory factory({engine});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        StartFrom("4k3/1P6/8/8/8/8/8/4K3 b - - 0 1");  // Black, the program, is to move; White's pawn on b7 is one step from the last rank
+        ASSERT_TRUE(Opponent().SetSide(PieceColor::Black).has_value());
+        ASSERT_TRUE(FramesUntil([&] { return engine->Calls() == 1; }));
+
+        ClickMove("b7", "b8");
+
+        EXPECT_EQ(Model().GetPremoves().size(), 1u);
+        EXPECT_FALSE(Model().HasPendingPromotion());
+        EXPECT_FALSE(PromotionShown());
+        engine->Open();
+        ASSERT_TRUE(FramesUntil([&] { return Model().GetMoves().size() >= 2; }));
+        EXPECT_EQ(Model().GetPieceAt(Sq("b8")).type, PieceType::Queen);
+        EXPECT_EQ(Model().GetPieceAt(Sq("b8")).color, PieceColor::White);
+    }
+
+    TEST_F(ChessUiTest, WithTwoPeopleAClickOnABlackPieceOnWhitesTurnIsNoPremove) {
+        _manager->UpdateAll();
+
+        Click("e7");
+        Click("e5");
+
+        EXPECT_FALSE(Model().HasSelection());
+        EXPECT_TRUE(Model().GetPremoves().empty());
+        EXPECT_FALSE(Model().GetPremoveColor().has_value());
+        Click("e2");
+        EXPECT_TRUE(Model().HasSelection()) << "an ordinary selection";
+        EXPECT_TRUE(Model().GetPremoves().empty());
+    }
+
+    TEST_F(ChessUiTest, WithTheProgramAsWhiteAPremoveOfBlackIsClickedOnTheTurnedBoard) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        const auto engine = eastl::make_shared<GatedEngine>(true);
+        CountingFactory factory({engine});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        ControlPlays("white");
+        _manager->UpdateAll();
+        ASSERT_TRUE(BlackIsAtTheBottom());
+        ASSERT_TRUE(FramesUntil([&] { return engine->Calls() == 1; })) << "the program opens and waits at its gate";
+        ASSERT_EQ(Model().GetTurn(), PieceColor::White);
+
+        Click("e7");
+        ASSERT_TRUE(Model().HasSelection());
+        EXPECT_EQ(Model().GetSelected(), Sq("e7"));
+        ClickCell(3, 4);  // the cell where e5 is drawn on this board
+        ASSERT_EQ(Model().GetPremoves().size(), 1u);
+        EXPECT_EQ(Model().GetPremoves()[0], (Premove{Sq("e7"), Sq("e5")}));
+        EXPECT_EQ(Model().GetPremoveColor(), std::optional<PieceColor>(PieceColor::Black));
+        Draw();
+        const auto marks = RectCalls(kPremoveColor);
+        ASSERT_EQ(marks.size(), 2u);
+        EXPECT_TRUE(SameRect(marks[0]->rect, CellRect(3, 6)) || SameRect(marks[1]->rect, CellRect(3, 6))) << "e7 is the second row from the bottom, the fifth column from the right";
+
+        engine->Open();
+        ASSERT_TRUE(FramesUntil([&] { return Model().GetMoves().size() >= 2; }));
+        EXPECT_EQ(Model().GetMoves()[1].ToUci(), "e7e5");
+    }
+
+    TEST_F(ChessUiTest, TheResetButtonDropsTheQueue) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        const auto engine = eastl::make_shared<GatedEngine>(true);
+        CountingFactory factory({engine});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        ASSERT_TRUE(Opponent().SetSide(PieceColor::Black).has_value());
+        ClickMove("e2", "e4");
+        ASSERT_TRUE(FramesUntil([&] { return engine->Calls() == 1; }));
+        ClickMove("d2", "d4");
+        ASSERT_EQ(Model().GetPremoves().size(), 1u);
+
+        Press("ChessReset");
+        _manager->UpdateAll();
+
+        EXPECT_TRUE(Model().GetPremoves().empty());
+        EXPECT_TRUE(Model().GetMoves().empty());
+        Draw();
+        EXPECT_TRUE(RectCalls(kPremoveColor).empty());
+    }
+
+    TEST_F(ChessUiTest, TheProgramsMateEndsTheQueueAndAClickAfterItStartsANewGame) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        const auto mate = MoveGenerator::ParseUci(PositionFromFen(kBlackMatesOnA1), "a8a1");
+        ASSERT_TRUE(mate.has_value());
+        const auto engine = eastl::make_shared<GatedEngine>(true, *mate);
+        CountingFactory factory({engine});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        StartFrom(kBlackMatesOnA1);
+        ASSERT_TRUE(Opponent().SetSide(PieceColor::Black).has_value());
+        ASSERT_TRUE(FramesUntil([&] { return engine->Calls() == 1; }));
+        ClickMove("g1", "h1");
+        ASSERT_EQ(Model().GetPremoves().size(), 1u);
+
+        engine->Open();
+        ASSERT_TRUE(FramesUntil([&] { return Model().IsGameOver(); }));
+
+        EXPECT_EQ(Model().GetMoves().size(), 1u) << "the premove did not play after the mate";
+        EXPECT_TRUE(Model().GetPremoves().empty());
+        Click("e4");
+        EXPECT_FALSE(Model().IsGameOver()) << "a click after the end starts the next game";
+        EXPECT_TRUE(Model().GetPremoves().empty());
     }
 
     TEST_F(ChessUiTest, AfterTheProgramsMateAClickStartsANewGameAndTheProgramMovesAgain) {
@@ -6250,6 +6464,26 @@ namespace BECore::Chess::Tests {
         EXPECT_TRUE(Opponent().IsThinking());
         EXPECT_FALSE(black->WasCancelled());
         EXPECT_EQ(black->Calls(), 1);
+    }
+
+    TEST_F(ChessUiTest, WatchNoClickQueuesAPremove) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        const auto white = eastl::make_shared<GatedEngine>(true);
+        const auto black = eastl::make_shared<GatedEngine>(true);
+        CountingFactory factory({white, black});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        StartFrom(kWatchBlackToMove);
+        ASSERT_TRUE(Opponent().ChooseSeats(kWatchBoth, {}, {}).has_value());
+        ASSERT_TRUE(FramesUntil([&] { return black->Calls() == 1; }));
+
+        ClickMove("d2", "d3");
+        ClickMove("d2", "d4");
+        IdleFrames(5);
+
+        EXPECT_TRUE(Model().GetPremoves().empty());
+        EXPECT_FALSE(Model().HasSelection());
+        EXPECT_TRUE(Model().GetMoves().empty());
     }
 
     TEST_F(ChessUiTest, WatchNoClickStartsAPromotion) {

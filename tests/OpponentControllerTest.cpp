@@ -1,3 +1,4 @@
+#include "ChessTestUtil.h"
 #include "FakeEngineUtil.h"
 #include "TestEngines.h"
 
@@ -1119,6 +1120,169 @@ namespace BECore::Chess::Tests {
         EXPECT_FALSE(controller.IsThinking());
         controller.Update();
         EXPECT_TRUE(model.GetMoves().empty());
+    }
+
+    // ---- The premoves of the person, played by the controller ----
+
+    namespace {
+
+        /// The person (White) has played e2e4 against a program that plays Black through the double and the program's search is held at the gate
+        struct PremoveGame {
+            explicit PremoveGame(eastl::shared_ptr<GatedEngine> gate) : engine(std::move(gate)), factory({engine}), controller(model) {
+                controller.SetEngineFactory(factory.AsFactory());
+                EXPECT_TRUE(controller.SetSide(PieceColor::Black).has_value());
+                EXPECT_TRUE(Play(model, "e2e4"));
+                controller.Update();
+                EXPECT_TRUE(WaitUntil([&] { return engine->Calls() == 1; })) << "the engine has the search and waits at its gate";
+            }
+
+            /// The premoves of the person, each a click on the from and on the to square
+            void Queue(eastl::string_view from, eastl::string_view to) {
+                model.OnPremoveClicked(PieceColor::White, Sq(from));
+                EXPECT_TRUE(model.OnPremoveClicked(PieceColor::White, Sq(to)));
+            }
+
+            ChessGameModel model;
+            eastl::shared_ptr<GatedEngine> engine;
+            CountingFactory factory;
+            OpponentController controller;
+        };
+
+    }  // namespace
+
+    TEST_F(OpponentControllerTest, APremoveQueuedWhileTheProgramThinksPlaysInTheFrameOfTheAnswerAndTheNextAfterTheNextAnswer) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        PremoveGame game(eastl::make_shared<GatedEngine>(true));
+        game.Queue("d2", "d4");
+        game.Queue("b1", "c3");
+        const uint64_t revision = game.controller.GetRevision();
+
+        game.engine->Open();
+        ASSERT_TRUE(UpdateUntil(game.controller, [&] { return game.model.GetMoves().size() >= 3; })) << DescribeError(game.controller.GetError()).c_str();
+
+        ASSERT_EQ(game.model.GetMoves().size(), 3u) << "the answer and the first premove land in the same Update, the second waits for the next answer";
+        EXPECT_EQ(game.model.GetMoves()[2].ToUci(), "d2d4");
+        ASSERT_EQ(game.model.GetPremoves().size(), 1u);
+        EXPECT_EQ(game.model.GetPremoves()[0], (Premove{Sq("b1"), Sq("c3")}));
+        EXPECT_EQ(game.model.GetTurn(), PieceColor::Black);
+
+        ASSERT_TRUE(UpdateUntil(game.controller, [&] { return game.model.GetMoves().size() >= 5; })) << DescribeError(game.controller.GetError()).c_str();
+
+        EXPECT_EQ(game.model.GetMoves().size(), 5u);
+        EXPECT_EQ(game.model.GetMoves()[4].ToUci(), "b1c3");
+        EXPECT_TRUE(game.model.GetPremoves().empty());
+        EXPECT_FALSE(game.controller.GetError().has_value());
+        EXPECT_EQ(game.controller.GetRevision(), revision) << "a premove is no change of the choice";
+    }
+
+    TEST_F(OpponentControllerTest, APremoveTheAnswerMadeIllegalDropsTheQueueAndLeavesTheAnswerOnTheBoardWithoutAnError) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        ChessGameModel scratch;
+        ASSERT_TRUE(Play(scratch, "e2e4"));
+        const auto answer = MoveGenerator::ParseUci(scratch.GetPosition(), "e7e5");
+        ASSERT_TRUE(answer.has_value());
+        PremoveGame game(eastl::make_shared<GatedEngine>(true, *answer));
+        game.Queue("e4", "e5");
+        game.Queue("d2", "d4");
+
+        game.engine->Open();
+        ASSERT_TRUE(UpdateUntil(game.controller, [&] { return game.model.GetMoves().size() >= 2; }));
+        for (int frame = 0; frame < kManyUpdates; ++frame) {
+            game.controller.Update();
+        }
+
+        ASSERT_EQ(game.model.GetMoves().size(), 2u) << "e4e5 is blocked by the answer: it does not play, and the d2d4 behind it does not either";
+        EXPECT_EQ(game.model.GetMoves()[1].ToUci(), "e7e5");
+        EXPECT_TRUE(game.model.GetPremoves().empty());
+        EXPECT_FALSE(game.model.GetPremoveColor().has_value());
+        EXPECT_FALSE(game.controller.GetError().has_value());
+    }
+
+    TEST_F(OpponentControllerTest, APickThatChangesTheSeatsDropsTheQueue) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        PremoveGame game(eastl::make_shared<GatedEngine>(true));
+        game.Queue("d2", "d4");
+        const size_t other = (kDefaultOpponentLevel + 1) % GetOpponentLevels().size();
+
+        ASSERT_TRUE(game.controller.SetLevel(other).has_value());
+
+        EXPECT_TRUE(game.model.GetPremoves().empty());
+        EXPECT_FALSE(game.model.GetPremoveColor().has_value());
+    }
+
+    TEST_F(OpponentControllerTest, APickThatChangesNothingKeepsTheQueue) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        PremoveGame game(eastl::make_shared<GatedEngine>(true));
+        game.Queue("d2", "d4");
+
+        ASSERT_TRUE(game.controller.SetSide(PieceColor::Black).has_value());
+        ASSERT_TRUE(game.controller.SetLevel(kDefaultOpponentLevel).has_value());
+
+        EXPECT_EQ(game.model.GetPremoves().size(), 1u);
+        EXPECT_EQ(game.factory.Calls(), 1) << "nothing was remade";
+    }
+
+    TEST_F(OpponentControllerTest, ARefusedPickKeepsTheQueue) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        ChessGameModel model;
+        const auto engine = eastl::make_shared<GatedEngine>(true);
+        bool refuse = false;
+        OpponentController controller(model);
+        controller.SetEngineFactory([&](OpponentEngine, const OpponentLevel&) -> std::expected<eastl::shared_ptr<IChessEngine>, EngineError> {
+            if (refuse) {
+                return std::unexpected(LaunchFailed());
+            }
+            return engine;
+        });
+        ASSERT_TRUE(controller.SetSide(PieceColor::Black).has_value());
+        ASSERT_TRUE(Play(model, "e2e4"));
+        controller.Update();
+        ASSERT_TRUE(WaitUntil([&] { return engine->Calls() == 1; }));
+        model.OnPremoveClicked(PieceColor::White, Sq("d2"));
+        ASSERT_TRUE(model.OnPremoveClicked(PieceColor::White, Sq("d4")));
+
+        refuse = true;
+        const auto picked = controller.SetLevel((kDefaultOpponentLevel + 1) % GetOpponentLevels().size());
+
+        ASSERT_FALSE(picked.has_value());
+        EXPECT_EQ(model.GetPremoves().size(), 1u);
+        EXPECT_TRUE(controller.PlaysFor(PieceColor::Black)) << "the old opponent stays";
+    }
+
+    TEST_F(OpponentControllerTest, APickOfTwoPlayersDropsTheQueueAndAHalfMadePremove) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        PremoveGame game(eastl::make_shared<GatedEngine>(true));
+        game.Queue("d2", "d4");
+        game.model.OnPremoveClicked(PieceColor::White, Sq("g1"));
+        ASSERT_TRUE(game.model.HasSelection());
+
+        ASSERT_TRUE(game.controller.SetSide(std::nullopt).has_value());
+
+        EXPECT_TRUE(game.model.GetPremoves().empty());
+        EXPECT_FALSE(game.model.HasSelection()) << "no premove target stays drawn for a program that no longer plays";
+    }
+
+    TEST_F(OpponentControllerTest, ShutdownDropsTheQueue) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        PremoveGame game(eastl::make_shared<GatedEngine>(true));
+        game.Queue("d2", "d4");
+
+        game.controller.Shutdown();
+
+        EXPECT_TRUE(game.model.GetPremoves().empty());
+    }
+
+    TEST_F(OpponentControllerTest, AQueueWaitsWhileTheProgramHasTheMove) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        PremoveGame game(eastl::make_shared<GatedEngine>(true));
+        game.Queue("d2", "d4");
+
+        for (int frame = 0; frame < kManyUpdates; ++frame) {
+            game.controller.Update();
+        }
+
+        EXPECT_EQ(game.model.GetMoves().size(), 1u) << "the answer is held at the gate, so the premove has not played";
+        EXPECT_EQ(game.model.GetPremoves().size(), 1u);
     }
 
 }  // namespace BECore::Chess::Tests

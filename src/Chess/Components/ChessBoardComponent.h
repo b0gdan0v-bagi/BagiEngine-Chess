@@ -50,8 +50,9 @@ namespace BECore::Chess {
      *
      * It is also the frame of the computer opponent and of the analysis: IGame has no per-frame hook, so on every SceneUpdateEvent it runs
      * ChessGame::GetOpponent().Update() and ChessGame::GetAnalyst().Update() (the one place that does either; the first changes the model, so neither can be done in OnDraw()). While the program plays
-     * the side to move, a click on the board does nothing: a half-made move of the person would only cancel the program's own search. After the game has ended a click still starts the next one. The
-     * result of a game is logged once, whoever ended it.
+     * the side to move, a click on the board is a premove of the person (ChessGameModel::OnPremoveClicked(): select a piece, then its target; any other click drops the queue), never an ordinary
+     * selection, which would only cancel the program's own search; while two programs play it does nothing. The queued premoves are filled in kPremoveSquare after the hint and before the
+     * selection; they are played by the controller after the program's answer. After the game has ended a click still starts the next one. The result of a game is logged once, whoever ended it.
      *
      * The hint (PositionAnalyst::GetHint()) is drawn here too: when the analyst holds a hint for the position on the board, the two squares of its move are filled, after the check and before the
      * selection (so a selection and its legal moves stay readable on top), through the same SquareToPixel(). Nothing is played; the hint is bound to the version of the model, so a move, a reset
@@ -61,9 +62,9 @@ namespace BECore::Chess {
      * The pieces, the highlights and the clicks all go through SquareToPixel() / OnMouseDown() and BoardOrientation.h; only the geometry turns, the model and the control API do not.
      *
      * It also publishes the letters and numbers at the edges of the board (`coordFile0..7`, the file drawn in the bottom-row cell of each column, and `coordRank0..7`, the rank drawn in the
-     * left-column cell of each row; Game/BoardCoordinates.h) to `CoreManager::GetUIVars()` from the orientation it draws, also when no game is active. The labels are the 16 text elements (`UITextComponent`) of the canvas
-     * of the node `BoardCoordinates` in SceneConfig.xml (RankLabel0..7, FileLabel0..7), which show these variables; their boxes stay at the same cells of the screen and their text turns with the
-     * board.
+     * left-column cell of each row; Game/BoardCoordinates.h) to `CoreManager::GetUIVars()` from the orientation it draws, also when no game is active. The labels are the 16 text elements
+     * (`UITextComponent`) of the canvas of the node `BoardCoordinates` in SceneConfig.xml (RankLabel0..7, FileLabel0..7), which show these variables; their boxes stay at the same cells of the screen
+     * and their text turns with the board.
      *
      * A piece can also be dragged, next to the two-click move. The press acts at once, exactly as a click (OnMouseDown), and when it left the piece of the side to move selected it also arms a
      * drag; motion past kDragThreshold lifts the piece (GetLiftedPiece() tells the picture where the pointer holds it); the release over a legal target of the selected piece plays the move through

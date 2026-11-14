@@ -74,6 +74,7 @@ namespace BECore::Chess {
         _moves.clear();
         _status = EvaluateStatus(_position);
         ClearSelection();
+        ClearPremoves();
         ++_version;
     }
 
@@ -140,6 +141,16 @@ namespace BECore::Chess {
     }
 
     std::expected<void, MoveError> ChessGameModel::TryMove(Move move) {
+        const PieceColor mover = _position.SideToMove();
+        const auto result = ApplyMove(move);
+        if (result.has_value() && _premoveColor == mover) {
+            // The premoving color moved by hand (a control client played for the person): the queue was made for another position
+            ClearPremoves();
+        }
+        return result;
+    }
+
+    std::expected<void, MoveError> ChessGameModel::ApplyMove(Move move) {
         if (IsGameOver()) {
             return std::unexpected(MoveError::GameOver);
         }
@@ -153,6 +164,9 @@ namespace BECore::Chess {
         _moves.push_back(move);
         ClearSelection();
         _status = EvaluateStatus(_position);
+        if (IsGameOver()) {
+            ClearPremoves();
+        }
         ++_version;
         return {};
     }
@@ -168,6 +182,7 @@ namespace BECore::Chess {
         }
         ReplayPieces();
         ClearSelection();
+        ClearPremoves();
         _status = EvaluateStatus(_position);
         ++_version;
         return count;
@@ -252,6 +267,77 @@ namespace BECore::Chess {
         _selected = Square{};
         _selectedMoves.clear();
         _legalTargets.clear();
+    }
+
+    PremoveBoard ChessGameModel::MakePremoveBoard() const {
+        PremoveBoard board(_position);
+        for (const Premove& premove : _premoves) {
+            board.Apply(premove);
+        }
+        return board;
+    }
+
+    bool ChessGameModel::OnPremoveClicked(PieceColor premover, Square s) {
+        if (!s.IsInside() || IsGameOver() || premover == _position.SideToMove()) {
+            return false;
+        }
+        if (_premoveColor.has_value() && *_premoveColor != premover) {
+            ClearPremoves();
+        }
+
+        const PremoveBoard board = MakePremoveBoard();
+
+        // A selection that is not of the premover's pieces is a half-made move of the other side: it is no premove selection
+        if (_hasSelected && !board.IsOwnPiece(_selected, premover)) {
+            ClearSelection();
+        }
+        if (_hasSelected && eastl::find(_legalTargets.begin(), _legalTargets.end(), s) != _legalTargets.end()) {
+            _premoves.push_back(Premove{_selected, s});
+            _premoveColor = premover;
+            ClearSelection();
+            return true;
+        }
+
+        if (board.IsOwnPiece(s, premover)) {
+            _selected = s;
+            _hasSelected = true;
+            _selectedMoves.clear();
+            _legalTargets = board.Targets(s, premover);
+            return false;
+        }
+
+        ClearPremoves();
+        ClearSelection();
+        return false;
+    }
+
+    bool ChessGameModel::PlayPremove() {
+        if (_premoves.empty() || _premoveColor != _position.SideToMove() || IsGameOver()) {
+            return false;
+        }
+
+        const Premove premove = _premoves.front();
+        for (const Move move : MoveGenerator::GenerateLegal(_position)) {
+            if (move.From() != premove.from || move.To() != premove.to) {
+                continue;
+            }
+            if (move.IsPromotion() && move.PromotionType() != PieceType::Queen) {
+                continue;
+            }
+            _premoves.erase(_premoves.begin());
+            if (_premoves.empty()) {
+                _premoveColor.reset();
+            }
+            return ApplyMove(move).has_value();
+        }
+
+        ClearPremoves();
+        return false;
+    }
+
+    void ChessGameModel::ClearPremoves() {
+        _premoves.clear();
+        _premoveColor.reset();
     }
 
     void ChessGameModel::RecomputeLegalMoves() {

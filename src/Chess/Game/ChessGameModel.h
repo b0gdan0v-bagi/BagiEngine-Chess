@@ -5,6 +5,7 @@
 #include <Chess/Game/Move.h>
 #include <Chess/Game/MoveGenerator.h>
 #include <Chess/Game/Position.h>
+#include <Chess/Game/Premove.h>
 
 namespace BECore::Chess {
 
@@ -23,6 +24,13 @@ namespace BECore::Chess {
      * move, a takeback) and never goes back; selecting a piece does not move it. A click on the last rank does not move the pawn either:
      * it leaves a promotion pending (HasPendingPromotion()) until the person names the piece (ChoosePromotion()) or drops it
      * (CancelPromotion()); a pending promotion is not a change of the game, so the version stays.
+     *
+     * It also holds the **premoves**: a queue of moves the person made while the program had the move (OnPremoveClicked()),
+     * played one per answer of the program (PlayPremove()). Like a selection, a queue is no change of the game: no call that
+     * only touches it moves the version, so a search in flight stays valid (the move PlayPremove() plays moves it, as any
+     * move). A queue is dropped by a new game (Reset(), SetPosition()), a takeback, the end of the game and a move of the
+     * premoving color that did not come from it, and, in PlayPremove(), whole when its front is not legal in its turn. A
+     * premoved promotion plays as a queen. Who may premove is for the owner of the opponent to decide; the model only keeps the queue.
      *
      * Also tracks visual-piece identities through opaque handles so the scene layer can render moves and captures
      * without re-deriving identity from piece type/color. Each handle is bound at registration time to its starting
@@ -108,6 +116,45 @@ namespace BECore::Chess {
         /// Drops the selection and its legal targets and any pending promotion, for an owner that takes over the turn (the computer opponent); the version does not move.
         void ClearSelection();
 
+        /// The queued premoves, the next to play first
+        [[nodiscard]] const eastl::vector<Premove>& GetPremoves() const noexcept {
+            return _premoves;
+        }
+        /// The color that premoves (the person's); empty while the queue is empty
+        [[nodiscard]] std::optional<PieceColor> GetPremoveColor() const noexcept {
+            return _premoveColor;
+        }
+
+        /**
+         * @brief Click handler of a premove, for @p premover while the OTHER side has the move (the program thinks).
+         *
+         * On the premove board (the position with the queued premoves lifted over it, `PremoveBoard`): no selection and an
+         * own piece -> select it (GetSelected() and GetLegalMoves() hold its premove targets); a selection and one of its
+         * targets -> the premove is queued and the selection ends; a selection and another own piece -> select that one;
+         * **any other click drops the whole queue** (and the selection). The length of the queue has no cap. Nothing here
+         * moves the version, and ClearSelection() leaves the queue alone.
+         *
+         * @return true when a premove was queued; false, and nothing done, when the game is over, @p s is outside the board
+         * or @p premover is the side to move (that person plays with OnSquareClicked()).
+         */
+        bool OnPremoveClicked(PieceColor premover, Square s);
+
+        /**
+         * @brief Plays the front premove when the premoving color is on the move.
+         *
+         * The premove is found among the legal moves by `from` and `to` (the queen for a promotion; an en passant capture is
+         * found too) and played through the one place a move is applied, so the version moves as for any move. The rest of the
+         * queue stays for the next answer.
+         *
+         * @return true when a move was played. False when the queue is empty or its color is not on the move yet (the queue
+         * stays), and when no legal move matches the front: then **the whole queue is dropped** (a premove that has become
+         * illegal cuts the ones behind it), with no error and no change of the version.
+         */
+        bool PlayPremove();
+
+        /// Drops the queue; the version does not move
+        void ClearPremoves();
+
         /**
          * @brief Takes back the last @p plies moves in one step (all there are when fewer).
          *
@@ -184,6 +231,12 @@ namespace BECore::Chess {
         [[nodiscard]] bool IsActive(PieceHandle handle) const;
 
     private:
+        /// The body of TryMove() and PlayPremove(): checks, applies and works out the status; a game that ends drops the premoves
+        std::expected<void, MoveError> ApplyMove(Move move);
+
+        /// The real position with the queued premoves lifted over it
+        [[nodiscard]] PremoveBoard MakePremoveBoard() const;
+
         struct PieceTrack {
             Square start{};
             Piece startPiece{};
@@ -219,6 +272,8 @@ namespace BECore::Chess {
         eastl::vector<Square> _legalTargets;
         bool _hasPendingPromotion = false;
         Square _promotionTarget{};
+        eastl::vector<Premove> _premoves;
+        std::optional<PieceColor> _premoveColor;
 
         eastl::hash_map<PieceHandle, PieceTrack> _pieces;
     };

@@ -115,8 +115,12 @@ namespace BECore::Chess {
                 seat.opponent->Update(_model);
             }
         }
+        // The answer of the program is on the board now: the person's next premove plays in this very frame. Before the error bookkeeping, since the premove moves the version like any move
+        if (!PlaysFor(_model.GetTurn())) {
+            _model.PlayPremove();
+        }
         if (_pickError && _errorVersion == version) {
-            // Only an opponent can have moved the game in the calls above, and a refused pick that left it playing must not lose its sentence to the program's own move
+            // Only an opponent or the premove after its answer can have moved the game in the calls above, and a refused pick that left it playing must not lose its sentence to the program's own move
             _errorVersion = _model.GetVersion();
         }
         for (Seat& seat : _seats) {
@@ -127,6 +131,7 @@ namespace BECore::Chess {
     }
 
     void OpponentController::Shutdown() {
+        _model.ClearPremoves();
         if (_seats[kWhite].opponent || _seats[kBlack].opponent || _pickError) {
             ++_revision;
         }
@@ -203,6 +208,13 @@ namespace BECore::Chess {
         }
         _pickError.reset();
         ++_revision;
+        if (!unchanged) {
+            // The sides or a choice changed: what was queued for the old program goes, and a half-made premove with it (a piece of the side that is not to move; a retry of a failed engine keeps both)
+            _model.ClearPremoves();
+            if (_model.HasSelection() && _model.GetPosition().GetPieceAt(_model.GetSelected()).color != _model.GetTurn()) {
+                _model.ClearSelection();
+            }
+        }
         for (const PieceColor color : EnumUtils<PieceColor>::Values()) {
             const size_t index = SeatIndex(color);
             if (!remake[index]) {
