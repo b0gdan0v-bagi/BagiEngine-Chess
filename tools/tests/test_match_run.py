@@ -277,7 +277,7 @@ class PairAndMatchTest(RunnerTestCase):
         def finished(pair: PairRecord) -> None:
             seen.append((pair.own_label, pair.opponent_elo, len(pair.games)))
             uci_match.write_record(out, {"games_per_pair": 2}, pairs)
-            self.assertEqual(len(json.loads(out.read_text())["pairs"]), len(pairs))  # the file holds every finished pair at once
+            self.assertEqual(len(json.loads(out.read_text())["pairs"]), len(pairs))
 
         uci_match.play_match(client, own, opponent, steps, [1500, 1600], self.config(games=2), pairs, finished)
 
