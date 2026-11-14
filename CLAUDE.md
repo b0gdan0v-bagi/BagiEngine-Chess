@@ -8,7 +8,7 @@
 
 ```
 src/Chess/
-├── ChessGame.{h,cpp}         IGame; owns the shared ChessGameModel, the OpponentController, the OpponentChoice over it, the PositionAnalyst and the control adapter; Start() resets the model and the opponent (nobody plays, default engine: Stockfish, the own engine in a `CHESS_NO_STOCKFISH` build, the person has White), Stop() destroys the opponent and shuts the analyst down; GetActive*() are how components reach them
+├── ChessGame.{h,cpp}         IGame; owns the shared ChessGameModel, the OpponentController, the OpponentChoice over it, the PositionAnalyst and the control adapter; Start() resets the model and the opponent (nobody plays, default engine: Stockfish, the own engine in a `CHESS_NO_STOCKFISH` build, the person has White) and restores the saved game (ChessSaveKeeper, `Save/CLAUDE.md`), Stop() writes it and destroys the opponent and shuts the analyst down; GetActive*() are how components reach them
 ├── ChessGameControl.{h,cpp}  IControllableGame: the control API adapter (below)
 ├── Game/                     plain C++ rules, no scene or renderer: squares, bitboards, moves, position and FEN, legal moves, game status, ChessGameModel, pure UI helpers (src/Chess/Game/CLAUDE.md)
 ├── Engine/                   the computer opponent: IChessEngine, Stockfish over UCI, the own engine, levels and handicap, settings, the controller and the choice, PositionAnalyst, MoveRater (src/Chess/Engine/CLAUDE.md)

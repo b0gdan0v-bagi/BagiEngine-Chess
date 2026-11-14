@@ -34,7 +34,8 @@ namespace BECore::Chess {
         inline constexpr eastl::string_view kSaveDir = "--save-dir";
     }  // namespace SaveArguments
 
-    /// The per-user folder of the game for its saves (`saves` under the preference folder SDL gives for BagiEngine / BagiChess; the folder is made); empty, with one warning, when there is none
+    /// The per-user folder of the game for its saves (`saves` under the preference folder SDL gives for BagiEngine / BagiChess; SDL makes the preference folder, the keeper makes `saves`); empty, with
+    /// one warning, when there is none
     [[nodiscard]] std::filesystem::path DefaultSaveDirectory();
 
     /**

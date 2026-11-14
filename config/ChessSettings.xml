@@ -8,6 +8,6 @@
     this file is committed and has to stay empty.
 
   rememberGame: "true" restores the unfinished game and the opponent choice at the start and saves them as you play.
-    Set "false" in config/ChessSettings.local.xml to start every run new. A run with the control API or --headless never saves, whatever this says.
+    Set "false" in config/ChessSettings.local.xml to start every run new. A run with --control, --control-port, --headless or --manual-clock does not save, unless --save-dir is given.
 -->
 <ChessSettings stockfishPath="" rememberGame="true"/>
