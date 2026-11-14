@@ -85,6 +85,10 @@ namespace BECore::Chess {
      * whose engine ignores its CancellationToken keeps that engine alive on the pool until it returns. Call Shutdown() (or destroy the controller) before
      * TaskManager::Shutdown().
      *
+     * The premoves of the person (ChessGameModel::GetPremoves()) are played here: Update() calls PlayPremove() right after the seats' Update, while the side to move is not a program's, so
+     * the premove goes in the frame in which the program's answer lands and the program then searches for the reply to it. A pick that changes a side or a choice and Shutdown() drop the queue
+     * (a refused pick and a pick that changes nothing keep it). Who may premove is the board's decision (ChessBoardComponent), not this class's.
+     *
      * This class, EngineOpponent, PositionAnalyst and MoveRater are the only ones of Engine/ that log.
      */
     class OpponentController {
@@ -156,7 +160,7 @@ namespace BECore::Chess {
         std::expected<void, EngineError> CycleLevel();
 
         /// One step per frame, for the main thread; it never waits for the engine. Drops an error of an earlier version, runs EngineOpponent::Update() of White's seat and then of Black's,
-        /// and notes a new error
+        /// plays the front premove of the person when the program does not have the move, and notes a new error
         void Update();
 
         /// Destroys the opponents (they cancel their searches and return at once); nobody plays afterwards and Update() does nothing, until a new pick

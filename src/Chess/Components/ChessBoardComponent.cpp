@@ -37,6 +37,9 @@ namespace BECore::Chess {
         // turns the light square (240,217,181) to about (243,211,111) and the dark one (181,136,99) to about (214,171,76), so it reads on both; drawn under all of them. A first guess nobody has seen
         // on screen
         constexpr Color kLastMoveSquare{245, 205, 50, 140};
+        // The queued premoves (the from and the to square of each, one color): a purple that is neither the green of the selection, the amber of the last move, the red of check nor the blue of the
+        // hint. Drawn after the hint and before the selection, so the selection of the next premove stays readable on top. A first guess nobody has seen on screen
+        constexpr Color kPremoveSquare{150, 90, 200, 150};
 
         // How far, in scene units, the pointer must go from the press before the piece is lifted: a click with a shaky hand never lifts one. It decides only the picture, not the move
         constexpr float kDragThreshold = 6.0f;
@@ -328,6 +331,16 @@ namespace BECore::Chess {
             }
         }
 
+        // The queued premoves of the person, read from the model (the component keeps nothing); they stand until the program has answered, so they are under the selection of the next one
+        for (const Premove& premove : model->GetPremoves()) {
+            float qx = 0.0f;
+            float qy = 0.0f;
+            SquareToPixel(premove.from.file, premove.from.rank, bottom, qx, qy);
+            renderer.DrawFilledRect(qx, qy, _squareSize, _squareSize, kPremoveSquare);
+            SquareToPixel(premove.to.file, premove.to.rank, bottom, qx, qy);
+            renderer.DrawFilledRect(qx, qy, _squareSize, _squareSize, kPremoveSquare);
+        }
+
         if (model->HasSelection()) {
             const Square sel = model->GetSelected();
             float px = 0.0f;
@@ -371,10 +384,15 @@ namespace BECore::Chess {
             return;
         }
 
-        // The program's turn: the person has nothing to move, and a selection would only fight the search that is under way. PlaysFor is true for either seat, so while two
-        // programs play (a watch) the board takes no click on either turn
+        // The program's turn: the person has no move to make, and a selection of the ordinary kind would only fight the search that is under way. When the program plays this side only, the
+        // click is a premove for the other color (the person's), queued on the premove board and played after the program's answer; no drag is armed and no promotion is asked (a premoved
+        // promotion plays as a queen). While two programs play (a watch) the board takes no click on either turn
         const OpponentController* opponent = ChessGame::GetActiveOpponent();
         if (opponent && opponent->PlaysFor(model->GetTurn())) {
+            const PieceColor person = Opposite(model->GetTurn());
+            if (!opponent->PlaysFor(person)) {
+                model->OnPremoveClicked(person, *clicked);
+            }
             return;
         }
 
