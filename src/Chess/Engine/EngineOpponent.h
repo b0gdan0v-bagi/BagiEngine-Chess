@@ -62,7 +62,7 @@ namespace BECore::Chess {
 
         /// Why the last search failed (any EngineError, or a move the model refused); empty when none did, or after ClearError(). A Cancelled of a search the opponent
         /// itself cancelled is dropped, not an error; an engine that answers Cancelled without the opponent having cancelled is recorded as one (and no retry loop follows)
-        [[nodiscard]] const std::optional<EngineError>& GetLastError() const noexcept {
+        [[nodiscard]] const Optional<EngineError>& GetLastError() const noexcept {
             return _lastError;
         }
 
@@ -101,7 +101,7 @@ namespace BECore::Chess {
         SearchLimits _limits;
         eastl::shared_ptr<Search> _search;  ///< the search under way, null when none; main thread only
         uint64_t _searchVersion = 0;        ///< the version of the model when _search was asked
-        std::optional<EngineError> _lastError;
+        Optional<EngineError> _lastError;
     };
 
 }  // namespace BECore::Chess

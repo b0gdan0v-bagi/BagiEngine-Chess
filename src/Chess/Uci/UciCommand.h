@@ -7,13 +7,13 @@ namespace BECore::Chess::Uci {
 
     /// The limits of a `go`. A number that is absent or not a number leaves its field empty; a negative number is kept as given (the server decides what it means)
     struct GoParams {
-        std::optional<int> depth;
-        std::optional<int> moveTime;
-        std::optional<int> wTime;
-        std::optional<int> bTime;
-        std::optional<int> wInc;
-        std::optional<int> bInc;
-        std::optional<int> movesToGo;
+        Optional<int> depth;
+        Optional<int> moveTime;
+        Optional<int> wTime;
+        Optional<int> bTime;
+        Optional<int> wInc;
+        Optional<int> bInc;
+        Optional<int> movesToGo;
 
         /// `infinite` or `ponder` (a ponder search is run as an infinite one)
         bool infinite = false;
@@ -44,7 +44,7 @@ namespace BECore::Chess::Uci {
     };
 
     /// A whole decimal number (a leading '-' allowed); nothing for an empty text, any other character or a value out of int
-    [[nodiscard]] std::optional<int> ParseInt(eastl::string_view text);
+    [[nodiscard]] Optional<int> ParseInt(eastl::string_view text);
 
     /// The command in @p line. Tolerant: spaces at both ends and a `\r` are ignored, unknown tokens inside `go` are skipped, a value that is not a number leaves
     /// its field empty. A first token that is no command, an empty line, and a `position` with neither `startpos` nor `fen` are Unknown

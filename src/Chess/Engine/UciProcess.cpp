@@ -188,7 +188,7 @@ namespace BECore::Chess {
 #if CHESS_HAS_UCI_PROCESS
 
     // The line buffer, the same on every platform with process code
-    std::optional<eastl::string> UciProcess::TakeBufferedLine() {
+    Optional<eastl::string> UciProcess::TakeBufferedLine() {
         constexpr char kLineEnd = '\n';
         constexpr char kCarriageReturn = '\r';
         constexpr size_t kCompactBytes = 64 * 1024;  // the consumed front of the line buffer is dropped once it is this big and half of the buffer
@@ -338,7 +338,7 @@ namespace BECore::Chess {
         const auto tooLong = [this] { return Fail(EngineErrorKind::ProtocolError, Format("process {} wrote a line longer than {} bytes", _pid, kMaxLineBytes)); };
 
         for (;;) {
-            if (std::optional<eastl::string> line = TakeBufferedLine()) {
+            if (Optional<eastl::string> line = TakeBufferedLine()) {
                 if (line->size() > kMaxLineBytes) {
                     return tooLong();  // it came whole within one read, but it is no line of ours
                 }

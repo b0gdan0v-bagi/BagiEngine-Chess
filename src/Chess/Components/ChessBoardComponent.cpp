@@ -174,7 +174,7 @@ namespace BECore::Chess {
         _publishedColor = personColor;
 
         // While an error of the opponent stands the game is stalled by it, so its sentence wins over "Check"
-        const std::optional<EngineError>& error = opponent.GetError();
+        const Optional<EngineError>& error = opponent.GetError();
         const eastl::string turn = StatusText::Turn(model, thinking);
         const eastl::string status = error ? OpponentText::Error(*error) : StatusText::Status(model);
         const eastl::string opponentError = error ? OpponentText::Error(*error) : eastl::string();
@@ -225,7 +225,7 @@ namespace BECore::Chess {
         }
         if (!promote) {
             model->CancelPromotion();
-        } else if (const std::optional<PieceType> piece = FindPromotion(event.value.ToStringView())) {
+        } else if (const Optional<PieceType> piece = FindPromotion(event.value.ToStringView())) {
             // Nothing pending (a press that came late) is an IllegalMove of the model and changes nothing
             if (model->ChoosePromotion(*piece)) {
                 LogResultOnce(*model);
@@ -322,7 +322,7 @@ namespace BECore::Chess {
         // The hint, once the engine has answered for this very position: the two squares of the move, under the selection. It is never played, and the analyst gives nothing for another
         // version, so any change of the position takes it off at the next frame
         if (const PositionAnalyst* analyst = ChessGame::GetActiveAnalyst(); analyst && !model->IsGameOver()) {
-            if (const std::optional<AnalysisLine> hint = analyst->GetHint(*model)) {
+            if (const Optional<AnalysisLine> hint = analyst->GetHint(*model)) {
                 float hx = 0.0f;
                 float hy = 0.0f;
                 SquareToPixel(hint->move.From().file, hint->move.From().rank, bottom, hx, hy);
@@ -357,7 +357,7 @@ namespace BECore::Chess {
         }
     }
 
-    std::optional<Square> ChessBoardComponent::SquareUnder(float screenX, float screenY) const {
+    Optional<Square> ChessBoardComponent::SquareUnder(float screenX, float screenY) const {
         const float boardSize = _squareSize * 8.0f;
         const float localX = GetScene().ScreenToSceneX(screenX) - _originX;
         const float localY = GetScene().ScreenToSceneY(screenY) - _originY;
@@ -374,7 +374,7 @@ namespace BECore::Chess {
             return;
         }
 
-        const std::optional<Square> clicked = SquareUnder(e.button.x, e.button.y);
+        const Optional<Square> clicked = SquareUnder(e.button.x, e.button.y);
         if (!clicked) {
             return;
         }
@@ -442,14 +442,14 @@ namespace BECore::Chess {
         if (e.button.button != SDL_BUTTON_LEFT) {
             return;
         }
-        const std::optional<Drag> drag = std::exchange(_drag, std::nullopt);  // a release ends the drag in every case below
+        const Optional<Drag> drag = std::exchange(_drag, std::nullopt);  // a release ends the drag in every case below
         ChessGameModel* model = ChessGame::GetActiveModel();
         if (!drag || !model || !IsDragValid(*drag, model)) {
             return;
         }
         // Only a legal target of the selected piece plays. Anywhere else nothing is called on the model: the piece goes back and the selection stays with its legal moves (and a release
         // on another own piece must not select it)
-        const std::optional<Square> target = SquareUnder(e.button.x, e.button.y);
+        const Optional<Square> target = SquareUnder(e.button.x, e.button.y);
         const auto& legalMoves = model->GetLegalMoves();
         if (!target || eastl::find(legalMoves.begin(), legalMoves.end(), *target) == legalMoves.end()) {
             return;
@@ -460,7 +460,7 @@ namespace BECore::Chess {
         SyncPromotionPanel(*model);
     }
 
-    std::optional<ChessBoardComponent::LiftedPiece> ChessBoardComponent::GetLiftedPiece() const {
+    Optional<ChessBoardComponent::LiftedPiece> ChessBoardComponent::GetLiftedPiece() const {
         if (!_drag || !_drag->lifted || !IsDragValid(*_drag, ChessGame::GetActiveModel())) {
             return std::nullopt;
         }

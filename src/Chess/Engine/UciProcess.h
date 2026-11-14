@@ -92,7 +92,7 @@ namespace BECore::Chess {
         }
 
     private:
-        std::optional<eastl::string> TakeBufferedLine();
+        Optional<eastl::string> TakeBufferedLine();
 
 #if CHESS_HAS_UCI_PROCESS && defined(_WIN32)
         struct WindowsState;  ///< the handles and the read in flight (UciProcessWindows.cpp: no <windows.h> in this header)

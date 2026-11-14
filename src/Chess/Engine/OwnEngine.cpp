@@ -18,7 +18,7 @@ namespace BECore::Chess {
         }
 
         /// The time after which line @p line of @p lineCount (counted from 1) must be done: the move time is shared out, line k ends at k / lineCount of it. No move time: no deadline
-        std::optional<std::chrono::steady_clock::time_point> DeadlineOfLine(std::chrono::steady_clock::time_point start, const SearchLimits& limits, size_t line, size_t lineCount) {
+        Optional<std::chrono::steady_clock::time_point> DeadlineOfLine(std::chrono::steady_clock::time_point start, const SearchLimits& limits, size_t line, size_t lineCount) {
             if (limits.moveTimeMs <= 0) {
                 return std::nullopt;
             }
@@ -43,12 +43,12 @@ namespace BECore::Chess {
         eastl::vector<Move> excluded;
         Analysis analysis;
         /// The search of the line being worked on; none once the answer or the error is ready
-        std::optional<SearchJob> job;
+        Optional<SearchJob> job;
         /// Whether the job is the retry at depth 1 of a line whose first search was stopped before its first node
         bool retrying = false;
         /// The nodes of the jobs that are over
         uint64_t finishedNodes = 0;
-        std::optional<std::expected<Analysis, EngineError>> result;
+        Optional<std::expected<Analysis, EngineError>> result;
 
         Impl(Position startPosition, MoveList legalMoves, const SearchLimits& searchLimits, std::chrono::steady_clock::time_point begun, const CancellationToken& cancelToken, size_t lines)
             : position(std::move(startPosition)), legal(std::move(legalMoves)), limits(searchLimits), start(begun), token(cancelToken), lineCount(lines) {}

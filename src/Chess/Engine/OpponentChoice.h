@@ -14,10 +14,10 @@ namespace BECore::Chess {
     [[nodiscard]] eastl::string_view OpponentModeId(OpponentMode mode);
 
     /// The mode with this id (exactly as written: ids are lower case), or nothing
-    [[nodiscard]] std::optional<OpponentMode> ParseMode(eastl::string_view id);
+    [[nodiscard]] Optional<OpponentMode> ParseMode(eastl::string_view id);
 
     /// The color with this id ("white" or "black", exactly as written), or nothing
-    [[nodiscard]] std::optional<PieceColor> ParseColor(eastl::string_view id);
+    [[nodiscard]] Optional<PieceColor> ParseColor(eastl::string_view id);
 
     /// BadId: the id is not one of the table; nothing was changed and no engine was asked. Engine: the controller refused the pick, see ChoiceError::engine
     CORE_ENUM(ChoiceErrorKind, uint8_t, BadId, Engine)

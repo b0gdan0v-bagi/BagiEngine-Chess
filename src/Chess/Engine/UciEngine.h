@@ -122,7 +122,7 @@ namespace BECore::Chess {
         UciEngineSettings _settings;
         std::mutex _mutex;                       ///< held for the whole of FindMove() and Analyse(): everything below is touched under it only
         eastl::unique_ptr<UciProcess> _process;  ///< null until the first search and after an error closed it
-        std::optional<SearchRequest> _previous;  ///< the request the running process was last given; none for a process that has had no search
+        Optional<SearchRequest> _previous;       ///< the request the running process was last given; none for a process that has had no search
         int _multiPv = kSingleLine;              ///< the `MultiPV` the running process has been told (1 for a new one, and again once it is closed)
     };
 
@@ -136,6 +136,6 @@ namespace BECore::Chess {
      * Only a lookup: nothing here knows where Stockfish is installed, and nothing of it is shipped with the game.
      * With CHESS_NO_STOCKFISH (the web build) the answer is always nothing and nothing is looked at.
      */
-    [[nodiscard]] std::optional<eastl::string> FindStockfish(eastl::string_view explicitPath);
+    [[nodiscard]] Optional<eastl::string> FindStockfish(eastl::string_view explicitPath);
 
 }  // namespace BECore::Chess

@@ -44,7 +44,7 @@ namespace BECore::Chess {
         return entry ? entry->label : eastl::string_view{};
     }
 
-    std::optional<PieceType> FindPromotion(eastl::string_view id) {
+    Optional<PieceType> FindPromotion(eastl::string_view id) {
         for (const PromotionEntry& entry : kPromotions) {
             if (entry.id == id) {
                 return entry.type;

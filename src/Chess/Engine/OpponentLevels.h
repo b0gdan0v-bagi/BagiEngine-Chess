@@ -23,7 +23,7 @@ namespace BECore::Chess {
     inline constexpr size_t kDefaultOpponentLevel = 1;
 
     /// The index of the level with this id (exactly as written: ids are lower case), or nothing
-    [[nodiscard]] std::optional<size_t> FindOpponentLevel(eastl::string_view id);
+    [[nodiscard]] Optional<size_t> FindOpponentLevel(eastl::string_view id);
 
     /// The longest the own engine may think about a move at any level. It is not a strength knob (the depth of the level ends the search): it only keeps the window from
     /// a freak position, so the own engine is deterministic unless this cap is hit

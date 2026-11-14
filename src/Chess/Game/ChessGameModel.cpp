@@ -78,7 +78,7 @@ namespace BECore::Chess {
         ++_version;
     }
 
-    std::optional<PieceColor> ChessGameModel::GetWinner() const noexcept {
+    Optional<PieceColor> ChessGameModel::GetWinner() const noexcept {
         if (_status == GameStatus::Checkmate) {
             return Opposite(_position.SideToMove());
         }

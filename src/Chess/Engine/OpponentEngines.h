@@ -27,7 +27,7 @@ namespace BECore::Chess {
     [[nodiscard]] eastl::string_view OpponentEngineName(OpponentEngine engine);
 
     /// The engine with this id (exactly as written: ids are lower case), or nothing
-    [[nodiscard]] std::optional<OpponentEngine> FindOpponentEngine(eastl::string_view id);
+    [[nodiscard]] Optional<OpponentEngine> FindOpponentEngine(eastl::string_view id);
 
     /// The engine after this one in the cycle of OpponentController::CycleEngine: Stockfish, Own, and back to Stockfish; an engine that is not available (IsOpponentEngineAvailable) is skipped,
     /// so without Stockfish the cycle stays on Own

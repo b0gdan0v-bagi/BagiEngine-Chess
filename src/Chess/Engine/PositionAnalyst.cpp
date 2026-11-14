@@ -8,7 +8,7 @@
 
 namespace BECore::Chess {
 
-    std::optional<HintRefusal> HintRefusalFor(const ChessGameModel& model, ProgramSides programPlays) {
+    Optional<HintRefusal> HintRefusalFor(const ChessGameModel& model, ProgramSides programPlays) {
         if (model.IsGameOver()) {
             return HintRefusal::GameOver;
         }
@@ -18,7 +18,7 @@ namespace BECore::Chess {
         return std::nullopt;
     }
 
-    std::optional<HintRefusal> HintRefusalFor(const ChessGameModel& model, std::optional<PieceColor> programPlays) {
+    Optional<HintRefusal> HintRefusalFor(const ChessGameModel& model, Optional<PieceColor> programPlays) {
         return HintRefusalFor(model, ProgramSides::Of(programPlays));
     }
 
@@ -28,7 +28,7 @@ namespace BECore::Chess {
                 if (!IsOpponentEngineAvailable(OpponentEngine::Stockfish)) {
                     return std::unexpected(UnavailableEngineError(OpponentEngine::Stockfish));
                 }
-                const std::optional<eastl::string> program = FindStockfish(settings.stockfishPath);
+                const Optional<eastl::string> program = FindStockfish(settings.stockfishPath);
                 if (!program) {
                     return std::unexpected(EngineError{EngineErrorKind::LaunchFailed, NoStockfishDetail(settings.stockfishPath)});
                 }
@@ -149,14 +149,14 @@ namespace BECore::Chess {
         return _search && !_search->token.IsCancelled();
     }
 
-    std::optional<AnalysisLine> PositionAnalyst::GetEvaluation(const ChessGameModel& model) const {
+    Optional<AnalysisLine> PositionAnalyst::GetEvaluation(const ChessGameModel& model) const {
         if (!_evaluationOn || !_result || _resultVersion != model.GetVersion()) {
             return std::nullopt;
         }
         return _result;
     }
 
-    std::optional<AnalysisLine> PositionAnalyst::GetHint(const ChessGameModel& model) const {
+    Optional<AnalysisLine> PositionAnalyst::GetHint(const ChessGameModel& model) const {
         if (!IsHintRequested(model) || !_result || _resultVersion != model.GetVersion()) {
             return std::nullopt;
         }
@@ -213,7 +213,7 @@ namespace BECore::Chess {
             return;
         }
         _result = answer->Best();
-        _second = answer->Second() ? std::optional<AnalysisLine>(*answer->Second()) : std::nullopt;
+        _second = answer->Second() ? Optional<AnalysisLine>(*answer->Second()) : std::nullopt;
         _resultVersion = version;
         _resultEngine = engine;
         ++_revision;

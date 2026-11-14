@@ -48,7 +48,7 @@ namespace BECore::Chess {
         return eastl::span<const OpponentLevel>(kLevels.data(), kLevels.size());
     }
 
-    std::optional<size_t> FindOpponentLevel(eastl::string_view id) {
+    Optional<size_t> FindOpponentLevel(eastl::string_view id) {
         for (size_t index = 0; index < kLevels.size(); ++index) {
             if (kLevels[index].id == id) {
                 return index;

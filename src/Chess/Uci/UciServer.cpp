@@ -55,7 +55,7 @@ namespace BECore::Chess::Uci {
             Position position = *start;
             for (size_t index = 0; index < params.moves.size(); ++index) {
                 const eastl::string& text = params.moves[index];
-                const std::optional<Move> move = MoveGenerator::ParseUci(position, eastl::string_view(text.data(), text.size()));
+                const Optional<Move> move = MoveGenerator::ParseUci(position, eastl::string_view(text.data(), text.size()));
                 if (!move) {
                     return std::unexpected(Format("position refused: move {} ({}) is not legal", index + 1, text));
                 }
@@ -66,7 +66,7 @@ namespace BECore::Chess::Uci {
         }
 
         /// The first legal move of the game @p request leads to, for the `bestmove` after a failure: a GUI must get a move when there is one
-        std::optional<Move> FirstLegalMove(const SearchRequest& request) {
+        Optional<Move> FirstLegalMove(const SearchRequest& request) {
             const auto position = request.FinalPosition();
             if (!position) {
                 return std::nullopt;
@@ -184,7 +184,7 @@ namespace BECore::Chess::Uci {
             if (EqualsIgnoreCase(value, kCustomLevel)) {
                 return;
             }
-            const std::optional<size_t> found = FindOpponentLevel(Lowered(value));
+            const Optional<size_t> found = FindOpponentLevel(Lowered(value));
             if (!found) {
                 SayInfo(Format("option refused: '{}' is not a level", value));
                 return;
@@ -200,7 +200,7 @@ namespace BECore::Chess::Uci {
             return;
         }
         const int top = isDepth ? kMaxDepthOption : kMaxBlunderPercentOption;
-        const std::optional<int> number = ParseInt(value);
+        const Optional<int> number = ParseInt(value);
         if (!number || *number < 0 || *number > top) {
             SayInfo(Format("option refused: '{}' is not a number from 0 to {}", value, top));
             return;
@@ -233,8 +233,8 @@ namespace BECore::Chess::Uci {
         }
         if (params.moveTime && *params.moveTime > 0) {
             limits.moveTimeMs = *params.moveTime;
-        } else if (const std::optional<int>& clock = whiteToMove ? params.wTime : params.bTime; clock) {
-            const std::optional<int>& increment = whiteToMove ? params.wInc : params.bInc;
+        } else if (const Optional<int>& clock = whiteToMove ? params.wTime : params.bTime; clock) {
+            const Optional<int>& increment = whiteToMove ? params.wInc : params.bInc;
             limits.moveTimeMs = MoveTimeFor(*clock, increment.value_or(0), params.movesToGo);
         }
         return limits;
@@ -263,8 +263,8 @@ namespace BECore::Chess::Uci {
     }
 
     void UciServer::RunSearch(const SearchJob& job) {
-        std::optional<Move> best;
-        std::optional<EngineError> failure;
+        Optional<Move> best;
+        Optional<EngineError> failure;
 
         if (job.deepen) {
             // The answer of a search that nobody stops is the move of the deepest finished iteration

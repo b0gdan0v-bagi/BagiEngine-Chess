@@ -56,7 +56,7 @@ namespace BECore::Chess {
             }
 
             /// `cp N` or `mate N` after `score`. Nothing for a kind we do not know, a missing or non-numeric value, and for a mate in 0
-            std::optional<AnalysisScore> TakeScore(eastl::string_view& rest) {
+            Optional<AnalysisScore> TakeScore(eastl::string_view& rest) {
                 const eastl::string_view kind = TakeToken(rest);
                 int value = 0;
                 if (kind == kCentipawnsToken && TakeInt(rest, value)) {
@@ -102,7 +102,7 @@ namespace BECore::Chess {
             return Format("setoption name {} value {}", name, value);
         }
 
-        std::optional<BestMove> ParseBestMove(eastl::string_view line) {
+        Optional<BestMove> ParseBestMove(eastl::string_view line) {
             eastl::string_view rest = TrimLine(line);
             if (TakeToken(rest) != kBestMoveToken) {
                 return std::nullopt;
@@ -111,7 +111,7 @@ namespace BECore::Chess {
             return BestMove{eastl::string(move.data(), move.size())};
         }
 
-        std::optional<Info> ParseInfo(eastl::string_view line) {
+        Optional<Info> ParseInfo(eastl::string_view line) {
             eastl::string_view rest = TrimLine(line);
             if (TakeToken(rest) != kInfoToken) {
                 return std::nullopt;
@@ -159,7 +159,7 @@ namespace BECore::Chess {
         LineCollector::LineCollector(int lineCount) : _exact(static_cast<size_t>(std::max(lineCount, 1))), _bound(static_cast<size_t>(std::max(lineCount, 1))) {}
 
         void LineCollector::Offer(eastl::string_view line) {
-            const std::optional<Info> info = ParseInfo(line);
+            const Optional<Info> info = ParseInfo(line);
             if (!info || !info->score || info->multiPv < 1 || static_cast<size_t>(info->multiPv) > _exact.size()) {
                 return;
             }
@@ -174,7 +174,7 @@ namespace BECore::Chess {
         eastl::vector<Info> LineCollector::Lines() const {
             eastl::vector<Info> lines;
             for (size_t slot = 0; slot < _exact.size(); ++slot) {
-                if (const std::optional<Info>& kept = _exact[slot] ? _exact[slot] : _bound[slot]) {
+                if (const Optional<Info>& kept = _exact[slot] ? _exact[slot] : _bound[slot]) {
                     lines.push_back(*kept);
                 }
             }

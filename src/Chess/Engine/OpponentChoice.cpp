@@ -35,7 +35,7 @@ namespace BECore::Chess {
         return "";
     }
 
-    std::optional<OpponentMode> ParseMode(eastl::string_view id) {
+    Optional<OpponentMode> ParseMode(eastl::string_view id) {
         for (const OpponentMode mode : EnumUtils<OpponentMode>::Values()) {
             if (OpponentModeId(mode) == id) {
                 return mode;
@@ -44,7 +44,7 @@ namespace BECore::Chess {
         return std::nullopt;
     }
 
-    std::optional<PieceColor> ParseColor(eastl::string_view id) {
+    Optional<PieceColor> ParseColor(eastl::string_view id) {
         if (id == kWhiteId) {
             return PieceColor::White;
         }
@@ -55,7 +55,7 @@ namespace BECore::Chess {
     }
 
     std::expected<void, ChoiceError> OpponentChoice::SetMode(eastl::string_view id) {
-        const std::optional<OpponentMode> mode = ParseMode(id);
+        const Optional<OpponentMode> mode = ParseMode(id);
         if (!mode) {
             return std::unexpected(BadId("mode", id));
         }
@@ -67,7 +67,7 @@ namespace BECore::Chess {
     }
 
     std::expected<void, ChoiceError> OpponentChoice::SetColor(eastl::string_view id) {
-        const std::optional<PieceColor> color = ParseColor(id);
+        const Optional<PieceColor> color = ParseColor(id);
         if (!color) {
             return std::unexpected(BadId("color", id));
         }
@@ -83,7 +83,7 @@ namespace BECore::Chess {
     }
 
     std::expected<void, ChoiceError> OpponentChoice::SetEngine(eastl::string_view id) {
-        const std::optional<OpponentEngine> engine = FindOpponentEngine(id);
+        const Optional<OpponentEngine> engine = FindOpponentEngine(id);
         if (!engine) {
             return std::unexpected(BadId("engine", id));
         }
@@ -91,7 +91,7 @@ namespace BECore::Chess {
     }
 
     std::expected<void, ChoiceError> OpponentChoice::SetLevel(eastl::string_view id) {
-        const std::optional<size_t> level = FindOpponentLevel(id);
+        const Optional<size_t> level = FindOpponentLevel(id);
         if (!level) {
             return std::unexpected(BadId("level", id));
         }
@@ -103,7 +103,7 @@ namespace BECore::Chess {
     }
 
     PieceColor OpponentChoice::Color() const noexcept {
-        if (const std::optional<PieceColor> plays = _opponent.GetPlays()) {
+        if (const Optional<PieceColor> plays = _opponent.GetPlays()) {
             _personColor = Opposite(*plays);
         }
         return _personColor;

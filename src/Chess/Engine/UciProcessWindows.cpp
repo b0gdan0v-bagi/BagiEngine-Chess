@@ -9,9 +9,6 @@
 #if !defined(NOMINMAX)
 #define NOMINMAX
 #endif
-#include <algorithm>
-#include <atomic>
-#include <string>
 #include <windows.h>
 
 namespace BECore::Chess {
@@ -29,7 +26,7 @@ namespace BECore::Chess {
         }
 
         /// UTF-16 of UTF-8 text, nothing for text that is not UTF-8
-        std::optional<std::wstring> Widen(eastl::string_view text) {
+        Optional<std::wstring> Widen(eastl::string_view text) {
             if (text.empty()) {
                 return std::wstring();
             }
@@ -243,7 +240,7 @@ namespace BECore::Chess {
         }
         const auto cannotStart = [&launch](eastl::string_view reason) { return Fail(EngineErrorKind::LaunchFailed, Format("cannot start {}: {}", launch.path, reason)); };
 
-        std::optional<std::wstring> application = Widen(launch.path);
+        Optional<std::wstring> application = Widen(launch.path);
         if (!application) {
             return cannotStart("the path is not UTF-8");
         }
@@ -251,7 +248,7 @@ namespace BECore::Chess {
         // argv[0] is read by other rules (no escapes, quotes only), and a path holds no quote: it is always quoted
         std::wstring commandLine = L"\"" + *application + L"\"";
         for (const eastl::string& argument : launch.args) {
-            const std::optional<std::wstring> wide = Widen(argument);
+            const Optional<std::wstring> wide = Widen(argument);
             if (!wide) {
                 return cannotStart("an argument is not UTF-8");
             }
@@ -364,7 +361,7 @@ namespace BECore::Chess {
         };
 
         for (;;) {
-            if (std::optional<eastl::string> line = TakeBufferedLine()) {
+            if (Optional<eastl::string> line = TakeBufferedLine()) {
                 if (line->size() > kMaxLineBytes) {
                     return tooLong();  // it came whole within one read, but it is no line of ours
                 }

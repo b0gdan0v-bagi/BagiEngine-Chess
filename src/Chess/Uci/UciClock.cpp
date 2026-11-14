@@ -2,7 +2,7 @@
 
 namespace BECore::Chess::Uci {
 
-    int MoveTimeFor(int remainingMs, int incrementMs, std::optional<int> movesToGo) {
+    int MoveTimeFor(int remainingMs, int incrementMs, Optional<int> movesToGo) {
         if (remainingMs <= 0) {
             return kMinMoveTimeMs;
         }

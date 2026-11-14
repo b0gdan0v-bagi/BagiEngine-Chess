@@ -37,7 +37,7 @@ namespace BECore::Chess {
         if (!_on || _blocked) {
             return;
         }
-        if (const std::optional<size_t> ply = OldestUnrated()) {
+        if (const Optional<size_t> ply = OldestUnrated()) {
             StartSearch(*ply);
         }
     }
@@ -101,7 +101,7 @@ namespace BECore::Chess {
         if (_search) {
             _search->token.Cancel();
         }
-        const bool hadRatings = eastl::any_of(_ratings.begin(), _ratings.end(), [](const std::optional<MoveRating>& rating) { return rating.has_value(); });
+        const bool hadRatings = eastl::any_of(_ratings.begin(), _ratings.end(), [](const Optional<MoveRating>& rating) { return rating.has_value(); });
         _moves.clear();
         _ratings.clear();
         _failed.clear();
@@ -162,7 +162,7 @@ namespace BECore::Chess {
         TaskManager::GetInstance().Run(RunSearch(_search, std::move(request)));
     }
 
-    std::optional<size_t> MoveRater::OldestUnrated() const {
+    Optional<size_t> MoveRater::OldestUnrated() const {
         for (size_t ply = 0; ply < _ratings.size(); ++ply) {
             if (!_ratings[ply] && !_failed[ply]) {
                 return ply;
@@ -171,7 +171,7 @@ namespace BECore::Chess {
         return std::nullopt;
     }
 
-    void MoveRater::Fail(std::optional<size_t> ply, EngineError error) {
+    void MoveRater::Fail(Optional<size_t> ply, EngineError error) {
         const eastl::string which = ply ? Format(" of ply {}", *ply + 1) : eastl::string();
         LOG_ERROR("Move rater: no rating{}, {}: {}"_format(which, EnumUtils<EngineErrorKind>::ToString(error.kind), error.detail));
         _error = std::move(error);

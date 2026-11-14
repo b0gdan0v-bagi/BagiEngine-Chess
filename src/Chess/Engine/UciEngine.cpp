@@ -92,7 +92,7 @@ namespace BECore::Chess {
 
 #if !CHESS_NO_STOCKFISH
         /// The first of the explicit path and $STOCKFISH that is set decides (see FindStockfish); nothing when it is not a file
-        std::optional<eastl::string> ExistingFile(const std::string& path) {
+        Optional<eastl::string> ExistingFile(const std::string& path) {
             std::error_code error;
             if (!std::filesystem::is_regular_file(path, error)) {
                 return std::nullopt;
@@ -127,7 +127,7 @@ namespace BECore::Chess {
             return !error && (permissions & (perms::owner_exec | perms::group_exec | perms::others_exec)) != perms::none;
         }
 
-        std::optional<eastl::string> StockfishOnPath() {
+        Optional<eastl::string> StockfishOnPath() {
             const std::string directories = EnvironmentValue(kPathVariable);
             size_t begin = 0;
             while (begin <= directories.size()) {
@@ -185,7 +185,7 @@ namespace BECore::Chess {
             if (info.firstPvMove.empty()) {
                 continue;
             }
-            const std::optional<Move> move = MoveGenerator::ParseUci(searched->position, eastl::string_view(info.firstPvMove.data(), info.firstPvMove.size()));
+            const Optional<Move> move = MoveGenerator::ParseUci(searched->position, eastl::string_view(info.firstPvMove.data(), info.firstPvMove.size()));
             if (!move) {
                 return Fail(EngineErrorKind::IllegalMove, Format("the engine answered '{}' for line {}, which is not legal in {}", info.firstPvMove, info.multiPv, searched->position.ToFen()));
             }
@@ -227,11 +227,11 @@ namespace BECore::Chess {
         }
 
         // The process is alive and in step from here on: it answered, so whatever is wrong with the answer, the next search can use it
-        const std::optional<UciProtocol::BestMove> best = UciProtocol::ParseBestMove(eastl::string_view(answer->data(), answer->size()));
+        const Optional<UciProtocol::BestMove> best = UciProtocol::ParseBestMove(eastl::string_view(answer->data(), answer->size()));
         if (!best || best->IsNone()) {
             return Fail(EngineErrorKind::NoMove, Format("the engine has no move here (it answered '{}') but the game has legal moves", *answer));
         }
-        const std::optional<Move> move = MoveGenerator::ParseUci(*position, eastl::string_view(best->move.data(), best->move.size()));
+        const Optional<Move> move = MoveGenerator::ParseUci(*position, eastl::string_view(best->move.data(), best->move.size()));
         if (!move) {
             return Fail(EngineErrorKind::IllegalMove, Format("the engine answered '{}', which is not legal in {}", best->move, position->ToFen()));
         }
@@ -343,7 +343,7 @@ namespace BECore::Chess {
         _multiPv = kSingleLine;
     }
 
-    std::optional<eastl::string> FindStockfish([[maybe_unused]] eastl::string_view explicitPath) {
+    Optional<eastl::string> FindStockfish([[maybe_unused]] eastl::string_view explicitPath) {
 #if CHESS_NO_STOCKFISH
         return std::nullopt;  // nothing is looked for: no file system walk, no environment, and no process could be started from what was found
 #else

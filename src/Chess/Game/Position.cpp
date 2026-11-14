@@ -55,7 +55,7 @@ namespace BECore::Chess {
             return piece.color == PieceColor::White ? static_cast<char>(lower - 'a' + 'A') : lower;
         }
 
-        std::optional<Piece> PieceFromLetter(char letter) noexcept {
+        Optional<Piece> PieceFromLetter(char letter) noexcept {
             const bool isWhite = letter >= 'A' && letter <= 'Z';
             const char lower = isWhite ? static_cast<char>(letter - 'A' + 'a') : letter;
             const size_t found = kPieceLetters.find(lower);

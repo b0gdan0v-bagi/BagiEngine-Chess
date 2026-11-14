@@ -16,7 +16,7 @@ namespace BECore::Chess {
     /// The color drawn at the bottom of the board, given the color the PROGRAM plays (`OpponentController::GetPlays()`).
     /// The person is the other color and sits at the bottom, so Black is at the bottom exactly when the program plays White;
     /// two people on one screen, or the program as Black, keep White at the bottom
-    [[nodiscard]] constexpr PieceColor BottomColor(std::optional<PieceColor> programPlays) noexcept {
+    [[nodiscard]] constexpr PieceColor BottomColor(Optional<PieceColor> programPlays) noexcept {
         return (programPlays.has_value() && *programPlays == PieceColor::White) ? PieceColor::Black : PieceColor::White;
     }
 
@@ -30,7 +30,7 @@ namespace BECore::Chess {
     }
 
     /// The square drawn in a cell (the inverse of `CellOf`), or nothing for a cell outside the board
-    [[nodiscard]] constexpr std::optional<Square> SquareAt(int column, int rowFromTop, PieceColor bottom) noexcept {
+    [[nodiscard]] constexpr Optional<Square> SquareAt(int column, int rowFromTop, PieceColor bottom) noexcept {
         if (!Square::IsInside(column, rowFromTop)) {
             return std::nullopt;
         }

@@ -89,7 +89,7 @@ namespace BECore::Chess {
             return _status != GameStatus::Ongoing;
         }
         /// The side that won; empty while the game is on and for every draw.
-        [[nodiscard]] std::optional<PieceColor> GetWinner() const noexcept;
+        [[nodiscard]] Optional<PieceColor> GetWinner() const noexcept;
         /// The side to move is in check (checkmate included).
         [[nodiscard]] bool IsInCheck() const noexcept {
             return _position.IsInCheck();
@@ -121,7 +121,7 @@ namespace BECore::Chess {
             return _premoves;
         }
         /// The color that premoves (the person's); empty while the queue is empty
-        [[nodiscard]] std::optional<PieceColor> GetPremoveColor() const noexcept {
+        [[nodiscard]] Optional<PieceColor> GetPremoveColor() const noexcept {
             return _premoveColor;
         }
 
@@ -273,7 +273,7 @@ namespace BECore::Chess {
         bool _hasPendingPromotion = false;
         Square _promotionTarget{};
         eastl::vector<Premove> _premoves;
-        std::optional<PieceColor> _premoveColor;
+        Optional<PieceColor> _premoveColor;
 
         eastl::hash_map<PieceHandle, PieceTrack> _pieces;
     };

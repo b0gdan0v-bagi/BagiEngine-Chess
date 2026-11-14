@@ -26,7 +26,7 @@ namespace BECore::Chess {
 
             /// `score cp N` or `score mate N` (a negative number allowed), from the side to move. Nothing when the line has no score, or a truncated or non-numeric one,
             /// and for `score mate 0` (the position is already mated: no move, no distance, see AnalysisScore)
-            std::optional<AnalysisScore> score;
+            Optional<AnalysisScore> score;
 
             /// `lowerbound` / `upperbound` after the score: the score is a bound, not the exact value
             bool lowerBound = false;
@@ -48,11 +48,11 @@ namespace BECore::Chess {
         [[nodiscard]] eastl::string SetOptionCommand(eastl::string_view name, eastl::string_view value);
 
         /// The answer in @p line when it is a `bestmove` line (an end of line left on it does no harm), nothing for any other line (`info ...`, an empty one)
-        [[nodiscard]] std::optional<BestMove> ParseBestMove(eastl::string_view line);
+        [[nodiscard]] Optional<BestMove> ParseBestMove(eastl::string_view line);
 
         /// The fields of @p line when it is an `info` line, nothing for any other line (`bestmove ...`, an empty one). Tolerant: `info string ...` is text to the end of
         /// the line (a `score` inside it is not read), unknown tokens are skipped, and a missing or non-numeric value leaves its field as it was and never fails the line
-        [[nodiscard]] std::optional<Info> ParseInfo(eastl::string_view line);
+        [[nodiscard]] Optional<Info> ParseInfo(eastl::string_view line);
 
         /// @p text without the spaces, `\r` and `\n` at both ends: a child on Windows ends its lines with `\r\n`. A view into @p text
         [[nodiscard]] eastl::string_view TrimLine(eastl::string_view text);
@@ -75,8 +75,8 @@ namespace BECore::Chess {
             [[nodiscard]] eastl::vector<Info> Lines() const;
 
         private:
-            eastl::vector<std::optional<Info>> _exact;  ///< by index - 1
-            eastl::vector<std::optional<Info>> _bound;
+            eastl::vector<Optional<Info>> _exact;  ///< by index - 1
+            eastl::vector<Optional<Info>> _bound;
         };
 
     }  // namespace UciProtocol

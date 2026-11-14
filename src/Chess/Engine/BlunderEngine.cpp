@@ -32,7 +32,7 @@ namespace BECore::Chess {
         ASSERT(_inner, "BlunderEngine: no engine to wrap");
     }
 
-    std::expected<std::optional<Move>, EngineError> BlunderEngine::BlunderMove(const SearchRequest& request, const CancellationToken& token) const {
+    std::expected<Optional<Move>, EngineError> BlunderEngine::BlunderMove(const SearchRequest& request, const CancellationToken& token) const {
         if (_percent == 0) {
             return std::nullopt;
         }

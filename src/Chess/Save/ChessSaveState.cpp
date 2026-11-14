@@ -27,14 +27,14 @@ namespace BECore::Chess {
             return kNobodyId;
         }
 
-        std::optional<ProgramSides> ParsePlays(eastl::string_view id) {
+        Optional<ProgramSides> ParsePlays(eastl::string_view id) {
             if (id == kNobodyId) {
                 return ProgramSides{};
             }
             if (id == kBothId) {
                 return ProgramSides{true, true};
             }
-            if (const std::optional<PieceColor> color = ParseColor(id)) {
+            if (const Optional<PieceColor> color = ParseColor(id)) {
                 return ProgramSides::Of(*color);
             }
             return std::nullopt;
@@ -62,7 +62,7 @@ namespace BECore::Chess {
                     end = all.size();
                 }
                 const size_t number = moves.size() + 1;
-                const std::optional<Move> move = MoveGenerator::ParseUci(scratch.GetPosition(), all.substr(begin, end - begin));
+                const Optional<Move> move = MoveGenerator::ParseUci(scratch.GetPosition(), all.substr(begin, end - begin));
                 if (!move) {
                     return Corrupt(Format("move {} is not a legal move in its turn", number));
                 }
@@ -76,11 +76,11 @@ namespace BECore::Chess {
         }
 
         std::expected<SeatChoice, SaveError> ParseSeat(const String& engineId, const String& levelId, eastl::string_view seat) {
-            const std::optional<OpponentEngine> engine = FindOpponentEngine(View(engineId));
+            const Optional<OpponentEngine> engine = FindOpponentEngine(View(engineId));
             if (!engine) {
                 return Corrupt(Format("{} engine is not an engine of this game", seat));
             }
-            const std::optional<size_t> level = FindOpponentLevel(View(levelId));
+            const Optional<size_t> level = FindOpponentLevel(View(levelId));
             if (!level) {
                 return Corrupt(Format("{} level is not a level of this game", seat));
             }
@@ -127,7 +127,7 @@ namespace BECore::Chess {
         plan.moves = std::move(*moves);
         plan.finished = scratch.IsGameOver();
 
-        const std::optional<ProgramSides> plays = ParsePlays(View(state.plays));
+        const Optional<ProgramSides> plays = ParsePlays(View(state.plays));
         if (!plays) {
             return Corrupt("colors the program plays are not none, white, black or both");
         }
@@ -144,7 +144,7 @@ namespace BECore::Chess {
         plan.white = *white;
         plan.black = *black;
 
-        const std::optional<PieceColor> person = ParseColor(View(state.personColor));
+        const Optional<PieceColor> person = ParseColor(View(state.personColor));
         if (!person) {
             return Corrupt("color of the person is not white or black");
         }

@@ -51,6 +51,6 @@ namespace BECore::Chess {
      *
      * A folder that comes back empty from the last step is "nothing".
      */
-    [[nodiscard]] std::optional<std::filesystem::path> ResolveSaveDirectory(const CommandLine& commandLine, bool rememberGame, std::filesystem::path (*defaultDirectory)() = &DefaultSaveDirectory);
+    [[nodiscard]] Optional<std::filesystem::path> ResolveSaveDirectory(const CommandLine& commandLine, bool rememberGame, std::filesystem::path (*defaultDirectory)() = &DefaultSaveDirectory);
 
 }  // namespace BECore::Chess

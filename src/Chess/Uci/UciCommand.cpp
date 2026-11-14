@@ -58,7 +58,7 @@ namespace BECore::Chess::Uci {
         }
 
         /// The field a `go` keyword fills, nothing for a word that is not one
-        std::optional<int>* GoField(GoParams& params, eastl::string_view token) {
+        Optional<int>* GoField(GoParams& params, eastl::string_view token) {
             if (token == kDepthToken) {
                 return &params.depth;
             }
@@ -91,9 +91,9 @@ namespace BECore::Chess::Uci {
                 const eastl::string_view token = tokens[i];
                 if (token == kInfiniteToken || token == kPonderToken) {
                     params.infinite = true;
-                } else if (std::optional<int>* field = GoField(params, token)) {
+                } else if (Optional<int>* field = GoField(params, token)) {
                     if (i + 1 < tokens.size()) {
-                        if (const std::optional<int> value = ParseInt(tokens[i + 1])) {
+                        if (const Optional<int> value = ParseInt(tokens[i + 1])) {
                             *field = value;
                             ++i;
                         }
@@ -154,7 +154,7 @@ namespace BECore::Chess::Uci {
 
     }  // namespace
 
-    std::optional<int> ParseInt(eastl::string_view text) {
+    Optional<int> ParseInt(eastl::string_view text) {
         int value = 0;
         if (text.empty()) {
             return std::nullopt;

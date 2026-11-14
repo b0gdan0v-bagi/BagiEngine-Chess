@@ -67,7 +67,7 @@ namespace BECore::Chess {
         return {};
     }
 
-    std::optional<PieceType> FindCaptured(eastl::string_view id) {
+    Optional<PieceType> FindCaptured(eastl::string_view id) {
         for (const CapturableEntry& entry : kCapturable) {
             if (entry.id == id) {
                 return entry.type;

@@ -144,7 +144,7 @@ namespace BECore::Chess {
         }
 
         /// {"kind", "detail"} of an engine error, or null
-        Json ErrorJson(const std::optional<EngineError>& error) {
+        Json ErrorJson(const Optional<EngineError>& error) {
             if (!error) {
                 return Json();
             }
@@ -164,9 +164,9 @@ namespace BECore::Chess {
 
         /// What set_state asks of the analyst, checked; a member that is missing is nothing
         struct AnalysisPick {
-            std::optional<bool> evaluation;
-            std::optional<bool> hint;
-            std::optional<bool> ratings;
+            Optional<bool> evaluation;
+            Optional<bool> hint;
+            Optional<bool> ratings;
         };
 
         constexpr const char* kAnalysisUsage = "'analysis' has to be an object like {\"evaluation\": true, \"hint\": true, \"ratings\": true} (the members are optional booleans)";
@@ -178,7 +178,7 @@ namespace BECore::Chess {
             }
             AnalysisPick pick;
             for (const auto& [key, value] : analysis.items()) {
-                std::optional<bool>* target = key == "evaluation" ? &pick.evaluation : key == "hint" ? &pick.hint : key == "ratings" ? &pick.ratings : nullptr;
+                Optional<bool>* target = key == "evaluation" ? &pick.evaluation : key == "hint" ? &pick.hint : key == "ratings" ? &pick.ratings : nullptr;
                 if (!target || !value.is_boolean()) {
                     return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, kAnalysisUsage));
                 }
@@ -195,7 +195,7 @@ namespace BECore::Chess {
         std::expected<void, ControlError> ReadChoice(const Json& object, eastl::string_view where, SeatChoice& choice) {
             if (FindJsonMember(object, "level")) {
                 const auto id = GetJsonString(object, "level");
-                const std::optional<size_t> level = id ? FindOpponentLevel(eastl::string_view(id->data(), id->size())) : std::nullopt;
+                const Optional<size_t> level = id ? FindOpponentLevel(eastl::string_view(id->data(), id->size())) : std::nullopt;
                 if (!level) {
                     return std::unexpected(BadOpponent(Format("{} 'level' has to be the id of a level: {}", where, LevelIds())));
                 }
@@ -203,7 +203,7 @@ namespace BECore::Chess {
             }
             if (FindJsonMember(object, "engine")) {
                 const auto id = GetJsonString(object, "engine");
-                const std::optional<OpponentEngine> engine = id ? FindOpponentEngine(eastl::string_view(id->data(), id->size())) : std::nullopt;
+                const Optional<OpponentEngine> engine = id ? FindOpponentEngine(eastl::string_view(id->data(), id->size())) : std::nullopt;
                 if (!engine) {
                     return std::unexpected(BadOpponent(Format("{} 'engine' has to be the id of an engine: {}", where, EngineIds())));
                 }
@@ -253,7 +253,7 @@ namespace BECore::Chess {
                 } else {
                     const auto side = GetJsonString(opponent, "plays");
                     const eastl::string_view id = side ? eastl::string_view(side->data(), side->size()) : eastl::string_view();
-                    const std::optional<PieceColor> color = side ? ParseColor(id) : std::nullopt;
+                    const Optional<PieceColor> color = side ? ParseColor(id) : std::nullopt;
                     if (side && id == kBothId) {
                         current.plays = ProgramSides{true, true};
                     } else if (color) {
@@ -305,8 +305,8 @@ namespace BECore::Chess {
     }
 
     Json ChessGameControl::OpponentJson() const {
-        const std::optional<PieceColor> plays = _opponent.GetPlays();
-        const std::optional<EngineError>& error = _opponent.GetError();
+        const Optional<PieceColor> plays = _opponent.GetPlays();
+        const Optional<EngineError>& error = _opponent.GetError();
 
         Json seats = Json::object();
         for (const PieceColor color : {PieceColor::White, PieceColor::Black}) {
@@ -338,7 +338,7 @@ namespace BECore::Chess {
         analysis["hintRequested"] = _analyst.IsHintRequested(_model);
         analysis["thinking"] = _analyst.IsThinking();
 
-        const std::optional<AnalysisLine> evaluation = _analyst.GetEvaluation(_model);
+        const Optional<AnalysisLine> evaluation = _analyst.GetEvaluation(_model);
         if (evaluation) {
             const AnalysisScore white = ScoreForWhite(evaluation->score, _model.GetTurn());  // a bar needs one fixed side
             Json line = Json::object();
@@ -350,7 +350,7 @@ namespace BECore::Chess {
             analysis["evaluation"] = Json();
         }
 
-        const std::optional<AnalysisLine> hint = _analyst.GetHint(_model);
+        const Optional<AnalysisLine> hint = _analyst.GetHint(_model);
         if (hint) {
             Json line = Json::object();
             line["move"] = TextJson(hint->move.ToUci());
@@ -376,7 +376,7 @@ namespace BECore::Chess {
         // One entry per move of "moves", in the same order: null while the move is not rated
         analysis["ratingsOn"] = _analyst.AreRatingsOn();
         Json ratings = Json::array();
-        for (const std::optional<MoveRating>& rating : _analyst.GetRatings(_model)) {
+        for (const Optional<MoveRating>& rating : _analyst.GetRatings(_model)) {
             if (rating) {
                 Json described = Json::object();
                 described["brilliant"] = rating->IsBrilliant();
@@ -454,7 +454,7 @@ namespace BECore::Chess {
         }
 
         // Check everything first: a refused call changes nothing
-        std::optional<Position> position;
+        Optional<Position> position;
         if (fenMember) {
             const auto fen = GetJsonString(state, "fen");
             if (!fen) {
@@ -466,7 +466,7 @@ namespace BECore::Chess {
             }
             position = *parsed;
         }
-        std::optional<OpponentPick> pick;
+        Optional<OpponentPick> pick;
         if (opponentMember) {
             auto parsed = ParseOpponent(*opponentMember, OpponentPick{_opponent.GetSides(), _opponent.GetSeatChoice(PieceColor::White), _opponent.GetSeatChoice(PieceColor::Black)});
             if (!parsed) {
@@ -501,7 +501,7 @@ namespace BECore::Chess {
             return std::unexpected(pick.error());
         }
         if (pick->hint.value_or(false)) {
-            if (const std::optional<HintRefusal> refusal = HintRefusalFor(_model, _opponent.GetSides())) {
+            if (const Optional<HintRefusal> refusal = HintRefusalFor(_model, _opponent.GetSides())) {
                 if (*refusal == HintRefusal::GameOver) {
                     return std::unexpected(MakeControlError(ChessControlErrors::kGameOver, Format("the game is over ({}): there is nothing to hint", StatusName(_model.GetStatus()))));
                 }

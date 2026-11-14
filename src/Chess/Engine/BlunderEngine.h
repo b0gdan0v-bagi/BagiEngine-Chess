@@ -51,7 +51,7 @@ namespace BECore::Chess {
     private:
         /// The part of FindMove() that is the handicap's own: an error of the request (in the order of OwnEngine), the random legal move when this move is a blunder,
         /// nothing when the wrapped engine is to answer (always at 0 percent, with no check of the request)
-        [[nodiscard]] std::expected<std::optional<Move>, EngineError> BlunderMove(const SearchRequest& request, const CancellationToken& token) const;
+        [[nodiscard]] std::expected<Optional<Move>, EngineError> BlunderMove(const SearchRequest& request, const CancellationToken& token) const;
 
         eastl::shared_ptr<IChessEngine> _inner;
         int _percent;

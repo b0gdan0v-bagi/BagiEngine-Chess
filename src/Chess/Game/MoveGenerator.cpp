@@ -157,7 +157,7 @@ namespace BECore::Chess {
         return moves;
     }
 
-    std::optional<Move> MoveGenerator::ParseUci(const Position& position, eastl::string_view text) {
+    Optional<Move> MoveGenerator::ParseUci(const Position& position, eastl::string_view text) {
         for (const Move move : GenerateLegal(position)) {
             if (eastl::string_view(move.ToUci().c_str()) == text) {
                 return move;

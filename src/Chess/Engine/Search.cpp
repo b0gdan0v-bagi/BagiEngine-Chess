@@ -230,7 +230,7 @@ namespace BECore::Chess {
             bool _stopEnabled = false;
             QuietMoves _quiet;
             /// Built in Begin() for a search deep enough; empty means no table
-            std::optional<TranspositionTable> _table;
+            Optional<TranspositionTable> _table;
             /// How many times a node returned a draw that depends on the history (a repeated position, the 50-move clock). A node
             /// whose subtree moved it stores nothing
             uint64_t _historyDraws = 0;

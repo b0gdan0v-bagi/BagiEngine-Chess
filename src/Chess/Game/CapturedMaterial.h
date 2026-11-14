@@ -16,7 +16,7 @@ namespace BECore::Chess {
     [[nodiscard]] eastl::string_view CapturedId(PieceType type);
 
     /// The capturable piece with this id (exactly as written: ids are lower case), or nothing
-    [[nodiscard]] std::optional<PieceType> FindCaptured(eastl::string_view id);
+    [[nodiscard]] Optional<PieceType> FindCaptured(eastl::string_view id);
 
     /**
      * @brief What a position says about the material: which pieces of each color are gone and how many points each side has on the board.

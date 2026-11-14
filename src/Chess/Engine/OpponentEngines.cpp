@@ -22,7 +22,7 @@ namespace BECore::Chess {
         return "";
     }
 
-    std::optional<OpponentEngine> FindOpponentEngine(eastl::string_view id) {
+    Optional<OpponentEngine> FindOpponentEngine(eastl::string_view id) {
         for (const OpponentEngine engine : EnumUtils<OpponentEngine>::Values()) {
             if (OpponentEngineId(engine) == id) {
                 return engine;

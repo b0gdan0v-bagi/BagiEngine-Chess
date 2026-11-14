@@ -14,6 +14,6 @@ namespace BECore::Chess {
     [[nodiscard]] eastl::string_view PromotionLabel(PieceType type);
 
     /// The promotion piece with this id (exactly as written: ids are lower case), or nothing
-    [[nodiscard]] std::optional<PieceType> FindPromotion(eastl::string_view id);
+    [[nodiscard]] Optional<PieceType> FindPromotion(eastl::string_view id);
 
 }  // namespace BECore::Chess

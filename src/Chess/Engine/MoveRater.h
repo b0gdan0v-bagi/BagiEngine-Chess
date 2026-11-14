@@ -14,7 +14,7 @@ namespace BECore::Chess {
     inline constexpr int kRatingLines = 2;
 
     /// One entry per played move, in the order of ChessGameModel::GetMoves(); an empty one is a move that is not rated (yet)
-    using MoveRatings = eastl::vector<std::optional<MoveRating>>;
+    using MoveRatings = eastl::vector<Optional<MoveRating>>;
 
     /**
      * @brief Rates the moves of a ChessGameModel in the background: for every played move, an analysis of the position BEFORE it, and RateMove() over that analysis (MoveRating.h has the definition).
@@ -83,7 +83,7 @@ namespace BECore::Chess {
         [[nodiscard]] MoveRatings GetRatings(const ChessGameModel& model) const;
 
         /// Why the last search failed (any EngineError, an engine that could not be made included); empty when none did or after it went with a new history, a switch or Shutdown()
-        [[nodiscard]] const std::optional<EngineError>& GetError() const noexcept {
+        [[nodiscard]] const Optional<EngineError>& GetError() const noexcept {
             return _error;
         }
 
@@ -113,8 +113,8 @@ namespace BECore::Chess {
         void DropHistory();
         void TakeAnswer();
         void StartSearch(size_t ply);
-        [[nodiscard]] std::optional<size_t> OldestUnrated() const;
-        void Fail(std::optional<size_t> ply, EngineError error);
+        [[nodiscard]] Optional<size_t> OldestUnrated() const;
+        void Fail(Optional<size_t> ply, EngineError error);
         void ClearError();
 
         AnalysisEngineFactory _factory;  ///< empty: MakeAnalysisEngine over empty settings
@@ -131,7 +131,7 @@ namespace BECore::Chess {
         size_t _searchPly = 0;              ///< the move _search rates
         uint64_t _searchGeneration = 0;
 
-        std::optional<EngineError> _error;
+        Optional<EngineError> _error;
         bool _blocked = false;  ///< the engine could not be made: nothing is tried until the error goes
 
         uint64_t _revision = 0;

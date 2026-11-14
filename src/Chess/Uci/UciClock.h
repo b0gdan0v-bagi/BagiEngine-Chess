@@ -30,6 +30,6 @@ namespace BECore::Chess::Uci {
      * @param incrementMs added to the clock after each move
      * @param movesToGo moves until the next time control; 0 or less is read as absent
      */
-    [[nodiscard]] int MoveTimeFor(int remainingMs, int incrementMs, std::optional<int> movesToGo);
+    [[nodiscard]] int MoveTimeFor(int remainingMs, int incrementMs, Optional<int> movesToGo);
 
 }  // namespace BECore::Chess::Uci
