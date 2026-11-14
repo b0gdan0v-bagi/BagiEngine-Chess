@@ -122,6 +122,10 @@ if(ENGINE_BUILD_TESTS)
         add_test(NAME BagiChessMatchToolTests COMMAND ${Python3_EXECUTABLE} -m unittest discover -s ${CMAKE_CURRENT_SOURCE_DIR}/tools/tests -p "test_match_*.py" WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
         set_tests_properties(BagiChessMatchToolTests PROPERTIES TIMEOUT 120)
 
+        # The unit tests of tools/check_comment_only.py, the proof of every comment-only change (standard library unittest; each case builds a git repository in a temp folder, so git must be on PATH)
+        add_test(NAME BagiChessCommentToolTests COMMAND ${Python3_EXECUTABLE} -m unittest discover -s ${CMAKE_CURRENT_SOURCE_DIR}/tools/tests -p "test_check_comment_only.py" WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+        set_tests_properties(BagiChessCommentToolTests PROPERTIES TIMEOUT 120)
+
         # The game formats through the engine's layer (BECore::Format), not fmt:: (tests/check_fmt_layer.py runs the engine's codemod over src, tests and uci); skipped (77) without the engine's tool
         add_test(NAME BagiChessFmtLayerCheck COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_fmt_layer.py)
         set_tests_properties(BagiChessFmtLayerCheck PROPERTIES

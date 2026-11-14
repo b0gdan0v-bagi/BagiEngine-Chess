@@ -19,6 +19,9 @@ from check_comment_only import cpp_tokens, first_cpp_difference, first_python_di
 GIT_ENV = ["-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false"]
 
 
+BACKSLASH = chr(92)
+
+
 def texts(source: str) -> list[str]:
     return [token.text for token in cpp_tokens(source)]
 
@@ -49,12 +52,30 @@ class CppScannerTest(unittest.TestCase):
 
     def test_markers_are_code(self):
         self.assertIn("//-NoStd: engine-file-layer", texts("std::ifstream f; //-NoStd: engine-file-layer\n"))
-        self.assertIn("// NOLINTNEXTLINE(x)", texts("// NOLINTNEXTLINE(x)\nint a;"))
+        self.assertIn("// NOLINTNEXTLINE(x) [+1]", texts("// NOLINTNEXTLINE(x)\nint a;"))
         self.assertIn("// clang-format off", texts("// clang-format off\nint a;"))
         self.assertIn("/* clang-format on */", texts("/* clang-format on */ int a;"))
 
     def test_an_ordinary_comment_that_names_std_is_no_marker(self):
         self.assertEqual(texts("// std: reason\nint a;"), ["int", "a", ";"])
+
+    def test_a_line_comment_ends_at_a_newline_after_any_backslash(self):
+        # a backslash right before the newline is a splice, one or two of them alike (the splice is translation phase 2, before the comments)
+        expected = ["int", "a", ";", "int", "b", ";"]
+        self.assertEqual(texts("int a; // c " + BACKSLASH + "\nint hidden;\nint b;"), expected)
+        self.assertEqual(texts("int a; // c " + BACKSLASH * 2 + "\nint hidden;\nint b;"), expected)
+        self.assertEqual(texts("int a; // c " + BACKSLASH + "\n\nint b;"), expected)
+
+    def test_a_backslash_in_the_middle_of_a_line_comment_ends_nothing(self):
+        self.assertEqual(texts("int a; // c " + BACKSLASH + "n d\nint b;"), ["int", "a", ";", "int", "b", ";"])
+
+    def test_a_spliced_line_comment_keeps_the_line_count(self):
+        found = first_cpp_difference("// c " + BACKSLASH + "\nint a;\nint b;\n", "// c " + BACKSLASH + "\nint a;\nint c;\n")
+        self.assertEqual(found[0], 3)
+
+    def test_a_crlf_source_with_a_trailing_backslash(self):
+        source = "int x; // c " + BACKSLASH + "\r\nint hidden;\r\nint b;\r\n"
+        self.assertEqual(texts(source), ["int", "x", ";", "int", "b", ";"])
 
     def test_the_end_of_a_directive_is_a_token(self):
         self.assertNotEqual(texts("#define A 1\nint b;"), texts("#define A 1 int b;"))
@@ -90,6 +111,28 @@ class CppDifferenceTest(unittest.TestCase):
 
     def test_a_marker_may_be_rewrapped(self):
         self.assertIsNone(first_cpp_difference("f(); //-NoStd:  a\n", "f();   //-NoStd: a\n"))
+
+    def test_a_line_between_a_lone_marker_and_its_code_fails(self):
+        for marker in ("// NOLINTNEXTLINE(x)", "//-NoStd: why"):
+            for between in ("// c\n", "\n", "/* c */\n"):
+                found = first_cpp_difference(f"{marker}\nint a;\n", f"{marker}\n{between}int a;\n")
+                self.assertIsNotNone(found, (marker, between))
+                self.assertIn("the code moved from its marker", found[1])
+
+    def test_a_line_taken_out_between_a_lone_marker_and_its_code_fails(self):
+        self.assertIsNotNone(first_cpp_difference("// NOLINTNEXTLINE\n\nint a;\n", "// NOLINTNEXTLINE\nint a;\n"))
+
+    def test_a_lone_marker_keeps_its_gap_when_comments_around_it_change(self):
+        for marker in ("// NOLINTNEXTLINE(x)", "//-NoStd: why"):
+            self.assertIsNone(first_cpp_difference(f"// why\n// more\n{marker}\nint a;\n", f"{marker}\nint a;\n"))
+        self.assertIsNone(first_cpp_difference("// NOLINTNEXTLINE\n\nint a;\n", "// reworded\n// NOLINTNEXTLINE\n\nint a;\n"))
+
+    def test_a_trailing_marker_has_no_gap(self):
+        self.assertIsNone(first_cpp_difference("int a; // NOLINT\n// c\nint b;\n", "int a; // NOLINT\nint b;\n"))
+        self.assertIsNone(first_cpp_difference("f(); //-NoStd: why\n\nint b;\n", "f(); //-NoStd: why\nint b;\n"))
+
+    def test_a_marker_at_the_end_of_the_file_has_no_gap(self):
+        self.assertIsNone(first_cpp_difference("int a;\n// NOLINTNEXTLINE\n", "int a;\n// NOLINTNEXTLINE\n\n"))
 
     def test_a_changed_string_fails(self):
         self.assertIsNotNone(first_cpp_difference('log("a");', 'log("b");'))
@@ -189,6 +232,16 @@ class CommandTest(unittest.TestCase):
         code, out, _ = self.run_check()
         self.assertEqual(code, 1)
         self.assertIn("src/b.py:1:", out)
+
+    def test_a_comment_put_between_a_marker_and_its_code_fails_with_the_line_of_the_marker(self):
+        self.write("src/a.cpp", "int a;\n// NOLINTNEXTLINE(x)\nint b = 1;\n")
+        self.git("commit", "-q", "-am", "marker")
+        self.base = self.git("rev-parse", "HEAD").strip()
+        self.write("src/a.cpp", "int a;\n// NOLINTNEXTLINE(x)\n// why\nint b = 1;\n")
+        code, out, _ = self.run_check()
+        self.assertEqual(code, 1)
+        self.assertIn("src/a.cpp:2:", out)
+        self.assertIn("the code moved from its marker", out)
 
     def test_other_files_are_not_compared(self):
         self.write("notes.md", "two\n")

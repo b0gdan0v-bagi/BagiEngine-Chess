@@ -19,7 +19,7 @@ A comment says **why**, or states a **contract** (units, ownership, thread, life
 - retells what a test checks: a test comment says why the case exists or what trap it sets;
 - cites a `CLAUDE.md` section that does not exist: a citation is kept only when the heading is in the `CLAUDE.md` of the file's folder or of an ancestor (`grep -n '^#' <that file>`).
 
-Doxygen on the public API stays, one or two sentences; `@param` and `@return` only when the name does not say it. Markers that tools read stay exactly as they are: `//-NoStd: <why>`, `NOLINT*`, `clang-format off` / `on`. An owner's decision or a known deviation is not deleted from a comment unless a `CLAUDE.md` holds it.
+Doxygen on the public API stays, one or two sentences; `@param` and `@return` only when the name does not say it. Markers that tools read stay exactly as they are: `//-NoStd: <why>`, `NOLINT*`, `clang-format off` / `on`; a `//-NoStd:` or `NOLINTNEXTLINE` marker alone on its line stays on the line right before the code it covers (no comment or blank line between), and the checker fails when that gap changes. An owner's decision or a known deviation is not deleted from a comment unless a `CLAUDE.md` holds it.
 
 ## A comment-only stage
 

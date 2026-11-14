@@ -8,9 +8,11 @@ whitespace ignored; exit 0 when every file is equal, 1 otherwise (the file, the 
 differing token are printed), 2 when git cannot answer. A file added or deleted since <rev> is a difference.
 
 C++ files are compared token by token. Comments are dropped, except the markers that tools read: `//-NoStd:`, `NOLINT*`,
-`clang-format off` / `on`, which stay in the compared text, so changing or deleting one fails. Comments and the insides of
-string, character and raw string literals are told apart by the scanner. Python files are compared by their syntax tree
-without docstrings (comments are not in it). XML, CMake and Markdown files are not compared.
+`clang-format off` / `on`, which stay in the compared text, so changing or deleting one fails. A `//-NoStd:` or
+`NOLINTNEXTLINE` marker alone on its line also keeps the number of lines down to its code, so a comment or a blank line put
+between them fails. Comments and the insides of string, character and raw string literals are told apart by the scanner.
+Python files are compared by their syntax tree without docstrings (comments are not in it). XML, CMake and Markdown files
+are not compared.
 
 Without `paths` the files are the ones `git diff <rev>` lists (and the untracked ones); a path (file or folder, relative to
 --root) narrows them. Standard library only.
@@ -33,12 +35,18 @@ SUFFIXES = CPP_SUFFIXES | PYTHON_SUFFIXES
 # A comment that is code to the check: a marker a tool reads. The text of the whole comment is compared.
 MARKER = re.compile(r"^//-NoStd:|NOLINT|clang-format\s+(?:off|on)\b")
 
+# A marker that covers the next line when it stands alone on its line. The number of lines between it and its code is part
+# of the compared text (`[+1]`: the code is on the next line), so a comment or a blank line put between them, or taken out,
+# is seen.
+NEXT_LINE_MARKER = re.compile(r"^//-NoStd:|NOLINTNEXTLINE")
+GAP = re.compile(r" \[\+(\d+)\]$")
+
 # One alternative per kind, leftmost wins (the same shape as `mask` of engine/CI/scripts/nostd.py, which blanks instead of
 # splitting). A raw string comes before a plain one, and both before an identifier, so that `u8"x"` and `R"x(..)x"` are
 # literals; a number is consumed whole so that the `'` of `1'000` is no character literal.
 TOKEN = re.compile(
     r"""
-      (?P<line>//(?:[^\n\\]|\\.)*)
+      (?P<line>//(?:[^\n]|(?<=\\)\n)*)
     | (?P<block>/\*.*?(?:\*/|\Z))
     | (?P<raw>(?:u8|u|U|L)?R"(?P<delim>[^()\\\s"]{0,16})\(.*?\)(?P=delim)")
     | (?P<str>(?:u8|u|U|L)?"(?:[^"\\\n]|\\.)*")
@@ -69,6 +77,16 @@ def cpp_tokens(source: str) -> list[Token]:
     line = 1
     at_line_start = True
     in_directive = False
+    lone_marker: tuple[int, int] | None = None  # (index in tokens, the line it ends on) of a marker waiting for its code
+
+    def add(text: str, text_line: int) -> None:
+        nonlocal lone_marker
+        if lone_marker is not None:
+            index, end_line = lone_marker
+            tokens[index] = Token(f"{tokens[index].text} [+{text_line - end_line}]", tokens[index].line)
+            lone_marker = None
+        tokens.append(Token(text, text_line))
+
     for match in TOKEN.finditer(source):
         kind = match.lastgroup
         text = match.group(0)
@@ -76,21 +94,24 @@ def cpp_tokens(source: str) -> list[Token]:
         line += text.count("\n")
         if kind in ("line", "block"):
             if MARKER.search(text):
-                tokens.append(Token(" ".join(text.split()), start_line))
+                alone = at_line_start and NEXT_LINE_MARKER.search(text) is not None
+                add(" ".join(text.split()), start_line)
+                if alone:
+                    lone_marker = (len(tokens) - 1, line)
                 at_line_start = False
             continue
         if kind in ("space", "cont"):
             continue
         if kind == "newline":
             if in_directive:
-                tokens.append(Token(NEWLINE_TOKEN, start_line))
+                add(NEWLINE_TOKEN, start_line)
                 in_directive = False
             at_line_start = True
             continue
         if kind == "punct" and text == "#" and at_line_start:
             in_directive = True
         at_line_start = False
-        tokens.append(Token(text, start_line))
+        add(text, start_line)
     return tokens
 
 
@@ -100,7 +121,13 @@ def first_cpp_difference(old: str, new: str) -> tuple[int, str] | None:
     new_tokens = cpp_tokens(new)
     for index in range(min(len(old_tokens), len(new_tokens))):
         if old_tokens[index].text != new_tokens[index].text:
-            return new_tokens[index].line, f"{describe(new_tokens[index].text)} instead of {describe(old_tokens[index].text)}"
+            old_text, new_text = old_tokens[index].text, new_tokens[index].text
+            if GAP.sub("", old_text) == GAP.sub("", new_text):
+                return new_tokens[index].line, (
+                    f"the code moved from its marker `{GAP.sub('', new_text)}` "
+                    f"(the next token is {GAP.search(new_text).group(1)} lines below it, was {GAP.search(old_text).group(1)})"
+                )
+            return new_tokens[index].line, f"{describe(new_text)} instead of {describe(old_text)}"
     if len(new_tokens) > len(old_tokens):
         extra = new_tokens[len(old_tokens)]
         return extra.line, f"extra {describe(extra.text)}"
