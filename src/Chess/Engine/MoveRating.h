@@ -7,20 +7,18 @@ namespace BECore::Chess {
     /**
      * @brief Why a played move is or is not a brilliant move. Pure: no engine, no task, no scene.
      *
-     * **The definition** (the only one the game uses): a move is brilliant when it is the engine's best move in the position it was played in
-     * (it equals the first line of an analysis of the position BEFORE the move, at a fixed depth) and it was a choice. The chess-site meaning (a good
-     * sacrifice) is not asked for. A best move is not marked when there was no choice:
-     *  - `Forced`: the position had one legal move (an analysis of such a position has one line, `Analysis::Second()` is null);
-     *  - `Obvious`: the second best line is far worse (the gap to line 1 is at least kForcedMargin), so it is "the only reasonable move": a forced recapture,
-     *    a mate in one against moves that do nothing.
-     * `NotBest` is any other move than the first line's (checked first, so it never depends on the second line).
+     * **The definition** (the only one the game uses): a move is brilliant when it is the engine's best move in the position it was played in (it equals the first line of an analysis of the
+     * position BEFORE the move, at a fixed depth) and it was a choice; the chess-site meaning (a good sacrifice) is not asked for. A best move is not marked when there was no choice:
+     *  - `Forced`: the position had one legal move (an analysis of it has one line, `Analysis::Second()` is null);
+     *  - `Obvious`: the second line is far behind (the gap to line 1 is at least kForcedMargin): "the only reasonable move".
+     * `NotBest` is any other move than the first line's (decided first, so it never depends on the second line).
      *
-     * A tie (equal scores of the first two lines) is a gap of 0, so the move of line 1 is the best move and the other move of the tie is `NotBest` (the engine's
-     * own pick decides between equals). The own engine searches each line on its own, so line 2 may score above line 1: a negative gap counts as 0, it is not a failure.
+     * A tie (equal scores of the first two lines) is a gap of 0: the move of line 1 is the best move and the other move of the tie is `NotBest`. The own engine searches each line on its own, so
+     * line 2 may score above line 1: a negative gap counts as 0, it is not a failure.
      */
     CORE_ENUM(MoveRatingReason, uint8_t, Brilliant, NotBest, Forced, Obvious)
 
-    /// The gap between the first two lines, in centipawns (two pawns), from which the best move is "the only reasonable one" (`Obvious`). A gap of kForcedMargin - 1 still is a choice
+    /// The gap between the first two lines, in centipawns, from which the best move is "the only reasonable one" (`Obvious`); a smaller gap is still a choice
     inline constexpr int kForcedMargin = 200;
 
     /// The scale on which a mate is compared with centipawns: a mate in m moves by the side to move is `kMateCentipawns - kCentipawnsPerMateMove * m`, the side to move mated in m moves is its
@@ -44,9 +42,8 @@ namespace BECore::Chess {
     /**
      * @brief @p score (from the side to move's view, as the analysis gives it) on one scale of centipawns, so that two lines can be subtracted.
      *
-     * Centipawns as they are. A mate in m moves is `kMateCentipawns - kCentipawnsPerMateMove * m` for the side that mates and its negation for the side that is mated:
-     * any mate beats any centipawn score (the search keeps those far below kMateCentipawns - 100 * 128), a closer mate is larger, and a closer mate
-     * against the side to move is smaller.
+     * Centipawns as they are; a mate as above. Any mate beats any centipawn score (a search keeps those below kMateScore - kMaxMatePly, Evaluation.h, far below a mate of kMaxMatePly plies on this
+     * scale), a closer mate is larger, and a closer mate against the side to move is smaller.
      */
     [[nodiscard]] int ScoreToCentipawns(const AnalysisScore& score) noexcept;
 
@@ -54,11 +51,10 @@ namespace BECore::Chess {
     [[nodiscard]] StringView MoveRatingReasonId(MoveRatingReason reason);
 
     /**
-     * @brief Rates @p played, a move made in the position that @p before analyses (an analysis of the position BEFORE the move, two lines asked for).
+     * @brief Rates @p played, a move made in the position that @p before analyses (the position BEFORE the move, two lines asked for), by the definition above.
      *
-     * `NotBest` when @p played is not `before.Best().move`; else `Forced` when `before.Second()` is null; else `Obvious` when
-     * `ScoreToCentipawns(line 1) - ScoreToCentipawns(line 2)` is at least kForcedMargin (a negative gap counts as 0); else `Brilliant`.
-     * @p before must have a line (an analysis that came back from an engine always has).
+     * The order is `NotBest`, `Forced`, `Obvious`, else `Brilliant`; the gap is `ScoreToCentipawns(line 1) - ScoreToCentipawns(line 2)`. @p before must have a line (an analysis that came back
+     * from an engine always has).
      */
     [[nodiscard]] MoveRating RateMove(const Analysis& before, Move played);
 
