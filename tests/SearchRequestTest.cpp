@@ -71,8 +71,8 @@ namespace BECore::Chess::Tests {
     TEST(SearchRequestTest, AModelGivesItsStartFenAndItsMovesWithCastlingAndPromotionSpelledRight) {
         ChessGameModel model;
         model.SetPosition(PositionFromFen(kCastlingAndPromotionFen));
-        ASSERT_TRUE(Play(model, "e1c1"));  // white castles long
-        ASSERT_TRUE(Play(model, "e8g8"));  // black castles short
+        ASSERT_TRUE(Play(model, "e1c1"));
+        ASSERT_TRUE(Play(model, "e8g8"));
         ASSERT_TRUE(Play(model, "b7b8q"));
 
         const SearchRequest request = SearchRequest::FromModel(model, SearchLimits{0, 8});
