@@ -57,11 +57,18 @@ namespace BECore::Chess {
         [[maybe_unused]] const auto engine = _opponent.SetEngine(kDefaultOpponentEngine);
         _choice.Reset();      // a new game starts with White remembered as the person's color
         _analyst.Shutdown();  // nothing is analysed or rated until the evaluation or the ratings are switched on or a hint is asked for
+        // Last: the game it restores goes into the fresh model and choice above, and the key it takes is that of the game it leaves
+        _keeper.Start(_model, _opponent, _choice);
+    }
+
+    void ChessGame::UpdateKeeper() {
+        _keeper.Update(_model, _opponent, _choice);
     }
 
     void ChessGame::Stop() {
-        // Components own their own subscriptions. The choice holds nothing but a reference to the controller and a color. The opponent goes now, before TaskManager::Shutdown(): a search nobody
-        // cancelled would hold the join of the pool
+        // Components own their own subscriptions. The choice holds nothing but a reference to the controller and a color. The game is written first, while the opponent still holds what the person
+        // picked (Shutdown() forgets it). The opponent goes now, before TaskManager::Shutdown(): a search nobody cancelled would hold the join of the pool
+        _keeper.Flush(_model, _opponent, _choice);
         _opponent.Shutdown();
         _analyst.Shutdown();
     }

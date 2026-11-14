@@ -5,6 +5,7 @@
 #include <Chess/Engine/OpponentController.h>
 #include <Chess/Engine/PositionAnalyst.h>
 #include <Chess/Game/ChessGameModel.h>
+#include <Chess/Save/ChessSaveKeeper.h>
 #include <Games/IGame.h>
 
 namespace BECore::Chess {
@@ -25,6 +26,9 @@ namespace BECore::Chess {
      * ratings of the played moves) is owned here as well, with the default factory over the settings the controller holds; it starts switched off and Start() puts it back to that. IGame has no
      * per-frame hook, so ChessBoardComponent runs GetOpponent().Update() and GetAnalyst().Update() every frame. Stop() destroys the opponent and shuts the analyst down, which happens before the task
      * system goes down (Application::Cleanup()): a search that nobody cancelled would hold the join of the pool.
+     *
+     * The game remembers itself (ChessSaveKeeper, when the run asks for it: Chess/Save/SaveSettings.h): Start() ends by restoring the saved game and the opponent choice into the fresh ones, Stop()
+     * starts by writing them (before the opponent goes), and ChessBoardComponent calls UpdateKeeper() every frame for the debounced write in between.
      */
     class ChessGame : public IGame {
         BE_CLASS(ChessGame)
@@ -69,6 +73,14 @@ namespace BECore::Chess {
             return _analyst;
         }
 
+        const ChessSaveKeeper& GetKeeper() const noexcept {
+            return _keeper;
+        }
+
+        /// Once per frame from ChessBoardComponent::OnUpdate (never from a draw): writes the game when it changed and the debounce of ChessSaveKeeper has passed. Does nothing in a run that saves
+        /// nothing
+        void UpdateKeeper();
+
         /// The active game, or nullptr when no game is active or the active game is not Chess.
         static ChessGame* GetActive();
 
@@ -89,6 +101,7 @@ namespace BECore::Chess {
         OpponentController _opponent;  ///< after the model (it holds a reference to it) and before the adapter
         OpponentChoice _choice;        ///< after the controller (it holds a reference to it)
         PositionAnalyst _analyst;      ///< after the controller (its factory reads the controller's settings) and before the adapter
+        ChessSaveKeeper _keeper;       ///< after everything it reads (it is handed the model, the controller and the choice in each call, and destroyed first)
         ChessGameControl _control;
     };
 
