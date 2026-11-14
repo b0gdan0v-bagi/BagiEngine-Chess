@@ -14,14 +14,14 @@ namespace BECore::Chess {
     constexpr StringView kFileLetters = "abcdefgh";
     constexpr StringView kRankDigits = "12345678";
 
-    /// The letter of the file drawn in the bottom-row cell of a column ("a".."h"), given the color at the bottom; empty for a column outside the board.
-    /// White at the bottom reads a..h from the left, Black at the bottom (the grid turned by 180 degrees) h..a
+    /// The letter of the file drawn in the bottom-row cell of a column, given the color at the bottom; empty for a column outside the board.
+    /// White at the bottom reads a..h from the left, Black at the bottom h..a
     [[nodiscard]] constexpr StringView FileLabel(int column, PieceColor bottom) noexcept {
         const Optional<Square> square = SquareAt(column, kLabelRow, bottom);
         return square ? kFileLetters.substr(square->file, 1) : StringView();
     }
 
-    /// The number of the rank drawn in the left-column cell of a row ("1".."8"), given the color at the bottom; empty for a row outside the board.
+    /// The number of the rank drawn in the left-column cell of a row, given the color at the bottom; empty for a row outside the board.
     /// White at the bottom reads 8..1 from the top, Black at the bottom 1..8
     [[nodiscard]] constexpr StringView RankLabel(int rowFromTop, PieceColor bottom) noexcept {
         const Optional<Square> square = SquareAt(kLabelColumn, rowFromTop, bottom);
@@ -33,8 +33,8 @@ namespace BECore::Chess {
         return ((file + rank) % 2) != 0;
     }
 
-    /// Whether the drawn cell is a light one, by the square it shows and the rule the board paints with (a1 is dark, h1 is light); false outside the board.
-    /// The turn by 180 degrees keeps the parity of the grid, so a cell has the same color in both orientations
+    /// Whether the drawn cell is a light one; false outside the board. The turn by 180 degrees keeps the parity of the grid,
+    /// so a cell has the same color in both orientations
     [[nodiscard]] constexpr bool IsLightCell(int column, int rowFromTop) noexcept {
         const Optional<Square> square = SquareAt(column, rowFromTop, PieceColor::White);
         return square && IsLightSquare(square->file, square->rank);
