@@ -25,8 +25,8 @@ namespace BECore::Chess {
     /// Why a pick of OpponentChoice did not happen as asked
     struct ChoiceError {
         ChoiceErrorKind kind = ChoiceErrorKind::BadId;
-        eastl::string detail;  ///< a sentence for the log: for BadId what was wrong, for Engine the detail of the engine error
-        EngineError engine;    ///< what OpponentController said; meaningful for the kind Engine only
+        String detail;       ///< a sentence for the log: for BadId what was wrong, for Engine the detail of the engine error
+        EngineError engine;  ///< what OpponentController said; meaningful for the kind Engine only
     };
 
     /**

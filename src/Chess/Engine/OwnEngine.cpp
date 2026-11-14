@@ -8,7 +8,7 @@ namespace BECore::Chess {
 
     namespace {
 
-        std::unexpected<EngineError> Fail(EngineErrorKind kind, eastl::string detail) {
+        std::unexpected<EngineError> Fail(EngineErrorKind kind, String detail) {
             return std::unexpected(EngineError{kind, std::move(detail)});
         }
 
@@ -67,7 +67,7 @@ namespace BECore::Chess {
             job.emplace(position, std::move(settings), std::move(control));
         }
 
-        void Finish(EngineErrorKind kind, eastl::string detail) {
+        void Finish(EngineErrorKind kind, String detail) {
             if (job) {
                 finishedNodes += job->GetResult().nodes;
                 job.reset();

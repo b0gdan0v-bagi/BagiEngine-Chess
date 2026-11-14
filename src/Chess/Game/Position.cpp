@@ -73,7 +73,7 @@ namespace BECore::Chess {
             return error == std::errc{} && end == text.data() + text.size() && out >= 0;
         }
 
-        void AppendSquareName(eastl::string& text, int sq) {
+        void AppendSquareName(String& text, int sq) {
             text.push_back(static_cast<char>('a' + sq % kBoardSide));
             text.push_back(static_cast<char>('1' + sq / kBoardSide));
         }
@@ -251,8 +251,8 @@ namespace BECore::Chess {
         return pos;
     }
 
-    eastl::string Position::ToFen() const {
-        eastl::string fen;
+    String Position::ToFen() const {
+        String fen;
         for (int rank = kBoardSide - 1; rank >= 0; --rank) {
             int empty = 0;
             for (int file = 0; file < kBoardSide; ++file) {

@@ -175,9 +175,9 @@ namespace BECore::Chess {
 
         // While an error of the opponent stands the game is stalled by it, so its sentence wins over "Check"
         const Optional<EngineError>& error = opponent.GetError();
-        const eastl::string turn = StatusText::Turn(model, thinking);
-        const eastl::string status = error ? OpponentText::Error(*error) : StatusText::Status(model);
-        const eastl::string opponentError = error ? OpponentText::Error(*error) : eastl::string();
+        const String turn = StatusText::Turn(model, thinking);
+        const String status = error ? OpponentText::Error(*error) : StatusText::Status(model);
+        const String opponentError = error ? OpponentText::Error(*error) : String();
         UIVars& vars = CoreManager::GetUIVars();
         vars.Set("turn"_intern, StringView(turn));
         vars.Set("status"_intern, StringView(status));

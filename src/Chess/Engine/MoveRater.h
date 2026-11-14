@@ -121,7 +121,7 @@ namespace BECore::Chess {
         eastl::shared_ptr<IChessEngine> _engine;
         bool _on = false;
 
-        eastl::string _startFen;  ///< the game the ratings belong to: its start position and the moves seen so far
+        String _startFen;  ///< the game the ratings belong to: its start position and the moves seen so far
         eastl::vector<Move> _moves;
         MoveRatings _ratings;         ///< aligned with _moves
         eastl::vector<bool> _failed;  ///< aligned with _moves: the search for this move failed and is not retried

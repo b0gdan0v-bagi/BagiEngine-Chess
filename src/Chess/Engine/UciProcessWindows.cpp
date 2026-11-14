@@ -21,7 +21,7 @@ namespace BECore::Chess {
         constexpr wchar_t kNullDevice[] = L"NUL";  // the child's stderr
         constexpr wchar_t kPipeNamePrefix[] = L"\\\\.\\pipe\\BagiChess-uci-";
 
-        std::unexpected<EngineError> Fail(EngineErrorKind kind, eastl::string detail) {
+        std::unexpected<EngineError> Fail(EngineErrorKind kind, String detail) {
             return std::unexpected(EngineError{kind, std::move(detail)});
         }
 
@@ -39,7 +39,7 @@ namespace BECore::Chess {
             return wide;
         }
 
-        eastl::string Narrow(const wchar_t* text, size_t length) {
+        String Narrow(const wchar_t* text, size_t length) {
             if (length == 0) {
                 return {};
             }
@@ -47,14 +47,14 @@ namespace BECore::Chess {
             if (size <= 0) {
                 return {};
             }
-            eastl::string narrow(static_cast<size_t>(size), '\0');
+            String narrow(static_cast<size_t>(size), '\0');
             WideCharToMultiByte(CP_UTF8, 0, text, static_cast<int>(length), narrow.data(), size, nullptr, nullptr);
             return narrow;
         }
 
         /// The system's sentence for @p code, in its language, without the end of line and the full stop, and the number: "Access is denied (error 5)".
         /// A few sentences have a placeholder for the file ("This version of %1 is not compatible ..."): it becomes "the program"
-        eastl::string ErrorText(DWORD code) {
+        String ErrorText(DWORD code) {
             wchar_t* message = nullptr;
             const DWORD length =
                 FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, nullptr, code, 0, reinterpret_cast<wchar_t*>(&message), 0, nullptr);
@@ -62,10 +62,10 @@ namespace BECore::Chess {
             while (end > 0 && (message[end - 1] == L'\r' || message[end - 1] == L'\n' || message[end - 1] == L' ' || message[end - 1] == L'.')) {
                 --end;
             }
-            eastl::string text = message != nullptr ? Narrow(message, end) : eastl::string();
+            String text = message != nullptr ? Narrow(message, end) : String();
             LocalFree(message);
             constexpr StringView kPlaceholder = "%1";
-            for (size_t at = text.find(kPlaceholder.data(), 0, kPlaceholder.size()); at != eastl::string::npos; at = text.find(kPlaceholder.data(), at, kPlaceholder.size())) {
+            for (size_t at = text.find(kPlaceholder.data(), 0, kPlaceholder.size()); at != String::npos; at = text.find(kPlaceholder.data(), at, kPlaceholder.size())) {
                 text.replace(at, kPlaceholder.size(), "the program");
             }
             if (text.empty()) {
@@ -247,7 +247,7 @@ namespace BECore::Chess {
         std::replace(application->begin(), application->end(), L'/', L'\\');
         // argv[0] is read by other rules (no escapes, quotes only), and a path holds no quote: it is always quoted
         std::wstring commandLine = L"\"" + *application + L"\"";
-        for (const eastl::string& argument : launch.args) {
+        for (const String& argument : launch.args) {
             const Optional<std::wstring> wide = Widen(argument);
             if (!wide) {
                 return cannotStart("an argument is not UTF-8");
@@ -334,7 +334,7 @@ namespace BECore::Chess {
             return Fail(EngineErrorKind::ProcessDied, Format("process {} is not running", _pid));
         }
 
-        eastl::string line(text.data(), text.size());
+        String line(text.data(), text.size());
         line.push_back('\n');
         size_t written = 0;
         while (written < line.size()) {
@@ -349,7 +349,7 @@ namespace BECore::Chess {
         return {};
     }
 
-    std::expected<eastl::string, EngineError> UciProcess::ReadLine(std::chrono::milliseconds timeout) {
+    std::expected<String, EngineError> UciProcess::ReadLine(std::chrono::milliseconds timeout) {
         using Clock = std::chrono::steady_clock;
         const Clock::time_point deadline = Clock::now() + timeout;
         WindowsState& state = *_windows;
@@ -361,7 +361,7 @@ namespace BECore::Chess {
         };
 
         for (;;) {
-            if (Optional<eastl::string> line = TakeBufferedLine()) {
+            if (Optional<String> line = TakeBufferedLine()) {
                 if (line->size() > kMaxLineBytes) {
                     return tooLong();  // it came whole within one read, but it is no line of ours
                 }

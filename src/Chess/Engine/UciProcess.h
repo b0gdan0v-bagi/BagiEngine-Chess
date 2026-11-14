@@ -15,8 +15,8 @@ namespace BECore::Chess {
 
     /// A program to start: the path of its executable (taken as it is, `PATH` is not searched) and the arguments after it
     struct ProcessLaunch {
-        eastl::string path;
-        eastl::vector<eastl::string> args;
+        String path;
+        eastl::vector<String> args;
     };
 
     /**
@@ -73,7 +73,7 @@ namespace BECore::Chess {
         /// The next line the child wrote, without its end of line (`\n` or `\r\n`), waiting at most @p timeout. Timeout when none came whole in that time:
         /// the bytes that did come are kept for the next call, so a line that arrives in pieces, or several lines in one read, are no problem.
         /// ProcessDied once the child closed its output and the lines before that were read (an unfinished last line is dropped)
-        [[nodiscard]] std::expected<eastl::string, EngineError> ReadLine(std::chrono::milliseconds timeout);
+        [[nodiscard]] std::expected<String, EngineError> ReadLine(std::chrono::milliseconds timeout);
 
         /**
          * @brief Ends the child and waits for it, whatever it does; the child is reaped when this returns. A second call does nothing.
@@ -92,7 +92,7 @@ namespace BECore::Chess {
         }
 
     private:
-        Optional<eastl::string> TakeBufferedLine();
+        Optional<String> TakeBufferedLine();
 
 #if CHESS_HAS_UCI_PROCESS && defined(_WIN32)
         struct WindowsState;  ///< the handles and the read in flight (UciProcessWindows.cpp: no <windows.h> in this header)
@@ -114,7 +114,7 @@ namespace BECore::Chess {
         int _pid = -1;
         bool _ended = false;        ///< the child is known to be gone or going: no more writes
         bool _outputEnded = false;  ///< end of file on the child's stdout: no more reads once the buffer is empty
-        eastl::string _buffer;      ///< bytes read and not yet given out; the next line starts at _head
+        String _buffer;             ///< bytes read and not yet given out; the next line starts at _head
         size_t _head = 0;
         size_t _scanned = 0;  ///< bytes after _head already searched for an end of line
     };

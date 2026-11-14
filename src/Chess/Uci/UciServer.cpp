@@ -36,8 +36,8 @@ namespace BECore::Chess::Uci {
             return true;
         }
 
-        eastl::string Lowered(StringView text) {
-            eastl::string result;
+        String Lowered(StringView text) {
+            String result;
             for (const char c : text) {
                 result.push_back(Lower(c));
             }
@@ -45,7 +45,7 @@ namespace BECore::Chess::Uci {
         }
 
         /// The game of a `position`: the start FEN and the moves as Move values. The text of the reason when the FEN or a move is refused
-        std::expected<SearchRequest, eastl::string> BuildGame(const PositionParams& params) {
+        std::expected<SearchRequest, String> BuildGame(const PositionParams& params) {
             const auto start = Position::FromFen(StringView(params.startFen));
             if (!start) {
                 return std::unexpected(Format("position refused: '{}' is not a position this game can play ({})", params.startFen, EnumUtils<FenError>::ToString(start.error())));
@@ -54,7 +54,7 @@ namespace BECore::Chess::Uci {
             game.startFen = params.startFen;
             Position position = *start;
             for (size_t index = 0; index < params.moves.size(); ++index) {
-                const eastl::string& text = params.moves[index];
+                const String& text = params.moves[index];
                 const Optional<Move> move = MoveGenerator::ParseUci(position, StringView(text));
                 if (!move) {
                     return std::unexpected(Format("position refused: move {} ({}) is not legal", index + 1, text));
@@ -128,7 +128,7 @@ namespace BECore::Chess::Uci {
                 Say(Format("option name {} type spin default 0 min 0 max {}", kDepthOption, kMaxDepthOption));
                 Say(Format("option name {} type spin default 0 min 0 max {}", kBlunderPercentOption, kMaxBlunderPercentOption));
                 {
-                    eastl::string levels = Format("option name {} type combo default {} var {}", kLevelOption, kCustomLevel, kCustomLevel);
+                    String levels = Format("option name {} type combo default {} var {}", kLevelOption, kCustomLevel, kCustomLevel);
                     for (const OpponentLevel& level : GetOpponentLevels()) {
                         levels.append(" var ");
                         levels.append(level.id.data(), level.id.size());

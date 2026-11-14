@@ -38,7 +38,7 @@ namespace BECore::Chess {
             return static_cast<char>('1' + s.rank);
         }
 
-        void AppendSquare(eastl::string& text, Square s) {
+        void AppendSquare(String& text, Square s) {
             text.push_back(FileLetter(s));
             text.push_back(RankDigit(s));
         }
@@ -78,8 +78,8 @@ namespace BECore::Chess {
 
     }  // namespace
 
-    eastl::string SanOf(const Position& before, Move move) {
-        eastl::string text;
+    String SanOf(const Position& before, Move move) {
+        String text;
         const Piece piece = before.GetPieceAt(move.From());
         const Square from = move.From();
         const Square to = move.To();

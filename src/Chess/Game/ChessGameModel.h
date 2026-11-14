@@ -68,7 +68,7 @@ namespace BECore::Chess {
             return _position;
         }
         /// The FEN the game began from: the opening position, or the one given to SetPosition().
-        [[nodiscard]] const eastl::string& GetStartFen() const noexcept {
+        [[nodiscard]] const String& GetStartFen() const noexcept {
             return _startFen;
         }
         /// The moves played since the game began, in order.
@@ -262,7 +262,7 @@ namespace BECore::Chess {
         void ReplayPieces();
 
         Position _position = Position::Start();
-        eastl::string _startFen;
+        String _startFen;
         eastl::vector<Move> _moves;
         uint64_t _version = 0;
         GameStatus _status = GameStatus::Ongoing;

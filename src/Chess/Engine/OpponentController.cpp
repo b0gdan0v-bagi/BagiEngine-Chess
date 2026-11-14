@@ -6,7 +6,7 @@
 namespace BECore::Chess {
 
     /// Why no Stockfish was found; names the path that was tried when the settings gave one, else the three places that are looked at
-    eastl::string NoStockfishDetail(const eastl::string& path) {
+    String NoStockfishDetail(const String& path) {
         if (!path.empty()) {
             return Format(
                 "no Stockfish file at '{}' (stockfishPath in config/ChessSettings.local.xml or ChessSettings.xml): the path is used as written, '~' and environment variables are not expanded, "
@@ -28,7 +28,7 @@ namespace BECore::Chess {
             if (!IsOpponentEngineAvailable(OpponentEngine::Stockfish)) {
                 return std::unexpected(UnavailableEngineError(OpponentEngine::Stockfish));
             }
-            const Optional<eastl::string> program = FindStockfish(settings.stockfishPath);
+            const Optional<String> program = FindStockfish(settings.stockfishPath);
             if (!program) {
                 return std::unexpected(EngineError{EngineErrorKind::LaunchFailed, NoStockfishDetail(settings.stockfishPath)});
             }

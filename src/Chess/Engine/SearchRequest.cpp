@@ -6,7 +6,7 @@ namespace BECore::Chess {
 
     namespace {
 
-        std::unexpected<EngineError> BadRequest(eastl::string detail) {
+        std::unexpected<EngineError> BadRequest(String detail) {
             return std::unexpected(EngineError{EngineErrorKind::BadRequest, std::move(detail)});
         }
 
@@ -48,7 +48,7 @@ namespace BECore::Chess {
         Position position = *start;
         for (size_t index = 0; index < moves.size(); ++index) {
             // The legal move of that spelling, not the stored one: a hand-made Move may lack its kind (castling, en passant)
-            const eastl::string text = moves[index].ToUci();
+            const String text = moves[index].ToUci();
             const auto legal = MoveGenerator::ParseUci(position, StringView(text));
             if (!legal) {
                 return BadRequest(Format("move {} ({}) is not legal in its turn", index + 1, text));

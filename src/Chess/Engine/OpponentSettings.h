@@ -29,7 +29,7 @@ namespace BECore::Chess {
         static constexpr StringView kStockfishPathAttribute = "stockfishPath";
 
         /// The path of the Stockfish to start; empty when no file names one
-        eastl::string stockfishPath;
+        String stockfishPath;
 
         /**
          * @brief The settings in the root elements of the two configs; an invalid node (no such file) is "not set".

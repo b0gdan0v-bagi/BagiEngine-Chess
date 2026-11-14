@@ -12,7 +12,7 @@ namespace BECore::Chess {
 
         }  // namespace
 
-        eastl::string Turn(const ChessGameModel& model, bool opponentThinking) {
+        String Turn(const ChessGameModel& model, bool opponentThinking) {
             if (!model.IsGameOver()) {
                 if (opponentThinking) {
                     return "Computer is thinking";
@@ -25,7 +25,7 @@ namespace BECore::Chess {
             return "Draw";
         }
 
-        eastl::string Status(const ChessGameModel& model) {
+        String Status(const ChessGameModel& model) {
             switch (model.GetStatus()) {
                 case GameStatus::Ongoing:
                     return model.IsInCheck() ? "Check" : "";

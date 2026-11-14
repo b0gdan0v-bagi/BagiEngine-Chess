@@ -22,7 +22,7 @@ namespace BECore::Chess {
             return value;
         }
 
-        std::unexpected<EngineError> Fail(EngineErrorKind kind, eastl::string detail) {
+        std::unexpected<EngineError> Fail(EngineErrorKind kind, String detail) {
             return std::unexpected(EngineError{kind, std::move(detail)});
         }
 

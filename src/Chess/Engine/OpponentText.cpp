@@ -4,15 +4,15 @@ namespace BECore::Chess {
 
     namespace OpponentText {
 
-        eastl::string ModeLabel(bool computer) {
+        String ModeLabel(bool computer) {
             return computer ? "Computer" : "Two players";
         }
 
-        eastl::string ColorLabel(PieceColor color) {
+        String ColorLabel(PieceColor color) {
             return color == PieceColor::White ? "White" : "Black";
         }
 
-        eastl::string Error(const EngineError& error) {
+        String Error(const EngineError& error) {
             switch (error.kind) {
                 case EngineErrorKind::LaunchFailed:
                     return "Engine not found";
@@ -33,7 +33,7 @@ namespace BECore::Chess {
                 case EngineErrorKind::Unsupported:
                     return "Engine not supported here";
             }
-            return eastl::string(kUnknownErrorSentence.data(), kUnknownErrorSentence.size());
+            return String(kUnknownErrorSentence.data(), kUnknownErrorSentence.size());
         }
 
     }  // namespace OpponentText

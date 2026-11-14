@@ -28,7 +28,7 @@ namespace BECore::Chess {
                 if (!IsOpponentEngineAvailable(OpponentEngine::Stockfish)) {
                     return std::unexpected(UnavailableEngineError(OpponentEngine::Stockfish));
                 }
-                const Optional<eastl::string> program = FindStockfish(settings.stockfishPath);
+                const Optional<String> program = FindStockfish(settings.stockfishPath);
                 if (!program) {
                     return std::unexpected(EngineError{EngineErrorKind::LaunchFailed, NoStockfishDetail(settings.stockfishPath)});
                 }

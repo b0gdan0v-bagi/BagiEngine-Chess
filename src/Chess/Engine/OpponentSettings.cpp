@@ -9,7 +9,7 @@ namespace BECore::Chess {
         constexpr StringView kWhitespace = " \t\r\n";
 
         /// The path in the root element @p root without the white space around it; empty when the node, the attribute or the value is missing
-        eastl::string ReadStockfishPath(const XmlNode& root) {
+        String ReadStockfishPath(const XmlNode& root) {
             if (!root) {
                 return {};
             }
@@ -22,7 +22,7 @@ namespace BECore::Chess {
                 return {};
             }
             const size_t last = value->find_last_not_of(kWhitespace);
-            return eastl::string(value->data() + first, last - first + 1);
+            return String(value->data() + first, last - first + 1);
         }
 
     }  // namespace

@@ -53,8 +53,8 @@ namespace BECore::Chess::Uci {
             return tokens;
         }
 
-        eastl::string ToString(StringView text) {
-            return eastl::string(text.data(), text.size());
+        String ToString(StringView text) {
+            return String(text.data(), text.size());
         }
 
         /// The field a `go` keyword fills, nothing for a word that is not one

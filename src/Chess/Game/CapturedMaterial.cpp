@@ -108,7 +108,7 @@ namespace BECore::Chess {
         return summary;
     }
 
-    eastl::string BalanceText(int pointsAhead) {
+    String BalanceText(int pointsAhead) {
         if (pointsAhead <= 0) {
             return {};
         }

@@ -24,7 +24,7 @@ namespace BECore::Chess {
         return {score.kind, sideToMove == PieceColor::White ? score.value : -score.value};
     }
 
-    eastl::string ScoreText(const AnalysisScore& score) {
+    String ScoreText(const AnalysisScore& score) {
         switch (score.kind) {
             case AnalysisScoreKind::Mate:
                 return Format("#{}", score.value);

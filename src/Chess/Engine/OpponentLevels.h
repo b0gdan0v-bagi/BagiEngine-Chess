@@ -39,6 +39,6 @@ namespace BECore::Chess {
 
     /// The UCI options of this level for UciEngineSettings::options (the Skill Level only; no UCI_Elo, it has the same floor as Skill Level 0): name and value of `setoption name <first> value
     /// <second>`
-    [[nodiscard]] eastl::vector<eastl::pair<eastl::string, eastl::string>> EngineOptionsOf(const OpponentLevel& level);
+    [[nodiscard]] eastl::vector<eastl::pair<String, String>> EngineOptionsOf(const OpponentLevel& level);
 
 }  // namespace BECore::Chess

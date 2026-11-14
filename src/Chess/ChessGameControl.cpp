@@ -61,7 +61,7 @@ namespace BECore::Chess {
             return "bad_request";
         }
 
-        Json TextJson(const eastl::string& text) {
+        Json TextJson(const String& text) {
             return MakeJsonString(StringView(text));
         }
 
@@ -80,7 +80,7 @@ namespace BECore::Chess {
         /// Whether the legal moves have a promotion between the squares of @p uci (a four letter spelling)
         bool NeedsPromotionPiece(const Position& position, StringView uci) {
             for (const Move move : MoveGenerator::GenerateLegal(position)) {
-                const eastl::string spelled = move.ToUci();
+                const String spelled = move.ToUci();
                 if (move.IsPromotion() && StringView(spelled.data(), kUciMoveLength) == uci) {
                     return true;
                 }
@@ -104,7 +104,7 @@ namespace BECore::Chess {
                 Json counts = Json::object();
                 for (const PieceType type : CapturableTypes()) {
                     const StringView id = CapturedId(type);
-                    counts[std::string(id.data(), id.size())] = summary.GetMissing(gone, type);
+                    counts[ToStdString(id)] = summary.GetMissing(gone, type);
                 }
                 return counts;
             };
@@ -117,8 +117,8 @@ namespace BECore::Chess {
         }
 
         /// "easy, medium, hard, max" for a message
-        eastl::string LevelIds() {
-            eastl::string ids;
+        String LevelIds() {
+            String ids;
             for (const OpponentLevel& level : GetOpponentLevels()) {
                 ids += Format("{}{}", ids.empty() ? "" : ", ", level.id);
             }
@@ -135,8 +135,8 @@ namespace BECore::Chess {
         constexpr StringView kBothId = "both";
 
         /// "stockfish, own" for a message
-        eastl::string EngineIds() {
-            eastl::string ids;
+        String EngineIds() {
+            String ids;
             for (const OpponentEngine engine : EnumUtils<OpponentEngine>::Values()) {
                 ids += Format("{}{}", ids.empty() ? "" : ", ", OpponentEngineId(engine));
             }
@@ -187,7 +187,7 @@ namespace BECore::Chess {
             return pick;
         }
 
-        ControlError BadOpponent(eastl::string message) {
+        ControlError BadOpponent(String message) {
             return MakeControlError(ControlErrors::kInvalidParams, message);
         }
 
@@ -214,7 +214,7 @@ namespace BECore::Chess {
 
         /// Reads the seat object {"engine", "level"} of one color into @p choice; nothing else is a member of it
         std::expected<void, ControlError> ReadSeat(const Json& seat, StringView color, SeatChoice& choice) {
-            const eastl::string where = Format("opponent '{}'", color);
+            const String where = Format("opponent '{}'", color);
             if (!seat.is_object()) {
                 return std::unexpected(BadOpponent(Format("{} has to be an object like {{\"engine\": \"own\", \"level\": \"easy\"}}", where)));
             }
@@ -277,13 +277,13 @@ namespace BECore::Chess {
     std::expected<Json, ControlError> ChessGameControl::GetState() const {
         Json board = Json::array();
         for (int8_t rank = 7; rank >= 0; --rank) {
-            std::string line;
+            String line;
             for (int8_t file = 0; file < 8; ++file) {
                 const Piece piece = _model.GetPieceAt(Square{file, rank});
                 const char* letters = piece.color == PieceColor::Black ? kBlackLetters : kWhiteLetters;
                 line.push_back(letters[static_cast<size_t>(piece.type)]);
             }
-            board.push_back(std::move(line));
+            board.push_back(MakeJsonString(line));
         }
 
         Json moves = Json::array();
@@ -315,7 +315,7 @@ namespace BECore::Chess {
             seat["engine"] = MakeJsonString(OpponentEngineId(choice.engine));
             seat["level"] = MakeJsonString(GetOpponentLevels()[choice.level].id);
             const StringView id = PieceColorId(color);
-            seats[std::string(id.data(), id.size())] = std::move(seat);
+            seats[ToStdString(id)] = std::move(seat);
         }
 
         Json opponent = Json::object();

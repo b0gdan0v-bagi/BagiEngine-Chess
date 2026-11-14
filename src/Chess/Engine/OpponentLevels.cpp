@@ -74,9 +74,9 @@ namespace BECore::Chess {
         return SearchLimits{};
     }
 
-    eastl::vector<eastl::pair<eastl::string, eastl::string>> EngineOptionsOf(const OpponentLevel& level) {
-        eastl::vector<eastl::pair<eastl::string, eastl::string>> options;
-        options.emplace_back(eastl::string(kSkillLevelOption.data(), kSkillLevelOption.size()), Format("{}", level.skillLevel));
+    eastl::vector<eastl::pair<String, String>> EngineOptionsOf(const OpponentLevel& level) {
+        eastl::vector<eastl::pair<String, String>> options;
+        options.emplace_back(String(kSkillLevelOption.data(), kSkillLevelOption.size()), Format("{}", level.skillLevel));
         return options;
     }
 

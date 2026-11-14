@@ -10,7 +10,7 @@ namespace BECore::Chess {
         constexpr StringView kBothId = "both";
         constexpr char kMoveSeparator = ' ';
 
-        std::unexpected<SaveError> Corrupt(const eastl::string& reason) {
+        std::unexpected<SaveError> Corrupt(const String& reason) {
             return std::unexpected(SaveError{SaveErrorKind::Corrupt, Format("the saved {}", reason)});
         }
 

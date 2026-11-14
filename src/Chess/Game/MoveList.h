@@ -7,7 +7,7 @@ namespace BECore::Chess {
     /// One move of the list: its text and where it is in the game. A place with no move (White's in a game that began with Black to move, Black's in
     /// the last row) has an empty text and a ply of -1.
     struct MoveListEntry {
-        eastl::string san;
+        String san;
         int ply = -1;  ///< The index of the move in ChessGameModel::GetMoves()
     };
 

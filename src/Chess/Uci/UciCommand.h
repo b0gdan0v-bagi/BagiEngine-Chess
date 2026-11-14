@@ -22,17 +22,17 @@ namespace BECore::Chess::Uci {
     /// The game of a `position` command: the start FEN and the moves as text. The parser does not know the rules: the position checks their legality later
     struct PositionParams {
         /// Position::kStartFen for `startpos`; for `fen` the fields up to `moves`, as they came (fewer than six fields too)
-        eastl::string startFen;
+        String startFen;
 
-        eastl::vector<eastl::string> moves;
+        eastl::vector<String> moves;
     };
 
     /// `setoption name <name> value <value>`; the name may hold spaces, the value is the rest of the line
     struct SetOptionParams {
-        eastl::string name;
+        String name;
 
         /// Empty when the line has no `value`
-        eastl::string value;
+        String value;
     };
 
     /// A parsed line: the kind, and the struct of that kind (the others stay empty)

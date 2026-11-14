@@ -10,7 +10,7 @@ namespace BECore::Chess {
         /// The answer of an engine to `go`: `bestmove e2e4`, `bestmove e2e4 ponder e7e5` (the ponder move is dropped)
         struct BestMove {
             /// The move as the engine spelled it ("e2e4", "e7e8q", "(none)", "0000"); empty when the line named none
-            eastl::string move;
+            String move;
 
             /// The engine has no move to give: `(none)` (mate or stalemate), `0000`, or no token at all
             [[nodiscard]] bool IsNone() const noexcept;
@@ -33,19 +33,19 @@ namespace BECore::Chess {
             bool upperBound = false;
 
             /// The first move after `pv` (the rest of the line is dropped); empty when there is none
-            eastl::string firstPvMove;
+            String firstPvMove;
         };
 
         /// `position fen <startFen>`, and ` moves m1 m2 ...` when the request has moves. The same text as `position_command` of tools/stockfish_bridge.py.
         /// The request is expected to have passed SearchRequest::Validate() and FinalPosition() (UciEngine does both first): the start FEN goes into the text as it is
-        [[nodiscard]] eastl::string PositionCommand(const SearchRequest& request);
+        [[nodiscard]] String PositionCommand(const SearchRequest& request);
 
         /// `go movetime 100`, `go depth 8`, or both (`go depth 8 movetime 100`). The limits are expected to be valid (SearchRequest::Validate()):
         /// without any limit the text is a plain `go`, which an engine answers with a search that never ends
-        [[nodiscard]] eastl::string GoCommand(const SearchLimits& limits);
+        [[nodiscard]] String GoCommand(const SearchLimits& limits);
 
         /// `setoption name Skill Level value 5`; a name may hold spaces, the value is taken as it is
-        [[nodiscard]] eastl::string SetOptionCommand(StringView name, StringView value);
+        [[nodiscard]] String SetOptionCommand(StringView name, StringView value);
 
         /// The answer in @p line when it is a `bestmove` line (an end of line left on it does no harm), nothing for any other line (`info ...`, an empty one)
         [[nodiscard]] Optional<BestMove> ParseBestMove(StringView line);

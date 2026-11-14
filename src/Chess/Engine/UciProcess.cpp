@@ -32,7 +32,7 @@ namespace BECore::Chess {
     namespace {
 
 #if !CHESS_HAS_UCI_PROCESS || CHESS_UCI_PROCESS_POSIX
-        std::unexpected<EngineError> Fail(EngineErrorKind kind, eastl::string detail) {
+        std::unexpected<EngineError> Fail(EngineErrorKind kind, String detail) {
             return std::unexpected(EngineError{kind, std::move(detail)});
         }
 #endif
@@ -47,9 +47,9 @@ namespace BECore::Chess {
         constexpr int kPipeWriteEnd = 1;
         constexpr const char* kNullDevice = "/dev/null";
 
-        eastl::string ErrnoText(int code) {
-            const std::string message = std::system_category().message(code);
-            return eastl::string(message.c_str(), message.size());
+        String ErrnoText(int code) {
+            const String message = std::system_category().message(code);
+            return String(message.c_str(), message.size());
         }
 
         /// A file descriptor closed with the object
@@ -188,13 +188,13 @@ namespace BECore::Chess {
 #if CHESS_HAS_UCI_PROCESS
 
     // The line buffer, the same on every platform with process code
-    Optional<eastl::string> UciProcess::TakeBufferedLine() {
+    Optional<String> UciProcess::TakeBufferedLine() {
         constexpr char kLineEnd = '\n';
         constexpr char kCarriageReturn = '\r';
         constexpr size_t kCompactBytes = 64 * 1024;  // the consumed front of the line buffer is dropped once it is this big and half of the buffer
 
         const size_t lineEnd = _buffer.find(kLineEnd, _head + _scanned);
-        if (lineEnd == eastl::string::npos) {
+        if (lineEnd == String::npos) {
             _scanned = _buffer.size() - _head;
             return std::nullopt;
         }
@@ -203,7 +203,7 @@ namespace BECore::Chess {
         if (textEnd > _head && _buffer[textEnd - 1] == kCarriageReturn) {
             --textEnd;
         }
-        eastl::string line(_buffer.data() + _head, textEnd - _head);
+        String line(_buffer.data() + _head, textEnd - _head);
         _head = lineEnd + 1;
         _scanned = 0;
         if (_head == _buffer.size()) {
@@ -244,7 +244,7 @@ namespace BECore::Chess {
         return Fail(EngineErrorKind::Unsupported, kNoProcessDetail);
     }
 
-    std::expected<eastl::string, EngineError> UciProcess::ReadLine(std::chrono::milliseconds) {
+    std::expected<String, EngineError> UciProcess::ReadLine(std::chrono::milliseconds) {
         return Fail(EngineErrorKind::Unsupported, kNoProcessDetail);
     }
 
@@ -287,7 +287,7 @@ namespace BECore::Chess {
 
         eastl::vector<char*> argv;  // posix_spawn takes char* const[] but does not change the strings
         argv.push_back(const_cast<char*>(launch.path.c_str()));
-        for (const eastl::string& argument : launch.args) {
+        for (const String& argument : launch.args) {
             argv.push_back(const_cast<char*>(argument.c_str()));
         }
         argv.push_back(nullptr);
@@ -313,7 +313,7 @@ namespace BECore::Chess {
             return Fail(EngineErrorKind::ProcessDied, Format("process {} is not running", _pid));
         }
 
-        eastl::string line(text.data(), text.size());
+        String line(text.data(), text.size());
         line.push_back('\n');
         size_t written = 0;
         while (written < line.size()) {
@@ -331,14 +331,14 @@ namespace BECore::Chess {
         return {};
     }
 
-    std::expected<eastl::string, EngineError> UciProcess::ReadLine(std::chrono::milliseconds timeout) {
+    std::expected<String, EngineError> UciProcess::ReadLine(std::chrono::milliseconds timeout) {
         using Clock = std::chrono::steady_clock;
         const Clock::time_point deadline = Clock::now() + timeout;
 
         const auto tooLong = [this] { return Fail(EngineErrorKind::ProtocolError, Format("process {} wrote a line longer than {} bytes", _pid, kMaxLineBytes)); };
 
         for (;;) {
-            if (Optional<eastl::string> line = TakeBufferedLine()) {
+            if (Optional<String> line = TakeBufferedLine()) {
                 if (line->size() > kMaxLineBytes) {
                     return tooLong();  // it came whole within one read, but it is no line of ours
                 }

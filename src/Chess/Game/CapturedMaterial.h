@@ -48,6 +48,6 @@ namespace BECore::Chess {
     [[nodiscard]] MaterialSummary SummarizeMaterial(const Position& position);
 
     /// The text of the lead of one side: "+N" for 1..99, "+99" for more, "" for no lead (zero or a deficit). The caller passes the lead of the side whose box this is
-    [[nodiscard]] eastl::string BalanceText(int pointsAhead);
+    [[nodiscard]] String BalanceText(int pointsAhead);
 
 }  // namespace BECore::Chess

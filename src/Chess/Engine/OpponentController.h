@@ -11,7 +11,7 @@ namespace BECore::Chess {
     using EngineFactory = eastl::function<std::expected<eastl::shared_ptr<IChessEngine>, EngineError>(OpponentEngine, const OpponentLevel&)>;
 
     /// Why no Stockfish was found: names the path that was tried when @p path is not empty, else the three places that are looked at. Shared with the analysis (PositionAnalyst)
-    [[nodiscard]] eastl::string NoStockfishDetail(const eastl::string& path);
+    [[nodiscard]] String NoStockfishDetail(const String& path);
 
     /// The error for an engine this build cannot run (IsOpponentEngineAvailable is false: Stockfish with CHESS_NO_STOCKFISH): `Unsupported`, with a sentence that says why. Shared with the analysis
     [[nodiscard]] EngineError UnavailableEngineError(OpponentEngine engine);

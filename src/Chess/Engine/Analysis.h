@@ -83,6 +83,6 @@ namespace BECore::Chess {
      * Centipawns are shown as pawns with two decimals and a sign (none for zero); a centipawn is already a hundredth, so nothing is rounded.
      * A mate is `#` and the signed number of moves.
      */
-    [[nodiscard]] eastl::string ScoreText(const AnalysisScore& score);
+    [[nodiscard]] String ScoreText(const AnalysisScore& score);
 
 }  // namespace BECore::Chess

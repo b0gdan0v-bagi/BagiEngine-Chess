@@ -16,6 +16,6 @@ namespace BECore::Chess {
      * @p move must be a legal move of the side to move in @p before (from MoveGenerator::GenerateLegal() or ParseUci()); for anything else the text is
      * unspecified. @p before is not changed.
      */
-    [[nodiscard]] eastl::string SanOf(const Position& before, Move move);
+    [[nodiscard]] String SanOf(const Position& before, Move move);
 
 }  // namespace BECore::Chess

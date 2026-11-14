@@ -75,8 +75,8 @@ namespace BECore::Chess {
             return text.empty() || text == kNoMoveText || text == kNullMoveText;
         }
 
-        eastl::string PositionCommand(const SearchRequest& request) {
-            eastl::string command = Format("position fen {}", request.startFen);
+        String PositionCommand(const SearchRequest& request) {
+            String command = Format("position fen {}", request.startFen);
             if (!request.moves.empty()) {
                 command.append(" moves");
                 for (const Move& move : request.moves) {
@@ -87,8 +87,8 @@ namespace BECore::Chess {
             return command;
         }
 
-        eastl::string GoCommand(const SearchLimits& limits) {
-            eastl::string command = "go";
+        String GoCommand(const SearchLimits& limits) {
+            String command = "go";
             if (limits.depth > 0) {
                 command.append(Format(" depth {}", limits.depth));
             }
@@ -98,7 +98,7 @@ namespace BECore::Chess {
             return command;
         }
 
-        eastl::string SetOptionCommand(StringView name, StringView value) {
+        String SetOptionCommand(StringView name, StringView value) {
             return Format("setoption name {} value {}", name, value);
         }
 
@@ -108,7 +108,7 @@ namespace BECore::Chess {
                 return std::nullopt;
             }
             const StringView move = TakeToken(rest);
-            return BestMove{eastl::string(move.data(), move.size())};
+            return BestMove{String(move.data(), move.size())};
         }
 
         Optional<Info> ParseInfo(StringView line) {
@@ -123,7 +123,7 @@ namespace BECore::Chess {
                 }
                 if (token == kPvToken) {
                     const StringView move = TakeToken(rest);
-                    info.firstPvMove = eastl::string(move.data(), move.size());
+                    info.firstPvMove = String(move.data(), move.size());
                     break;  // the other moves of the line are of no use here
                 }
                 if (token == kDepthToken) {

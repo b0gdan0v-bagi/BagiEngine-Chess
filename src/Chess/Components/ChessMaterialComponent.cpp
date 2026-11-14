@@ -72,7 +72,7 @@ namespace BECore::Chess {
                 const size_t row = group * kMaterialRowsPerGroup + index;
                 const int count = summary.GetMissing(taken, types[index]);
                 _counts[row] = count;
-                const eastl::string word = count > 0 ? Format("x{}", count) : eastl::string();
+                const String word = count > 0 ? Format("x{}", count) : String();
                 vars.Set(names.vars[row], StringView(word));
                 if (iconsToo && canvas) {
                     if (UIElement* element = canvas->GetRoot().FindByName(names.icons[row])) {
@@ -82,7 +82,7 @@ namespace BECore::Chess {
                     }
                 }
             }
-            const eastl::string balance = BalanceText(summary.GetPoints(color) - summary.GetPoints(taken));
+            const String balance = BalanceText(summary.GetPoints(color) - summary.GetPoints(taken));
             vars.Set(names.balanceVars[group], StringView(balance));
         }
     }

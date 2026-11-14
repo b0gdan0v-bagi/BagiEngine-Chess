@@ -18,7 +18,7 @@ namespace BECore::Chess {
     /// A failure of an engine call: the kind to branch on and a sentence for the log. Only the code that owns the player logs it
     struct EngineError {
         EngineErrorKind kind = EngineErrorKind::BadRequest;
-        eastl::string detail;
+        String detail;
     };
 
     /// How long or how deep an engine may search. 0 means no limit of that kind; the limits are valid when neither is negative and at least one is positive

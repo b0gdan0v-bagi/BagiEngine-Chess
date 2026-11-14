@@ -15,7 +15,7 @@ namespace BECore::Chess {
         static constexpr int kDefaultQuitGraceMs = 5000;          ///< how long a closed engine gets to leave after `quit` before it is sent a signal
 
         ProcessLaunch launch;
-        eastl::vector<eastl::pair<eastl::string, eastl::string>> options;  ///< `setoption name <first> value <second>`, in this order, after `uciok`
+        eastl::vector<eastl::pair<String, String>> options;  ///< `setoption name <first> value <second>`, in this order, after `uciok`
         int startupTimeoutMs = kDefaultStartupTimeoutMs;
         int answerSlackMs = kDefaultAnswerSlackMs;
         int depthOnlyTimeoutMs = kDefaultDepthOnlyTimeoutMs;
@@ -136,6 +136,6 @@ namespace BECore::Chess {
      * Only a lookup: nothing here knows where Stockfish is installed, and nothing of it is shipped with the game.
      * With CHESS_NO_STOCKFISH (the web build) the answer is always nothing and nothing is looked at.
      */
-    [[nodiscard]] Optional<eastl::string> FindStockfish(StringView explicitPath);
+    [[nodiscard]] Optional<String> FindStockfish(StringView explicitPath);
 
 }  // namespace BECore::Chess

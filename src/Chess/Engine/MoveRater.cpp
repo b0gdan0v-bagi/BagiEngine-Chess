@@ -172,7 +172,7 @@ namespace BECore::Chess {
     }
 
     void MoveRater::Fail(Optional<size_t> ply, EngineError error) {
-        const eastl::string which = ply ? Format(" of ply {}", *ply + 1) : eastl::string();
+        const String which = ply ? Format(" of ply {}", *ply + 1) : String();
         LOG_ERROR("Move rater: no rating{}, {}: {}"_format(which, EnumUtils<EngineErrorKind>::ToString(error.kind), error.detail));
         _error = std::move(error);
         if (ply) {

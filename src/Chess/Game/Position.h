@@ -46,7 +46,7 @@ namespace BECore::Chess {
         /// Parse a FEN string. The halfmove clock and fullmove number may be left out (they default to 0 and 1).
         [[nodiscard]] static std::expected<Position, FenError> FromFen(StringView fen);
 
-        [[nodiscard]] eastl::string ToFen() const;
+        [[nodiscard]] String ToFen() const;
 
         [[nodiscard]] PieceColor SideToMove() const noexcept {
             return _sideToMove;
