@@ -1,0 +1,36 @@
+{"scenario": 1, "game": "Chess", "flags": ["--headless", "--manual-clock"], "title": "Chess: the opponent panel by the person's clicks and what the game reads back, no move of the program"}
+{"method": "step", "params": {"frames": 2}}
+{"method": "reset"}
+{"method": "step", "params": {"frames": 2}}
+{"method": "ui_click", "params": {"name": "Menu"}, "expect": {"equal": {"consumed": true, "action": "ChessOpenOpponent", "value": ""}}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "get_state", "expect": {"pointers": {"/state/opponent/plays": null, "/state/moves": []}, "versionStep": 0}}
+{"method": "ui_click", "params": {"name": "LevelHard"}, "expect": {"equal": {"consumed": true, "action": "ChessSetLevel", "value": "hard"}}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "get_state", "expect": {"pointers": {"/state/opponent/level": "hard", "/state/opponent/plays": null}, "versionStep": 1}}
+{"method": "ui_click", "params": {"name": "ColorBlack"}, "expect": {"equal": {"consumed": true, "action": "ChessSetColor", "value": "black"}}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "get_state", "expect": {"pointers": {"/state/opponent/plays": null}, "versionStep": 0}}
+{"method": "ui_click", "params": {"name": "ColorWhite"}, "expect": {"equal": {"consumed": true, "action": "ChessSetColor", "value": "white"}}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "ui_click", "params": {"name": "EngineOwn"}, "expect": {"equal": {"consumed": true, "action": "ChessSetEngine", "value": "own"}}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "get_state", "expect": {"pointers": {"/state/opponent/engine": "own", "/state/opponent/plays": null, "/state/opponent/error": null}, "versionStep": 1}}
+{"method": "ui_click", "params": {"name": "ModeComputer"}, "expect": {"equal": {"consumed": true, "action": "ChessSetMode", "value": "computer"}}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "get_state", "expect": {"pointers": {"/state/opponent/plays": "black", "/state/opponent/engine": "own", "/state/opponent/level": "hard", "/state/opponent/error": null, "/state/moves": []}, "versionStep": 1}}
+{"method": "ui_click", "params": {"name": "LevelEasy"}, "expect": {"equal": {"consumed": true, "action": "ChessSetLevel", "value": "easy"}}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "get_state", "expect": {"pointers": {"/state/opponent/level": "easy"}, "versionStep": 1}}
+{"method": "ui_click", "params": {"name": "ColorWhite"}, "expect": {"equal": {"consumed": true, "action": "ChessSetColor", "value": "white"}}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "get_state", "expect": {"pointers": {"/state/opponent/plays": "black", "/state/moves": []}, "versionStep": 0}}
+{"method": "ui_click", "params": {"name": "ModeTwo"}, "expect": {"equal": {"consumed": true, "action": "ChessSetMode", "value": "two"}}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "get_state", "expect": {"pointers": {"/state/opponent/plays": null, "/state/opponent/error": null, "/state/moves": []}, "versionStep": 1}}
+{"method": "ui_click", "params": {"name": "LevelMax"}, "expect": {"equal": {"consumed": true, "action": "ChessSetLevel", "value": "max"}}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "get_state", "expect": {"pointers": {"/state/opponent/level": "max", "/state/opponent/plays": null, "/state/moves": []}, "versionStep": 1}}
+{"method": "ui_click", "params": {"name": "Ok"}, "expect": {"equal": {"consumed": true, "action": "ChessCloseOpponent", "value": ""}}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "ui_click", "params": {"name": "ModeComputer"}, "expect": {"error": "not_clickable", "logClean": true}}
