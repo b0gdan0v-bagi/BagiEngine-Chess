@@ -48,8 +48,7 @@ namespace BECore::Chess {
         constexpr const char* kNullDevice = "/dev/null";
 
         String ErrnoText(int code) {
-            const String message = std::system_category().message(code);
-            return String(message.c_str(), message.size());
+            return FromStdString(std::system_category().message(code));
         }
 
         /// A file descriptor closed with the object

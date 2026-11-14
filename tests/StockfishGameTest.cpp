@@ -89,7 +89,7 @@ namespace BECore::Chess::Tests {
         }
 
         OpponentSettings SettingsFor(const std::filesystem::path& program) {
-            return SettingsFor(StringView(FromStdString(program.string())));
+            return OpponentSettings{FromStdString(program.string())};
         }
 
         /// A Stockfish at @p path at the weakest `Skill Level`, the way the game starts one for the weakest level (but not through the factory: the games ask it directly)
