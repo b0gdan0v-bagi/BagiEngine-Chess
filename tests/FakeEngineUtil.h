@@ -26,7 +26,7 @@
 /// The fake UCI engine (tests/fake_uci_engine.py) and the files its tests leave behind. A test that starts it begins with SKIP_WITHOUT_FAKE_ENGINE()
 namespace BECore::Chess::Tests {
 
-    /// True when the fake engine can run here: there is a Python interpreter and the build has the process code (CHESS_HAS_UCI_PROCESS: not CHESS_NO_STOCKFISH)
+    /// True when the fake engine can run here: there is a Python interpreter and the build has the process code (CHESS_HAS_UCI_PROCESS)
     inline bool FakeEngineAvailable() {
 #if !CHESS_HAS_UCI_PROCESS
         return false;

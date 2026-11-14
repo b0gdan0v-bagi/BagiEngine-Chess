@@ -106,7 +106,7 @@ namespace BECore::Chess::Tests {
         }
 
 #if !defined(_WIN32)
-        /// A shell script that notes its start and its process id in @p pidFile, then becomes the Stockfish at @p stockfish. Without @p stdinLog it `exec`s the program, so the
+        /// A shell script that notes its start in kLaunchLogName and its process id in @p pidFile, then becomes the Stockfish at @p stockfish. Without @p stdinLog it `exec`s the program, so the
         /// id is the engine's. With it the script stays the parent of a pipe `tee | program` that copies every line the game sends into @p stdinLog: the first line of
         /// @p pidFile is then the script's id and the second the program's own
         std::filesystem::path WriteWrapper(const TempDirectory& directory, const String& stockfish, const char* pidFile, const char* stdinLog = nullptr) {
