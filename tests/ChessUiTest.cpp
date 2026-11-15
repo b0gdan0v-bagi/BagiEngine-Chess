@@ -3787,7 +3787,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheLevelActionPicksEveryLevelAndTheFactoryIsAskedOnlyWhenTheProgramPlays) {
-        // Every level segment of the panel emits ChessSetLevel with its id
+        // The segments of LevelGroup emit ChessSetLevel with the id of their level; the test presses the action the same way
         const auto levels = GetOpponentLevels();
         CountingFactory factory({MakeShared<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
