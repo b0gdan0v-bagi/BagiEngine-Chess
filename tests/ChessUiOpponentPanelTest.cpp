@@ -179,7 +179,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, EveryActionOfThePanelIsOneTheBoardAnswers) {
-        // Press each action with the id of a segment through the board, as the segment would: the controller reads the pick back (the unknown action is ignored by the board)
+        // Press each action with the id of a segment, as the segment would: the controller reads the pick back (the unknown action is ignored by ChessOpponentPanelComponent)
         CountingFactory factory({MakeShared<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -361,7 +361,7 @@ namespace BECore::Chess::Tests {
 
     // ---- the words and the actions of the opponent ------------------------------------------------------------------------
     // The HUD shows `turn` and `status` and the panel the ids of the choice; the layout is another matter, so these tests press the actions the segments emit (or
-    // click the segments where they are drawn) and read the variables the board publishes. The engines are the doubles of TestEngines.h
+    // click the segments where they are drawn) and read the variables the HUD publishes. The engines are the doubles of TestEngines.h
 
     TEST_F(ChessUiTest, TheOpponentWordsStartWithTwoPlayersAtTheMediumLevel) {
         EXPECT_EQ(Var("opponentMode"), "two");
@@ -372,7 +372,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, TheBoardDoesNotPublishASideVariable) {
         Draw();
-        EXPECT_TRUE(CoreManager::GetUIVars().Has(PoolString::Intern("opponentMode"))) << "the board publishes its variables: the check below is not about a missing frame";
+        EXPECT_TRUE(CoreManager::GetUIVars().Has(PoolString::Intern("opponentMode"))) << "the HUD publishes its variables: the check below is not about a missing frame";
         EXPECT_FALSE(CoreManager::GetUIVars().Has(PoolString::Intern("side")));
         PressWith("ChessSetLevel", "hard");  // a pick that needs no engine while nobody plays
         Draw();
@@ -752,8 +752,8 @@ namespace BECore::Chess::Tests {
     }
 
     // ---- the choice of the opponent panel: the actions with a value and the ids --------------------------------------------
-    // The segments of the panel emit ChessSetMode / ChessSetColor / ChessSetEngine / ChessSetLevel with the id as `value`; the board answers through OpponentChoice and
-    // publishes the ids. These tests press the actions the segments emit and read the variables
+    // The segments of the panel emit ChessSetMode / ChessSetColor / ChessSetEngine / ChessSetLevel with the id as `value`; ChessOpponentPanelComponent answers through OpponentChoice,
+    // ChessHudComponent publishes the ids. These tests press the actions the segments emit and read the variables
 
     TEST_F(ChessUiTest, TheIdsOfThePanelStartAsTwoWhiteTheDefaultEngineMediumAndNoError) {
         EXPECT_EQ(Var("opponentMode"), "two");

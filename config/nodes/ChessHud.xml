@@ -12,6 +12,7 @@
      safe area of the narrowest window with side insets is 590 units and 48 % of it, 283, cuts the longest sentence, which the 330 of the default view's narrowest window holds. -->
 <node name="Hud" layer="10" contentVersion="5">
   <components>
+    <component type="ChessHudComponent" />
     <component type="UICanvasComponent" space="SceneView" useSafeArea="true">
       <elements>
         <element type="UIElement" name="Turn" x="12" y="12" width="320" height="56" fontSize="28">

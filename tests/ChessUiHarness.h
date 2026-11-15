@@ -1031,7 +1031,7 @@ namespace BECore::Chess::Tests {
             return *opponent;
         }
 
-        /// The text of a UI variable after a frame was drawn: the board publishes the words of the HUD when it draws
+        /// The text of a UI variable after a frame was drawn: ChessHudComponent publishes the words of the HUD when it draws
         String Var(const char* name) {
             Draw();
             const StringView value = CoreManager::GetUIVars().Get(PoolString::Intern(name));
@@ -1373,7 +1373,7 @@ namespace BECore::Chess::Tests {
         /// The HUD as the board leaves it after a frame, through the size matrix with every word it can show: the validator's findings, and HudProblems()
         void ExpectTheHudSurvivesTheMatrix() {
             constexpr size_t kReportedFailures = 4;
-            Draw();  // the board publishes the words
+            Draw();  // the HUD publishes the words
 
             auto canvas = Hud();
             ASSERT_TRUE(canvas);
