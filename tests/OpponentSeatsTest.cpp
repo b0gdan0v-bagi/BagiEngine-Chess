@@ -48,7 +48,7 @@ namespace BECore::Chess::Tests {
     class OpponentSeatsTest : public ::testing::Test {
     protected:
         static void SetUpTestSuite() {
-            ::BECore::Tests::EngineEnvironment::EnsureCoreServices();  // TaskManager
+            ::BECore::Tests::EngineEnvironment::EnsureCoreServices();  // TaskManager, which the searches run on
         }
     };
 

@@ -62,7 +62,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(OpponentLevelsTest, TheShippedLadderIsPinned) {
-        // The numbers as the owner reads them: first guesses, tuned by playing. A change here is a decision, so it is a change of this test too
+        // The numbers as the owner reads them. A change here is a decision, so it is a change of this test too
         struct Row {
             const char* id;
             int skillLevel;

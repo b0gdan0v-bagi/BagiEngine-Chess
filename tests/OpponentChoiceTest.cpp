@@ -56,7 +56,7 @@ namespace BECore::Chess::Tests {
     class OpponentChoiceTest : public ::testing::Test {
     protected:
         static void SetUpTestSuite() {
-            ::BECore::Tests::EngineEnvironment::EnsureCoreServices();  // TaskManager
+            ::BECore::Tests::EngineEnvironment::EnsureCoreServices();  // TaskManager, which the searches run on
         }
     };
 
@@ -276,7 +276,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OpponentChoiceTest, WithoutStockfishThePickOfStockfishIsAnEngineErrorUnderTheDefaultFactoryAlsoWhileNobodyPlays) {
         ChessGameModel model;
-        OpponentController controller(model);  // the default factory
+        OpponentController controller(model);
         OpponentChoice choice(controller);
         ASSERT_EQ(choice.EngineId(), kOwnId);
 

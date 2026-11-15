@@ -59,7 +59,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(OpponentTextTest, AnIllegalMoveIsSaidInTheWidthOfTheLongestStatus) {
-        // The Status label is laid out for "Draw: insufficient material"; the sentence was longer once and did not fit the width of that label
+        // The Status label is laid out for "Draw: insufficient material", so the sentence has to fit that width
         EXPECT_EQ(OpponentText::Error(EngineError{EngineErrorKind::IllegalMove, "e2e5"}), "Illegal engine move");
     }
 
