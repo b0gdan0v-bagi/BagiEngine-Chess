@@ -87,6 +87,16 @@ namespace BECore::Chess::Tests {
         }
     }
 
+    TEST(SearchRequestTest, TheModelsSeedGoesIntoTheRequestAndAPositionHasNone) {
+        ChessGameModel model;
+        EXPECT_EQ(SearchRequest::FromModel(model, kMoveTime100).seed, 0U);
+
+        model.SetSeed(4242);
+        EXPECT_EQ(SearchRequest::FromModel(model, kMoveTime100).seed, 4242U);
+        EXPECT_EQ(SearchRequest::FromPosition(model.GetPosition(), kMoveTime100).seed, 0U);
+        EXPECT_EQ(SearchRequest{}.seed, 0U);
+    }
+
     TEST(SearchRequestTest, AnUnderpromotionKeepsItsLetter) {
         ChessGameModel model;
         model.SetPosition(PositionFromFen("8/P6k/8/8/8/8/8/K7 w - - 0 1"));

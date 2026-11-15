@@ -17,6 +17,7 @@ namespace BECore::Chess {
         request.startFen = model.GetStartFen();
         request.moves = model.GetMoves();
         request.limits = limits;
+        request.seed = model.GetSeed();
         return request;
     }
 

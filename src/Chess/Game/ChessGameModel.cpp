@@ -22,8 +22,19 @@ namespace BECore::Chess {
     }
 
     void ChessGameModel::Reset() {
+        if (_seedSource) {
+            const uint32_t drawn = _seedSource();
+            _seed = drawn == 0 ? 1 : drawn;  // 0 is "no variety", never a drawn seed
+        }
         BeginGame(Position::Start());
         PlaceHandlesAtStart();
+    }
+
+    void ChessGameModel::SetSeed(uint32_t seed) noexcept {
+        if (seed != _seed) {
+            _seed = seed;
+            ++_version;
+        }
     }
 
     void ChessGameModel::PlaceHandlesAtStart() {
