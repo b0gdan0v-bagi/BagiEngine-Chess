@@ -4,34 +4,30 @@
     python tests/control_smoke.py --exe build/macos-debug/BagiChess
 
 ctest runs it as BagiChessControlSmoke (be_add_game_control_tests). It builds on the engine's tools/control/tests/smoke.py,
-which it finds through the environment variable BAGI_ENGINE_DIR (set by ctest), or in the submodule engine/. The game is played on the real clock, with
---manual-clock, and with moves before its first frame. The computer opponent is played on both clocks in two ways. The engine of our own ("own
-engine" scenarios, base ones) needs nothing from the environment: it runs inside the game, with no process, so it also runs where the next kind is left out;
-it answers the same move to the same position (a fixed depth), which the scenario checks after a reset. The watch ("watch" scenarios, base ones too) lets two own engines
-play each other (`set_state` with `"plays": "both"` and a seat each), reads the seats back, follows the game (the version only grows, the turns alternate), checks that a hint is refused,
-that a reset keeps both seats (and, on the manual clock, plays the same game again), that `"plays": "white"` is a takeover that leaves Black to the person, and that null ends it. The analysis ("analysis" scenarios, base ones too) switches the evaluation of the own engine on, reads it from White's view on a mate in one, asks for a hint and reads it, and
-leaves the game with the analyst running; it also switches the ratings of the moves on (the own engine, in the background), plays a short game, waits until every entry of
-`analysis.ratings` is set and checks its shape and the pinned reasons of the game, and, after a reset and a frame (so that the old ratings are dropped), plays the same game again for the same ratings. The opponent panel ("opponent panel" scenarios, base
-ones too) reads the tree by element name where the build decides (the Stockfish segment, what is selected at the start) and, by `ui_click` on the buttons as a person
-would, picks the own engine and Computer, plays, lets the program open as White and closes with Close; the clicks and their read-back are `tests/scenarios/opponent_panel.jsonl`.
-The captured material ("captured material" scenarios, base ones too, no engine) is a picture check: on the headless run it compares the left margin of a screenshot
-(the display of the captured pieces) before and after a capture and after the reset; the numbers of `get_state.material` are `tests/scenarios/captured_material.jsonl`. Stockfish ("opponent" scenarios) is replaced by
-tests/fake_uci_engine.py: main() writes a wrapper script that starts it into a temporary directory and puts the script in STOCKFISH of the environment,
-which the game inherits. STOCKFISH comes before PATH in the game's search for an engine and the committed config has no path, so a Stockfish installed on
-this machine is never used. A config/ChessSettings.local.xml (a person's own path, which would win over STOCKFISH) leaves the Stockfish scenarios out, as
-does Windows; the smoke never edits a person's files. A build without Stockfish (CHESS_NO_STOCKFISH, the web build's world, or a desktop build that switches it on) is
-recognised by the script itself, with no environment variable: the first get_state of a game says `opponent.engine` "own" instead of "stockfish". Then the scenarios that
-need the fake Stockfish end at once, and the base scenario "without Stockfish" checks what that build does instead (the default engine is own, `stockfish` is `engine_unavailable`
-in `engine`, in a seat object and with a side, with the opponent unchanged, the panel has no visible Stockfish segment and Own engine is selected, and the own engine plays);
-in a build with Stockfish that scenario ends at once. Exit code: 0 passed, 1 failed, 77 skipped (the executable does not exist).
+which it finds through the environment variable BAGI_ENGINE_DIR (set by ctest), or in the submodule engine/. The game is played
+on the real clock and with --manual-clock; one scenario plays moves before the first frame.
 
-The restart ("restart" scenarios, base ones, real and manual clock) starts the game with `--save-dir=<its own temporary folder>` (the flag turns the save on despite the control flags), picks the
-own engine as Black and plays a move, quits, and starts again on the same folder: the position, the moves and the opponent are the same; a reset then a restart keeps the choice with the opening. A start with no `--save-dir`
-is the opening with nobody playing. The person's own save folder is never named.
+The scenarios of the own engine, the watch (two own engines), the analysis and the ratings, the opponent panel, the captured
+material and "without Stockfish" are base ones: the own engine runs inside the game, so they need nothing from the environment.
+Stockfish ("opponent" scenarios) is replaced by tests/fake_uci_engine.py: main() writes a wrapper script that starts it into a
+temporary directory and puts the script in STOCKFISH of the environment, which the game inherits. STOCKFISH comes before PATH in
+the game's search for an engine and the committed config has no path, so a Stockfish installed on this machine is never used. A
+config/ChessSettings.local.xml (a person's own path, which would win over STOCKFISH) leaves the Stockfish scenarios out, as does
+Windows; the smoke never edits a person's files. A build without Stockfish (CHESS_NO_STOCKFISH, the web build's world, or a
+desktop build that switches it on) is recognised by the script itself, with no environment variable: the get_state of a new
+game says `opponent.engine` "own" instead of "stockfish". Then the scenarios that need the fake Stockfish end at once, and the
+scenario "without Stockfish" checks what that build does instead; in a build with Stockfish it ends at once.
 
-What a recorded scenario can state moved out of this script into `tests/scenarios/*.jsonl` (ctest `BagiChessScenario.<file>`, the manual clock, played by the engine's
-bagi_play.py): the refusals, the mate and the game over, the reset, promotion, the captured material numbers and the clicks of the opponent panel. What stays here needs a wait
-for the program, a picture, the real clock or an answer that depends on the build; the real clock keeps the start position, the opening, the push and the screenshots.
+The restart scenarios start the game with `--save-dir=<their own temporary folder>` (the flag turns the save on despite the
+control flags), play, quit and start again on the same folder. A start with no `--save-dir` is the opening with nobody playing;
+the person's own save folder is never named.
+
+What a recorded scenario can state lives in `tests/scenarios/*.jsonl` (ctest `BagiChessScenario.<file>`, the manual clock, played
+by the engine's bagi_play.py): the refusals, the mate and the game over, the reset, promotion, the numbers of the captured
+material and the clicks of the opponent panel. What stays here needs a wait for the program, a picture, the real clock or an
+answer that depends on the build.
+
+Exit code: 0 passed, 1 failed, 77 skipped (the executable does not exist).
 """
 
 import os
@@ -191,8 +187,8 @@ def run_moves_before_the_first_frame(client: BagiControlClient, headless: bool) 
     client.call("step", {"frames": 2})
     by_moves = take_screenshot(client)
 
-    # The same position set from outside is drawn the same way, and it is not the opening. The board marks the two squares of the last move and a position set from a FEN
-    # has no move, so those two squares are left out of the comparison (the pieces on them are still compared by the neighbours and by the other squares)
+    # The same position set from outside is drawn the same way, and it is not the opening. A position set from a FEN has no last move, so the two squares
+    # the board marks for it are left out of the comparison
     client.call("set_state", {"fen": client.call("get_state")["state"]["fen"]})
     client.call("step", {"frames": 2})
     by_fen = take_screenshot(client)
@@ -236,7 +232,7 @@ def let_frames_pass(client: BagiControlClient, frames: int) -> None:
 def let_the_pieces_settle(client: BagiControlClient) -> None:
     """The pieces of a move that was just played have finished sliding to their squares (ChessPieceComponent, 0.15 s).
 
-    Manual clock: four frames of 0.1 s (the first sees the move, the next ones move the tween). Real clock: until the game time has grown by 0.5 s."""
+    Manual clock: SETTLE_FRAMES frames (the first sees the move, the next ones move the tween). Real clock: until the game time has grown by SETTLE_SECONDS."""
     if client.call("status")["manualClock"]:
         client.call("step", {"frames": SETTLE_FRAMES, "dt": SETTLE_FRAME_SECONDS})
         return
@@ -596,7 +592,6 @@ def run_analysis_scenario(client: BagiControlClient, headless: bool) -> None:
 
     check_the_ratings(client)  # two people play, the own engine rates in the background; it ends with the ratings off and a reset
 
-    # The own engine analyses; the evaluation is switched on and read back
     client.call("reset")
     version = client.call("get_state")["version"]
     client.call("set_state", {"opponent": {"engine": "own", "plays": None}})
@@ -682,7 +677,7 @@ BOARD_BAND_INSET = 2  # rows kept away from the edge of the board, against round
 
 
 def view_in_picture(image) -> tuple:
-    """Where the scene is in a screenshot: (scale, left, top). The window fits the 840 x 800 view by the smaller scale and centers it."""
+    """Where the scene is in a screenshot: (scale, left, top)."""
     scale = min(image.width / VIEW_WIDTH, image.height / VIEW_HEIGHT)
     return scale, (image.width - VIEW_WIDTH * scale) / 2, (image.height - VIEW_HEIGHT * scale) / 2
 
@@ -706,11 +701,10 @@ def check_the_board_turns_with_the_program(client: BagiControlClient) -> None:
     """The picture is drawn from Black's side while the program plays White, and from White's side otherwise.
 
     Only the rows of the board are compared (`board_band`): the HUD above and below the board says other words in each picture (the
-    turn and the status), so whole pictures differ without the board turning. The same placement of the pieces is drawn three times: with the program as White (Black to move: the
-    program does not search), with two people (Black to move) and with the program as Black (White to move, the same pieces: the side to move is not
-    drawn on the board). The last two have White at the bottom and must give one board band, which also shows that the band leaves the HUD out; the
-    turned one must differ from them, and drawn again after a round trip it must be the same band. Equality with a reference of "the white pieces at the
-    bottom" proves the turn only as far as the pieces differ between the two orientations, which they do after any opening move."""
+    turn and the status), so whole pictures differ without the board turning. The same placement of the pieces is drawn with the program as White (Black to move: the
+    program does not search), with two people (Black to move) and with the program as Black (White to move: the side to move is not drawn on the board). The last
+    two have White at the bottom and must give one board band, which also shows that the band leaves the HUD out; the turned one must differ from them, and drawn
+    again after a round trip it must be the same band. What fails when the board does not turn is the comparison of the turned band with each of the two bands that have White at the bottom (`!=`); it can tell only as far as the pieces differ between the two orientations, which they do after any opening move."""
     client.call("reset")
     client.call("set_state", {"opponent": {"engine": "own", "plays": "white", "level": "easy"}})
     wait_until_the_program_played(client, lambda moves: len(moves) == 1, "the opening move of White")
@@ -780,8 +774,7 @@ def band_has_color(band: list, channels: int, color: tuple) -> bool:
 def run_material_scenario(client: BagiControlClient, headless: bool) -> None:
     """The captured material in the picture: on the headless run the left margin shows it (the numbers of `get_state.material` are `tests/scenarios/captured_material.jsonl`).
 
-    Two people play e2e4 d7d5 e4d5, so White has taken a pawn. The margin band of a screenshot (the rows of the board, the columns left of it) is compared, not the
-    whole picture: the HUD says other words in each picture. A position set from outside and a reset in between bring the band back to the one of the start."""
+    The margin band of a screenshot (the rows of the board, the columns left of it) is compared, not the whole picture: the HUD says other words in each picture. A position set from outside and a reset in between bring the band back to the one of the start."""
     if client.call("status")["manualClock"]:
         client.call("step")  # the scene registers its pieces in the first frame
     client.call("reset")

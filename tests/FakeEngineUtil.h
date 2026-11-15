@@ -26,7 +26,7 @@
 /// The fake UCI engine (tests/fake_uci_engine.py) and the files its tests leave behind. A test that starts it begins with SKIP_WITHOUT_FAKE_ENGINE()
 namespace BECore::Chess::Tests {
 
-    /// True when the fake engine can run here: there is a Python interpreter and the build has the process code (POSIX or Windows, and not CHESS_NO_STOCKFISH: CHESS_HAS_UCI_PROCESS)
+    /// True when the fake engine can run here: there is a Python interpreter and the build has the process code (CHESS_HAS_UCI_PROCESS)
     inline bool FakeEngineAvailable() {
 #if !CHESS_HAS_UCI_PROCESS
         return false;
@@ -55,8 +55,8 @@ namespace BECore::Chess::Tests {
     /// A directory of the running test under the system's temporary one, removed with the object
     class TempDirectory {
     public:
-        // One directory per object: the name has the suite, the test, the process id (with TestTempPath's tag) and a counter. ctest runs every test in a process of its own, 8 or more at
-        // a time and beside other checkouts' ctests, and the constructor clears the directory, so a name made of the test alone lets two processes delete each other's files
+        // One directory per object: the name has the suite, the test, the process id (beside TestTempPath's tag) and a counter. ctest runs 8 or more processes at a time, beside
+        // other checkouts' ctests, and the constructor clears the directory, so a name made of the test alone lets two processes delete each other's files
         TempDirectory() : _path(::BECore::Tests::TestTempPath(DirectoryName())) {
             std::filesystem::remove_all(_path);
             std::filesystem::create_directories(_path);

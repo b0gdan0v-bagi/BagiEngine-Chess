@@ -98,7 +98,6 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(entry->depth, 2);
         EXPECT_EQ(entry->bound, TableBound::Upper);
 
-        // A new move replaces the old one
         table.Store(kKeyA, kMoveG1F3, 5, 3, TableBound::Lower);
         EXPECT_EQ(table.Probe(kKeyA)->move, kMoveG1F3);
     }

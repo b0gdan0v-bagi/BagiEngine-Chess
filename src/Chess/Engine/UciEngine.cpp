@@ -91,7 +91,6 @@ namespace BECore::Chess {
         }
 
 #if !CHESS_NO_STOCKFISH
-        /// The first of the explicit path and $STOCKFISH that is set decides (see FindStockfish); nothing when it is not a file
         Optional<String> ExistingFile(const String& path) {
             std::error_code error;
             if (!std::filesystem::is_regular_file(std::filesystem::path(ToStd(path)), error)) {
@@ -177,8 +176,8 @@ namespace BECore::Chess {
         const UciProtocol::Info& main = searched->infos.front();
         Analysis analysis{{AnalysisLine{searched->move, *main.score, main.depth}}};
 
-        // The other lines: the first move of the `pv` of their index, in the order of the index. A move that is not legal is the engine's fault (the process is kept, as for
-        // the `bestmove`); a repeat of a move already in the answer, and an index whose `pv` named nothing, are dropped, so the lines are always different moves
+        // The other lines: the first move of the `pv` of their index. An illegal one is the engine's fault (the process is kept, as for the `bestmove`);
+        // a repeat and an index whose `pv` named nothing are dropped, so the lines are always different moves
         for (size_t at = 1; at < searched->infos.size(); ++at) {
             const UciProtocol::Info& info = searched->infos[at];
             if (info.firstPvMove.empty()) {
@@ -260,8 +259,7 @@ namespace BECore::Chess {
                 return ready;
             }
         }
-        // The engine reads its input in order, so the option needs no `isready` of its own. A process has 1 line until told otherwise (the handshake does not touch the option),
-        // and a search for one line puts it back, so the opponent's own search is never slowed by a line count an analysis left
+        // The engine reads its input in order, so the option needs no `isready` of its own. The handshake does not touch the option, and a search for one line puts it back
         if (lineCount != _multiPv) {
             const String value = Format("{}", lineCount);
             if (auto sent = Send(UciProtocol::SetOptionCommand(kMultiPvOption, StringView(value))); !sent) {

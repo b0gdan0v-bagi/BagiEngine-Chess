@@ -171,7 +171,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(CapturedMaterialTest, SeveralPiecesGoneForBothColors) {
-        // White: six pawns, a knight, two rooks (no queen, no bishop). Black: five pawns, a knight, two rooks (no queen, no bishop)
+        // White: six pawns, a knight, two rooks. Black: five pawns, a knight, two rooks. Neither has a queen or a bishop
         const MaterialSummary summary = SummaryOf("r3k2r/pp3ppp/2n5/8/8/5N2/PPP2PPP/R3K2R w KQkq - 0 1");
         ExpectGone(summary, PieceColor::White, {1, 0, 2, 1, 2}, "white");
         ExpectGone(summary, PieceColor::Black, {1, 0, 2, 1, 3}, "black");
@@ -190,7 +190,7 @@ namespace BECore::Chess::Tests {
     // ---- Promotions ----
 
     TEST(CapturedMaterialTest, APromotionToAnExtraPieceIsNotAMissingPawn) {
-        // A full set minus the a-pawn, then the same set with an extra piece on a3 instead: seven pawns and the piece, so the pawn is not missing
+        // A full set minus the a-pawn, then an extra piece on a3 instead: seven pawns and the piece, so the pawn is not missing
         struct Case {
             const char* piece;
             int points;
@@ -215,7 +215,6 @@ namespace BECore::Chess::Tests {
             ExpectGone(after, PieceColor::Black, {0, 0, 0, 0, 0}, test.piece);
             EXPECT_EQ(after.GetBalance(), test.points) << test.piece;
 
-            // Black has the same, seen from the other side of the table
             const String mirrored = MirrorFen(StringView(promoted));
             const MaterialSummary seen = SummaryOf(StringView(mirrored));
             ExpectGone(seen, PieceColor::Black, test.whiteGone, test.piece);
@@ -260,7 +259,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(CapturedMaterialTest, APromotionToAPieceThatWasMissingFillsItsSlotAndTheListShowsAPawn) {
-        // The queen is the one the player lost: after a7a8q it is back (the list cannot tell a promoted queen from the first one), so the pawn shows as gone
+        // The queen is the one the player lost: after a7a8q it is back (the list cannot tell it from the first one), so the pawn shows as gone
         ChessGameModel model;
         model.SetPosition(PositionFromFen("4k3/P7/8/8/8/8/1PPPPPPP/4K3 w - - 0 1"));
         const MaterialSummary before = SummarizeMaterial(model.GetPosition());

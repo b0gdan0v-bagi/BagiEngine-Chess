@@ -153,7 +153,7 @@ namespace BECore::Chess::Tests {
     class EngineOpponentTest : public ::testing::Test {
     protected:
         static void SetUpTestSuite() {
-            ::BECore::Tests::EngineEnvironment::EnsureCoreServices();  // TaskManager
+            ::BECore::Tests::EngineEnvironment::EnsureCoreServices();  // TaskManager, which the opponent's search runs on
         }
     };
 
@@ -454,7 +454,7 @@ namespace BECore::Chess::Tests {
         EXPECT_FALSE(opponent.GetLastError().has_value());
     }
 
-    /// The real own engine over many slices (depth 4 is far more than one slice of nodes): the move is the blocking one, and a version that moves meanwhile drops the answer
+    /// The real own engine over many slices (depth 4 is far more than one slice of nodes): the move is the blocking one
     TEST_F(EngineOpponentTest, TheOwnEngineOverManySlicesPlaysTheBlockingMove) {
         constexpr SearchLimits kOwnLimits{0, 4};
         ChessGameModel model;

@@ -106,7 +106,6 @@ namespace BECore::Chess {
         const Piece clicked = _position.GetPieceAt(s);
 
         if (_hasPendingPromotion) {
-            // The person clicked the board instead of naming a piece: the choice is dropped, the pawn stays selected.
             CancelPromotion();
             return false;
         }

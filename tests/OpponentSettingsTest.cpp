@@ -123,7 +123,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(OpponentSettingsLoadTest, ConfigsThatAreNotLoadedMeanNoPath) {
-        // The game's own config/ is not mounted in the test environment, so neither of the two files is there; a machine where it is says nothing about this case
+        // The game's own config/ is not mounted in the test environment, so neither of the two files is there; the case skips when one is
         const ConfigManager& configs = CoreManager::GetConfigManager();
         if (configs.HasConfig(OpponentSettings::kSharedConfigName) || configs.HasConfig(OpponentSettings::kLocalConfigName)) {
             GTEST_SKIP() << "the test environment has a ChessSettings config mounted: Load() would read its path";

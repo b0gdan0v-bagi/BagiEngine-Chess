@@ -266,7 +266,7 @@ namespace BECore::Chess::Uci {
         Optional<EngineError> failure;
 
         if (job.deepen) {
-            // The answer of a search that nobody stops is the move of the deepest finished iteration
+            // The answer, also after a `stop`, is the move of the deepest finished iteration
             SearchRequest request = job.request;
             for (int depth = 1; depth <= kMaxSearchDepth; ++depth) {
                 request.limits = SearchLimits{0, depth};

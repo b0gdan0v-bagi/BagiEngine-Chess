@@ -16,9 +16,9 @@ namespace BECore::Chess {
     namespace {
 
         constexpr DWORD kReadChunkBytes = 4096;
-        constexpr DWORD kPipeBytes = 64 * 1024;    // the size the system is asked for, for both pipes (a hint: it may round it)
-        constexpr UINT kTerminatedExitCode = 1;    // the exit code of a child that TerminateProcess ended
-        constexpr wchar_t kNullDevice[] = L"NUL";  // the child's stderr
+        constexpr DWORD kPipeBytes = 64 * 1024;  // the size the system is asked for, for both pipes (a hint: it may round it)
+        constexpr UINT kTerminatedExitCode = 1;  // the exit code of a child that was terminated (TerminateJobObject or TerminateProcess)
+        constexpr wchar_t kNullDevice[] = L"NUL";
         constexpr StringView kPipeNamePrefix = "\\\\.\\pipe\\BagiChess-uci-";
 
         std::unexpected<EngineError> Fail(EngineErrorKind kind, String detail) {

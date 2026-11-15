@@ -16,7 +16,7 @@ namespace BECore::Chess::Tests {
     namespace {
 
         constexpr int kManyUpdates = 1000;
-        /// Well under the 5 s a UciEngine gives a stubborn child by default (UciEngineSettings::kDefaultQuitGraceMs); only the yardstick uses it
+        /// Well under the grace a UciEngine gives a stubborn child by default (UciEngineSettings::kDefaultQuitGraceMs); only the yardstick uses it
         constexpr std::chrono::milliseconds kShutdownBudget{3000};
         constexpr const char* kLogName = "fake.log";
 #if defined(_WIN32)
@@ -26,8 +26,8 @@ namespace BECore::Chess::Tests {
 #endif
         constexpr StringView kMissingPath = "/no/such/file";
         constexpr StringView kTildePath = "~/bin/stockfish";
-        constexpr std::filesystem::perms kScriptPermissions = std::filesystem::perms::owner_all | std::filesystem::perms::group_read | std::filesystem::perms::group_exec |
-                                                              std::filesystem::perms::others_read | std::filesystem::perms::others_exec;  // 755
+        constexpr std::filesystem::perms kScriptPermissions =
+            std::filesystem::perms::owner_all | std::filesystem::perms::group_read | std::filesystem::perms::group_exec | std::filesystem::perms::others_read | std::filesystem::perms::others_exec;
         constexpr StringView kHardLevelId = "hard";
 
         bool Play(ChessGameModel& model, StringView uci) {
@@ -82,7 +82,7 @@ namespace BECore::Chess::Tests {
     class OpponentControllerTest : public ::testing::Test {
     protected:
         static void SetUpTestSuite() {
-            ::BECore::Tests::EngineEnvironment::EnsureCoreServices();  // TaskManager
+            ::BECore::Tests::EngineEnvironment::EnsureCoreServices();  // TaskManager, which the searches run on
         }
     };
 
@@ -1054,7 +1054,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OpponentControllerTest, TheDefaultFactoryMakesTheOwnEngineWithNoSettingsNoFileAndNoProcess) {
         ChessGameModel model;
-        OpponentController controller(model);  // no factory, no settings
+        OpponentController controller(model);
         ASSERT_TRUE(controller.SetEngine(OpponentEngine::Own).has_value());
         ASSERT_TRUE(controller.SetLevel(LevelIndex("easy")).has_value());
         ASSERT_TRUE(controller.SetSide(PieceColor::Black).has_value());
@@ -1063,7 +1063,6 @@ namespace BECore::Chess::Tests {
 
         ASSERT_TRUE(UpdateUntil(controller, [&] { return model.GetMoves().size() == 2; })) << DescribeError(controller.GetError()).c_str();
 
-        // The reply is a legal move of Black: the model accepted it, and it is White's turn again
         EXPECT_EQ(model.GetTurn(), PieceColor::White);
         EXPECT_FALSE(controller.IsThinking());
         EXPECT_FALSE(controller.GetError().has_value());

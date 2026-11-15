@@ -9,11 +9,9 @@ namespace BECore::Chess {
     /**
      * @brief Precomputed attack sets and hashing keys, built once on first use.
      *
-     * Leapers (knight, king, pawn) are plain lookups. Rooks and bishops use magic bitboards: the blockers on a
-     * piece's rays are masked out of the occupancy, multiplied by a per-square magic number and shifted to an index
-     * into a table that holds the attack set for exactly that blocker pattern. The magics are searched for with a
-     * seeded generator when the tables are built; a candidate is accepted only if it maps every blocker pattern to the
-     * attack set the slow SlidingAttacks() gives for it.
+     * Leapers (knight, king, pawn) are plain lookups; rooks and bishops use magic bitboards. The magics are searched
+     * for with a fixed seed when the tables are built, so every run gets the same ones; a candidate is accepted only if
+     * it maps every blocker pattern to the attack set the slow SlidingAttacks() gives for it.
      *
      * Squares are Square::Index() values (a1 = 0 ... h8 = 63). Immutable after construction, so it is safe to read
      * from any thread.

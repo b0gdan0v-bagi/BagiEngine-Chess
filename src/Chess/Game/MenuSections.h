@@ -6,11 +6,11 @@ namespace BECore::Chess {
 
     /// One section of the menu: a modal canvas that the list panel `MenuPanel` opens by a button of its own
     struct MenuSection {
-        /// The name of the section in the action `ChessOpenSection` (its `value`): lower case, "opponent"
+        /// The name of the section in the action `ChessOpenSection` (its `value`), lower case
         StringView id;
-        /// The scene node that holds the canvas of the section: "OpponentPanel"
+        /// The scene node that holds the canvas of the section
         StringView node;
-        /// The word on the button of the list: "Opponent"
+        /// The word on the button of the list
         StringView label;
     };
 

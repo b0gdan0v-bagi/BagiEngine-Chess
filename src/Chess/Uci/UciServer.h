@@ -26,27 +26,24 @@ namespace BECore::Chess::Uci {
     /**
      * @brief The server side of UCI over an IChessEngine: what a GUI or a tournament tool talks to.
      *
-     * HandleLine() takes one line of the GUI and answers through the sink, one line each, without the end of line. Everything but a search is
-     * answered inside HandleLine(); a `go` starts the search on a worker thread and returns, so the caller (the reader of stdin) goes on reading
-     * `isready`, `stop` and `quit` while the engine thinks. One search runs at a time: `position`, `ucinewgame`, `setoption` and a second `go`
-     * are refused with an `info string` line until the `bestmove` is out. A line that is no command is skipped, a bad `position` or `setoption`
-     * is answered with an `info string` line and changes nothing.
+     * HandleLine() takes one line of the GUI and answers through the sink, one line each, without the end of line. It is for one thread; the sink may be called from the worker. A `go` starts the
+     * search on a worker thread and returns at once, so the caller (the reader of stdin) goes on reading `isready`, `stop` and `quit` while the engine thinks.
      *
-     * The engine that answers is a BlunderEngine over the engine given, with the share of the option BlunderPercent, so a level plays as the
-     * game plays it. A bounded `go` (a depth, a move time or a clock) is one FindMove() call. `go infinite` and `go ponder` deepen: depth 1, 2,
-     * 3, ... with Analyse() until `stop`, a mate score or kMaxSearchDepth. `stop` cancels the search; the answer is then the move of the last
-     * depth that finished, or, for a bounded `go` (or an infinite one stopped before depth 1 finished), the move of a search of depth 1.
-     * Every `go` is answered by exactly one `bestmove`. `stop` and `quit` cancel the search and wait for that answer (the cancelled search ends at once), so a
-     * `position` or `go` sent right behind a `stop`, before the GUI has read the `bestmove`, finds an idle server. Pondering is not supported: there is no Ponder
-     * option and no `ponder` move in a `bestmove`; `go ponder` is run as an infinite search and `ponderhit` is ignored. HandleLine() is for one thread; the sink
-     * may be called from the worker.
+     * One search runs at a time: `position`, `ucinewgame`, `setoption` and a second `go` are refused with an `info string` line until the `bestmove` is out. A line that is no command is skipped, a
+     * bad `position` or `setoption` is answered with an `info string` line and changes nothing.
+     *
+     * The engine that answers is a BlunderEngine over the engine given, with the share of the option BlunderPercent, so a level plays as the game plays it. A bounded `go` (a depth, a move time or a
+     * clock) is one FindMove(); a `go` with no limit, `go infinite` and `go ponder` deepen with Analyse() until `stop`, a mate score or kMaxSearchDepth. Every `go` is answered by exactly one
+     * `bestmove`. After a `stop` it is the move of the last depth that finished, or, when none did (a bounded `go` too), the move of a search of depth 1. `stop` and `quit` cancel the search and
+     * wait for that answer, so a `position` or `go` sent right behind a `stop`, before the GUI has read the `bestmove`, finds an idle server. Pondering is not supported: there is no Ponder option
+     * and no `ponder` move in a `bestmove`; `go ponder` is run as an infinite search and `ponderhit` is ignored.
      */
     class UciServer {
     public:
         //-NoStd: no callable alias yet (callables-move-only)
         using Sink = eastl::function<void(StringView)>;
 
-        /// @p engine answers the searches (not null); @p sink gets every line of the server
+        /// @p engine answers the searches (not null) and must honour the CancellationToken: `stop` and `quit` wait for it. @p sink gets every line of the server
         UciServer(SharedPtr<IChessEngine> engine, Sink sink);
 
         /// Cancels a running search and waits for the worker (its `bestmove` still goes to the sink)

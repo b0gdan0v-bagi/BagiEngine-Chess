@@ -1,6 +1,6 @@
 """Everything about a UCI match that needs no process: the steps, the openings, the schedule, the record and the report.
 
-Used by `tools/uci_match.py` (the runner); standard library and `elo_rating` only, no process, no I/O.
+Used by `tools/uci_match.py` (the runner); standard library and `elo_rating` only.
 
     step = parse_own_step("hard")                      # OwnStep(label="hard", options={"Level": "hard"}, go_depth=None)
     step = parse_own_step("depth=2,blunder=15")        # options {"Depth": "2", "BlunderPercent": "15"}, go_depth 2
@@ -76,7 +76,7 @@ _NUMBER = re.compile(r"[0-9]+")  # `int()` alone also takes "+3", "-3", " 3", "3
 
 @dataclass(frozen=True)
 class OwnStep:
-    """One strength of the engine under test: the options set before a pair and the depth of `go` (None: it comes from the options)."""
+    """One strength of the engine under test; `go_depth` None: the depth comes from the options."""
 
     label: str
     options: dict[str, str]
@@ -240,7 +240,7 @@ def _rating_json(rating: Rating | None) -> dict | None:
 
 
 def to_json(settings: dict, pairs: list[PairRecord]) -> dict:
-    """The record of a match as a dict for `json.dump`: the settings, every pair with its games, and the summary per own step."""
+    """The record of a match as a dict for `json.dump` (the shape is in the module docstring)."""
     return {
         "settings": _plain(settings),
         "pairs": [
@@ -271,7 +271,7 @@ def to_json(settings: dict, pairs: list[PairRecord]) -> dict:
 
 
 def format_table(pairs: list[PairRecord]) -> str:
-    """A plain ASCII table: one row per pair (step, opponent Elo, W/D/L, score, Elo of the pair), then one line per step."""
+    """A plain ASCII table: one row per pair, then one line per own step."""
     header = ("step", "opp Elo", "W/D/L", "score", "Elo")
     rows = []
     for pair in pairs:

@@ -91,7 +91,7 @@ namespace BECore::Chess {
     MaterialSummary SummarizeMaterial(const Position& position) {
         MaterialSummary summary;
         for (const PieceColor color : {PieceColor::White, PieceColor::Black}) {
-            int promoted = 0;  // pieces beyond the starting set: each one is a pawn that is not a pawn any more
+            int promoted = 0;  // pieces beyond the starting set: each is a promoted pawn
             int pawns = 0;
             for (const CapturableEntry& entry : kCapturable) {
                 const int onBoard = PopCount(position.Pieces(color, entry.type));

@@ -131,7 +131,7 @@ class UciEngine:
         return said[:-1]
 
     def legal_moves(self, position: str) -> set[str]:
-        """The legal moves of `position` as Stockfish counts them (`go perft 1`)."""
+        """The legal moves of `position` as Stockfish lists them."""
         self._send(position)
         self._send("go perft 1")
         moves: set[str] = set()
@@ -209,7 +209,7 @@ class GameReport:
     plies: int = 0  # moves this run sent to the game
     status: str = STATUS_ONGOING
     winner: str | None = None
-    moves: list[str] = field(default_factory=list)  # every move of the game, as the game has them
+    moves: list[str] = field(default_factory=list)
     reached_max_plies: bool = False
 
 

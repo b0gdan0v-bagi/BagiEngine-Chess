@@ -114,7 +114,7 @@ namespace BECore::Chess::Tests {
             CancelOnLogLine(const CancelOnLogLine&) = delete;
             CancelOnLogLine& operator=(const CancelOnLogLine&) = delete;
 
-            /// When the token was cancelled
+            /// When the token was cancelled; waits for the watcher first
             Clock::time_point CancelledAt() {
                 Join();
                 return _cancelledAt;
@@ -228,7 +228,7 @@ namespace BECore::Chess::Tests {
 
     TEST(UciEngineTest, InfoLinesAndUnknownLinesAreSkipped) {
         SKIP_WITHOUT_FAKE_ENGINE();
-        UciEngine engine(FakeSettings({"--garbage", "--moves", "e2e4,d2d4"}));  // the fake prints an info line before every bestmove
+        UciEngine engine(FakeSettings({"--garbage", "--moves", "e2e4,d2d4"}));  // the fake prints a few unknown lines before the info line of every answer
 
         ExpectMove(engine.FindMove(MakeRequest({}), CancellationToken()), "e2e4");
         ExpectMove(engine.FindMove(MakeRequest({}), CancellationToken()), "d2d4");
@@ -872,7 +872,7 @@ namespace BECore::Chess::Tests {
         UciEngine engine(FakeSettings({"--log", log, "--lines", kThreeLines}));
         const String position = StartPositionCommand();
 
-        // A fresh process has one line: a search for one line sends no option. Three lines ask for it; a search for one line (Analyse, then FindMove) puts it back once
+        // A fresh process has one line, so a search for one line sends no option; three lines send MultiPV 3; the next search for one line puts MultiPV 1 back, once
         ExpectAnalysis(engine.Analyse(MakeRequest({}), CancellationToken()), "e2e4", Cp(30), 1);
         EXPECT_EQ(CountMultiPvOptions(ReadFileLines(directory.File(kLogName))), 0u);
         ExpectLines(engine.Analyse(WithLines(MakeRequest({}), 3), CancellationToken()), {{"e2e4", Cp(30)}, {"d2d4", Cp(20)}, {"g1f3", Cp(-15)}});

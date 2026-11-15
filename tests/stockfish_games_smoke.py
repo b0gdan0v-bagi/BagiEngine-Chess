@@ -3,8 +3,8 @@
 
     python tests/stockfish_games_smoke.py --exe build/<preset>/bin/BagiChess
 
-ctest runs it as BagiChessStockfishGames (CMakeLists.txt). Stockfish plays both sides, then against random moves, then a mate in one, at a
-low skill level and a few milliseconds a move, capped in plies; every position is cross-checked against Stockfish's own move list (perft 1).
+ctest runs it as BagiChessStockfishGames (CMakeLists.txt). Stockfish plays both sides, then against random moves, then a mate in one,
+capped in plies; every position is cross-checked against Stockfish's own move list (perft 1).
 The assertions are about events (a move accepted, the same legal moves, the game ended), never about speed.
 
 The games are played by pytest (the file is a pytest module); the other tests of the file need no program and stay a plain `pytest` run.
@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 TOOLS = ROOT / "tools"
 TEST_FILE = TOOLS / "tests" / "test_stockfish.py"
 REAL_GAMES = "stockfish_plays_both_sides or stockfish_beats_random or stockfish_gives_mate"
-TIMEOUT_SECONDS = 600.0  # only ends a hung run; the three games take seconds
+TIMEOUT_SECONDS = 600.0  # only ends a hung run
 
 
 def skip(reason: str) -> int:

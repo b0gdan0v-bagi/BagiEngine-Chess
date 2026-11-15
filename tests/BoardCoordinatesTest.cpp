@@ -8,7 +8,7 @@ namespace BECore::Chess::Tests {
 
         constexpr PieceColor kWhite = PieceColor::White;
         constexpr PieceColor kBlack = PieceColor::Black;
-        constexpr int kBoardSize = 8;  // files and ranks
+        constexpr int kBoardSize = 8;
 
         String Joined(bool files, PieceColor bottom) {
             String text;
@@ -19,7 +19,6 @@ namespace BECore::Chess::Tests {
             return text;
         }
 
-        // The letter and the digit a square is named with
         char FileLetter(Square square) {
             return static_cast<char>('a' + square.file);
         }

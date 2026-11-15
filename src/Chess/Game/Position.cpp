@@ -7,7 +7,7 @@ namespace BECore::Chess {
     namespace {
 
         constexpr int kBoardSide = 8;
-        constexpr int kRankStep = 8;  // index distance between two squares one rank apart
+        constexpr int kRankStep = 8;
 
         constexpr int kA1 = 0;
         constexpr int kE1 = 4;
@@ -111,7 +111,7 @@ namespace BECore::Chess {
 
         Position pos;
 
-        // 1. Piece placement, rank 8 first.
+        // Piece placement, rank 8 first.
         int file = 0;
         int rank = kBoardSide - 1;
         for (const char c : fields[0]) {
@@ -152,7 +152,6 @@ namespace BECore::Chess {
             }
         }
 
-        // 2. Side to move.
         if (fields[1] == "w") {
             pos._sideToMove = PieceColor::White;
         } else if (fields[1] == "b") {
@@ -163,7 +162,7 @@ namespace BECore::Chess {
         const PieceColor us = pos._sideToMove;
         const PieceColor them = Opposite(us);
 
-        // 3. Castling rights; each one needs its king and rook on their home squares.
+        // Castling rights; each one needs its king and rook on their home squares.
         if (fields[2] != "-") {
             for (const char c : fields[2]) {
                 int right = 0;
@@ -204,7 +203,7 @@ namespace BECore::Chess {
             }
         }
 
-        // 4. En passant square: behind a pawn that has just advanced two squares, and only kept when it can be captured.
+        // En passant square: behind a pawn that has just advanced two squares, and only kept when it can be captured.
         if (fields[3] != "-") {
             if (fields[3].size() != 2 || fields[3][0] < 'a' || fields[3][0] > 'h') {
                 return std::unexpected(FenError::BadEnPassant);
@@ -226,7 +225,6 @@ namespace BECore::Chess {
             }
         }
 
-        // 5. and 6. Clocks.
         if (fieldCount > 4 && !ParseNumber(fields[4], pos._halfmoveClock)) {
             return std::unexpected(FenError::BadClock);
         }

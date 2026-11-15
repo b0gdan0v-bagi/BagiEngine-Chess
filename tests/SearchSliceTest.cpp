@@ -21,13 +21,13 @@ namespace BECore::Chess::Tests {
 
         using Clock = std::chrono::steady_clock;
 
-        /// The depths of the rows: 3 and 4 for the six positions, 5 where the table matters, 8 and 64 for the stops by the node limit
+        /// The depths of the rows; the two deepest are ended by a node limit, a mate or a cancel, never by their depth
         constexpr int kGoldenShallowDepth = 3;
         constexpr int kGoldenDepth = 4;
         constexpr int kGoldenDeepDepth = 5;
         constexpr int kGoldenDeepestDepth = 8;
         constexpr int kGoldenForeverDepth = 64;
-        /// The 1 and 2 plies of the easy and the medium level, and the depths of the mate and perpetual check positions
+        /// The plies of the easy and the medium level, and the depth of the perpetual check position
         constexpr int kGoldenEasyDepth = 1;
         constexpr int kGoldenMediumDepth = 2;
         constexpr int kGoldenChecksDepth = 6;
@@ -66,7 +66,6 @@ namespace BECore::Chess::Tests {
             bool cancelled = false;
         };
 
-        /// What a row of the table says
         struct GoldenRow {
             const char* name;
             const char* best;
@@ -170,7 +169,6 @@ namespace BECore::Chess::Tests {
             return settings;
         }
 
-        /// What a case hands to a search
         struct SearchInputs {
             Position position;
             SearchSettings settings;
@@ -205,7 +203,6 @@ namespace BECore::Chess::Tests {
         //-NoStd: no callable alias yet (callables-move-only)
         using SlicePolicy = std::function<uint64_t(size_t call)>;
 
-        /// The same slice every time
         SlicePolicy Fixed(uint64_t nodes) {
             return [nodes](size_t) { return nodes; };
         }
@@ -361,7 +358,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(SearchSliceTest, TheSearchGivesTheGoldenResults) {
-        // Every row was taken from the recursive search before it was rewritten. A row that moves means the search gives another answer
+        // The rows were taken from the recursive search: a row that moves means the search gives another answer
         const Vector<GoldenCase> cases = BuildGoldenCases();
         ASSERT_EQ(std::size(kGoldenRows), cases.size());
 
@@ -410,13 +407,13 @@ namespace BECore::Chess::Tests {
 
         /// A deadline far enough that a test never reaches it by accident, and short enough that a hang ends
         constexpr std::chrono::seconds kSafetyDeadline{60};
-        /// The perpetual checks of kChecksFen at depth 64 go on for ever (17 plies in 45 million nodes), so the deep search is stopped by its nodes
+        /// The perpetual checks of kChecksFen at depth 64 go on for ever, so the deep search is stopped by its nodes
         constexpr uint64_t kDeepSearchNodes = 300000;
-        /// The iteration the deep search has reached by then (measured: more than this), which is past the 6 of the golden row
+        /// A lower bound of the iteration the deep search has reached by then: past the depth of the golden row
         constexpr int kDeepSearchIterations = 8;
         /// A node limit that stops a search of kGoldenDeepestDepth inside an iteration
         constexpr uint64_t kMidIterationNodeLimit = 3000;
-        /// The deadline test: the first wait, the factor between attempts and the last wait worth trying (150, 600, 2400, 9600 ms)
+        /// The deadline test tries again with a longer wait when a busy machine lets the deadline pass early: the first wait, the factor between attempts and the last wait worth trying
         constexpr std::chrono::milliseconds kFirstDeadlineWait{150};
         constexpr int kDeadlineWaitFactor = 4;
         constexpr std::chrono::milliseconds kLastDeadlineWait{9600};
@@ -426,8 +423,7 @@ namespace BECore::Chess::Tests {
     }  // namespace
 
     TEST(SearchSliceTest, TheSlicedSearchGivesTheOneCallResult) {
-        // Every row of the golden table (the six perft positions with and without the table, the old quiet order and an excluded root move, the
-        // positions with a history, the mates, the node limits) driven in slices gives the numbers of the one call
+        // Every row of the golden table driven in slices gives the numbers of the one call
         const Vector<GoldenCase> cases = BuildGoldenCases();
         ASSERT_EQ(std::size(kGoldenRows), cases.size());
 
@@ -589,7 +585,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(job.Advance(kSliceOfOneNode), SearchProgress::Paused);
         control.token.Cancel();
 
-        // The first iteration of Kiwipete is 5180 nodes; nothing stops it, and the job stops at the end of it
+        // The first iteration of Kiwipete is 5180 nodes (the golden row); nothing stops it, and the job stops at the end of it
         while (!job.IsDone() && job.FinishedDepth() < 1) {
             (void)job.Advance(kSearchSliceNodes);
         }
@@ -606,8 +602,8 @@ namespace BECore::Chess::Tests {
         settings.maxDepth = kGoldenForeverDepth;
         constexpr int kIterations = 2;
 
-        // The deadline has to pass while the job is paused after its second iteration (204 nodes of the start position, a millisecond), and not before;
-        // on a machine so busy that it passes earlier the attempt is made again with a deadline kDeadlineWaitFactor times as far
+        // The deadline has to pass while the job is paused after its second iteration (204 nodes of the start position, far less than the first wait), and not
+        // before; on a machine so busy that it passes earlier the attempt is made again with a deadline kDeadlineWaitFactor times as far
         bool tried = false;
         for (std::chrono::milliseconds wait = kFirstDeadlineWait; wait <= kLastDeadlineWait && !tried; wait *= kDeadlineWaitFactor) {
             SearchControl control;
@@ -695,8 +691,8 @@ namespace BECore::Chess::Tests {
 
     TEST(SearchSliceTest, ADeepSearchNeedsNoDeepStack) {
         // The plies of the line are frames on the heap, not calls: a search of the perpetual checks at depth 64 (the extension, then the iterations
-        // that deepen the line one ply each) is driven on a thread of the default stack and ends when its nodes do. It does not reach the 96 plies
-        // of the limit in a test run (it would need the iteration 64), so this guards the shape, not the limit
+        // that deepen the line one ply each) is driven on a thread of the default stack and ends when its nodes do. It does not reach the ply limit
+        // in a test run (it would need the iteration 64), so this guards the shape, not the limit
         SearchResult result;
         std::thread worker([&result]() {
             Position position = PositionFromFen(kChecksFen);
@@ -726,7 +722,7 @@ namespace BECore::Chess::Tests {
         constexpr int kEngineShallowDepth = 3;
         constexpr int kEngineDepths[] = {3, 4};
         constexpr int kAnalysisLineCounts[] = {1, 2, 3, 8};
-        /// A position where Black has the king move a7 and nothing else, a mate and a stalemate
+        /// The positions of the errors: Black has the king move a7 and nothing else, is mated, is stalemated
         constexpr StringView kOneLegalMoveFen = "k7/8/2K5/8/8/8/8/1R6 b - - 0 1";
         constexpr StringView kMatedFen = "R5k1/5ppp/8/8/8/8/8/4K3 b - - 0 1";
         constexpr StringView kStalematedFen = "7k/5Q2/6K1/8/8/8/8/8 b - - 0 1";
@@ -808,7 +804,7 @@ namespace BECore::Chess::Tests {
             return text;
         }
 
-        /// The slice 2 pattern: a coroutine on the pool that begins a search and drives it a slice at a time, giving the frame back first
+        /// A coroutine on the pool that begins a search and drives it a slice at a time, giving the frame back first
         struct CoroutineAnswer {
             std::atomic<bool> done{false};
             std::expected<Analysis, EngineError> answer = std::unexpected(EngineError{EngineErrorKind::Unsupported, "not answered"});
@@ -1091,18 +1087,17 @@ namespace BECore::Chess::Tests {
         EXPECT_TRUE(SameLines(*b->Result(), *expectedSecond)) << Describe(*b->Result()) << " against " << Describe(*expectedSecond);
     }
 
-    /// Slice 2's pattern in a test: a coroutine on the pool begins the search and drives it with the frame budget in mind. On a threaded build `YieldIfNeeded()` never suspends
+    /// A coroutine on the pool begins the search and drives it with the frame budget in mind. On a threaded build `YieldIfNeeded()` never suspends
     class OwnSearchOnThePoolTest : public ::testing::Test {
     protected:
         static void SetUpTestSuite() {
-            ::BECore::Tests::EngineEnvironment::EnsureCoreServices();  // TaskManager
+            ::BECore::Tests::EngineEnvironment::EnsureCoreServices();  // TaskManager, which the coroutines run on
         }
     };
 
     TEST_F(OwnSearchOnThePoolTest, ACoroutineCanDriveTheSearchOnThePool) {
 #if BE_SINGLE_THREAD
-        // A single-thread build resumes a task that yielded only in TaskManager::Update, which only CoreManager calls, and this test waits with a poll and never pumps (OpponentOverFramesTest does,
-        // with PumpTaskFrame)
+        // A single-thread build resumes a yielded task only in TaskManager::Update, which only CoreManager calls; this test polls and never pumps (OpponentOverFramesTest does, with PumpTaskFrame)
         GTEST_SKIP() << "needs worker threads (BE_SINGLE_THREAD)";
 #else
         OwnEngine engine;
@@ -1347,7 +1342,7 @@ namespace BECore::Chess::Tests {
         constexpr std::chrono::microseconds kTinyFrameBudget{5};
         /// The depth of the opponent's search: far more than one slice of nodes, and quick in a Debug build
         constexpr int kFramesDepth = 4;
-        /// A frame is one slice plus a poll: a generous multiple of the budget, since a Debug slice costs far more than 5 us. Only DISABLED_FrameLengthYardstick uses it
+        /// A frame is one slice plus a poll: a generous multiple of the budget, since a Debug slice costs far more than it. Only DISABLED_FrameLengthYardstick uses it
         constexpr std::chrono::milliseconds kFrameLimit{250};
         /// The frames of the interleaving tests run before they cancel
         constexpr int kFramesBeforeCancel = 5;
@@ -1376,7 +1371,7 @@ namespace BECore::Chess::Tests {
         class OpponentOverFramesTest : public ::testing::Test {
         protected:
             static void SetUpTestSuite() {
-                ::BECore::Tests::EngineEnvironment::EnsureCoreServices();  // TaskManager
+                ::BECore::Tests::EngineEnvironment::EnsureCoreServices();  // TaskManager, which the opponent's search runs on
             }
 
             void SetUp() override {
@@ -1416,7 +1411,7 @@ namespace BECore::Chess::Tests {
 #endif
     }
 
-    /// By hand, on a quiet machine (the claim the test above dropped: no frame of the sliced search is long; most telling in a single-thread build, where the search runs in the frames):
+    /// By hand, on a quiet machine: no frame of the sliced search is long (most telling in a single-thread build, where the search runs in the frames):
     /// ChessTests --gtest_also_run_disabled_tests --gtest_filter=OpponentOverFramesTest.DISABLED_FrameLengthYardstick
     TEST_F(OpponentOverFramesTest, DISABLED_FrameLengthYardstick) {
         ChessGameModel model;
@@ -1487,7 +1482,6 @@ namespace BECore::Chess::Tests {
             int depth;
         };
 
-        /// Depth 4 on the six positions, depth 5 on the start position and Kiwipete: about 70 ms of work in Release (one pass over the rows)
         Vector<BenchmarkPosition> BenchmarkPositions() {
             Vector<BenchmarkPosition> positions;
             for (const NamedFen& position : kPerftPositions) {
@@ -1571,9 +1565,9 @@ namespace BECore::Chess::Tests {
             return job.GetResult().nodes;
         }
 
-        /// The same, with the cheap look that a coroutine caller takes between slices: whether the frame budget is spent (it never is here,
-        /// no task runs, so this is the cost of the call and of the pointer test). The result is the nodes plus the polls that said yes (none),
-        /// so it is comparable with the other two and the poll cannot be optimized away
+        /// The same, with the cheap look that a coroutine caller takes between slices: whether the frame budget is spent (it never is here, no task
+        /// runs, so this is the cost of the call and of the pointer test). The result is the nodes plus the polls that said yes (none), so it is
+        /// comparable with the other two and the poll cannot be optimized away
         uint64_t JobInSlicesWithAPoll(StringView fen, int depth) {
             SearchSettings settings;
             settings.maxDepth = depth;

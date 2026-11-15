@@ -152,7 +152,7 @@ def test_legal_moves_are_read_from_perft_1(fake_engine):
     path, log = fake_engine({"perft": {START_POSITION: ["e2e4", "d2d4", "e7e8q"]}})
     with UciEngine(path) as engine:
         assert engine.legal_moves(START_POSITION) == {"e2e4", "d2d4", "e7e8q"}
-        assert engine.legal_moves(AFTER_E4_E5) == set()  # a position the engine has no moves for
+        assert engine.legal_moves(AFTER_E4_E5) == set()
     assert "go perft 1" in received(log)
 
 
@@ -211,7 +211,7 @@ def test_stockfish_plays_white_against_a_scripted_opponent(make_game, fake_engin
     lines = received(log)
     assert lines.count("ucinewgame") == 1
     assert START_POSITION in lines and "go movetime 33" in lines
-    assert len([line for line in lines if line.startswith("go movetime")]) == 2  # only the white plies went to Stockfish
+    assert len([line for line in lines if line.startswith("go movetime")]) == 2  # plies 1 and 3 only: the opponent has the black ones
 
 
 @needs_shebang

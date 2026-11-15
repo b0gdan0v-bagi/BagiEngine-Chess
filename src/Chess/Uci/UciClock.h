@@ -2,8 +2,7 @@
 
 namespace BECore::Chess::Uci {
 
-    /// The share of the remaining time spent on one move when the GUI does not say how many moves the time must last (`movestogo` absent): a game is guessed to
-    /// have this many moves left
+    /// The moves the remaining time is spread over when the GUI sends no `movestogo`: a game is guessed to have this many moves left
     inline constexpr int kDefaultMovesToGo = 30;
 
     /// The part of an increment that is added to the time of one move (numerator over denominator): the rest is kept for the next moves
@@ -13,7 +12,7 @@ namespace BECore::Chess::Uci {
     /// Milliseconds always left on the clock after a move for the pipe, the process and the GUI: a move that takes the whole clock loses on time
     inline constexpr int kClockMarginMs = 100;
 
-    /// One move never takes more than this part of the remaining time (1 over the divisor): the last move of a control must not spend the whole clock
+    /// One move never takes more than remainingMs / kMaxClockShareDivisor: the last move of a control must not spend the whole clock
     inline constexpr int kMaxClockShareDivisor = 2;
 
     /// The least time of a move: a search asks for at least one millisecond

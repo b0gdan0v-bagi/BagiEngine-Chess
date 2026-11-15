@@ -9,7 +9,7 @@
 #include <tests/TestEngines.h>
 
 /// PositionAnalyst with the real TaskManager and engines made in the test (TestEngines.h, no process), plus the OwnEngine for the mate in one and the default factory, and a
-/// real Stockfish when there is one. Every wait polls a condition with a time limit; none is a fixed sleep
+/// real Stockfish (the two cases that run it skip without one). Every wait polls a condition with a time limit; none is a fixed sleep
 namespace BECore::Chess::Tests {
 
     namespace {
@@ -56,7 +56,7 @@ namespace BECore::Chess::Tests {
     class PositionAnalystTest : public ::testing::Test {
     protected:
         static void SetUpTestSuite() {
-            ::BECore::Tests::EngineEnvironment::EnsureCoreServices();  // TaskManager
+            ::BECore::Tests::EngineEnvironment::EnsureCoreServices();  // TaskManager, which the searches run on
         }
     };
 
@@ -211,12 +211,12 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(PositionAnalystTest, TheHintRuleIsOnePureFunction) {
-        ChessGameModel model;  // White to move
+        ChessGameModel model;
         EXPECT_EQ(HintRefusalFor(model, std::nullopt), std::nullopt) << "two people: either side may ask";
         EXPECT_EQ(HintRefusalFor(model, PieceColor::Black), std::nullopt) << "the program plays Black, it is the person's turn";
         EXPECT_EQ(HintRefusalFor(model, PieceColor::White), HintRefusal::ProgramsTurn);
 
-        ASSERT_TRUE(Play(model, "e2e4"));  // Black to move
+        ASSERT_TRUE(Play(model, "e2e4"));
         EXPECT_EQ(HintRefusalFor(model, std::nullopt), std::nullopt);
         EXPECT_EQ(HintRefusalFor(model, PieceColor::White), std::nullopt);
         EXPECT_EQ(HintRefusalFor(model, PieceColor::Black), HintRefusal::ProgramsTurn);
@@ -232,13 +232,13 @@ namespace BECore::Chess::Tests {
         const ProgramSides nobody;
         const ProgramSides both{true, true};
 
-        ChessGameModel model;  // White to move
+        ChessGameModel model;
         EXPECT_EQ(HintRefusalFor(model, nobody), std::nullopt);
         EXPECT_EQ(HintRefusalFor(model, both), HintRefusal::ProgramsTurn);
         EXPECT_EQ(HintRefusalFor(model, ProgramSides::Of(PieceColor::Black)), std::nullopt);
         EXPECT_EQ(HintRefusalFor(model, ProgramSides::Of(PieceColor::White)), HintRefusal::ProgramsTurn);
 
-        ASSERT_TRUE(Play(model, "e2e4"));  // Black to move
+        ASSERT_TRUE(Play(model, "e2e4"));
         EXPECT_EQ(HintRefusalFor(model, nobody), std::nullopt);
         EXPECT_EQ(HintRefusalFor(model, both), HintRefusal::ProgramsTurn) << "refused on either turn";
         EXPECT_EQ(HintRefusalFor(model, ProgramSides::Of(PieceColor::White)), std::nullopt);
@@ -763,7 +763,7 @@ namespace BECore::Chess::Tests {
     TEST_F(PositionAnalystTest, TheOwnEngineGivesTwoLinesWithTheMateFirst) {
         ChessGameModel model;
         model.SetPosition(PositionFromFen(kMateInOneFen));
-        PositionAnalyst analyst;  // the default factory
+        PositionAnalyst analyst;
         analyst.SetEvaluation(true);
 
         ASSERT_TRUE(UpdateUntil(analyst, model, OpponentEngine::Own, [&] { return !analyst.GetLines(model).empty(); })) << DescribeError(analyst.GetError()).c_str();
@@ -835,7 +835,7 @@ namespace BECore::Chess::Tests {
     TEST_F(PositionAnalystTest, TheOwnEngineGivesTheMatingMoveAsTheHintAndMateInOne) {
         ChessGameModel model;
         model.SetPosition(PositionFromFen(kMateInOneFen));
-        PositionAnalyst analyst;  // the default factory
+        PositionAnalyst analyst;
         analyst.SetEvaluation(true);
         ASSERT_TRUE(analyst.RequestHint(model).has_value());
 
@@ -855,7 +855,7 @@ namespace BECore::Chess::Tests {
         const std::expected<Analysis, EngineError> expected = OwnEngine().Analyse(request, CancellationToken::Create());
         ASSERT_TRUE(expected.has_value());
 
-        PositionAnalyst analyst;  // the default factory
+        PositionAnalyst analyst;
         analyst.SetEvaluation(true);
         ASSERT_TRUE(UpdateUntil(analyst, model, OpponentEngine::Own, [&] { return !analyst.GetLines(model).empty() || analyst.GetError().has_value(); })) << DescribeError(analyst.GetError()).c_str();
 

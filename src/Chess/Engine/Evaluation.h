@@ -10,12 +10,11 @@ namespace BECore::Chess {
     inline constexpr int kBishopValue = 330;
     inline constexpr int kRookValue = 500;
     inline constexpr int kQueenValue = 900;
-    /// A king is never counted by Evaluate() (each side has exactly one); the value is large so that a search which orders
-    /// captures by "most valuable victim, least valuable attacker" sends the king in last
+    /// A king is never counted by Evaluate() (each side has exactly one); the value only says it is worth more than any other piece
     inline constexpr int kKingValue = 20000;
 
     /// The material of both sides without pawns and kings, at or below which the king plays the endgame: it stops hiding in
-    /// the corner and goes to the center. Two queens and two rooks, so a queen and a rook each (or less) is an endgame
+    /// the corner and goes to the center (a queen and a rook each, or less, is an endgame)
     inline constexpr int kEndgameMaterialLimit = 2 * (kQueenValue + kRookValue);
 
     /// The score of a mate on the move: the larger the score, the better. A side that is mated scores -MateIn(ply)
@@ -36,7 +35,7 @@ namespace BECore::Chess {
         return score >= MateIn(kMaxMatePly) || score <= -MateIn(kMaxMatePly);
     }
 
-    /// The value of a piece kind from the list above; 0 for no piece
+    /// The value of a piece kind; 0 for no piece
     [[nodiscard]] int PieceValue(PieceType type) noexcept;
 
     /// Whether the king table of the endgame is used for @p position: the pieces of both sides without pawns and kings are
@@ -46,11 +45,10 @@ namespace BECore::Chess {
     /**
      * @brief The static evaluation of a position in centipawns, from the point of view of the side to move.
      *
-     * Material plus a piece-square table per piece kind (the pawn, knight, bishop, rook, queen and the king in the
-     * middlegame or in the endgame, see IsEndgame()), the tables of the simplified evaluation function of the chess
-     * programming wiki. White reads a table by the square (a1 = 0, like Bitboard), Black by the square mirrored over the
-     * horizontal middle, so the evaluation of a position equals the one of its color-mirrored position. A positive score is
-     * good for the side to move. The start position is 0.
+     * Material plus a piece-square table per piece kind (the king has one for the middlegame and one for the endgame, see
+     * IsEndgame()), the tables of the simplified evaluation function of the chess programming wiki. White reads a table by
+     * the square (a1 = 0, like Bitboard), Black by the square mirrored over the horizontal middle, so the evaluation of a
+     * position equals the one of its color-mirrored position. A positive score is good for the side to move.
      *
      * Pure and deterministic: no search, no allocation, no state. It knows nothing about mates, draws or whose move it is
      * beyond the sign; the search handles those with kMateScore and kDrawScore.

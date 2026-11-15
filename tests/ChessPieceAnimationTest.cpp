@@ -35,18 +35,19 @@ namespace BECore::Chess::Tests {
         constexpr float kDuration = 0.125f;       // the slide, four frames
         constexpr float kPixelTolerance = 0.01f;  // in view units
         constexpr size_t kPieceCount = 32;
-        constexpr float kHidden = -10000.0f;     // where a captured piece waits (ChessPieceComponent.cpp)
-        constexpr float kQuarter = 0.25f;        // progress after one tween step
-        constexpr float kHalf = 0.5f;            // progress after two
-        constexpr float kThreeQuarters = 0.75f;  // progress after three
-        constexpr float kDefaultSlide = 0.15f;   // what SceneConfig.xml gets from the code
-        constexpr int kStepsToEnd = 4;           // tween steps (frames after the first) until the slide ends
-        constexpr float kViewWidth = 840.0f;     // the view of the scene (SceneConfig.xml) and half a square, to turn a square into the output pixel of its middle
+        constexpr float kHidden = -10000.0f;  // where a captured piece waits (ChessPieceComponent.cpp)
+        constexpr float kQuarter = 0.25f;     // progress after one tween step (kHalf after two, kThreeQuarters after three)
+        constexpr float kHalf = 0.5f;
+        constexpr float kThreeQuarters = 0.75f;
+        constexpr float kDefaultSlide = 0.15f;  // what SceneConfig.xml gets from the code
+        constexpr int kStepsToEnd = 4;          // tween steps (frames after the first) until the slide ends
+        // The view of the scene (config/SceneConfig.xml) and half a square, to turn a square into the output pixel of its middle
+        constexpr float kViewWidth = 840.0f;
         constexpr float kViewHeight = 800.0f;
         constexpr float kHalfSquare = 40.0f;
         constexpr float kDragStepPixels = 20.0f;  // a first motion of a drag, well past the threshold of the board
-        constexpr int32_t kPieceLayer = 0;        // the layer of a piece node in the scene
-        constexpr int32_t kDragLayer = 6;         // the layer of a piece in the hand (ChessPieceComponent::kDragLayer, written out here to pin it)
+        constexpr int32_t kPieceLayer = 0;
+        constexpr int32_t kDragLayer = 6;  // the layer of a piece in the hand (ChessPieceComponent::kDragLayer, written out here to pin it)
 
         const char* const kCaptureFen = "4k3/8/8/3p4/4P3/8/8/4K3 w - - 0 1";    // e4xd5
         const char* const kEnPassantFen = "4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 1";  // e5xd6 en passant
@@ -116,7 +117,7 @@ namespace BECore::Chess::Tests {
             return *_manager->GetSceneByName(PoolString::Intern("ChessScene"));
         }
 
-        /// One frame of the game loop, in its order: the clock, the tweens (stage 2b), the scenes
+        /// One frame of the game loop, in its order: the clock, the tweens (they step before the scenes read the transforms), the scenes
         void Frame(double seconds = kFrame) {
             CoreManager::GetTime().Advance(seconds);
             CoreManager::GetTweens().Advance(CoreManager::GetTime().GetDeltaTime());
@@ -129,7 +130,6 @@ namespace BECore::Chess::Tests {
             }
         }
 
-        /// Every piece node the scene has
         Vector<IntrusivePtr<SceneNode>> PieceNodes() const {
             Vector<IntrusivePtr<SceneNode>> nodes;
             for (const auto& node : GetScene().GetRootNode().GetChildren()) {
@@ -208,7 +208,7 @@ namespace BECore::Chess::Tests {
             ExpectOrigin(node, {kHidden, kHidden}, "hidden");
         }
 
-        /// Every piece that stands on a square is drawn on it
+        /// Every piece that stands on a square is drawn on it, a captured one is hidden
         void ExpectEveryPieceOnItsSquare(const char* what = "on its square") const {
             size_t checked = 0;
             for (const auto& node : PieceNodes()) {
@@ -226,7 +226,6 @@ namespace BECore::Chess::Tests {
             EXPECT_GT(checked, 0u);
         }
 
-        /// Where every piece node is now, by node name
         Vector<Pair<PoolString, Origin>> Origins() const {
             Vector<Pair<PoolString, Origin>> origins;
             for (const auto& node : PieceNodes()) {

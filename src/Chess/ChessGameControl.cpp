@@ -8,7 +8,7 @@ namespace BECore::Chess {
 
     namespace {
 
-        /// One letter per PieceType, in enum order; '.' is an empty square. White is upper case.
+        /// Indexed by PieceType; '.' is None
         constexpr char kWhiteLetters[] = ".PNBRQK";
         constexpr char kBlackLetters[] = ".pnbrqk";
         static_assert(sizeof(kWhiteLetters) - 1 == static_cast<size_t>(PieceType::King) + 1, "one letter per piece type and one for None");
@@ -36,7 +36,6 @@ namespace BECore::Chess {
             return "ongoing";
         }
 
-        /// The kind of an engine error as it goes on the wire
         StringView ErrorKindName(EngineErrorKind kind) {
             switch (kind) {
                 case EngineErrorKind::BadRequest:
@@ -65,7 +64,6 @@ namespace BECore::Chess {
             return MakeJsonString(StringView(text));
         }
 
-        /// Whether @p text is spelled like a UCI move: two squares and, for a promotion, the piece in lower case
         bool IsUciSyntax(StringView text) {
             if (text.size() != kUciMoveLength && text.size() != kUciPromotionLength) {
                 return false;
@@ -97,7 +95,6 @@ namespace BECore::Chess {
             json["inCheck"] = model.IsInCheck();
         }
 
-        /// {"balance", "capturedByWhite", "capturedByBlack"} of the position: a derived view, computed at every call (it has no version of its own)
         Json MaterialJson(const Position& position) {
             const MaterialSummary summary = SummarizeMaterial(position);
             const auto captured = [&](PieceColor gone) {
@@ -116,7 +113,6 @@ namespace BECore::Chess {
             return material;
         }
 
-        /// "easy, medium, hard, max" for a message
         String LevelIds() {
             String ids;
             for (const OpponentLevel& level : GetOpponentLevels()) {
@@ -125,7 +121,7 @@ namespace BECore::Chess {
             return ids;
         }
 
-        /// The opponent as set_state asks for it, checked: the colors the program plays and the choice of each seat
+        /// The opponent as set_state asks for it, checked
         struct OpponentPick {
             ProgramSides plays;
             SeatChoice white;
@@ -134,7 +130,6 @@ namespace BECore::Chess {
 
         constexpr StringView kBothId = "both";
 
-        /// "stockfish, own" for a message
         String EngineIds() {
             String ids;
             for (const OpponentEngine engine : EnumUtils<OpponentEngine>::Values()) {
@@ -143,7 +138,6 @@ namespace BECore::Chess {
             return ids;
         }
 
-        /// {"kind", "detail"} of an engine error, or null
         Json ErrorJson(const Optional<EngineError>& error) {
             if (!error) {
                 return Json();
@@ -154,7 +148,6 @@ namespace BECore::Chess {
             return described;
         }
 
-        /// {"kind", "value"} of a score
         Json ScoreJson(const AnalysisScore& score) {
             Json json = Json::object();
             json["kind"] = score.kind == AnalysisScoreKind::Mate ? "mate" : "centipawns";
@@ -162,7 +155,6 @@ namespace BECore::Chess {
             return json;
         }
 
-        /// What set_state asks of the analyst, checked; a member that is missing is nothing
         struct AnalysisPick {
             Optional<bool> evaluation;
             Optional<bool> hint;
@@ -171,7 +163,6 @@ namespace BECore::Chess {
 
         constexpr const char* kAnalysisUsage = "'analysis' has to be an object like {\"evaluation\": true, \"hint\": true, \"ratings\": true} (the members are optional booleans)";
 
-        /// Reads {"evaluation", "hint", "ratings"}; nothing is changed
         std::expected<AnalysisPick, ControlError> ParseAnalysis(const Json& analysis) {
             if (!analysis.is_object()) {
                 return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, kAnalysisUsage));
@@ -191,7 +182,7 @@ namespace BECore::Chess {
             return MakeControlError(ControlErrors::kInvalidParams, message);
         }
 
-        /// Reads "level" and "engine" of @p object (the opponent, or one of its seat objects, named @p where in a message) into @p choice; a member that is missing keeps what it was
+        /// Reads "level" and "engine" of the opponent or of one of its seat objects (named @p where in a message); a member that is missing keeps what it was
         std::expected<void, ControlError> ReadChoice(const Json& object, StringView where, SeatChoice& choice) {
             if (FindJsonMember(object, "level")) {
                 const auto id = GetJsonString(object, "level");
@@ -212,7 +203,7 @@ namespace BECore::Chess {
             return {};
         }
 
-        /// Reads the seat object {"engine", "level"} of one color into @p choice; nothing else is a member of it
+        /// Nothing but "engine" and "level" is a member of a seat object
         std::expected<void, ControlError> ReadSeat(const Json& seat, StringView color, SeatChoice& choice) {
             const String where = Format("opponent '{}'", color);
             if (!seat.is_object()) {
@@ -232,7 +223,7 @@ namespace BECore::Chess {
             if (!opponent.is_object()) {
                 return std::unexpected(BadOpponent("'opponent' has to be an object like {\"plays\": \"black\", \"level\": \"easy\"}"));
             }
-            for (SeatChoice* seat : {&current.white, &current.black}) {  // the old shape: one level and one engine for both seats
+            for (SeatChoice* seat : {&current.white, &current.black}) {  // one level and one engine for both seats
                 if (auto read = ReadChoice(opponent, "opponent", *seat); !read) {
                     return std::unexpected(std::move(read.error()));
                 }

@@ -22,12 +22,11 @@ namespace BECore::Chess {
      *
      * Like lichess, the opponent's answer is not known when a premove is made, so the geometry is its own and not the
      * rules' (the real legality is checked when the premove's turn comes, in `ChessGameModel::PlayPremove()`):
-     *  - a piece reaches the squares of its own movement, **blocked by the pieces of its own color only** (an opponent's
-     *    piece never blocks: it may be gone by then, and a square that holds one is a target);
+     *  - a piece reaches the squares of its own movement, **blocked by the pieces of its own color only** (an own piece
+     *    is no target; an opponent's never blocks, it may be gone by then, and its square is a target);
      *  - **check and pins are ignored**;
-     *  - a square with an own piece is no target;
-     *  - a pawn goes one step forward and, from its start rank, two (both squares free of own pieces), and to the two
-     *    diagonal squares whether or not something stands there now;
+     *  - a pawn goes one step forward and, from its start rank, two, and to the two diagonal squares whether or not
+     *    something stands there now;
      *  - **not here:** castling (the king's two-file step is no target) and the choice of a promotion piece: a premoved
      *    promotion is a queen, `Apply()` shows it as one.
      *

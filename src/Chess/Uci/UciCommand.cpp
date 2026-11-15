@@ -53,7 +53,6 @@ namespace BECore::Chess::Uci {
             return tokens;
         }
 
-        /// The field a `go` keyword fills, nothing for a word that is not one
         Optional<int>* GoField(GoParams& params, StringView token) {
             if (token == kDepthToken) {
                 return &params.depth;

@@ -9,7 +9,7 @@
 #include <thread>
 
 /// OwnEngine through IChessEngine: the contract of UciEngine::FindMove without a process, a whole game against itself and against a random mover, and
-/// the engine inside a running OpponentController (the real TaskManager). The fixture starts the core services (TaskManager) for the last one.
+/// the engine inside a running OpponentController (the real TaskManager).
 namespace BECore::Chess::Tests {
 
     namespace {
@@ -71,7 +71,6 @@ namespace BECore::Chess::Tests {
             return answer ? Optional<Move>(*answer) : std::nullopt;
         }
 
-        /// @p request asking for @p lines lines
         SearchRequest WithLines(SearchRequest request, int lines) {
             request.lines = lines;
             return request;
@@ -395,8 +394,8 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(answer.has_value());
         EXPECT_EQ(answer->Best().score.kind, AnalysisScoreKind::Centipawns);
         EXPECT_EQ(answer->Best().depth, kFloorDepth);
-        // The value was computed once (depth 3, Evaluation.h as it is) and is written out: +50 (the piece-square tables favour the side to move a little).
-        // The window of 40 around it is the guard against a change of the evaluation that nobody meant
+        // +50 at depth 3 is the expected value (the piece-square tables favour the side to move a little). The window of 40
+        // around it is the guard against a change of the evaluation that nobody meant
         EXPECT_GE(answer->Best().score.value, 10);
         EXPECT_LE(answer->Best().score.value, 90);
     }

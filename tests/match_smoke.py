@@ -9,7 +9,7 @@ mean depths here and only the mechanics are checked. The tool is a child process
 
   1. `--verify-openings`: the referee takes every line of the opening table, exit code 0;
   2. a match of one step (`depth=1`) against the opponent at two "Elo" steps, 2 games each, capped at 40 plies, with `--out`: exit code 0, the table on
-     stdout, and a record with 2 pairs of 2 games (W + D + L is 2 in each, every game has moves and a termination, the summary has an `elo` for the step);
+     stdout and a record file of the pairs and games whose shape is checked;
   3. an opponent that does not exist: exit code 77 (the tool's "no opponent engine").
 
 The temporary files live in a directory that is removed at the end. Exit code: 0 passed, 1 failed, 77 skipped (an executable or the tool is missing).
@@ -26,8 +26,8 @@ from pathlib import Path
 
 SKIP_EXIT_CODE = 77
 TOOL_EXIT_SKIPPED = 77  # the tool's own code for "no opponent engine"
-VERIFY_TIMEOUT_SECONDS = 120.0  # starts the game and plays 12 lines of 4 plies
-MATCH_TIMEOUT_SECONDS = 240.0  # a Debug build searches slowly; 4 games of at most 40 plies at depth 1 and 2
+VERIFY_TIMEOUT_SECONDS = 120.0  # starts the game and plays every line of the opening table
+MATCH_TIMEOUT_SECONDS = 240.0  # a Debug build searches slowly
 GAMES_PER_PAIR = 2
 OPPONENT_STEPS = (1, 2)  # depths, in the place of Elo steps
 MAX_PLIES = 40

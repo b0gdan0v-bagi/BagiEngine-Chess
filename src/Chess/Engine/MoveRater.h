@@ -7,7 +7,7 @@
 
 namespace BECore::Chess {
 
-    /// The depth every move is rated at, the depth of the strongest level of the own engine: a fixed depth is deterministic, so the same game gets the same ratings twice
+    /// The depth every move is rated at, the depth of the strongest level of the own engine
     inline constexpr int kRatingDepth = 5;
 
     /// How many lines the rater asks of the engine for the position before a move: the best one and the second best, which RateMove() compares
@@ -19,28 +19,26 @@ namespace BECore::Chess {
     /**
      * @brief Rates the moves of a ChessGameModel in the background: for every played move, an analysis of the position BEFORE it, and RateMove() over that analysis (MoveRating.h has the definition).
      *
-     * **Which engine and when.** Always the own engine at the fixed depth kRatingDepth, with kRatingLines lines and no move time (deterministic: the same game gives the same ratings twice, and there
-     * is no process and no Stockfish to depend on). It is made lazily by the factory (SetEngineFactory(); empty: MakeAnalysisEngine(Own, {})) asked for OpponentEngine::Own, so it is an object of its
-     * own, never the opponent's and never the analyst's: its searches never delay the opponent's move. It is **opt-in** (SetOn(), off at the start: it costs CPU) and nothing starts while it is off,
-     * nor when every move is rated. The owner of the model calls Update() once per frame on the main thread; one search runs at a time, on the Background pool (TaskManager must be running), and the
-     * oldest move that is not rated goes first. The request of ply `i` is the start FEN of the game with the moves `[0, i)`, so the answer is about the position the move `i` was played in.
+     * **Which engine and when.** Always the own engine at the fixed depth kRatingDepth, with kRatingLines lines and no move time: deterministic, so the same game gives the same ratings twice,
+     * with no process to depend on. It is made lazily by the factory (SetEngineFactory(); empty: MakeAnalysisEngine(Own, {})) asked for OpponentEngine::Own, so it is an object of its own, never
+     * the opponent's and never the analyst's. It is **opt-in** (SetOn(), off at the start: it costs CPU); nothing starts while it is off or when every move is rated. The owner of the model calls
+     * Update() once per frame on the main thread; one search runs at a time on the Background pool (TaskManager must be running), the oldest move that is not rated first. The request of ply `i`
+     * is the start FEN of the game with the moves `[0, i)`, so the answer is about the position the move `i` was played in.
      *
-     * **The history rule** (the pattern of EngineOpponent, with the history of the game in place of the version). The rater keeps the start FEN and the moves it has seen. A game that only grew keeps
-     * its ratings (they are not a hint: a rating does not go with the next move). A game that is not an extension of what the rater holds (another start FEN, a shorter history, a move that differs: a
-     * reset, a position set from outside) cancels the search, throws its answer away, also when the engine ignores the token, drops every rating and the error, and rating starts again from the new
-     * history. The reads follow the same rule: GetRatings() gives nothing for a model whose game is not an extension of the held one, even before the next Update().
+     * **The history rule** (the pattern of EngineOpponent, with the history of the game in place of the version). The rater keeps the start FEN and the moves it has seen. A game that only grew
+     * keeps its ratings (unlike a hint, a rating does not go with the next move). A game that is not an extension of the held one (another start FEN, a shorter history, a move that differs: a
+     * reset, a position set from outside) cancels the search, throws its answer away, also when the engine ignores the token, drops every rating and the error, and starts again. GetRatings()
+     * gives nothing for a model whose game is not an extension of the held one, even before the next Update().
      *
-     * **Errors.** An engine that cannot be made blocks the rater (the error is kept in GetError(), logged once with LOG_ERROR, and nothing is tried again). A search that fails (any EngineError) fails
-     * that one move: logged once, kept in GetError(), and that move is not asked again every frame; **the later moves are still tried** and the failed one stays empty. Both go with a new history,
-     * with a switch off and on, and with Shutdown().
+     * **Errors.** An engine that cannot be made blocks the rater: the error is kept in GetError(), logged once (LOG_ERROR), and nothing is tried again. A search that fails (any EngineError)
+     * fails that one move: logged once, kept in GetError(), the move stays empty and is not asked again every frame; **the later moves are still tried**. Both go with a new history, a switch off
+     * and on, and Shutdown().
      *
-     * **Threads and shutdown.** Main thread only, as PositionAnalyst: the worker sees a copy of the request and a state of its own (the engine, a CancellationToken, the answer behind a mutex, an
-     * atomic `done`) that it shares through a shared pointer, so nothing dangles whichever side ends first. The destructor, Cancel() and Shutdown() cancel the token and return at once; a search that
-     * ignores its token keeps the engine alive until it returns and its answer is thrown away. Call Shutdown() (or destroy the rater) before TaskManager::Shutdown(); Shutdown() also switches the
-     * rating off and drops the ratings, so a later Update() starts nothing until SetOn(true). The destructor does not touch TaskManager.
+     * **Threads and shutdown** are PositionAnalyst's (main thread only, the worker's shared state, the destructor, Cancel() and Shutdown() return at once, Shutdown() before
+     * TaskManager::Shutdown()); Shutdown() also switches the rating off and drops the ratings.
      *
-     * GetRevision() grows with a rating that arrives or is dropped, a switch, an error that appears or goes, never with a search that starts or ends (IsThinking()), and never goes back; a display
-     * that publishes the ratings adds it to the version of the model. Logging: LOG_ERROR once per failed move, LOG_INFO for a dropped answer.
+     * GetRevision() grows with a rating that arrives or is dropped, a switch, an error that appears or goes; never with a search that starts or ends (IsThinking()), and never goes back. A display
+     * that publishes the ratings adds it to the version of the model.
      */
     class MoveRater {
     public:
@@ -54,40 +52,39 @@ namespace BECore::Chess {
         MoveRater(MoveRater&&) = delete;
         MoveRater& operator=(MoveRater&&) = delete;
 
-        /// How the engine is made at the first search; an empty one puts the default back (MakeAnalysisEngine(Own, {})). The factory is asked for OpponentEngine::Own. Read at the next engine made
+        /// How the engine is made; an empty one puts the default back (MakeAnalysisEngine(Own, {})). Read when the next engine is made
         void SetEngineFactory(AnalysisEngineFactory factory);
 
         /// Switches the rating on or off. Off cancels a running search at the next Update(); the ratings stay. Either way a standing error goes (switching off and on is the retry)
         void SetOn(bool on);
 
-        /// One step, for the main thread; it never waits for the engine. In this order: the history of @p model is compared with the one held (see above); a finished search is taken (kept when it
-        /// is still wanted, else dropped); a running search is cancelled when the rater went off; then, when it is on, no search runs and a move is not rated and has not failed, a search for the
-        /// oldest such move starts
+        /// One step, for the main thread; it never waits for the engine. Compares the history of @p model with the held one, takes a finished search, and starts the search for the oldest move
+        /// that is not rated and has not failed
         void Update(const ChessGameModel& model);
 
         /// Cancels the search in flight; the ratings and the switch stay, so the next Update() asks again. Returns at once
         void Cancel();
 
-        /// Cancels, switches the rating off, drops the ratings, the error and the engine. Later Update()s start nothing until SetOn(true). Call it before TaskManager::Shutdown()
+        /// Cancels, switches the rating off, drops the ratings, the error and the engine. Call it before TaskManager::Shutdown()
         void Shutdown();
 
         [[nodiscard]] bool IsOn() const noexcept {
             return _on;
         }
 
-        /// A search is under way and wanted: from the Update() that started it to the one that takes its answer. False once it is cancelled, though the worker may still be returning
+        /// A search is under way and wanted. False once it is cancelled, though the worker may still be returning
         [[nodiscard]] bool IsThinking() const;
 
         /// The ratings of the moves of @p model, in the order of GetMoves() and never more than there are moves; an empty entry is a move that is not rated yet, and so is every move of a game that is
         /// not an extension of the one held
         [[nodiscard]] MoveRatings GetRatings(const ChessGameModel& model) const;
 
-        /// Why the last search failed (any EngineError, an engine that could not be made included); empty when none did or after it went with a new history, a switch or Shutdown()
+        /// Why the last search failed (an engine that could not be made included); empty when none did or after it went with a new history, a switch or Shutdown()
         [[nodiscard]] const Optional<EngineError>& GetError() const noexcept {
             return _error;
         }
 
-        /// Grows with every change a display shows (see above); never goes back
+        /// See the class comment
         [[nodiscard]] uint64_t GetRevision() const noexcept {
             return _revision;
         }
@@ -104,7 +101,7 @@ namespace BECore::Chess {
             std::atomic<bool> done{false};
         };
 
-        /// Runs on the pool: asks the engine and leaves the answer in @p search. Takes its arguments by value, so the frame owns everything it uses
+        /// Runs on the pool: asks the engine and leaves the answer in @p search. Its arguments are by value, so the frame owns everything it uses
         static Task<void> RunSearch(SharedPtr<Search> search, SearchRequest request);
 
         /// The game of @p model is the held one, perhaps grown: the same start FEN and the held moves as its first moves

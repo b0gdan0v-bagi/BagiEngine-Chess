@@ -34,11 +34,11 @@ namespace BECore::Chess {
     /**
      * @brief The answer to IChessEngine::Analyse(): the lines of the position, best first.
      *
-     * Every line is a different legal move of the position with its own score, **all scores from the side to move** (line 2 is "the second best move
-     * and how the position stands if it is played"). Line 1 is the answer a request for one line gets at a fixed depth (the same move; for OwnEngine also the same score
-     * and depth; under a move time the searches are not repeatable, so neither are their lines). There are as many lines as SearchRequest::lines asks for, but fewer when the position has fewer legal
-     * moves (a position with one legal move has one line, whatever was asked) or when the engine sent fewer: that is not an error. A successful analysis is never empty. The scores of the lines are
-     * not forced to fall: an engine that searches each line on its own (OwnEngine) may give line 2 a score a little above line 1's.
+     * Every line is a different legal move of the position with its own score, **all scores from the side to move** (line 2 is the second best move and how the position stands if it is
+     * played). Line 1 is the answer a request for one line gets at a fixed depth (the same move; for OwnEngine also the same score and depth; under a move time the searches are not repeatable,
+     * so neither are their lines). There are as many lines as SearchRequest::lines asks for, but fewer when the position has fewer legal moves or when the engine sent fewer: that is not an
+     * error. A successful analysis is never empty. The scores of the lines are not forced to fall: an engine that searches each line on its own (OwnEngine) may give line 2 a score a little
+     * above line 1's.
      */
     struct Analysis {
         Vector<AnalysisLine> lines;
@@ -62,26 +62,23 @@ namespace BECore::Chess {
     /**
      * @brief A score of Search (centipawns, or kMateScore - ply and its negation, see Evaluation.h) as an AnalysisScore.
      *
-     * A mate that falls @p ply plies from the root is `moves = (ply + 1) / 2`: a win lands on an odd ply (our move, then theirs, ...:
-     * 1 ply = mate in 1, 3 = 2, 5 = 3) and a loss on an even one (2 plies = mated in 1, 4 = 2, 6 = 3). The sign of @p searchScore is the sign of the value.
-     * Anything that is not a mate score is centipawns as it is. A mate at ply 0 (kMateScore itself: the root is mated) is not a score to convert:
-     * the root of an analysis has a move, so a search never gives it (an engine answers NoMove first); it is asserted.
+     * A mate that falls @p ply plies from the root is `moves = (ply + 1) / 2`: a win lands on an odd ply (1 ply = mate in 1, 3 = 2), a loss on an even one (2 plies = mated in 1, 4 = 2).
+     * The sign of @p searchScore is the sign of the value. Anything that is not a mate score is centipawns as it is. A mate at ply 0 (the root is mated) is asserted away: the root of an
+     * analysis has a move, so a search never gives it (an engine answers NoMove first).
      */
     [[nodiscard]] AnalysisScore ScoreFromSearch(int searchScore) noexcept;
 
     /**
      * @brief @p score (from the side to move's view) as White sees it: unchanged when White is to move, the sign of `value` flipped when Black is.
      *
-     * The kind is kept (a mate stays a mate, in the same number of moves). It is the score a display with one fixed side wants (an evaluation bar), where
-     * the analysis itself speaks from the side to move. Applying it twice for the same side is the identity.
+     * The kind is kept (a mate stays a mate, in the same number of moves). For a display with one fixed side (an evaluation bar); applying it twice for the same side is the identity.
      */
     [[nodiscard]] AnalysisScore ScoreForWhite(const AnalysisScore& score, PieceColor sideToMove) noexcept;
 
     /**
      * @brief A stable text of @p score for the log and the control API: "+0.35", "-1.20", "0.00", "#3", "#-2".
      *
-     * Centipawns are shown as pawns with two decimals and a sign (none for zero); a centipawn is already a hundredth, so nothing is rounded.
-     * A mate is `#` and the signed number of moves.
+     * Centipawns are shown as pawns with two decimals and a sign (none for zero). A mate is `#` and the signed number of moves.
      */
     [[nodiscard]] String ScoreText(const AnalysisScore& score);
 

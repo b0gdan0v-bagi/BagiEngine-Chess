@@ -496,7 +496,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(ReadFileLines(directory.File("fake.log")), Lines({"isready", "quit"}));
     }
 
-#if !defined(_WIN32)  // no signals on Windows: Close() goes from the grace to TerminateProcess, the test above
+#if !defined(_WIN32)  // no signals on Windows: Close() goes from the grace to ending the job, the test above
     TEST(UciProcessTest, ClosingAChildThatIgnoresSigtermSendsSigkill) {
         SKIP_WITHOUT_FAKE_ENGINE();
         const TempDirectory directory;

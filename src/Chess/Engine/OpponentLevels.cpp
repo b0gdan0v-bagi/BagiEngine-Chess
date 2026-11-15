@@ -6,11 +6,8 @@ namespace BECore::Chess {
 
     namespace {
 
-        // The strength of each level. First guesses, to be tuned by playing: `Skill Level` of the engine, the time for a move and the share of moves the handicap
-        // replaces. Measured with Stockfish 19: Skill Level 0 is the floor of the engine (about a 1300-1400 player, a casual person is 600-1000) and `UCI_Elo` at its
-        // minimum (1320) is the same strength, so neither goes lower; a limit of depth or nodes does not make Skill Level 0 weaker. A random legal move costs about five
-        // pawns, so the share of them (blunderPercent, BlunderEngine) is the knob that reaches a beginner. The move time of the low levels only makes the program answer
-        // sooner, the quality there is the skill and the handicap
+        // First guesses. Skill Level 0 is the floor of Stockfish, so below it only blunderPercent weakens a level; the move time of the low levels only makes the program
+        // answer sooner
         constexpr int kEasySkillLevel = 0;
         constexpr int kEasyMoveTimeMs = 50;
         constexpr int kEasyBlunderPercent = 40;
@@ -23,9 +20,7 @@ namespace BECore::Chess {
         constexpr int kMaxSkillLevel = 20;
         constexpr int kMaxMoveTimeMs = 2000;
         constexpr int kMaxBlunderPercent = 0;
-        // The depth of the own engine at each level, first guesses too (tuned by hand like the Stockfish ones). Measured in a Debug build on macOS, one search with no
-        // clock: the deepest level (depth 5) takes 0.18 s from the start position and 0.63 s from Kiwipete, 0.44 s at worst of the other perft positions; depth 6 would take
-        // 1.4 s, 2.5 s and 3.2 s, so 5 leaves room for a slower machine
+        // The depth of the own engine at each level; the deepest stops at 5 so that a slower machine still answers in a short time
         constexpr int kEasyOwnDepth = 1;
         constexpr int kMediumOwnDepth = 2;
         constexpr int kHardOwnDepth = 3;

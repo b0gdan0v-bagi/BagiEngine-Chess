@@ -70,4 +70,6 @@ New rule code goes into `Game/` with a gtest case; do not patch around the gener
 
 ## Tests
 
-`tests/`, executable `ChessTests`, plus the control smoke `BagiChessControlSmoke` (`tests/control_smoke.py`) and the recorded scenarios `BagiChessScenario.*` (`tests/scenarios/`) under ctest. Where a test goes, the helpers, the fake UCI engine and the build variants are in `tests/CLAUDE.md`: read it before adding or changing a test.
+`tests/`, executable `ChessTests`, plus the control smoke `BagiChessControlSmoke` and the recorded scenarios `BagiChessScenario.*` under ctest. Where a test goes, the helpers, the fake UCI engine and the build variants are in `tests/CLAUDE.md`: read it before adding or changing a test.
+
+Comments follow `.claude/rules/code-comments.md`.
