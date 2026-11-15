@@ -44,7 +44,6 @@ namespace BECore::Chess {
         using PieceHandle = const void*;
 
         /// Where Reset() gets a new seed from; returns any value (a 0 becomes 1).
-        //-NoStd: no callable alias yet (callables-move-only)
         using SeedSource = MoveOnlyFunction<uint32_t()>;
 
         ChessGameModel();

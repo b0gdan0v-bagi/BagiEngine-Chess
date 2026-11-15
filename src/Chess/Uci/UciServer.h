@@ -41,7 +41,6 @@ namespace BECore::Chess::Uci {
      */
     class UciServer {
     public:
-        //-NoStd: no callable alias yet (callables-move-only)
         using Sink = MoveOnlyFunction<void(StringView)>;
 
         /// @p engine answers the searches (not null) and must honour the CancellationToken: `stop` and `quit` wait for it. @p sink gets every line of the server
