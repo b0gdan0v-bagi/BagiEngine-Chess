@@ -21,6 +21,11 @@ namespace BECore::Chess::Tests {
         constexpr FrameCost kHighlightedFrame{};
         constexpr FrameCost kAnalysisFrame{};
         constexpr FrameCost kFinishedFrame{};
+        constexpr FrameCost kPanelFrame{};
+        constexpr FrameCost kPromotionFrame{};
+        constexpr FrameCost kHintFrame{};
+        constexpr FrameCost kTurnedResizedFrame{};
+        constexpr FrameCost kSearchingFrame{};
 
         /// The allocations the calling thread makes while @p frame runs
         template <typename Frame>
@@ -121,6 +126,53 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(Model().IsGameOver());
         WarmUp();
         EXPECT_TRUE(CostIs(MeasureFrame(), kFinishedFrame));
+    }
+
+    TEST_F(ChessUiAllocTest, AFrameWithTheOpponentPanelOpenAllocatesNothingNew) {
+        ASSERT_TRUE(OpenThePanel());
+        WarmUp();
+        EXPECT_TRUE(CostIs(MeasureFrame(), kPanelFrame));
+    }
+
+    TEST_F(ChessUiAllocTest, AFrameWithAPromotionPendingAllocatesNothingNew) {
+        StartFrom(kPromotionFen);
+        ClickMove("a7", "a8");
+        ASSERT_TRUE(PromotionShown());
+        WarmUp();
+        EXPECT_TRUE(CostIs(MeasureFrame(), kPromotionFrame));
+    }
+
+    TEST_F(ChessUiAllocTest, AFrameWithTheHintShownAllocatesNothingNew) {
+        CountingAnalysisFactory factory({New<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"))});
+        Analyst().SetEngineFactory(factory.AsFactory());
+        ASSERT_TRUE(ShowTheHint());
+        WarmUp();
+        EXPECT_TRUE(CostIs(MeasureFrame(), kHintFrame));
+    }
+
+    // The keys of what the board and the HUD rebuild (the orientation, the window, the view) have moved by now and must not move again in an idle frame
+    TEST_F(ChessUiAllocTest, AFrameAfterTheBoardWasTurnedAndTheWindowResizedAllocatesNothingNew) {
+        CountingFactory factory({New<InstantEngine>()});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        ControlPlays("white");
+        ASSERT_TRUE(ShowPortrait({kNarrowestWidth, kNarrowestPortraitHeight}));
+        ASSERT_TRUE(BlackIsAtTheBottom());
+        WarmUp();
+        EXPECT_TRUE(CostIs(MeasureFrame(), kTurnedResizedFrame));
+    }
+
+    // The search is on a worker and held at its gate, so the frames are the same however long the machine takes
+    TEST_F(ChessUiAllocTest, AFrameWhileTheProgramThinksAllocatesNothingNew) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        const auto engine = New<GatedEngine>(true);
+        CountingFactory factory({engine});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        ControlPlays("white");
+        ASSERT_TRUE(FramesUntil([&] { return engine->Calls() == 1; })) << "the search never started";
+        ASSERT_TRUE(Opponent().IsThinking());
+        WarmUp();
+        EXPECT_TRUE(CostIs(MeasureFrame(), kSearchingFrame));
+        EXPECT_EQ(engine->Answered(), 0) << "the search was still held";
     }
 
 }  // namespace BECore::Chess::Tests

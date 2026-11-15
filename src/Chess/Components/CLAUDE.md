@@ -77,3 +77,7 @@ Node `OpponentPanel` (`ChessOpponentPanel.xml`, layer 20, modal, `visible="false
 ## Draw order
 
 By layer, not by place among the references of `SceneConfig.xml` (`engine/src/Modules/BECore/Scene/CLAUDE.md`, "Draw order"); the same layer draws in scene order. `Board` and then `BoardCoordinates` -1, pieces 0, `Result` 1, `Material` 5, a dragged piece 6, `Hud` 10, the panels and the menu 20. A test reads the draw calls of one frame.
+
+## Allocations
+
+A steady frame of the scene allocates nothing on the main thread, in every state a game sits in (the panels, a pending promotion, a hint, the evaluation, a turned board in another window, a search held on a worker, a finished game); `ChessUiAllocTest` pins it in a profile build (`ENGINE_PROFILER_ALLOC`) and `headless_frames.py` on that build reports `allocsPerFrame` 0 for the opening. Nothing is listed as engine-owned. A frame that changes something (a move, the start of a search) does allocate; a case measures a frame in which nothing changes.
