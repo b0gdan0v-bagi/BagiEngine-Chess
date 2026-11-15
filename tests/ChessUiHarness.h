@@ -691,9 +691,17 @@ namespace BECore::Chess::Tests {
         }
 
         // Shared by the files of several topics
-        constexpr const char* kPromotionFen = "8/P6k/8/8/8/8/8/K7 w - - 0 1";                                  // a white pawn on a7, the way to a8 is free
-        constexpr const char* kWhiteTookAPawn = "rnbqkbnr/ppp1pppp/8/3P4/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 3";  // White has taken the d pawn of Black: +1 for White
-        const Color kMaterialChipColor{232, 210, 170, 255};                                                    // the fill of a row (SceneConfig.xml)
+        constexpr const char* kPromotionFen = "8/P6k/8/8/8/8/8/K7 w - - 0 1";                                       // a white pawn on a7, the way to a8 is free
+        constexpr const char* kWhiteTookAPawn = "rnbqkbnr/ppp1pppp/8/3P4/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 3";       // White has taken the d pawn of Black: +1 for White
+        constexpr const char* kBlackCanTakeAPawn = "rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2";  // Black to move: d5e4 takes a pawn
+
+        /// set_state {"fen": ...} of the control API; whether it was taken
+        bool FenSetsTheState(const char* fen) {
+            Json request = Json::object();
+            request["fen"] = fen;
+            return ChessGame::GetActive()->AsControllable()->SetState(request).has_value();
+        }
+        const Color kMaterialChipColor{232, 210, 170, 255};  // the fill of a row (SceneConfig.xml)
         constexpr float kBoardUnits = 640.0f;
         /// The outputs that decide which view is right: phones held upright and sideways, tablets, desktop windows, squares and the degenerate ones
         const Pair<float, float> kViewOutputs[] = {{480.0f, 853.0f},  {390.0f, 844.0f},   {720.0f, 1280.0f},  {768.0f, 1024.0f},  {800.0f, 800.0f},  {1024.0f, 768.0f},
@@ -1517,6 +1525,35 @@ namespace BECore::Chess::Tests {
         /// An element of the `MovePanel` canvas by name (the test fails when it is not there)
         UIElement& MovePanelElement(const char* name) const {
             return ElementOf("MovePanel", name);
+        }
+
+        /// The word of a cell of the move list after one frame: @p side is "White" or "Black"
+        String MovePanelWord(size_t row, const char* side) {
+            Draw();
+            return ShownText(MovePanelElement(Format("MovePanel{}Text{}", side, row).c_str()));
+        }
+
+        /// The rows of the move list the screen has after one frame, shown ones only, joined by " | ": "1. e4 e5", the cell of the last move in brackets ("2. [Nf3]"), a cell with no word left out
+        String ShownMovePanelRows() {
+            Draw();
+            String rows;
+            for (size_t row = 0; row < kMovePanelRows; ++row) {
+                if (!MovePanelElement(Format("MovePanelRow{}", row).c_str()).active.visible) {
+                    continue;
+                }
+                String line = ShownText(MovePanelElement(Format("MovePanelNumber{}", row).c_str()));
+                for (const char* side : {"White", "Black"}) {
+                    const String word = MovePanelWord(row, side);
+                    if (word.empty()) {
+                        continue;
+                    }
+                    const bool marked = MovePanelElement(Format("MovePanel{}Mark{}", side, row).c_str()).active.visible;
+                    line += marked ? Format(" [{}]", word.c_str()) : Format(" {}", word.c_str());
+                }
+                rows += rows.empty() ? "" : " | ";
+                rows += line;
+            }
+            return rows;
         }
 
         /// An element of the `Material` canvas by name (the test fails when it is not there)

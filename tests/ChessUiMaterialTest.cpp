@@ -10,17 +10,10 @@ namespace BECore::Chess::Tests {
 
     namespace {
 
-        constexpr const char* kBlackTookTheQueen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB1KBNR w KQkq - 0 1";      // the queen of White is gone: +9 for Black
-        constexpr const char* kBlackCanTakeAPawn = "rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2";  // Black to move: d5e4 takes a pawn
-        constexpr const char* kPawnAboutToPromote = "8/P6k/8/8/8/8/8/K7 w - - 0 1";                                 // White: a pawn; Black: a king. a7a8q makes a queen
-        constexpr const char* kEightPawnsAgainstNothing = "4k3/8/8/8/8/8/PPPPPPPP/4K3 w - - 0 1";                   // White: king and eight pawns, Black: a bare king
-        constexpr const char* kEmptyMaterialWords = "||||||||||||";                                                 // twelve variables, each followed by "|"
-
-        bool FenSetsTheState(const char* fen) {
-            Json request = Json::object();
-            request["fen"] = fen;
-            return ChessGame::GetActive()->AsControllable()->SetState(request).has_value();
-        }
+        constexpr const char* kBlackTookTheQueen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB1KBNR w KQkq - 0 1";  // the queen of White is gone: +9 for Black
+        constexpr const char* kPawnAboutToPromote = "8/P6k/8/8/8/8/8/K7 w - - 0 1";                             // White: a pawn; Black: a king. a7a8q makes a queen
+        constexpr const char* kEightPawnsAgainstNothing = "4k3/8/8/8/8/8/PPPPPPPP/4K3 w - - 0 1";               // White: king and eight pawns, Black: a bare king
+        constexpr const char* kEmptyMaterialWords = "||||||||||||";                                             // twelve variables, each followed by "|"
 
     }  // namespace
 

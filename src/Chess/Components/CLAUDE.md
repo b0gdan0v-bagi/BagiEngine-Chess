@@ -61,6 +61,7 @@ Node `MovePanel` (`ChessMovePanel.xml`, layer 5, after `Material` in the referen
 
 - The component rebuilds `BuildMoveList` and `BuildMovePanelRows` only when the model or its version changed, writes `movePanelNumber<i>`, `movePanelWhite<i>` and `movePanelBlack<i>` of the 8 rows and shows the rows and marks the entries say; the list is the **last 8 rows** of the game and has no scroll (the engine's UI has none; the window of rows is the component's choice).
 - **Where it is hidden:** `MovePanelBox` is shown only while `MovePanelFits` holds for the canvas's `safeBounds`, asked on every draw and never before the first layout. That is the Wide view with no insets and with side insets that leave the box (a 3:2 or 16:10 window of 480 px short side keeps it); the default and Portrait views are narrower than the box, and a Wide window of 700 x 480 or 672 x 480 with side insets cuts it. The panel for those windows is a later stage.
+- **Known limit:** the HUD follows the safe area, the box does not. A notch (7 % of the short side) pushes `Menu` and `Reset` down onto the title band, and the home bar of the side insets (4 %) pushes `Status` up onto the lower empty band; the 8 rows are clear of the HUD in every window (`ChessUiTest` pins which controls come closer than 8 units, per kind of window). A later stage that puts content in a band has to move the HUD or the band.
 
 ## The HUD
 
