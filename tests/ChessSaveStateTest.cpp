@@ -1,7 +1,9 @@
 #include <BECore/Save/SaveGame.h>
+#include <Chess/Engine/OpponentEngines.h>
 #include <Chess/Save/ChessSaveState.h>
 #include <Common/EngineEnvironment.h>
 #include <Common/TempPath.h>
+#include <tests/ChessTestUtil.h>
 #include <tests/TestEngines.h>
 
 /// The save of a game and the opponent choice (Chess/Save/ChessSaveState.h): the state a game captures, written and read back through a real SaveGameService on a temp folder, and
@@ -84,6 +86,10 @@ namespace BECore::Chess::Tests {
             _directory = ::BECore::Tests::TestTempDirectory("ChessSaveState");
             std::filesystem::remove_all(_directory);
             ASSERT_TRUE(_service.Initialize(_directory / "saves"));
+            // Whether Stockfish is offered decides what a seat nobody plays comes back as, so it must not come from the machine: STOCKFISH names a file for the whole case
+            const std::filesystem::path stockfish = _directory / "stockfish";
+            MakeStockfishFile(stockfish);
+            _stockfishEnvironment.emplace("STOCKFISH", FromStdString(stockfish.string()).c_str());
         }
 
         void TearDown() override {
@@ -169,6 +175,7 @@ namespace BECore::Chess::Tests {
         }
 
         std::filesystem::path _directory;
+        Optional<ScopedEnvironment> _stockfishEnvironment;
         FileSystem _fileSystem;
         SaveGameService _service{_fileSystem};
     };
@@ -242,10 +249,13 @@ namespace BECore::Chess::Tests {
         SavedGame target;
         ASSERT_TRUE(LoadAndRestore(target).has_value());
 
-        EXPECT_EQ(Describe(target.Captured()), Describe(source.Captured()));
+        // A build without Stockfish never offers it, so the seat nobody plays comes back on the default engine
+        if constexpr (kStockfishAvailable) {
+            EXPECT_EQ(Describe(target.Captured()), Describe(source.Captured()));
+        }
         EXPECT_EQ(target.choice.ColorId(), "black");
         EXPECT_EQ(target.choice.ModeId(), "two");
-        EXPECT_EQ(target.controller.GetSeatChoice(PieceColor::Black), Seat(OpponentEngine::Stockfish, "easy"));
+        EXPECT_EQ(target.controller.GetSeatChoice(PieceColor::Black), Seat(kDefaultOpponentEngine, "easy"));
     }
 
     TEST_F(ChessSaveStateTest, OneProgramKeepsItsSideAndBothSeats) {
@@ -257,10 +267,12 @@ namespace BECore::Chess::Tests {
         SavedGame target;
         ASSERT_TRUE(LoadAndRestore(target).has_value());
 
-        EXPECT_EQ(Describe(target.Captured()), Describe(source.Captured()));
+        if constexpr (kStockfishAvailable) {  // as in the case above
+            EXPECT_EQ(Describe(target.Captured()), Describe(source.Captured()));
+        }
         EXPECT_EQ(target.controller.GetPlays(), PieceColor::Black);
         EXPECT_EQ(target.choice.ColorId(), "white");
-        EXPECT_EQ(target.controller.GetSeatChoice(PieceColor::White), Seat(OpponentEngine::Stockfish, "max"));
+        EXPECT_EQ(target.controller.GetSeatChoice(PieceColor::White), Seat(kDefaultOpponentEngine, "max"));
         EXPECT_EQ(target.controller.GetSeatChoice(PieceColor::Black), Seat(OpponentEngine::Own, "easy"));
     }
 
