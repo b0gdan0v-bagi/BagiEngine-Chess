@@ -55,12 +55,14 @@ namespace BECore::Chess {
      * A pick asks the factory for every seat that plays and is new, has another choice or whose opponent has failed, all BEFORE it changes anything. A pick that finds no engine is REFUSED as a whole:
      * nothing changes (the sides, the choices, the running opponents and their searches stay), the error is kept in GetError(), the revision grows and one warning is logged. Nothing falls back to the
      * other engine: the person picks it (SetEngine(), which clears the error), then a side. While nobody plays, SetEngine() only changes the choice and cannot be refused (except a pick of Stockfish
-     * in a CHESS_NO_STOCKFISH build, below). A change destroys the old EngineOpponent of a changed seat first (it cancels its search and returns at once, and a late answer is never played); a seat
+     * that cannot run, below). A change destroys the old EngineOpponent of a changed seat first (it cancels its search and returns at once, and a late answer is never played); a seat
      * whose color and choice are unchanged keeps its opponent and its search. A pick that changes nothing does nothing, except that it clears a standing refusal and remakes an opponent whose search
      * failed (the retry).
      *
      * In a build without Stockfish (CHESS_NO_STOCKFISH) a pick of Stockfish is refused the same way (`Unsupported`), for any seat and also while nobody plays it, as long as the controller uses its
-     * default factory: a factory given by SetEngineFactory() is the caller's own world and is asked as before.
+     * default factory: a factory given by SetEngineFactory() is the caller's own world and is asked as before. With Stockfish in the build but no file found (FindStockfish() over the settings,
+     * looked up afresh at every pick that moves a seat onto Stockfish) the pick is refused the same way, as `LaunchFailed` with NoStockfishDetail(), also for a seat nobody plays; a seat that
+     * already holds Stockfish keeps it (a Stockfish that disappears after it was picked stays picked and its search fails, the factory says so when the seat plays).
      *
      * The error rule: an error belongs to the version of the game it came from (ChessGameModel::GetVersion()). When the version moves (a reset, a position set from outside, a move of someone else)
      * Update() clears the error, the opponents' too, and a new pick clears it as well: the person has acted, so they have seen it. The program's own move does not take a refused pick's error away
@@ -97,8 +99,26 @@ namespace BECore::Chess {
         OpponentController(OpponentController&&) = delete;
         OpponentController& operator=(OpponentController&&) = delete;
 
-        /// Where the default factory looks for Stockfish; read at the next pick, an opponent that already plays keeps its engine
+        /// Where the default factory looks for Stockfish; read at the next pick, an opponent that already plays keeps its engine. Looks for the file again (RefreshStockfish())
         void SetSettings(OpponentSettings settings);
+
+        /**
+         * @brief Whether Stockfish is offered to the person: the build can run it (kStockfishAvailable) and a factory of a test is set or a Stockfish file was found.
+         *
+         * Answers from a cache, so it is cheap enough for every frame; FindStockfish() walks PATH and is asked only by RefreshStockfish() and by a pick of Stockfish. Never changes GetRevision():
+         * what is installed is not the state of the game.
+         */
+        [[nodiscard]] bool OffersStockfish() const noexcept {
+            return kStockfishAvailable && (_factory || _stockfishFound);
+        }
+
+        /// Looks for the Stockfish file again (FindStockfish() over the settings), for a Stockfish installed since the last look
+        void RefreshStockfish();
+
+        /// The engine a new game starts with: kDefaultOpponentEngine while it is offered, else the own engine
+        [[nodiscard]] OpponentEngine DefaultEngine() const noexcept {
+            return OffersStockfish() ? kDefaultOpponentEngine : OpponentEngine::Own;
+        }
 
         /// The analysis reads these at the time of its search, so the ones `ChessGame::Start()` loads are seen
         [[nodiscard]] const OpponentSettings& GetSettings() const noexcept {
@@ -137,9 +157,11 @@ namespace BECore::Chess {
         /// Side, strength and engine in one pick; BadRequest for a level outside GetOpponentLevels(), as the other picks
         std::expected<void, EngineError> Choose(Optional<PieceColor> computer, size_t level, OpponentEngine engine);
 
-        /// The engine, for both seats; with nobody playing it only changes the choice and clears a standing pick error (a pick of Stockfish is still refused in a CHESS_NO_STOCKFISH build)
+        /// The engine, for both seats; with nobody playing it only changes the choice and clears a standing pick error (a pick of Stockfish is still refused when it cannot run: no Stockfish
+        /// in the build, or no file found)
         std::expected<void, EngineError> SetEngine(OpponentEngine engine);
 
+        /// The next engine of the cycle; Stockfish is skipped while it is not offered (OffersStockfish())
         std::expected<void, EngineError> CycleEngine();
 
         /// The next level, the first one after the last
@@ -235,6 +257,8 @@ namespace BECore::Chess {
         [[nodiscard]] std::expected<SharedPtr<IChessEngine>, EngineError> MakeEngine(OpponentEngine engine, const OpponentLevel& level) const;
         /// The color of the first seat (White's first) whose picked engine this build cannot run, while the default factory is in use; nothing for a factory given by a test
         [[nodiscard]] Optional<PieceColor> FindUnavailableSeat(const Array<SeatChoice, kSeatCount>& picked) const;
+        /// The color of the first seat that is moved onto Stockfish while no file is found, while the default factory is in use; looks afresh (RefreshStockfish()) only for such a seat
+        [[nodiscard]] Optional<PieceColor> FindSeatWithoutStockfish(const Array<SeatChoice, kSeatCount>& picked);
         std::expected<void, EngineError> ChooseLevel(ProgramSides plays, size_t level);
         void FailPick(EngineError error, PieceColor computer, OpponentEngine engine, const OpponentLevel& level);
         void DropStaleError();
@@ -242,7 +266,8 @@ namespace BECore::Chess {
 
         ChessGameModel& _model;
         OpponentSettings _settings;
-        EngineFactory _factory;  ///< empty: the Stockfish of _settings, the OwnEngine, each wrapped by WithHandicap
+        EngineFactory _factory;        ///< empty: the Stockfish of _settings, the OwnEngine, each wrapped by WithHandicap
+        bool _stockfishFound = false;  ///< the last look of RefreshStockfish(); FindStockfish() walks PATH, so it is not asked per frame
         Array<Seat, kSeatCount> _seats;
         Optional<EngineError> _pickError;  ///< the factory's failure of the last pick; the old opponents (if any) go on playing while it stands
         uint64_t _errorVersion = 0;        ///< GetVersion() of the model when the standing error came

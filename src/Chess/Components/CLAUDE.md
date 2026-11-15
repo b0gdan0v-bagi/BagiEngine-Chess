@@ -17,7 +17,7 @@ ChessResultComponent    its own node (layer 1): dims the board and draws the res
 - **Geometry** is in scene units of the active view: `_originX/_originY/_squareSize` for the default view, (100, 80), and `_portraitOriginX/_portraitOriginY/_portraitSquareSize` for Portrait, (40, 144); change a pair with the numbers of the canvases around it. The component takes one set on `SceneViewChangedEvent` (`kPortraitView` is the name) and every accessor reads that choice, so the squares, the pieces and the result bar cannot disagree for a frame; a drag in the hand ends with the view. The board is not a named region. The mouse goes through `Scene::ScreenToSceneX/Y`.
 - **Orientation:** the board is drawn from Black's side exactly when the program plays White (`BottomColor(OpponentController::GetPlays())`, read live on every use). `SquareToPixel` and `OnMouseDown` map through `Game/BoardOrientation.h`; everything placed on a square uses them. The HUD, panels, model, control API and FEN do not turn.
 - **Coordinates:** 16 labels of a `SceneView` canvas on `BoardCoordinates` (layer -1, after `Board`, no safe area, no `blocksInput`). The rects are fixed per view (a variant sets each label for the Portrait origin), the text (`coordRank<row>`, `coordFile<column>` from `Game/BoardCoordinates.h`) turns. A turn keeps the parity of the grid, so the label colors are static; `IsLightSquare` is the one function for it.
-- In a `CHESS_NO_STOCKFISH` build the board hides the segment `EngineStockfish` at its first update or draw.
+- The board hides the segment `EngineStockfish` exactly while `OpponentController::OffersStockfish()` is false (a `CHESS_NO_STOCKFISH` build, or no Stockfish file found) and shows it again when it turns true. Every update and draw compares the **cached** answer (no file lookup per frame); the lookup is `RefreshStockfish()`, made when the opponent section opens (`ChessOpenSection`), so a Stockfish installed while the game runs shows up at the next opening. The scene file is the same everywhere.
 
 ## Highlights
 
@@ -65,7 +65,7 @@ Node `OpponentPanel` (`ChessOpponentPanel.xml`, layer 20, modal, `visible="false
 - The group owns no choice: a press emits the action, the board picks through `ChessGame::GetActiveChoice()` and publishes the variable, so the panel shows what the game has. An id in no table logs one warning.
 - **The color is the person's**; `opponent.plays` of the control API is the program's.
 - A pick applies at once and the panel stays open. No group is greyed (a disabled group read as a dead button): a pick made while two people play is kept and applies when Computer is picked.
-- A refused pick changes nothing (no fallback, the program is not switched off); "Engine not found" stays in `OpponentError` and `Status` until someone's move, a reset, `set_state` or the next pick.
+- A refused pick changes nothing (no fallback, the program is not switched off); "Engine not found" stays in `OpponentError` and `Status` until someone's move, a reset, `set_state` or the next pick. The panel itself never offers a Stockfish that is not found, so the error shows for a hand-made press, a factory of a test, or a Stockfish that went away after it was picked.
 - No name may be in two canvases, hence `ModeGroup`, not `Mode`.
 
 ## Draw order

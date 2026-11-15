@@ -165,9 +165,20 @@ namespace BECore::Chess {
             }
         }
 
+        // The engine of a seat nobody plays is only a memory: Stockfish that is not offered would be refused and show "Engine not found" with nobody playing, so the seat takes the default
+        SeatChoice white = plan.white;
+        SeatChoice black = plan.black;
+        if (!controller.OffersStockfish()) {
+            if (!plan.plays.white && white.engine == OpponentEngine::Stockfish) {
+                white.engine = controller.DefaultEngine();
+            }
+            if (!plan.plays.black && black.engine == OpponentEngine::Stockfish) {
+                black.engine = controller.DefaultEngine();
+            }
+        }
         // The sides first and the person's color after, only when the program plays no single side: SetColor() on a program that plays would remake its opponent and write one seat's
         // choice into the other, and with one side played the color follows from it
-        if (const std::expected<void, EngineError> picked = controller.ChooseSeats(plan.plays, plan.white, plan.black); !picked) {
+        if (const std::expected<void, EngineError> picked = controller.ChooseSeats(plan.plays, white, black); !picked) {
             LOG_WARNING("Save: the saved opponent was not restored, the game goes on as two people: {}"_format(picked.error().detail));
         }
         if (!controller.GetPlays()) {

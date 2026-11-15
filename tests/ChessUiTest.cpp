@@ -33,6 +33,7 @@
 #include <Chess/Game/PromotionChoices.h>
 #include <Common/EngineEnvironment.h>
 #include <Common/RecordingRenderer.h>
+#include <Common/TempPath.h>
 #include <Common/UILayoutMatrix.h>
 #include <CoreSDL/SDLEvents.h>
 #include <Events/InputEvents.h>
@@ -668,6 +669,12 @@ namespace BECore::Chess::Tests {
         }
 
         void SetUp() override {
+            // Whether Stockfish is offered must not depend on the machine: STOCKFISH names a file for the whole case (a test that wants none points it at a missing one)
+            _stockfishDirectory = TestTempDirectory("ChessUiStockfish");
+            std::filesystem::remove_all(_stockfishDirectory);
+            std::filesystem::create_directories(_stockfishDirectory);
+            _stockfishEnvironment.emplace("STOCKFISH", FoundStockfishFile().c_str());
+
             CoreManager::GetFontAtlasLibrary().Clear();
             CoreManager::GetUIVars().Clear();
             _renderer = New<RecordingRenderer>();
@@ -692,6 +699,48 @@ namespace BECore::Chess::Tests {
             CoreManager::GetUIVars().Clear();
             CoreManager::GetRendererManager().SetRenderer({});
             CoreManager::GetFontAtlasLibrary().Clear();
+            _stockfishEnvironment.reset();
+            std::error_code ignored;
+            std::filesystem::remove_all(_stockfishDirectory, ignored);
+        }
+
+        /// A file FindStockfish() accepts (it is never run: the doubles of a test play); the same name every time, so it can be made again after it was removed
+        String FoundStockfishFile() const {
+            const std::filesystem::path file = _stockfishDirectory / "stockfish-found";
+            MakeStockfishFile(file);
+            return FromStdString(file.string());
+        }
+
+        /// The path of a Stockfish that is not there (yet): handed to the settings it finds nothing, and PATH is not looked at then
+        String MissingStockfishFile() const {
+            return FromStdString((_stockfishDirectory / "stockfish-missing").string());
+        }
+
+        /// Settings with an explicit path for the controller of the game, and a new look at it
+        void UseStockfishPath(const String& path) const {
+            Opponent().SetSettings(OpponentSettings{path});
+        }
+
+        /// The opponent panel is open and drawn, the segment of Stockfish takes no room and Own engine fills the group, selected, and takes its click
+        void ExpectOnlyTheOwnSegment() {
+            const UIElement& stockfish = PanelButton("EngineStockfish");
+            const UIElement& own = PanelButton("EngineOwn");
+            const UISegmented& group = PanelControl<UISegmented>("EngineGroup");
+            EXPECT_FALSE(stockfish.active.visible);
+            EXPECT_TRUE(own.active.visible);
+            ASSERT_FALSE(own.rect.IsEmpty());
+            EXPECT_NEAR(own.rect.h, kSegmentHeight, kPixelTolerance);
+            EXPECT_TRUE(stockfish.rect.IsEmpty()) << "a hidden segment takes no room";
+            EXPECT_NEAR(own.rect.x, group.rect.x, kPixelTolerance) << "Own engine fills the group";
+            EXPECT_NEAR(own.rect.w, group.rect.w, kPixelTolerance);
+            EXPECT_EQ(Var("opponentEngine"), "own");
+            Draw();
+            EXPECT_TRUE(own.selected) << "and it is the selected one";
+            EXPECT_FALSE(stockfish.selected);
+            ActionLog log;
+            ASSERT_TRUE(ClickPanel("EngineOwn").Both()) << "the one segment takes its click";
+            EXPECT_EQ(log.Total(), 1u);
+            EXPECT_EQ(log.LastValue(), PoolString::Intern("own"));
         }
 
         ChessGameModel& Model() const {
@@ -1652,6 +1701,8 @@ namespace BECore::Chess::Tests {
 
         IntrusivePtr<RecordingRenderer> _renderer;
         IntrusivePtrAtomic<SceneManager> _manager;
+        std::filesystem::path _stockfishDirectory;
+        Optional<ScopedEnvironment> _stockfishEnvironment;
     };
 
     // ---- the screen -------------------------------------------------------------------------------------------------------
@@ -5144,35 +5195,85 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(Var("opponentError"), "") << "the move of the person took the sentence away (the controller test pins that the program's own move does not)";
     }
 
-    TEST_F(ChessUiTest, TheStockfishSegmentIsHiddenExactlyWhenTheBuildHasNoStockfishAndTheOwnSegmentFillsTheGroupThen) {
-        // The scene file is the same in every build; ChessBoardComponent::HideUnavailableEngines hides the segment once, at the first update or draw
+    TEST_F(ChessUiTest, TheStockfishSegmentIsShownWhileStockfishIsOfferedAndSharesTheGroupWithTheOwnSegment) {
+        // The fixture names a found Stockfish file; the scene file is the same in every build and on every machine
         ASSERT_TRUE(OpenThePanel());
         Draw();
+        if constexpr (!kStockfishAvailable) {
+            ExpectOnlyTheOwnSegment();
+            return;
+        }
         const UIElement& stockfish = PanelButton("EngineStockfish");
         const UIElement& own = PanelButton("EngineOwn");
         const UISegmented& group = PanelControl<UISegmented>("EngineGroup");
-        EXPECT_EQ(stockfish.active.visible, kStockfishAvailable);
+        EXPECT_TRUE(Opponent().OffersStockfish());
+        EXPECT_TRUE(stockfish.active.visible);
         EXPECT_TRUE(own.active.visible);
         ASSERT_FALSE(own.rect.IsEmpty());
         EXPECT_NEAR(own.rect.h, kSegmentHeight, kPixelTolerance);
-        if constexpr (kStockfishAvailable) {
-            ASSERT_FALSE(stockfish.rect.IsEmpty());
-            EXPECT_NEAR(stockfish.rect.x, group.rect.x, kPixelTolerance) << "two segments share the group";
-            EXPECT_NEAR(stockfish.rect.w, own.rect.w, kPixelTolerance);
-            EXPECT_NEAR(own.rect.x + own.rect.w, group.rect.x + group.rect.w, kPixelTolerance);
-        } else {
-            EXPECT_TRUE(stockfish.rect.IsEmpty()) << "a hidden segment takes no room";
-            EXPECT_NEAR(own.rect.x, group.rect.x, kPixelTolerance) << "Own engine fills the group";
-            EXPECT_NEAR(own.rect.w, group.rect.w, kPixelTolerance);
-            EXPECT_EQ(Var("opponentEngine"), "own");
-            Draw();
-            EXPECT_TRUE(own.selected) << "and it is the selected one";
-            EXPECT_FALSE(stockfish.selected);
-            ActionLog log;
-            ASSERT_TRUE(ClickPanel("EngineOwn").Both()) << "the one segment takes its click";
-            EXPECT_EQ(log.Total(), 1u);
-            EXPECT_EQ(log.LastValue(), PoolString::Intern("own"));
-        }
+        ASSERT_FALSE(stockfish.rect.IsEmpty());
+        EXPECT_NEAR(stockfish.rect.x, group.rect.x, kPixelTolerance) << "two segments share the group";
+        EXPECT_NEAR(stockfish.rect.w, own.rect.w, kPixelTolerance);
+        EXPECT_NEAR(own.rect.x + own.rect.w, group.rect.x + group.rect.w, kPixelTolerance);
+    }
+
+    TEST_F(ChessUiTest, TheStockfishSegmentIsHiddenWhenNoStockfishIsFoundAndTheOwnSegmentFillsTheGroupThen) {
+        // In every build: no file found hides the segment the way a build without Stockfish does
+        UseStockfishPath(MissingStockfishFile());
+        ASSERT_FALSE(Opponent().OffersStockfish());
+        EXPECT_EQ(Opponent().DefaultEngine(), OpponentEngine::Own);
+        EXPECT_TRUE(Opponent().SetEngine(OpponentEngine::Own));
+        _manager->UpdateAll();
+        ASSERT_TRUE(OpenThePanel());
+        Draw();
+        ExpectOnlyTheOwnSegment();
+    }
+
+    TEST_F(ChessUiTest, AStockfishThatAppearsAfterTheFirstLookShowsTheSegmentWhenThePanelIsOpenedAgainNotBefore) {
+        SKIP_WITHOUT_STOCKFISH_SEGMENT();
+        const String path = MissingStockfishFile();
+        UseStockfishPath(path);
+        EXPECT_TRUE(Opponent().SetEngine(OpponentEngine::Own));
+        ASSERT_TRUE(OpenThePanel());
+        Draw();
+        ExpectOnlyTheOwnSegment();
+        ASSERT_TRUE(CloseThePanel());
+
+        MakeStockfishFile(std::filesystem::path(path.c_str()));
+        const uint64_t revision = Opponent().GetRevision();
+        _manager->UpdateAll();
+        Draw();
+        EXPECT_FALSE(Opponent().OffersStockfish()) << "the cached look: no file lookup per frame";
+        EXPECT_TRUE(PanelButton("EngineStockfish").rect.IsEmpty());
+
+        ASSERT_TRUE(OpenThePanel());
+        Draw();
+        EXPECT_TRUE(Opponent().OffersStockfish());
+        EXPECT_TRUE(PanelButton("EngineStockfish").active.visible);
+        EXPECT_FALSE(PanelButton("EngineStockfish").rect.IsEmpty());
+        EXPECT_EQ(Opponent().GetRevision(), revision) << "what is installed is not the state of the game";
+        EXPECT_EQ(Opponent().GetEngine(), OpponentEngine::Own) << "a Stockfish found later only becomes pickable";
+        ASSERT_TRUE(ClickPanel("EngineStockfish").Both());
+        EXPECT_EQ(Var("opponentEngine"), "stockfish");
+
+        std::error_code ignored;
+        std::filesystem::remove(std::filesystem::path(path.c_str()), ignored);
+        ASSERT_TRUE(CloseThePanel());
+        ASSERT_TRUE(OpenThePanel());
+        Draw();
+        EXPECT_TRUE(PanelButton("EngineStockfish").rect.IsEmpty()) << "gone again: hidden at the next opening";
+        EXPECT_EQ(Opponent().GetEngine(), OpponentEngine::Stockfish) << "the pick stays; nothing falls back";
+    }
+
+    TEST_F(ChessUiTest, WithAFactoryOfATestTheStockfishSegmentIsShownWhateverIsFound) {
+        SKIP_WITHOUT_STOCKFISH_SEGMENT();
+        UseStockfishPath(MissingStockfishFile());
+        CountingFactory factory({MakeShared<InstantEngine>()});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        ASSERT_TRUE(Opponent().OffersStockfish());
+        ASSERT_TRUE(OpenThePanel());
+        Draw();
+        EXPECT_FALSE(PanelButton("EngineStockfish").rect.IsEmpty());
     }
 
     TEST_F(ChessUiTest, ThePanelWithTheStockfishSegmentHiddenPassesTheMatrixAndOwnEngineIsATouchTargetInTheNarrowestWindow) {

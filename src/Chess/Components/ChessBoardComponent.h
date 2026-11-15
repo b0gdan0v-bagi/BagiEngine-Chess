@@ -146,9 +146,10 @@ namespace BECore::Chess {
         /// Takes the geometry of the new view; a drag in the hand ends, since its scene units were those of the old one
         void OnViewChanged(const SceneEvents::SceneViewChangedEvent&);
 
-        /// Without Stockfish in this build (CHESS_NO_STOCKFISH) hides its segment of the opponent panel, so Own engine fills the group; once, at the first update or draw, when every node of the
-        /// scene is attached. The scene file is the same in every build
-        void HideUnavailableEngines();
+        /// Hides the segment of Stockfish in the opponent panel exactly while the opponent does not offer it (no Stockfish in the build or none found), so Own engine fills the group, and shows
+        /// it again when it is offered. Compares the cached answer of OffersStockfish() on every update and draw (no file lookup); the first call is at the first update or draw, when every node
+        /// of the scene is attached. The scene file is the same in every build and on every machine
+        void SyncStockfishSegment();
 
         /// One line in the log when a game has ended, the first time it is seen: whether the person, the program or the control API played the last move
         void LogResultOnce(const ChessGameModel& model);
@@ -173,7 +174,7 @@ namespace BECore::Chess {
 
         bool _portraitActive = false;       // the geometry in effect: the `portrait*` fields, else the default ones
         bool _promotionPanelShown = false;  // the canvas starts hidden
-        bool _enginesChecked = false;
+        bool _stockfishShown = true;        // the segment starts visible in the scene file
 
         Optional<Drag> _drag;
 

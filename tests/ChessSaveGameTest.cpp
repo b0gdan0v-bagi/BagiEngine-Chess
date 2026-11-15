@@ -15,6 +15,7 @@
 #include <Common/TempPath.h>
 #include <Games/GameManager.h>
 #include <iterator>
+#include <tests/ChessTestUtil.h>
 #include <tests/ShippedScene.h>
 #include <tests/TestEngines.h>
 
@@ -82,6 +83,9 @@ namespace BECore::Chess::Tests {
             std::filesystem::remove_all(_directory);
             std::filesystem::create_directories(_directory);
             _saves = _directory / "saves";
+            _stockfishDirectory = TestTempDirectory("ChessSaveGameStockfish");  // beside _directory, whose emptiness a test checks
+            std::filesystem::remove_all(_stockfishDirectory);
+            std::filesystem::create_directories(_stockfishDirectory);
             CoreManager::GetTweens().Clear();
             CoreManager::GetTime().Reset();
             CoreManager::GetFontAtlasLibrary().Clear();
@@ -97,6 +101,7 @@ namespace BECore::Chess::Tests {
             CoreManager::GetFontAtlasLibrary().Clear();
             std::error_code ignored;
             std::filesystem::remove_all(_directory, ignored);
+            std::filesystem::remove_all(_stockfishDirectory, ignored);
         }
 
         /// The command line of the run: the flags, and the folder of the test when @p withFolder
@@ -166,6 +171,27 @@ namespace BECore::Chess::Tests {
         void Restart() {
             Game().Stop();
             Game().Start();
+        }
+
+        /// A file FindStockfish() accepts, for the STOCKFISH of a test that starts a game (it is never run: nothing plays)
+        String FoundStockfishFile() const {
+            const std::filesystem::path file = _stockfishDirectory / "stockfish-found";
+            MakeStockfishFile(file);
+            return FromStdString(file.string());
+        }
+
+        /// A STOCKFISH that names no file: nothing is found, and PATH is not looked at then
+        String MissingStockfishFile() const {
+            return FromStdString((_stockfishDirectory / "stockfish-missing").string());
+        }
+
+        /// set_state {"opponent": {"engine": <engine>}} through the control adapter
+        auto PickEngine(const char* engine) {
+            Json opponent = Json::object();
+            opponent["engine"] = MakeJsonString(engine);
+            Json request = Json::object();
+            request["opponent"] = opponent;
+            return Game().AsControllable()->SetState(request);
         }
 
         std::filesystem::path SaveFile() const {
@@ -250,6 +276,7 @@ namespace BECore::Chess::Tests {
         Vector<String> _savedArguments;
         std::filesystem::path _directory;
         std::filesystem::path _saves;
+        std::filesystem::path _stockfishDirectory;
         IntrusivePtr<RecordingRenderer> _renderer;
         IntrusivePtrAtomic<SceneManager> _manager;
         UniquePtr<CountingFactory> _factory;
@@ -259,7 +286,8 @@ namespace BECore::Chess::Tests {
     // ---- Clean starts: nothing is read or written without a switch ----
 
     TEST_F(ChessSaveGameTest, AStartWithNoFlagIsAFreshGameAndMakesNoFile) {
-        CoreManager::GetCommandLine().Set(Vector<String>{});  // config/ is not mounted in ChessTests, so rememberGame is false: no switch, no memory
+        const ScopedEnvironment stockfish("STOCKFISH", FoundStockfishFile().c_str());  // the engine of a new game is Stockfish only when a file is found
+        CoreManager::GetCommandLine().Set(Vector<String>{});                           // config/ is not mounted in ChessTests, so rememberGame is false: no switch, no memory
         StartManager();
         const ChessGame& game = Game();
 
@@ -458,5 +486,135 @@ namespace BECore::Chess::Tests {
         ExpectEveryPieceOnItsSquare("two frames after a restore");
         EXPECT_EQ(Game().GetModel().GetMoves().size(), 1u);
     }
+
+#if !CHESS_NO_STOCKFISH
+
+    // ---- Stockfish found or not at the start (STOCKFISH names the file, so the machine's own Stockfish is not asked) ----
+
+    TEST_F(ChessSaveGameTest, AGameStartedWithNoStockfishFoundPlaysTheOwnEngineAndOffersNoStockfish) {
+        const ScopedEnvironment stockfish("STOCKFISH", MissingStockfishFile().c_str());
+        SetCommandLine({"--control", "--headless"}, false);
+        StartManager();
+        const OpponentController& opponent = Game().GetOpponent();
+
+        EXPECT_FALSE(opponent.OffersStockfish());
+        EXPECT_EQ(opponent.GetEngine(), OpponentEngine::Own);
+        EXPECT_FALSE(opponent.GetError().has_value()) << "the start picks what it can run: nothing is refused";
+        EXPECT_EQ(Member(OpponentOfState(), "engine"), "own");
+        EXPECT_EQ(Game().GetChoice().EngineId(), "own");
+
+        const Json before = State();
+        const uint64_t version = Game().AsControllable()->GetStateVersion();
+        const auto refused = PickEngine("stockfish");
+        ASSERT_FALSE(refused.has_value());
+        EXPECT_EQ(refused.error().code, "engine_unavailable");
+        EXPECT_EQ(Member(OpponentOfState(), "engine"), "own") << "nothing falls back and nothing changes";
+        EXPECT_EQ(Member(State(), "fen"), Member(before, "fen"));
+        EXPECT_GT(Game().AsControllable()->GetStateVersion(), version) << "the error that appeared is a change a client can see";
+        EXPECT_TRUE(PickEngine("own").has_value());
+    }
+
+    TEST_F(ChessSaveGameTest, ASeatPickedAsStockfishWithNoFileFindsNoEngineAndTakesNoFenWithIt) {
+        const ScopedEnvironment stockfish("STOCKFISH", MissingStockfishFile().c_str());
+        SetCommandLine({"--control", "--headless"}, false);
+        StartManager();
+        const String startFen = Member(State(), "fen");
+
+        Json seat = Json::object();
+        seat["engine"] = MakeJsonString("stockfish");
+        Json opponent = Json::object();
+        opponent["white"] = seat;
+        Json request = Json::object();
+        request["opponent"] = opponent;
+        request["fen"] = MakeJsonString(kOddStartFen);
+        const auto refused = Game().AsControllable()->SetState(request);
+
+        ASSERT_FALSE(refused.has_value());
+        EXPECT_EQ(refused.error().code, "engine_unavailable");
+        EXPECT_EQ(Member(State(), "fen"), startFen) << "a pick that is refused as a whole leaves the position too";
+    }
+
+    TEST_F(ChessSaveGameTest, TheAnalysisOfAGameStartedWithNoStockfishFoundUsesTheOwnEngine) {
+        const ScopedEnvironment stockfish("STOCKFISH", MissingStockfishFile().c_str());
+        SetCommandLine({"--control", "--headless"}, false);
+        StartManager();
+        Game().GetAnalyst().SetEvaluation(true);
+
+        const bool answered = WaitUntil([&] {
+            Frame();
+            return Game().GetAnalyst().GetEvaluation(Game().GetModel()).has_value() || Game().GetAnalyst().GetError().has_value();
+        });
+
+        ASSERT_TRUE(answered) << "no answer from the analysis";
+        EXPECT_FALSE(Game().GetAnalyst().GetError().has_value()) << DescribeError(Game().GetAnalyst().GetError()).c_str();
+        EXPECT_TRUE(Game().GetAnalyst().GetEvaluation(Game().GetModel()).has_value());
+        EXPECT_FALSE(Game().GetAnalyst().GetLines(Game().GetModel()).empty());
+    }
+
+    TEST_F(ChessSaveGameTest, AGameStartedWithAStockfishFileStartsOnStockfishAndRefusesNothing) {
+        const ScopedEnvironment stockfish("STOCKFISH", FoundStockfishFile().c_str());
+        SetCommandLine({"--control", "--headless"}, false);
+        StartManager();
+        const OpponentController& opponent = Game().GetOpponent();
+
+        EXPECT_TRUE(opponent.OffersStockfish());
+        EXPECT_EQ(opponent.GetEngine(), OpponentEngine::Stockfish);
+        EXPECT_FALSE(opponent.GetError().has_value());
+        EXPECT_EQ(Member(OpponentOfState(), "engine"), "stockfish");
+        EXPECT_TRUE(PickEngine("own").has_value());
+        EXPECT_TRUE(PickEngine("stockfish").has_value());
+    }
+
+    TEST_F(ChessSaveGameTest, StockfishSavedForASeatNobodyPlaysComesBackAsTheOwnEngineWithNoError) {
+        const ScopedEnvironment stockfish("STOCKFISH", MissingStockfishFile().c_str());
+        ChessSaveState state = SavedGameOf(kGameInProgress, "none");
+        state.whiteEngine = "stockfish";
+        state.blackEngine = "stockfish";
+        MakeSave(state);
+        SetCommandLine({}, true);
+
+        StartManager();
+
+        const OpponentController& opponent = Game().GetOpponent();
+        EXPECT_EQ(Game().GetModel().GetMoves().size(), 4u) << "the game itself comes back";
+        EXPECT_FALSE(opponent.GetError().has_value());
+        EXPECT_EQ(opponent.GetSeatChoice(PieceColor::White).engine, OpponentEngine::Own);
+        EXPECT_EQ(opponent.GetSeatChoice(PieceColor::Black).engine, OpponentEngine::Own);
+        EXPECT_EQ(opponent.GetSeatChoice(PieceColor::White).level, opponent.GetSeatChoice(PieceColor::Black).level) << "only the engine is replaced";
+    }
+
+    TEST_F(ChessSaveGameTest, StockfishSavedForASeatThatPlaysComesBackAsTwoPeopleWithTheErrorOfAMissingStockfish) {
+        const ScopedEnvironment stockfish("STOCKFISH", MissingStockfishFile().c_str());
+        ChessSaveState state = SavedGameOf(kGameInProgress, "black");
+        state.blackEngine = "stockfish";
+        MakeSave(state);
+        SetCommandLine({}, true);
+
+        StartManager();
+
+        const OpponentController& opponent = Game().GetOpponent();
+        EXPECT_EQ(Game().GetModel().GetMoves().size(), 4u);
+        EXPECT_FALSE(opponent.GetPlays().has_value()) << "the documented rule: the pick is refused and the game goes on as two people";
+        ASSERT_TRUE(opponent.GetError().has_value());
+        EXPECT_EQ(opponent.GetError()->kind, EngineErrorKind::LaunchFailed);
+        EXPECT_EQ(opponent.GetEngine(), OpponentEngine::Own) << "nothing falls back to the other engine: the seats keep what the start gave them";
+    }
+
+    TEST_F(ChessSaveGameTest, StockfishSavedForASeatThatPlaysComesBackWhenAFileIsFound) {
+        const ScopedEnvironment stockfish("STOCKFISH", FoundStockfishFile().c_str());
+        ChessSaveState state = SavedGameOf(kGameInProgress, "black");
+        state.blackEngine = "stockfish";
+        MakeSave(state);
+        SetCommandLine({}, true);
+
+        StartManager();
+
+        const OpponentController& opponent = Game().GetOpponent();
+        EXPECT_EQ(opponent.GetPlays(), PieceColor::Black);
+        EXPECT_EQ(opponent.GetEngine(), OpponentEngine::Stockfish);
+        EXPECT_FALSE(opponent.GetError().has_value());
+    }
+
+#endif  // !CHESS_NO_STOCKFISH
 
 }  // namespace BECore::Chess::Tests

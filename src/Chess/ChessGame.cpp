@@ -57,10 +57,10 @@ namespace BECore::Chess {
     void ChessGame::Start() {
         _model.Reset();
         _opponent.SetSettings(OpponentSettings::Load());
-        // Two people: nothing is looked up or started until a side is picked, so none of the three can be refused (kDefaultOpponentEngine is the one engine this build can run)
+        // Two people: nothing is looked up or started until a side is picked, so none of the three can be refused (DefaultEngine() is Stockfish only when a file was found by SetSettings())
         [[maybe_unused]] const auto side = _opponent.SetSide(std::nullopt);
         [[maybe_unused]] const auto level = _opponent.SetLevel(kDefaultOpponentLevel);
-        [[maybe_unused]] const auto engine = _opponent.SetEngine(kDefaultOpponentEngine);
+        [[maybe_unused]] const auto engine = _opponent.SetEngine(_opponent.DefaultEngine());
         _choice.Reset();      // a new game starts with White remembered as the person's color
         _analyst.Shutdown();  // nothing is analysed or rated until the evaluation or the ratings are switched on or a hint is asked for
         // Last: the game it restores goes into the fresh model and choice above, and the key it takes is that of the game it leaves

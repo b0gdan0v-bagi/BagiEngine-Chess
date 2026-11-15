@@ -32,15 +32,15 @@ namespace BECore::Chess {
      *
      * opponent is {"plays", "level", "engine", "seats", "seed", "thinking", "error"}: plays is the color the PROGRAM plays ("white" or "black"; "both" while two programs play
      * each other; null for two people, the start of every game), level the id of the strength ("easy", "medium", "hard", "max"; the one that would be used, also while
-     * plays is null), engine the id of the program that plays ("stockfish", the start of every game, or "own", the engine of the game itself; also the one that would be used
-     * while plays is null; one never stands in for the other); level and engine are those of the seat that plays when exactly one plays, else of White's seat. seats is
+     * plays is null), engine the id of the program that plays ("stockfish", the start of every game when a Stockfish file is found, else "own", the engine of the game itself; also the one that would
+     * be used while plays is null; one never stands in for the other); level and engine are those of the seat that plays when exactly one plays, else of White's seat. seats is
      * {"white": {"engine", "level"}, "black": {"engine", "level"}}, always there: the choice of each color, also for a color that nobody plays. seed is the integer 0..4294967295 of the game
      * that varies the own engine's pick among near-equal moves and the choice and move of every handicap (not Stockfish's own picks): 0 is no variety (every engine plays as it always did), a
      * reset draws a new one, a set_state fen keeps it; the same position, seed and depth give the same answer. thinking is whether a program
      * (either) is searching for its move, error null or {"kind", "detail"} (kind in snake_case:
      * "launch_failed", "timeout", "process_died", "protocol_error", "illegal_move", "no_move", "bad_request", "cancelled", "unsupported"; detail is the sentence
      * of the log). While an error stands the program does not play and waits for the version of the game to move (a reset, set_state, a move of someone else) or
-     * for another pick. A pick of Stockfish succeeds whenever a Stockfish file is found (a launch that fails shows only at the first search, as error
+     * for another pick. A pick of Stockfish succeeds whenever a Stockfish file is found and is engine_unavailable when none is (a launch that fails shows only at the first search, as error
      * "launch_failed"); a pick of "own" always succeeds.
      *
      * material is {"balance", "capturedByWhite", "capturedByBlack"}, derived from the position at every call (it has no version of its own): balance is White's points minus Black's on the board (pawn
@@ -89,7 +89,8 @@ namespace BECore::Chess {
      * no engine (only Stockfish can fail) is engine_unavailable (with the sentence of the engine's error) and is refused as a whole, whichever seat has no engine: the position is not replaced and the
      * opponent is unchanged (sides, seats and a running search stay as they were), the error is in the state, so a client can ask again with "engine": "own". A pick that changes nothing (the same
      * sides and seats, no error standing) does nothing: a running Stockfish is not restarted. With an error standing, the same "plays" asks for an engine again, and plays null clears it. Without
-     * Stockfish (CHESS_NO_STOCKFISH) "stockfish" is engine_unavailable in "engine" and in the seat objects, also while nobody plays, and the default engine is "own".
+     * Stockfish (no Stockfish file found when the pick is made, or a CHESS_NO_STOCKFISH build) "stockfish" is engine_unavailable in "engine" and in the seat objects, also while nobody plays,
+     * and the default engine is "own" (a game that starts with no file found shows "own").
      *
      * The state version is the version of the game (a changed seed moves it) plus the revision of the opponent (a pick, an error that appears or goes) plus the revision of the analyst (a switch of
      * the evaluation or the ratings, a hint asked or dropped, an answer or a rating that arrives or is dropped, an error that appears or goes, also the rater's, which is not in get_state), so a push
