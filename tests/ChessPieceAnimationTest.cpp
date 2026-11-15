@@ -45,6 +45,11 @@ namespace BECore::Chess::Tests {
         constexpr float kViewWidth = 840.0f;
         constexpr float kViewHeight = 800.0f;
         constexpr float kHalfSquare = 40.0f;
+        constexpr float kPortraitBoardLeft = 40.0f;  // the board of the Portrait view (720 x 960), the squares 80 units as in the default one
+        constexpr float kPortraitBoardTop = 144.0f;
+        constexpr float kSquare = 80.0f;
+        constexpr float kUprightWidth = 480.0f;  // a window taller than wide: the scene picks the Portrait view
+        constexpr float kUprightHeight = 853.0f;
         constexpr float kDragStepPixels = 20.0f;  // a first motion of a drag, well past the threshold of the board
         constexpr int32_t kPieceLayer = 0;
         constexpr int32_t kDragLayer = 6;  // the layer of a piece in the hand (ChessPieceComponent::kDragLayer, written out here to pin it)
@@ -386,6 +391,27 @@ namespace BECore::Chess::Tests {
         ExpectOn(pawn, "e4");
         ExpectOthersStill(before, pawn);
         EXPECT_EQ(Model().GetVersion(), version + 1) << "the animation is the component's only: the model moved once";
+    }
+
+    TEST_F(ChessPieceAnimationTest, AViewChangeInTheMiddleOfASlideLeavesThePieceOnItsSquareOfTheNewGeometry) {
+        Settle();
+        const auto pawn = NodeAt("e2");
+        ASSERT_TRUE(Play(Model(), "e2e4"));
+        Frames(3);
+        ExpectSliding(pawn, "e2", "e4", kHalf);
+
+        // The window is turned upright: the draw picks the Portrait view and the next update announces it, so the board and the slide go on in its geometry
+        _renderer->width = kUprightWidth;
+        _renderer->height = kUprightHeight;
+        _manager->DrawAll();
+        ASSERT_EQ(GetScene().GetActiveView().name, PoolString::Intern("Portrait"));
+        Frame();
+        ExpectSliding(pawn, "e2", "e4", kThreeQuarters);
+        EXPECT_NEAR(PixelOf("e2").first, kPortraitBoardLeft + 4.0f * kSquare, kPixelTolerance) << "the geometry is the Portrait one";
+
+        Frame();
+        ExpectOrigin(pawn, {kPortraitBoardLeft + 4.0f * kSquare, kPortraitBoardTop + 4.0f * kSquare}, "the end of the slide, on e4 of the Portrait board");
+        ExpectEveryPieceOnItsSquare();
     }
 
     TEST_F(ChessPieceAnimationTest, ACapturedPieceStaysOnItsSquareDuringTheSlideAndThenGoesOffScreen) {

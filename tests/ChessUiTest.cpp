@@ -1169,6 +1169,12 @@ namespace BECore::Chess::Tests {
             return GetScene().GetViewHeight();
         }
 
+        /// Draws the scene in @p output (width, height in pixels); whether it shows the Portrait view then, with the board following it
+        bool ShowPortrait(const Pair<float, float>& output) {
+            DrawAt(output.first, output.second);
+            return PortraitIsActive();
+        }
+
         /// The fit of the active view into the current output, as the scene draws it
         ViewTransform ActiveFit() const {
             return ViewTransform::Fit(GetScene().GetViewWidth(), GetScene().GetViewHeight(), _renderer->width, _renderer->height);
@@ -7741,6 +7747,266 @@ namespace BECore::Chess::Tests {
         _manager->UpdateAll();
         EXPECT_EQ(PieceOrigin("WhitePawn_e2"), home) << "a new position";
         EXPECT_EQ(NodeLayer("WhitePawn_e2"), kPieceLayer);
+    }
+
+    // ---- the board in the Portrait view ------------------------------------------------------------------------------------------
+    // What the entry asks of the board holds in the Portrait view as in the default one: a click and a drag go by the cells that are drawn, in both orientations, and the dim and the bar
+    // cover the board. The expected cells are written out here from the numbers of the view (the fit of 720 x 960, the board at (40, 144)), not taken from the board component
+
+    namespace {
+
+        // 480 x 853 has bars above and below the view, 1000 x 1200 at the sides, 768 x 1024 (3:4) none
+        const Pair<float, float> kPortraitOutputs[] = {{480.0f, 853.0f}, {768.0f, 1024.0f}, {1000.0f, 1200.0f}};
+        constexpr int kPawnRow = 6;    // the row of the pawns of the person at the bottom, from the top
+        constexpr int kTargetRow = 4;  // where a pawn goes with its double step
+
+        /// The cell (column from the left, row from the top) of the board in the Portrait view, in the pixels of an output
+        Rect PortraitCell(const Pair<float, float>& output, int column, int row) {
+            const ViewTransform fit = ViewTransform::Fit(kPortraitViewWidth, kPortraitViewHeight, output.first, output.second);
+            return fit.ToOutput(kPortraitBoardLeft + static_cast<float>(column) * kCellSize, kPortraitBoardTop + static_cast<float>(row) * kCellSize, kCellSize, kCellSize);
+        }
+
+        Pair<float, float> MiddleOf(const Rect& rect) {
+            return {rect.x + rect.w * 0.5f, rect.y + rect.h * 0.5f};
+        }
+
+        /// The column of the e file: the fifth from the left with White at the bottom, the fourth with Black
+        int EColumn(bool turned) {
+            return turned ? 3 : 4;
+        }
+
+    }  // namespace
+
+    TEST_F(ChessUiTest, AClickOnADrawnSquareOfThePortraitBoardSelectsThatSquareInBothOrientations) {
+        CountingFactory factory({MakeShared<InstantEngine>()});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        for (const auto& output : kPortraitOutputs) {
+            for (const bool turned : {false, true}) {
+                SCOPED_TRACE(Format("output {}x{}, {}", output.first, output.second, turned ? "turned" : "White at the bottom").c_str());
+                ASSERT_TRUE(ShowPortrait(output));
+                ControlPlays(turned ? "white" : nullptr);
+                StartFrom(turned ? kBlackToMoveAfterE4 : Position::kStartFen.data());
+                ASSERT_EQ(BlackIsAtTheBottom(), turned);
+                Model().ClearSelection();
+
+                const int column = EColumn(turned);
+                const auto at = MiddleOf(PortraitCell(output, column, kPawnRow));
+                CoreManager::GetUIInput().DispatchMouseButtonDown(Button(at.first, at.second, true));
+                ASSERT_TRUE(Model().HasSelection());
+                EXPECT_EQ(Model().GetSelected(), Sq(turned ? "e7" : "e2"));
+
+                Draw();
+                const auto selected = RectCalls(kSelectedColor);
+                ASSERT_EQ(selected.size(), 1u);
+                EXPECT_TRUE(SameRect(selected[0]->rect, PortraitCell(output, column, kPawnRow)));
+                const auto moves = RectCalls(kLegalMoveColor);
+                ASSERT_EQ(moves.size(), 2u);
+                for (const int row : {kPawnRow - 1, kTargetRow}) {
+                    const Rect cell = PortraitCell(output, column, row);
+                    EXPECT_TRUE(std::any_of(moves.begin(), moves.end(), [&](const DrawCall* call) { return SameRect(call->rect, cell); })) << "row " << row;
+                }
+                Release(at.first, at.second);
+            }
+        }
+    }
+
+    TEST_F(ChessUiTest, TheFourCornersOfThePortraitBoardAreTheSquaresTheyShowInBothOrientations) {
+        CountingFactory factory({MakeShared<InstantEngine>()});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        for (const auto& output : kPortraitOutputs) {
+            for (const bool turned : {false, true}) {
+                SCOPED_TRACE(Format("output {}x{}, {}", output.first, output.second, turned ? "turned" : "White at the bottom").c_str());
+                ASSERT_TRUE(ShowPortrait(output));
+                ControlPlays(turned ? "white" : nullptr);
+                StartFrom(kFourRooks);
+                ASSERT_EQ(BlackIsAtTheBottom(), turned);
+
+                // By their place on the screen; a rook of Black stands on each corner square
+                const struct {
+                    int column;
+                    int row;
+                    const char* square;
+                } corners[] = {{0, 7, turned ? "h8" : "a1"}, {7, 7, turned ? "a8" : "h1"}, {0, 0, turned ? "h1" : "a8"}, {7, 0, turned ? "a1" : "h8"}};
+                for (const auto& corner : corners) {
+                    SCOPED_TRACE(corner.square);
+                    Model().ClearSelection();
+                    const auto at = MiddleOf(PortraitCell(output, corner.column, corner.row));
+                    CoreManager::GetUIInput().DispatchMouseButtonDown(Button(at.first, at.second, true));
+                    ASSERT_TRUE(Model().HasSelection());
+                    EXPECT_EQ(Model().GetSelected(), Sq(corner.square));
+                    EXPECT_TRUE(SameRect(SquareRect(corner.square), PortraitCell(output, corner.column, corner.row)));
+                    Release(at.first, at.second);
+                }
+            }
+        }
+    }
+
+    TEST_F(ChessUiTest, AClickInABarOutsideThePortraitViewSelectsNothingAndAClickInsideItDoes) {
+        // 480 x 853: the view is 480 x 640 pixels, bars of 106.5 above and below; 1000 x 1200: the view is 900 wide, bars of 50 at the sides
+        StartFrom(kFourRooks);
+        const struct {
+            Pair<float, float> output;
+            Pair<float, float> inBar;
+        } shapes[] = {{{480.0f, 853.0f}, {240.0f, 50.0f}}, {{480.0f, 853.0f}, {240.0f, 800.0f}}, {{1000.0f, 1200.0f}, {25.0f, 600.0f}}, {{1000.0f, 1200.0f}, {975.0f, 600.0f}}};
+        for (const auto& shape : shapes) {
+            SCOPED_TRACE(Format("output {}x{}, click ({}, {})", shape.output.first, shape.output.second, shape.inBar.first, shape.inBar.second).c_str());
+            ASSERT_TRUE(ShowPortrait(shape.output));
+            Model().ClearSelection();
+            CoreManager::GetUIInput().DispatchMouseButtonDown(Button(shape.inBar.first, shape.inBar.second, true));
+            Release(shape.inBar.first, shape.inBar.second);
+            EXPECT_FALSE(Model().HasSelection()) << "a bar is not the board";
+
+            const auto a1 = MiddleOf(PortraitCell(shape.output, 0, 7));
+            CoreManager::GetUIInput().DispatchMouseButtonDown(Button(a1.first, a1.second, true));
+            Release(a1.first, a1.second);
+            EXPECT_TRUE(Model().HasSelection()) << "the same board takes a click on a1";
+        }
+    }
+
+    TEST_F(ChessUiTest, TheDimAndTheResultBarCoverThePortraitBoardInBothOrientations) {
+        CountingFactory factory({MakeShared<InstantEngine>()});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        for (const auto& output : {kPortraitOutputs[0], kPortraitOutputs[2]}) {
+            for (const bool turned : {false, true}) {
+                SCOPED_TRACE(Format("output {}x{}, {}", output.first, output.second, turned ? "turned" : "White at the bottom").c_str());
+                ASSERT_TRUE(ShowPortrait(output));
+                ControlPlays(turned ? "white" : nullptr);
+                StartFrom(kBlackMatesOnA1);
+                ASSERT_EQ(BlackIsAtTheBottom(), turned);
+
+                ClickMove("a8", "a1");
+                ASSERT_TRUE(Model().IsGameOver());
+                Draw();
+
+                const ViewTransform fit = ViewTransform::Fit(kPortraitViewWidth, kPortraitViewHeight, output.first, output.second);
+                const auto dim = RectCalls(kBoardDimColor);
+                ASSERT_EQ(dim.size(), 1u);
+                EXPECT_TRUE(SameRect(dim[0]->rect, fit.ToOutput(kPortraitBoardLeft, kPortraitBoardTop, kBoardUnits, kBoardUnits))) << "the whole board";
+                const auto bar = RectCalls(kResultBarColor);
+                ASSERT_EQ(bar.size(), 1u);
+                const float middle = kPortraitBoardTop + (kBoardUnits - kCellSize) * 0.5f;
+                EXPECT_TRUE(SameRect(bar[0]->rect, fit.ToOutput(kPortraitBoardLeft, middle, kBoardUnits, kCellSize))) << "one square high, across the middle of the board";
+            }
+        }
+    }
+
+    TEST_F(ChessUiTest, TheMarksOfThePortraitBoardSitAroundTheirPiecesInBothOrientations) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        CountingFactory factory({MakeShared<GatedEngine>(true)});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        const auto output = kPortraitOutputs[0];
+        for (const bool turned : {false, true}) {
+            SCOPED_TRACE(turned ? "turned" : "White at the bottom");
+            ASSERT_TRUE(ShowPortrait(output));
+            ControlPlays(turned ? "white" : nullptr);
+            StartFrom(turned ? kBlackToMoveAfterE4 : Position::kStartFen.data());
+            const auto texture = GiveAtlasCell(turned ? "BlackPawn_e7" : "WhitePawn_e2");
+            _manager->UpdateAll();
+
+            const int column = EColumn(turned);
+            const auto from = MiddleOf(PortraitCell(output, column, kPawnRow));
+            CoreManager::GetUIInput().DispatchMouseButtonDown(Button(from.first, from.second, true));
+            Release(from.first, from.second);
+            ASSERT_TRUE(Model().HasSelection());
+            Draw();
+            const DrawCall* piece = TextureCall(*texture);
+            ASSERT_NE(piece, nullptr);
+            const auto selected = RectCalls(kSelectedColor);
+            ASSERT_EQ(selected.size(), 1u);
+            EXPECT_TRUE(SameRect(selected[0]->rect, PortraitCell(output, column, kPawnRow)));
+            EXPECT_TRUE(IsCenteredIn(piece->rect, selected[0]->rect)) << "the piece is inside its selected square";
+
+            // The move marks the two squares it joins, and the pawn stands on the second
+            const auto to = MiddleOf(PortraitCell(output, column, kTargetRow));
+            CoreManager::GetUIInput().DispatchMouseButtonDown(Button(to.first, to.second, true));
+            Release(to.first, to.second);
+            ASSERT_EQ(Model().GetMoves().size(), 1u);
+            _manager->UpdateAll();
+            Draw();
+            const auto marks = LastMoveFills();
+            ASSERT_EQ(marks.size(), 2u);
+            EXPECT_TRUE(SameRect(marks[0]->rect, PortraitCell(output, column, kPawnRow)));
+            EXPECT_TRUE(SameRect(marks[1]->rect, PortraitCell(output, column, kTargetRow)));
+            const DrawCall* moved = TextureCall(*texture);
+            ASSERT_NE(moved, nullptr);
+            EXPECT_TRUE(IsCenteredIn(moved->rect, marks[1]->rect)) << "the pawn stands on the square the move went to";
+        }
+    }
+
+    TEST_F(ChessUiTest, ADragOnThePortraitBoardLiftsThePieceUnderThePointerAndAReleaseOnATargetPlaysTheMove) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        CountingFactory factory({MakeShared<GatedEngine>(true)});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        for (const auto& output : kPortraitOutputs) {
+            for (const bool turned : {false, true}) {
+                SCOPED_TRACE(Format("output {}x{}, {}", output.first, output.second, turned ? "turned" : "White at the bottom").c_str());
+                ASSERT_TRUE(ShowPortrait(output));
+                ControlPlays(turned ? "white" : nullptr);
+                StartFrom(turned ? kBlackToMoveAfterE4 : Position::kStartFen.data());
+                const int column = EColumn(turned);
+                const char* node = turned ? "BlackPawn_e7" : "WhitePawn_e2";
+                const auto from = MiddleOf(PortraitCell(output, column, kPawnRow));
+                const auto to = MiddleOf(PortraitCell(output, column, kTargetRow));
+
+                // In the hand: the piece is a square centered on the pointer, in the units of the Portrait view
+                CoreManager::GetUIInput().DispatchMouseButtonDown(Button(from.first, from.second, true));
+                const float pointerX = from.first + kPointerOffsetX;
+                const float pointerY = from.second + kPointerOffsetY;
+                MouseMove(pointerX, pointerY, true);
+                _manager->UpdateAll();
+                ASSERT_TRUE(Lifted().has_value());
+                EXPECT_NEAR(PieceOrigin(node).first, GetScene().ScreenToSceneX(pointerX) - kHalfSquare, kPixelTolerance);
+                EXPECT_NEAR(PieceOrigin(node).second, GetScene().ScreenToSceneY(pointerY) - kHalfSquare, kPixelTolerance);
+                EXPECT_EQ(NodeLayer(node), kDragLayer);
+
+                // Let go on a square that is no target: nothing is played, the piece goes back to its cell and stays selected
+                const auto off = MiddleOf(PortraitCell(output, turned ? 7 : 0, 0));
+                MouseMove(off.first, off.second, true);
+                Release(off.first, off.second);
+                _manager->UpdateAll();
+                EXPECT_EQ(Model().GetMoves().size(), 0u);
+                EXPECT_TRUE(Model().HasSelection());
+                ExpectPiecesAtTheCellsOf(turned);
+
+                // And the drag to the target plays it
+                CoreManager::GetUIInput().DispatchMouseButtonDown(Button(from.first, from.second, true));
+                MouseMove(from.first + kDragStepPixels, from.second, true);
+                MouseMove(to.first, to.second, true);
+                Release(to.first, to.second);
+                ASSERT_EQ(Model().GetMoves().size(), 1u);
+                EXPECT_EQ(Model().GetMoves().back().ToUci(), turned ? "e7e5" : "e2e4");
+                _manager->UpdateAll();
+                EXPECT_EQ(NodeLayer(node), kPieceLayer);
+                ExpectPiecesAtTheCellsOf(turned);
+            }
+        }
+    }
+
+    TEST_F(ChessUiTest, AWindowThatTurnsToPortraitInTheMiddleOfADragEndsTheDragWithoutAMove) {
+        DrawAt(1280.0f, 720.0f);
+        ASSERT_FALSE(PortraitIsActive());
+        _manager->UpdateAll();
+        const auto from = SquareCenter("e2");
+        CoreManager::GetUIInput().DispatchMouseButtonDown(Button(from.first, from.second, true));
+        MouseMove(from.first + kDragStepPixels, from.second, true);
+        _manager->UpdateAll();
+        ASSERT_TRUE(Lifted().has_value());
+        ASSERT_EQ(Model().GetSelected(), Sq("e2"));
+
+        // The window is turned upright while the button is held: the scene units of the drag are those of the other view
+        ASSERT_TRUE(ShowPortrait(kPortraitOutputs[0]));
+        EXPECT_FALSE(Lifted().has_value());
+        const auto target = MiddleOf(PortraitCell(kPortraitOutputs[0], 4, kTargetRow));
+        MouseMove(target.first, target.second, true);
+        Release(target.first, target.second);
+        _manager->UpdateAll();
+
+        EXPECT_TRUE(Model().GetMoves().empty()) << "e2e4 was not played";
+        EXPECT_TRUE(Model().HasSelection());
+        EXPECT_EQ(Model().GetSelected(), Sq("e2"));
+        EXPECT_EQ(NodeLayer("WhitePawn_e2"), kPieceLayer);
+        ExpectPiecesAtTheCellsOf(false);
+        EXPECT_FALSE(Lifted().has_value());
     }
 
 }  // namespace BECore::Chess::Tests
