@@ -43,6 +43,7 @@ set(expected
     config/nodes/ChessMaterial.xml
     config/nodes/ChessMenuPanel.xml
     config/nodes/ChessOpponentPanel.xml
+    config/nodes/ChessPiece.xml
     config/nodes/ChessPromotionPanel.xml
     config/nodes/ChessResult.xml)
 chess_web_package_files(OUT files GAME_ROOT "${GAME_ROOT}")
