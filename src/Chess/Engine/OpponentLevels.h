@@ -13,6 +13,7 @@ namespace BECore::Chess {
         int moveTimeMs = 0;      ///< how long Stockfish thinks about a move
         int ownDepth = 0;        ///< plies the own engine searches (a fixed depth is deterministic); 0 means no depth limit, only kOwnMoveTimeCapMs
         int blunderPercent = 0;  ///< 0..100: the share of moves replaced by a random legal move (BlunderEngine), for both engines; the one knob below the floor of the engines
+        int varietyMargin = 0;   ///< centipawns: the own engine may play any move this close to its best (OwnEngine, with a seed); 0 = always the best
     };
 
     /// The levels, weakest first, from a beginner (Easy) to the full strength of each engine (Max). The numbers are first guesses

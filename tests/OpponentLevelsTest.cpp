@@ -228,6 +228,28 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(limits.moveTimeMs, kOwnMoveTimeCapMs);
     }
 
+    TEST(OpponentLevelsTest, TheVarietyMarginsAreNeverNegativeAndAWeakerLevelNeverHasASmallerOne) {
+        const auto levels = GetOpponentLevels();
+
+        for (size_t i = 0; i < levels.size(); ++i) {
+            EXPECT_GE(levels[i].varietyMargin, 0) << Text(levels[i].id);
+            if (i > 0) {
+                EXPECT_GE(levels[i - 1].varietyMargin, levels[i].varietyMargin) << Text(levels[i - 1].id) << " against " << Text(levels[i].id);
+            }
+        }
+        EXPECT_EQ(levels.back().varietyMargin, 0) << "the full-strength level plays its best move";
+        EXPECT_GT(levels.front().varietyMargin, 0);
+    }
+
+    TEST(OpponentLevelsTest, TheVarietyMarginIsNoLimitOfTheEngine) {
+        OpponentLevel varied{"custom", "Custom", 3, 400, 2, 0, 80};
+        OpponentLevel plain{"custom", "Custom", 3, 400, 2, 0, 0};
+
+        EXPECT_EQ(LimitsOf(OpponentEngine::Own, varied).depth, LimitsOf(OpponentEngine::Own, plain).depth);
+        EXPECT_EQ(LimitsOf(OpponentEngine::Own, varied).moveTimeMs, LimitsOf(OpponentEngine::Own, plain).moveTimeMs);
+        EXPECT_EQ(LimitsOf(OpponentEngine::Stockfish, varied).moveTimeMs, LimitsOf(OpponentEngine::Stockfish, plain).moveTimeMs);
+    }
+
     TEST(OpponentLevelsTest, TheEngineIsToldTheSkillLevelAndNothingElse) {
         const OpponentLevel custom{"custom", "Custom", 7, 1234};
 

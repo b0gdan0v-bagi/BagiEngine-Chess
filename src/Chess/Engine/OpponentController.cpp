@@ -233,7 +233,7 @@ namespace BECore::Chess {
             case OpponentEngine::Stockfish:
                 return MakeStockfishEngine(_settings, level);
             case OpponentEngine::Own:
-                return WithHandicap(MakeShared<OwnEngine>(), level);
+                return WithHandicap(MakeShared<OwnEngine>(level.varietyMargin), level);
         }
         return std::unexpected(EngineError{EngineErrorKind::BadRequest, "unknown engine"});
     }

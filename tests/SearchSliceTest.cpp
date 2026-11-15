@@ -1212,6 +1212,31 @@ namespace BECore::Chess::Tests {
 
     }  // namespace
 
+    TEST_F(OwnSearchOnThePoolTest, OwnEngineAsyncWithAVarietyMarginGivesTheBlockingAnswer) {
+        // The pumped frames are what resumes a yielded task on a single-thread build; on a threaded one the call is a no-op
+        constexpr int kVarietyMarginCp = 50;
+        constexpr uint32_t kSeeds = 6;
+        OwnEngine engine(kVarietyMarginCp);
+
+        for (uint32_t seed = 1; seed <= kSeeds; ++seed) {
+            SearchRequest request = RequestFor(Position::kStartFen, kGoldenShallowDepth);
+            request.seed = seed;
+            const auto expected = engine.FindMove(request, CancellationToken::Create());
+            ASSERT_TRUE(expected.has_value()) << seed;
+
+            const auto out = RunOnThePool<Move>(engine.FindMoveAsync(request, CancellationToken::Create()));
+            const Clock::time_point deadline = Clock::now() + kPoolWaitLimit;
+            while (!out->done.load(std::memory_order_acquire) && Clock::now() < deadline) {
+                PumpTaskFrame();
+                std::this_thread::sleep_for(kPoolPollInterval);
+            }
+
+            ASSERT_TRUE(out->done.load(std::memory_order_acquire)) << seed << ": FindMoveAsync did not finish";
+            ASSERT_TRUE(out->answer.has_value()) << seed;
+            EXPECT_EQ(*out->answer, *expected) << seed;
+        }
+    }
+
     TEST_F(OwnSearchOnThePoolTest, OwnEngineAsyncGivesTheBlockingAnswer) {
         SKIP_WITHOUT_WORKER_THREADS();
         OwnEngine engine;
