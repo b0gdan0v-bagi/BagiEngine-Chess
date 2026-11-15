@@ -3038,8 +3038,8 @@ namespace BECore::Chess::Tests {
     }
 
     // ---- the board coordinates: the labels in the scene ---------------------------------------------------------------------------
-    // The node BoardCoordinates of the shipped scene is a canvas of 16 UILabels at the edges of the board (SceneConfig.xml has the reasons for its numbers). The layout is checked the way the
-    // HUD's is: the validator and CheckContent() on the size matrix
+    // The node BoardCoordinates of the shipped scene is a canvas of 16 UILabels at the edges of the board (ChessBoardCoordinates.xml has the reasons for its numbers). The layout is checked the way
+    // the HUD's is: the validator and CheckContent() on the size matrix
 
     namespace {
 
@@ -5953,7 +5953,7 @@ namespace BECore::Chess::Tests {
     }
 
     // ---- the captured material: the node Material ---------------------------------------------------------------------------------------
-    // A canvas in the left margin (SceneConfig.xml has the reasons for its numbers) that ChessMaterialComponent gives its words and its sprites. Two groups: the lower one shows what the color at
+    // A canvas in the left margin (ChessMaterial.xml has the reasons for its numbers) that ChessMaterialComponent gives its words and its sprites. Two groups: the lower one shows what the color at
     // the bottom of the board has taken, the upper one what the other color has taken. The rows are shown while the lists lie inside the safe area (Game/MaterialLayout.h). The library of
     // textures is empty in the test, so an icon has its sprite name and draws nothing
 

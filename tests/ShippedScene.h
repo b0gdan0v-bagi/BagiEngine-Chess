@@ -32,13 +32,19 @@ namespace BECore::Chess::Tests {
         return expansion.Ok();
     }
 
-    /// The SceneManager of the shipped scene, built the way the application builds it from the expanded scene; empty (and a failed test) when the scene does not expand
+    /// The SceneManager of the shipped scene, built the way the application builds it: LoadSceneManager gets the raw root and expands the references itself (so `sourceRef` is set).
+    /// The expansion is checked first, because LoadSceneManager only logs its errors; empty (and a failed test) when the scene does not expand
     inline IntrusivePtrAtomic<SceneManager> LoadShippedSceneManager() {
-        pugi::xml_document document;
-        if (!LoadShippedSceneDocument(document)) {
+        pugi::xml_document expanded;
+        if (!LoadShippedSceneDocument(expanded)) {
             return {};
         }
-        return LoadSceneManager(XmlNode{document.document_element()}, MakeDirectoryNodeLoader(ShippedConfigFolder()));
+        pugi::xml_document raw;
+        if (!raw.load_file(ShippedSceneConfig().c_str())) {
+            ADD_FAILURE() << "the shipped scene does not parse";
+            return {};
+        }
+        return LoadSceneManager(XmlNode{raw.document_element()}, MakeDirectoryNodeLoader(ShippedConfigFolder()));
     }
 
 }  // namespace BECore::Chess::Tests
