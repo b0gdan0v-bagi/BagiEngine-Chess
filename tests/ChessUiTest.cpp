@@ -53,8 +53,8 @@ namespace BECore::Chess::Tests {
 
         constexpr float kViewWidth = 840.0f;
         constexpr float kViewHeight = 800.0f;
-        constexpr float kBoardTop = 80.0f;      // in view units
-        constexpr float kBoardBottom = 720.0f;  // 80 + 8 * 80
+        constexpr float kBoardTop = 80.0f;  // in view units
+        constexpr float kBoardBottom = 720.0f;
         const Color kResetColor{40, 90, 60, 255};
         const Color kMenuColor{45, 75, 120, 255};           // the fills of the buttons of the HUD (SceneConfig.xml): a color each, so a test can tell where each one is drawn
         const Color kPlateColor{36, 40, 52, 255};           // the plate of the opponent panel
@@ -68,7 +68,7 @@ namespace BECore::Chess::Tests {
         const Color kSelectedColor{120, 200, 120, 200};
         const Color kLegalMoveColor{120, 200, 120, 120};
         const Color kCheckColor{230, 60, 60, 210};
-        const Color kHintFromColor{60, 130, 230, 110};  // the two squares of the hint: the one the piece leaves and the one it goes to
+        const Color kHintFromColor{60, 130, 230, 110};
         const Color kHintToColor{60, 130, 230, 200};
         const Color kLastMoveColor{245, 205, 50, 140};  // the two squares of the last move, one color for both
         const Color kPremoveColor{150, 90, 200, 150};   // the two squares of each queued premove, one color for all
@@ -87,8 +87,8 @@ namespace BECore::Chess::Tests {
         constexpr float kUnderThresholdPixels = 3.0f;  // a motion of a drag that stays under that threshold
         constexpr float kPointerOffsetX = 60.0f;       // where a test holds the pointer, from the middle of the square it pressed (pixels)
         constexpr float kPointerOffsetY = -50.0f;
-        constexpr float kHalfSquare = 40.0f;     // half the 80 units of a square: the piece in the hand is centered on the pointer
-        constexpr int32_t kPieceLayer = 0;       // the layer of a piece node in the scene
+        constexpr float kHalfSquare = 40.0f;  // half the 80 units of a square: the piece in the hand is centered on the pointer
+        constexpr int32_t kPieceLayer = 0;
         constexpr int32_t kDragLayer = 6;        // the layer of a piece in the hand: over the chips (5), under the HUD (10)
         constexpr float kGlyphTolerance = 1.0f;  // a glyph of a label is laid out to the pixel of the font, not to the unit
 
@@ -284,9 +284,8 @@ namespace BECore::Chess::Tests {
             return found;
         }
 
-        /// What is wrong with a modal panel as it is laid out (the plate is the element @p plateName), one problem to a line, nothing when it is right: a control that is not shown at all (an empty
-        /// rect: a segment without a `height`), text that its control cuts (the validator does not see it for an ellipsis label; a button keeps kButtonAir between its text and the edge of its fill),
-        /// a button under kSegmentHeight, and a plate that leaves the safe area
+        /// What is wrong with a modal panel as it is laid out (the plate is the element @p plateName), one problem to a line, nothing when it is right. The text that a control cuts is
+        /// checked here because the validator does not see it for an ellipsis label (a button keeps kButtonAir between its text and the edge of its fill)
         String PanelProblems(const UICanvasLayout& layout, const char* plateName = "Plate") {
             String problems;
             const float scale = layout.GetResolved().scale;
@@ -413,9 +412,9 @@ namespace BECore::Chess::Tests {
             return (column + row) % 2 == 0 ? kDarkSquareColor : kLightSquareColor;
         }
 
-        /// What is wrong with the labels of the board as they are laid out, one problem to a line, nothing when it is right: a label that is missing or not shown, a glyph the box cuts
-        /// (the validator does not see it for a label that clips), a box that is not in the corner of its edge cell (the top left, left of the piece, for a rank; the bottom right, right of it, for a
-        /// file) or leaves the board, and a text color that does not read on the cell
+        /// What is wrong with the labels of the board as they are laid out, one problem to a line, nothing when it is right: a glyph the box cuts (the validator does not see it for a label
+        /// that clips), a box that is not in the corner of its edge cell (the top left, left of the piece, for a rank; the bottom right, right of it, for a file) and a text color that does not
+        /// read on the cell
         String BoardLabelProblems(const UICanvasLayout& layout) {
             String problems;
             const float scale = layout.GetResolved().scale;
@@ -485,10 +484,9 @@ namespace BECore::Chess::Tests {
             }
         }
 
-        /// What is wrong with the canvas Material as it is laid out with all ten rows shown, one problem to a line, nothing when it is right: an element that is missing or has no rect, a list, row,
-        /// count or balance outside the margin (x 0 to 100, the rows of the board) or on top of one another, a row under kMaterialRowHeight, a count or a sign that its box cuts (the validator
-        /// does not see a Clip label's cut), and, while the box of the lists lies inside the safe area (the rule of Game/MaterialLayout.h, so the rows would be shown), a list that is not inside
-        /// the safe area; a balance box must always be inside it
+        /// What is wrong with the canvas Material as it is laid out with all ten rows shown, one problem to a line, nothing when it is right. The text that a count or a sign cuts is checked
+        /// here because the validator does not see a Clip label's cut; the lists must lie inside the safe area only while their box does (the rule of Game/MaterialLayout.h, so the rows would
+        /// be shown), a balance box always
         String MaterialProblems(const UICanvasLayout& layout) {
             String problems;
             const float scale = layout.GetResolved().scale;
@@ -891,7 +889,6 @@ namespace BECore::Chess::Tests {
             return context;
         }
 
-        /// The opponent of the game that is running
         OpponentController& Opponent() const {
             OpponentController* opponent = ChessGame::GetActiveOpponent();
             EXPECT_NE(opponent, nullptr);
@@ -1090,7 +1087,6 @@ namespace BECore::Chess::Tests {
             });
         }
 
-        /// The analyst of the game that is running
         PositionAnalyst& Analyst() const {
             PositionAnalyst* analyst = ChessGame::GetActiveAnalyst();
             EXPECT_NE(analyst, nullptr);

@@ -704,7 +704,7 @@ def check_the_board_turns_with_the_program(client: BagiControlClient) -> None:
     turn and the status), so whole pictures differ without the board turning. The same placement of the pieces is drawn with the program as White (Black to move: the
     program does not search), with two people (Black to move) and with the program as Black (White to move: the side to move is not drawn on the board). The last
     two have White at the bottom and must give one board band, which also shows that the band leaves the HUD out; the turned one must differ from them, and drawn
-    again after a round trip it must be the same band. This proves the turn only as far as the pieces differ between the two orientations, which they do after any opening move."""
+    again after a round trip it must be the same band. What fails when the board does not turn is the comparison of the turned band with each of the two bands that have White at the bottom (`!=`); it can tell only as far as the pieces differ between the two orientations, which they do after any opening move."""
     client.call("reset")
     client.call("set_state", {"opponent": {"engine": "own", "plays": "white", "level": "easy"}})
     wait_until_the_program_played(client, lambda moves: len(moves) == 1, "the opening move of White")

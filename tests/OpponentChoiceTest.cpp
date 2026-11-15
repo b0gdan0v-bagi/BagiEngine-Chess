@@ -56,7 +56,7 @@ namespace BECore::Chess::Tests {
     class OpponentChoiceTest : public ::testing::Test {
     protected:
         static void SetUpTestSuite() {
-            ::BECore::Tests::EngineEnvironment::EnsureCoreServices();  // TaskManager, which the searches run on
+            ::BECore::Tests::EngineEnvironment::EnsureCoreServices();  // TaskManager, which the controller's opponents need
         }
     };
 
