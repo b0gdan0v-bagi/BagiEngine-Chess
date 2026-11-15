@@ -98,8 +98,9 @@ namespace BECore::Chess::Tests {
         constexpr float kPointerOffsetY = -50.0f;
         constexpr float kHalfSquare = 40.0f;  // half the 80 units of a square: the piece in the hand is centered on the pointer
         constexpr int32_t kPieceLayer = 0;
-        constexpr int32_t kDragLayer = 6;        // the layer of a piece in the hand: over the chips (5), under the HUD (10)
-        constexpr float kGlyphTolerance = 1.0f;  // a glyph of a label is laid out to the pixel of the font, not to the unit
+        constexpr int32_t kDragLayer = 6;  // the layer of a piece in the hand: over the chips (5), under the HUD (10)
+        constexpr float kGlyphTolerance =
+            2.0f;  // a glyph of a label is laid out to the pixel of the font, not to the unit: at the scale of the Portrait view a narrow glyph reaches past its box by more than a pixel
 
         constexpr int kManyFrames = 200;  // frames that must pass with nothing happening
 
@@ -202,7 +203,7 @@ namespace BECore::Chess::Tests {
             text.replace(at, what.size(), with);
         }
 
-        /// The `<elements>` of the canvas on the node @p nodeName of the shipped scene, as the content of a screen; empty when there is none
+        /// The `<elements>` and the `<variants>` of the canvas on the node @p nodeName of the shipped scene, as the content of a screen; empty when there is none
         String ShippedElementsXml(const char* nodeName) {
             pugi::xml_document document;
             if (!document.load_file(ShippedSceneConfig().string().c_str())) {
@@ -216,6 +217,9 @@ namespace BECore::Chess::Tests {
             std::ostringstream out;
             out << "<ui>";
             elements.print(out, "", pugi::format_raw);
+            if (const pugi::xml_node variants = node.select_node(".//component[@type='UICanvasComponent']/variants").node()) {
+                variants.print(out, "", pugi::format_raw);
+            }
             out << "</ui>";
             return FromStdString(out.str());
         }
@@ -390,6 +394,20 @@ namespace BECore::Chess::Tests {
         // The letters and numbers at the edges of the board (the node BoardCoordinates of SceneConfig.xml): a label sits in the corner of an edge cell that a piece does not reach
         constexpr float kCellSize = 80.0f;
         constexpr float kBoardLeft = 100.0f;
+
+        /// A view of the scene as a test walks it: an output that shows it, where its board is and the narrowest window it is shown in (480 px wide, with side insets)
+        struct ViewShape {
+            const char* name;
+            Pair<float, float> output;
+            Pair<float, float> narrowest;
+            float viewWidth;
+            float boardLeft;
+            float boardTop;
+        };
+
+        const ViewShape kViewShapes[] = {
+            {"default view", {1280.0f, 720.0f}, {kNarrowestWidth, kNarrowestHeight}, kViewWidth, kBoardLeft, kBoardTop},
+            {"Portrait view", {kNarrowestWidth, kNarrowestPortraitHeight}, {kNarrowestWidth, kNarrowestPortraitHeight}, kPortraitViewWidth, kPortraitBoardLeft, kPortraitBoardTop}};
         constexpr size_t kBoardEdgeCells = kLastBoardIndex + 1;
         constexpr float kPieceWidth = kCellSize * kCellWidth / kCellHeight;  // a piece fitted by Contain is as high as its cell, as wide as the aspect of its atlas cell, and centered
         constexpr float kPieceLeft = (kCellSize - kPieceWidth) * 0.5f;       // 15.5 units from the left edge of the cell
@@ -427,6 +445,10 @@ namespace BECore::Chess::Tests {
         String BoardLabelProblems(const UICanvasLayout& layout) {
             String problems;
             const float scale = layout.GetResolved().scale;
+            // The board of the view the canvas was laid out for: its bounds are that view in units
+            const bool portrait = layout.GetResolved().bounds.w == kPortraitViewWidth;
+            const float boardLeft = portrait ? kPortraitBoardLeft : kBoardLeft;
+            const float boardTop = portrait ? kPortraitBoardTop : kBoardTop;
             for (const BoardLabel& spec : ExpectedBoardLabels()) {
                 const UIElement* element = layout.root->FindByName(PoolString::Intern(spec.name));
                 if (element == nullptr) {
@@ -442,8 +464,8 @@ namespace BECore::Chess::Tests {
                 if (fit.hasContent && !fit.fits) {
                     problems += Format("{} cuts '{}': {:.1f} x {:.1f} units at scale {:.3f}\n", spec.name.c_str(), ShownText(*element).c_str(), rect.w, rect.h, scale);
                 }
-                const float cellX = kBoardLeft + static_cast<float>(spec.column) * kCellSize;
-                const float cellY = kBoardTop + static_cast<float>(spec.row) * kCellSize;
+                const float cellX = boardLeft + static_cast<float>(spec.column) * kCellSize;
+                const float cellY = boardTop + static_cast<float>(spec.row) * kCellSize;
                 const float low = spec.file ? cellX + kPieceRight : cellX;
                 const float high = spec.file ? cellX + kCellSize : cellX + kPieceLeft;
                 const float top = spec.file ? cellY + kCellSize - kLabelBand : cellY;
@@ -1204,13 +1226,19 @@ namespace BECore::Chess::Tests {
 
         /// Lays the canvas out on every case of the size matrix and calls @p check(label, layout) after each. A SceneView canvas ignores the scale mode and the user scale, so one
         /// run per case is all there is; the layout is left to be laid out again afterwards
+        /// With @p pickView every case takes the view the scene would draw for its output (as ValidateOnMatrix() does with the views of the scene), else the view that is active now
         template <typename Check>
-        void OnEveryCaseOfTheMatrix(UICanvasLayout& layout, Check check) const {
+        void OnEveryCaseOfTheMatrix(UICanvasLayout& layout, Check check, bool pickView = false) const {
             for (const UIMatrixCase& matrixCase : UILayoutMatrix()) {
                 UILayoutContext context = ViewContext();
                 context.outputWidth = matrixCase.context.outputWidth;
                 context.outputHeight = matrixCase.context.outputHeight;
                 context.safeArea = matrixCase.context.safeArea;
+                if (pickView) {
+                    const ActiveSceneView view = SceneViewSelector::Pick(kViewWidth, kViewHeight, GetScene().GetViewVariants(), context.outputWidth, context.outputHeight);
+                    context.sceneViewWidth = view.width;
+                    context.sceneViewHeight = view.height;
+                }
                 layout.Update(context);
                 check(matrixCase.label, layout);
             }
@@ -1313,12 +1341,21 @@ namespace BECore::Chess::Tests {
             return report;
         }
 
-        /// The canvas alone in the narrowest window of the matrix: 480 px wide with the side insets of a phone held sideways
-        void LayOutInTheNarrowestWindow(UICanvasLayout& layout) const {
+        /// The views of the scene as the matrix picks from: the default size and the variants
+        UIMatrixViews SceneViews() const {
+            return UIMatrixViews{kViewWidth, kViewHeight, GetScene().GetViewVariants()};
+        }
+
+        /// The canvas alone in the narrowest window of a view: 480 px wide with the side insets of a phone held sideways, 480 x 480 for the default view and 480 x 853 for Portrait; the view
+        /// is the one the scene picks for that window
+        void LayOutInTheNarrowestWindow(UICanvasLayout& layout, const ViewShape& shape = kViewShapes[0]) const {
             UILayoutContext context = ViewContext();
-            context.outputWidth = kNarrowestWidth;
-            context.outputHeight = kNarrowestHeight;
-            context.safeArea = UIPreview::SimulatedSafeArea(SafeAreaSimulation::SideInsets, kNarrowestWidth, kNarrowestHeight);
+            context.outputWidth = shape.narrowest.first;
+            context.outputHeight = shape.narrowest.second;
+            context.safeArea = UIPreview::SimulatedSafeArea(SafeAreaSimulation::SideInsets, context.outputWidth, context.outputHeight);
+            const ActiveSceneView view = SceneViewSelector::Pick(kViewWidth, kViewHeight, GetScene().GetViewVariants(), context.outputWidth, context.outputHeight);
+            context.sceneViewWidth = view.width;
+            context.sceneViewHeight = view.height;
             layout.Update(context);
         }
 
@@ -1443,17 +1480,20 @@ namespace BECore::Chess::Tests {
         }
 
         /// BoardLabelProblems() on every case of the matrix for each of the 8 rounds of letters: the lines of the first @p reportedCases cases that have any
-        String BoardLabelProblemsOnMatrix(UICanvasLayout& layout, size_t reportedCases = kReportedCases) const {
+        String BoardLabelProblemsOnMatrix(UICanvasLayout& layout, size_t reportedCases = kReportedCases, bool pickView = true) const {
             String report;
             size_t reported = 0;
             for (size_t round = 0; round < kBoardEdgeCells; ++round) {
                 PublishCoordinateRound(round);
-                OnEveryCaseOfTheMatrix(layout, [&](const String& label, const UICanvasLayout& laidOut) {
-                    const String problems = BoardLabelProblems(laidOut);
-                    if (!problems.empty() && reported++ < reportedCases) {
-                        report += Format("round {}, {}:\n{}", round, label.c_str(), problems.c_str());
-                    }
-                });
+                OnEveryCaseOfTheMatrix(
+                    layout,
+                    [&](const String& label, const UICanvasLayout& laidOut) {
+                        const String problems = BoardLabelProblems(laidOut);
+                        if (!problems.empty() && reported++ < reportedCases) {
+                            report += Format("round {}, {}:\n{}", round, label.c_str(), problems.c_str());
+                        }
+                    },
+                    pickView);
             }
             return report;
         }
@@ -2942,7 +2982,7 @@ namespace BECore::Chess::Tests {
         options.minTouchSize = CoreManager::GetUIEnvironment().GetSettings().minTouchSize;
         for (size_t round = 0; round < kBoardEdgeCells; ++round) {
             PublishCoordinateRound(round);
-            const auto failures = ValidateOnMatrix(canvas->GetLayout(), options, ViewContext());
+            const auto failures = ValidateOnMatrix(canvas->GetLayout(), options, ViewContext(), SceneViews());
             EXPECT_TRUE(failures.empty()) << "round " << round << ": " << DescribeMatrixFailures(failures).c_str();
         }
         const String problems = BoardLabelProblemsOnMatrix(canvas->GetLayout());
@@ -2955,13 +2995,16 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(canvas);
         canvas->UpdateLayout(1280.0f, 720.0f);
         UICanvasLayout& layout = canvas->GetLayout();
-        LayOutInTheNarrowestWindow(layout);
-        EXPECT_NEAR(layout.GetResolved().scale, kNarrowestWidth / kViewWidth, 0.01f) << "about 10 px for a font of 18 units";
+        for (const ViewShape& shape : kViewShapes) {
+            SCOPED_TRACE(shape.name);
+            LayOutInTheNarrowestWindow(layout, shape);
+            EXPECT_NEAR(layout.GetResolved().scale, kNarrowestWidth / shape.viewWidth, 0.01f) << "about 10 px for a font of 18 units in the default view, 12 in Portrait";
 
-        for (size_t round = 0; round < kBoardEdgeCells; ++round) {
-            PublishCoordinateRound(round);
-            const String problems = BoardLabelProblems(layout);
-            EXPECT_TRUE(problems.empty()) << "round " << round << ":\n" << problems.c_str();
+            for (size_t round = 0; round < kBoardEdgeCells; ++round) {
+                PublishCoordinateRound(round);
+                const String problems = BoardLabelProblems(layout);
+                EXPECT_TRUE(problems.empty()) << "round " << round << ":\n" << problems.c_str();
+            }
         }
         layout.Invalidate();
     }
@@ -2986,27 +3029,32 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, EveryCoordinateLabelIsInTheCornerOfItsEdgeCellOnTheShippedScene) {
-        Draw();
-        for (const BoardLabel& spec : ExpectedBoardLabels()) {
-            SCOPED_TRACE(spec.name.c_str());
-            const UIElement* found = CoordinateLabel(spec.name.c_str());
-            ASSERT_NE(found, nullptr);
-            const UIElement& label = *found;
-            const float cellX = kBoardLeft + static_cast<float>(spec.column) * kCellSize;
-            const float cellY = kBoardTop + static_cast<float>(spec.row) * kCellSize;
-            const auto [expectedX, expectedY] = CellOrigin(spec.column, spec.row);
-            EXPECT_FLOAT_EQ(cellX, expectedX);
-            EXPECT_FLOAT_EQ(cellY, expectedY);
-            EXPECT_GE(label.rect.x, spec.file ? cellX + kPieceRight : cellX) << "the rank numbers are left of the piece, the file letters right of it";
-            EXPECT_LE(label.rect.x + label.rect.w, spec.file ? cellX + kCellSize : cellX + kPieceLeft);
-            EXPECT_GE(label.rect.y, spec.file ? cellY + kCellSize - kLabelBand : cellY) << "the rank numbers are at the top of the cell, the file letters at the bottom";
-            EXPECT_LE(label.rect.y + label.rect.h, spec.file ? cellY + kCellSize : cellY + kLabelBand);
-            EXPECT_GE(label.rect.x, kBoardLeft) << "inside the board";
-            EXPECT_LE(label.rect.x + label.rect.w, kBoardLeft + static_cast<float>(kBoardEdgeCells) * kCellSize);
-            EXPECT_GE(label.rect.y, kBoardTop);
-            EXPECT_LE(label.rect.y + label.rect.h, kBoardBottom);
+        for (const ViewShape& shape : kViewShapes) {
+            SCOPED_TRACE(shape.name);
+            DrawAt(shape.output.first, shape.output.second);
+            ASSERT_EQ(PortraitIsActive(), shape.boardLeft == kPortraitBoardLeft);
+            const float boardBottom = shape.boardTop + static_cast<float>(kBoardEdgeCells) * kCellSize;
+            for (const BoardLabel& spec : ExpectedBoardLabels()) {
+                SCOPED_TRACE(spec.name.c_str());
+                const UIElement* found = CoordinateLabel(spec.name.c_str());
+                ASSERT_NE(found, nullptr);
+                const UIElement& label = *found;
+                const float cellX = shape.boardLeft + static_cast<float>(spec.column) * kCellSize;
+                const float cellY = shape.boardTop + static_cast<float>(spec.row) * kCellSize;
+                const auto [expectedX, expectedY] = CellOrigin(spec.column, spec.row);
+                EXPECT_FLOAT_EQ(cellX, expectedX);
+                EXPECT_FLOAT_EQ(cellY, expectedY);
+                EXPECT_GE(label.rect.x, spec.file ? cellX + kPieceRight : cellX) << "the rank numbers are left of the piece, the file letters right of it";
+                EXPECT_LE(label.rect.x + label.rect.w, spec.file ? cellX + kCellSize : cellX + kPieceLeft);
+                EXPECT_GE(label.rect.y, spec.file ? cellY + kCellSize - kLabelBand : cellY) << "the rank numbers are at the top of the cell, the file letters at the bottom";
+                EXPECT_LE(label.rect.y + label.rect.h, spec.file ? cellY + kCellSize : cellY + kLabelBand);
+                EXPECT_GE(label.rect.x, shape.boardLeft) << "inside the board";
+                EXPECT_LE(label.rect.x + label.rect.w, shape.boardLeft + static_cast<float>(kBoardEdgeCells) * kCellSize);
+                EXPECT_GE(label.rect.y, shape.boardTop);
+                EXPECT_LE(label.rect.y + label.rect.h, boardBottom);
+            }
+            EXPECT_EQ(BoardLabelProblems(Coordinate()->GetLayout()), "") << "the same checks the matrix runs";
         }
-        EXPECT_EQ(BoardLabelProblems(Coordinate()->GetLayout()), "") << "the same checks the matrix runs";
     }
 
     TEST_F(ChessUiTest, NoCoordinateGlyphReachesAPieceInEitherOrientation) {
@@ -3020,40 +3068,43 @@ namespace BECore::Chess::Tests {
         CountingFactory factory({MakeShared<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
 
-        for (const bool turned : {false, true}) {
-            SCOPED_TRACE(turned ? "the program plays White: the board is turned" : "two people");
-            ControlPlays(turned ? "white" : nullptr);
-            _manager->UpdateAll();
-            Draw();
+        for (const ViewShape& shape : kViewShapes) {
+            for (const bool turned : {false, true}) {
+                SCOPED_TRACE(Format("{}, {}", shape.name, turned ? "the program plays White: the board is turned" : "two people").c_str());
+                ControlPlays(turned ? "white" : nullptr);
+                DrawAt(shape.output.first, shape.output.second);
+                _manager->UpdateAll();
+                Draw();
 
-            size_t pieces = 0;
-            size_t glyphs = 0;
-            for (const DrawCall& call : _renderer->calls) {
-                if (call.kind != DrawKind::Texture || std::find(std::begin(rooks), std::end(rooks), call.texture) == std::end(rooks)) {
-                    continue;
-                }
-                ++pieces;
-                // a rook is as wide as its atlas cell says, and the corner cells are the ones whose labels are closest
-                EXPECT_NEAR(call.rect.w / call.rect.h, kCellWidth / kCellHeight, 1e-4f);
-                for (const DrawCall& other : _renderer->calls) {
-                    if (IsLabelGlyph(other)) {
-                        EXPECT_FALSE(Touch(call.rect, other.rect, 0.0f))
-                            << "a glyph at (" << other.rect.x << ", " << other.rect.y << ") is on a piece at (" << call.rect.x << ", " << call.rect.y << ")";
+                size_t pieces = 0;
+                size_t glyphs = 0;
+                for (const DrawCall& call : _renderer->calls) {
+                    if (call.kind != DrawKind::Texture || std::find(std::begin(rooks), std::end(rooks), call.texture) == std::end(rooks)) {
+                        continue;
+                    }
+                    ++pieces;
+                    // a rook is as wide as its atlas cell says, and the corner cells are the ones whose labels are closest
+                    EXPECT_NEAR(call.rect.w / call.rect.h, kCellWidth / kCellHeight, 1e-4f);
+                    for (const DrawCall& other : _renderer->calls) {
+                        if (IsLabelGlyph(other)) {
+                            EXPECT_FALSE(Touch(call.rect, other.rect, 0.0f))
+                                << "a glyph at (" << other.rect.x << ", " << other.rect.y << ") is on a piece at (" << call.rect.x << ", " << call.rect.y << ")";
+                        }
                     }
                 }
-            }
-            for (const DrawCall& call : _renderer->calls) {
-                glyphs += IsLabelGlyph(call) ? 1 : 0;
-            }
-            EXPECT_EQ(pieces, 4u) << "a rook in each corner";
-            EXPECT_EQ(glyphs, 2 * kBoardEdgeCells) << "one glyph for each of the 16 labels";
+                for (const DrawCall& call : _renderer->calls) {
+                    glyphs += IsLabelGlyph(call) ? 1 : 0;
+                }
+                EXPECT_EQ(pieces, 4u) << "a rook in each corner";
+                EXPECT_EQ(glyphs, 2 * kBoardEdgeCells) << "one glyph for each of the 16 labels";
 
-            // the constants of the test are the piece of the game: a rook is drawn between kPieceLeft and kPieceRight of its corner cell, whole height
-            const DrawCall* rook = TextureCall(*whiteA1);
-            ASSERT_NE(rook, nullptr);
-            const auto [column, row] = CellOfSquare(Sq("a1"), turned);
-            const auto [x, y] = CellOrigin(column, row);
-            EXPECT_TRUE(SameRect(rook->rect, OutputRect(Rect{x + kPieceLeft, y, kPieceWidth, kCellSize})));
+                // the constants of the test are the piece of the game: a rook is drawn between kPieceLeft and kPieceRight of its corner cell, whole height
+                const DrawCall* rook = TextureCall(*whiteA1);
+                ASSERT_NE(rook, nullptr);
+                const auto [column, row] = CellOfSquare(Sq("a1"), turned);
+                const auto [x, y] = CellOrigin(column, row);
+                EXPECT_TRUE(SameRect(rook->rect, OutputRect(Rect{x + kPieceLeft, y, kPieceWidth, kCellSize})));
+            }
         }
     }
 
@@ -3062,44 +3113,47 @@ namespace BECore::Chess::Tests {
         CountingFactory factory({MakeShared<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
 
-        for (const bool turned : {false, true}) {
-            SCOPED_TRACE(turned ? "the program plays White: the board is turned" : "two people");
-            ControlPlays(turned ? "white" : nullptr);
-            _manager->UpdateAll();
-            Draw();
+        for (const ViewShape& shape : kViewShapes) {
+            for (const bool turned : {false, true}) {
+                SCOPED_TRACE(Format("{}, {}", shape.name, turned ? "the program plays White: the board is turned" : "two people").c_str());
+                ControlPlays(turned ? "white" : nullptr);
+                DrawAt(shape.output.first, shape.output.second);
+                _manager->UpdateAll();
+                Draw();
 
-            for (const BoardLabel& spec : ExpectedBoardLabels()) {
-                SCOPED_TRACE(spec.name.c_str());
-                const UIElement* found = CoordinateLabel(spec.name.c_str());
-                ASSERT_NE(found, nullptr);
-                const UIElement& label = *found;
-                const Rect cell = CellRect(spec.column, spec.row);
-                const bool light = (spec.column + spec.row) % 2 == 0;
+                for (const BoardLabel& spec : ExpectedBoardLabels()) {
+                    SCOPED_TRACE(spec.name.c_str());
+                    const UIElement* found = CoordinateLabel(spec.name.c_str());
+                    ASSERT_NE(found, nullptr);
+                    const UIElement& label = *found;
+                    const Rect cell = CellRect(spec.column, spec.row);
+                    const bool light = (spec.column + spec.row) % 2 == 0;
 
-                // the square the board really fills there
-                const DrawCall* square = nullptr;
-                for (const DrawCall& call : _renderer->calls) {
-                    if (call.kind == DrawKind::Rect && SameRect(call.rect, cell)) {
-                        square = &call;
-                        break;
+                    // the square the board really fills there
+                    const DrawCall* square = nullptr;
+                    for (const DrawCall& call : _renderer->calls) {
+                        if (call.kind == DrawKind::Rect && SameRect(call.rect, cell)) {
+                            square = &call;
+                            break;
+                        }
                     }
-                }
-                ASSERT_NE(square, nullptr);
-                EXPECT_TRUE(SameColor(square->color, light ? kLightSquareColor : kDarkSquareColor)) << (light ? "a light cell" : "a dark cell");
-                EXPECT_EQ(IsLightCell(spec.column, spec.row), light) << "BoardCoordinates.h says what the board paints";
-                EXPECT_TRUE(SameColor(TextOf(label)->textColor, light ? kDarkSquareColor : kLightSquareColor)) << "dark brown on a light cell, cream on a dark one";
+                    ASSERT_NE(square, nullptr);
+                    EXPECT_TRUE(SameColor(square->color, light ? kLightSquareColor : kDarkSquareColor)) << (light ? "a light cell" : "a dark cell");
+                    EXPECT_EQ(IsLightCell(spec.column, spec.row), light) << "BoardCoordinates.h says what the board paints";
+                    EXPECT_TRUE(SameColor(TextOf(label)->textColor, light ? kDarkSquareColor : kLightSquareColor)) << "dark brown on a light cell, cream on a dark one";
 
-                // and the glyph that is drawn in the label's box has that color
-                const Rect box = OutputRect(label.rect);
-                size_t inBox = 0;
-                for (const DrawCall& call : _renderer->calls) {
-                    if (call.kind == DrawKind::Texture && LiesIn(call.rect, box, kGlyphTolerance)) {
-                        ++inBox;
-                        EXPECT_TRUE(SameColor(call.color, TextOf(label)->textColor));
-                        EXPECT_TRUE(LiesIn(call.rect, cell, kGlyphTolerance)) << "inside the cell it labels";
+                    // and the glyph that is drawn in the label's box has that color
+                    const Rect box = OutputRect(label.rect);
+                    size_t inBox = 0;
+                    for (const DrawCall& call : _renderer->calls) {
+                        if (call.kind == DrawKind::Texture && LiesIn(call.rect, box, kGlyphTolerance)) {
+                            ++inBox;
+                            EXPECT_TRUE(SameColor(call.color, TextOf(label)->textColor));
+                            EXPECT_TRUE(LiesIn(call.rect, cell, kGlyphTolerance)) << "inside the cell it labels";
+                        }
                     }
+                    EXPECT_EQ(inBox, 1u) << "one glyph in the box";
                 }
-                EXPECT_EQ(inBox, 1u) << "one glyph in the box";
             }
         }
     }
@@ -3171,39 +3225,42 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheCoordinateLabelsTakeNoClickAndTheBoardGetsItInTheirCells) {
-        Draw();
-        const auto canvas = Coordinate();
-        ASSERT_TRUE(canvas);
-        for (const BoardLabel& spec : ExpectedBoardLabels()) {
-            const UIElement* label = CoordinateLabel(spec.name.c_str());
-            ASSERT_NE(label, nullptr);
-            const Rect& rect = label->rect;  // canvas units: the view units of a SceneView canvas
-            EXPECT_EQ(canvas->GetLayout().HitTest(rect.x + rect.w * 0.5f, rect.y + rect.h * 0.5f), nullptr) << spec.name.c_str() << " is not found by a hit test";
-        }
-
         CountingFactory factory({MakeShared<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         StartFrom(kFourRooks);  // a rook of Black in each corner, Black to move
         ASSERT_EQ(Model().GetTurn(), PieceColor::Black);
+        const auto canvas = Coordinate();
+        ASSERT_TRUE(canvas);
         const struct {
             bool turned;
             const char* label;
             const char* square;
         } presses[] = {{false, "RankLabel0", "a8"}, {false, "FileLabel0", "a1"}, {false, "FileLabel7", "h1"}, {false, "RankLabel7", "a1"},
                        {true, "RankLabel0", "h1"},  {true, "FileLabel0", "h8"},  {true, "FileLabel7", "a8"},  {true, "RankLabel7", "h8"}};
-        for (const auto& press : presses) {
-            SCOPED_TRACE(Format("{} with the board {}", press.label, press.turned ? "turned" : "upright").c_str());
-            ControlPlays(press.turned ? "white" : nullptr);
-            _manager->UpdateAll();
-            Model().ClearSelection();
-            Draw();
-            const UIElement* label = CoordinateLabel(press.label);
-            ASSERT_NE(label, nullptr);
-            const auto [x, y] = ScreenCenter(*label);
-            EXPECT_FALSE(CoreManager::GetUIInput().DispatchMouseButtonDown(Button(x, y, true))) << "the canvas does not take the press";
-            EXPECT_FALSE(CoreManager::GetUIInput().DispatchMouseButtonUp(Button(x, y, false)));
-            ASSERT_TRUE(Model().HasSelection()) << "the board got it";
-            EXPECT_EQ(Model().GetSelected(), Sq(press.square)) << "the square drawn in that cell";
+        for (const ViewShape& shape : kViewShapes) {
+            DrawAt(shape.output.first, shape.output.second);
+            for (const BoardLabel& spec : ExpectedBoardLabels()) {
+                SCOPED_TRACE(Format("{} {}", shape.name, spec.name).c_str());
+                const UIElement* label = CoordinateLabel(spec.name.c_str());
+                ASSERT_NE(label, nullptr);
+                const Rect& rect = label->rect;  // canvas units: the view units of a SceneView canvas
+                EXPECT_EQ(canvas->GetLayout().HitTest(rect.x + rect.w * 0.5f, rect.y + rect.h * 0.5f), nullptr) << "not found by a hit test";
+            }
+
+            for (const auto& press : presses) {
+                SCOPED_TRACE(Format("{}: {} with the board {}", shape.name, press.label, press.turned ? "turned" : "upright").c_str());
+                ControlPlays(press.turned ? "white" : nullptr);
+                _manager->UpdateAll();
+                Model().ClearSelection();
+                Draw();
+                const UIElement* label = CoordinateLabel(press.label);
+                ASSERT_NE(label, nullptr);
+                const auto [x, y] = ScreenCenter(*label);
+                EXPECT_FALSE(CoreManager::GetUIInput().DispatchMouseButtonDown(Button(x, y, true))) << "the canvas does not take the press";
+                EXPECT_FALSE(CoreManager::GetUIInput().DispatchMouseButtonUp(Button(x, y, false)));
+                ASSERT_TRUE(Model().HasSelection()) << "the board got it";
+                EXPECT_EQ(Model().GetSelected(), Sq(press.square)) << "the square drawn in that cell";
+            }
         }
     }
 
@@ -3231,24 +3288,30 @@ namespace BECore::Chess::Tests {
             return found;
         };
 
-        EXPECT_EQ(read(true), "abcdefgh") << "White at the bottom: a..h from the left";
-        EXPECT_EQ(read(false), "87654321") << "8 at the top";
-        const Vector<Rect> upright = rects();
+        for (const ViewShape& shape : kViewShapes) {
+            SCOPED_TRACE(shape.name);
+            ControlPlays(nullptr);
+            DrawAt(shape.output.first, shape.output.second);
+            _manager->UpdateAll();
+            EXPECT_EQ(read(true), "abcdefgh") << "White at the bottom: a..h from the left";
+            EXPECT_EQ(read(false), "87654321") << "8 at the top";
+            const Vector<Rect> upright = rects();
 
-        ControlPlays("white");
-        _manager->UpdateAll();
-        EXPECT_EQ(read(true), "hgfedcba") << "the board is turned by 180 degrees: h..a from the left";
-        EXPECT_EQ(read(false), "12345678") << "1 at the top";
-        const Vector<Rect> turned = rects();
-        ASSERT_EQ(turned.size(), upright.size());
-        for (size_t i = 0; i < turned.size(); ++i) {
-            EXPECT_TRUE(SameRect(turned[i], upright[i])) << "label " << i << " is fixed on the screen";
+            ControlPlays("white");
+            _manager->UpdateAll();
+            EXPECT_EQ(read(true), "hgfedcba") << "the board is turned by 180 degrees: h..a from the left";
+            EXPECT_EQ(read(false), "12345678") << "1 at the top";
+            const Vector<Rect> turned = rects();
+            ASSERT_EQ(turned.size(), upright.size());
+            for (size_t i = 0; i < turned.size(); ++i) {
+                EXPECT_TRUE(SameRect(turned[i], upright[i])) << "label " << i << " is fixed on the screen";
+            }
+
+            ControlPlays("black");
+            _manager->UpdateAll();
+            EXPECT_EQ(read(true), "abcdefgh");
+            EXPECT_EQ(read(false), "87654321");
         }
-
-        ControlPlays("black");
-        _manager->UpdateAll();
-        EXPECT_EQ(read(true), "abcdefgh");
-        EXPECT_EQ(read(false), "87654321");
     }
 
     TEST_F(ChessUiTest, TheCoordinateColorsAreTheSameWhenTheBoardIsTurned) {
@@ -3318,6 +3381,15 @@ namespace BECore::Chess::Tests {
         String missing = shipped;
         Replace(missing, "name=\"FileLabel7\"", "name=\"FileLabelX\"");
         EXPECT_NE(problemsOf(missing).find("FileLabel7 is missing"), String::npos);
+
+        // The Portrait view has its own numbers: a label left where the default view has it is not in a corner of its cell there, and a missing variant leaves all sixteen
+        String strayInPortrait = shipped;
+        Replace(strayInPortrait, "<set element=\"RankLabel3\" x=\"42\"", "<set element=\"RankLabel3\" x=\"102\"");
+        EXPECT_NE(problemsOf(strayInPortrait).find("RankLabel3 (102.0, 386.0"), String::npos) << "a rank number of the Portrait view that stayed in the default place";
+
+        String noVariant = shipped;
+        Replace(noVariant, "orientation:portrait", "orientation:landscape");
+        EXPECT_NE(problemsOf(noVariant).find("RankLabel0 (102.0, 82.0"), String::npos) << "without the variant the labels stay where the default view has them";
     }
 
     TEST_F(ChessUiTest, TheHudStillStaysOutsideTheBoardWithTheCoordinatesOnIt) {
@@ -6323,9 +6395,9 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheShownMaterialStaysInTheMarginAndClearOfTheHudAndTheCoordinatesInFiveWindowShapes) {
+        // The shapes of the default view (the Portrait view has its own layout of the material)
         StartFrom("4k3/8/8/8/8/8/8/4K3 w - - 0 1");
-        for (const auto& size : {Pair<float, float>{1280.0f, 720.0f}, Pair<float, float>{720.0f, 1280.0f}, Pair<float, float>{1024.0f, 768.0f}, Pair<float, float>{800.0f, 800.0f},
-                                 Pair<float, float>{2560.0f, 1080.0f}}) {
+        for (const auto& size : {Pair<float, float>{1280.0f, 720.0f}, Pair<float, float>{1024.0f, 768.0f}, Pair<float, float>{800.0f, 800.0f}, Pair<float, float>{2560.0f, 1080.0f}}) {
             SCOPED_TRACE(Format("{}x{}", size.first, size.second).c_str());
             DrawAt(size.first, size.second);
             DrawAt(size.first, size.second);  // the rows wait for the first layout

@@ -25,10 +25,12 @@
 
         <!-- The letters and numbers at the edges of the board. A canvas of UILabels (the renderer has no text primitive) on the same layer as the Board, written right after it:
              same layer, scene order, so it is drawn after the squares and the highlights of ChessBoardComponent and before the pieces (layer 0), the result bar (1), the HUD (10) and
-             the panels (20). The canvas has no safe area: the board stands at fixed scene units (view 840 x 800, the board 640 x 640 at (100, 80)) and an inset must not move a label.
+             the panels (20). The canvas has no safe area: the board stands at fixed scene units (view 840 x 800, the board 640 x 640 at (100, 80); in the Portrait view 720 x 960 at (40, 144)) and an inset must not move a label.
              The labels take no click (no blocksInput, not interactive), so the board gets every press. Rank numbers sit in the left column of cells (RankLabel<row>, row from the
              top), top-left in the cell; file letters in the bottom row (FileLabel<column>), bottom-right in the cell. The rects are fixed on the screen; the text is a variable that
              ChessBoardComponent publishes from Game/BoardCoordinates.h (coordRank<row>, coordFile<column>), so it turns with the board (h..a and 1..8 while the program plays White).
+             The numbers of the elements are those of the default view; the variant for orientation:portrait (a canvas variant is conditioned on the bounds of the canvas, which are the view in units: 720 x 960 is portrait,
+             840 x 800 is not) sets x and y of each label for the board of the Portrait view, (40, 144): the same offsets from its corner, so every label moves by (-60, +64).
              A box is 13 x 26 units (the line of an 18-unit font is about 24 units high, and a box under it cuts the glyph) in the 13-unit corner (x 2..15 or 65..78 of the 80-unit cell) that a piece never reaches: a Contain-fitted piece covers about 15.5..64.5.
              The contrast is static: a turn by 180 degrees keeps the color of a cell, so a label has the dark brown of the dark squares on a light cell and the cream on a dark one
              (a cell is light when column + row is even; the rank labels are in column 0, the file labels in row 7). Font 18: about 10 px at the narrowest fit scale (0.57). -->
@@ -117,6 +119,28 @@
                   </components>
                 </element>
               </elements>
+              <variants>
+                <variant when="orientation:portrait">
+                  <overrides>
+                    <set element="RankLabel0" x="42" y="146" />
+                    <set element="RankLabel1" x="42" y="226" />
+                    <set element="RankLabel2" x="42" y="306" />
+                    <set element="RankLabel3" x="42" y="386" />
+                    <set element="RankLabel4" x="42" y="466" />
+                    <set element="RankLabel5" x="42" y="546" />
+                    <set element="RankLabel6" x="42" y="626" />
+                    <set element="RankLabel7" x="42" y="706" />
+                    <set element="FileLabel0" x="105" y="756" />
+                    <set element="FileLabel1" x="185" y="756" />
+                    <set element="FileLabel2" x="265" y="756" />
+                    <set element="FileLabel3" x="345" y="756" />
+                    <set element="FileLabel4" x="425" y="756" />
+                    <set element="FileLabel5" x="505" y="756" />
+                    <set element="FileLabel6" x="585" y="756" />
+                    <set element="FileLabel7" x="665" y="756" />
+                  </overrides>
+                </variant>
+              </variants>
             </component>
           </components>
         </node>
