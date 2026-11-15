@@ -95,19 +95,19 @@ namespace BECore::Chess {
         _drag.reset();
     }
 
-    void ChessBoardComponent::HideUnavailableEngines() {
-        if (_enginesChecked) {
+    void ChessBoardComponent::SyncStockfishSegment() {
+        const OpponentController* opponent = ChessGame::GetActiveOpponent();
+        const bool offered = opponent ? opponent->OffersStockfish() : kStockfishAvailable;
+        if (offered == _stockfishShown) {
             return;
         }
-        _enginesChecked = true;
-        if (!IsOpponentEngineAvailable(OpponentEngine::Stockfish)) {
-            // A scene without the panel has nothing to hide: the call does nothing
-            UICanvasComponent::SetElementVisibleByName(GetScene(), "EngineStockfish"_intern, false);
-        }
+        _stockfishShown = offered;
+        // A scene without the panel has nothing to hide: the call does nothing
+        UICanvasComponent::SetElementVisibleByName(GetScene(), "EngineStockfish"_intern, offered);
     }
 
     void ChessBoardComponent::OnUpdate(const SceneEvents::SceneUpdateEvent&) {
-        HideUnavailableEngines();
+        SyncStockfishSegment();
         ChessGame* game = ChessGame::GetActive();
         if (!game) {
             return;
@@ -260,6 +260,13 @@ namespace BECore::Chess {
                 LOG_WARNING("ChessOpenSection ignored: '{}' is not a section of the menu"_format(event.value.ToStringView()));
                 return true;
             }
+            if (section->id == kOpponentSectionId) {
+                // The only look for a Stockfish installed since the game started; the panel is drawn from the same frame on
+                if (OpponentController* opponent = ChessGame::GetActiveOpponent()) {
+                    opponent->RefreshStockfish();
+                }
+                SyncStockfishSegment();
+            }
             UICanvasComponent::SetVisibleByName(GetScene(), menuNode, false);
             ShowMenuSection(section);
         } else {
@@ -302,7 +309,7 @@ namespace BECore::Chess {
     }
 
     void ChessBoardComponent::OnDraw() {
-        HideUnavailableEngines();  // the panel is drawn after the board, so a frame with no update before it already lacks the segment
+        SyncStockfishSegment();  // the panel is drawn after the board, so a frame with no update before it already lacks the segment
         PublishUiVars();
         auto& renderer = *CoreManager::GetRenderer();
         const float squareSize = GetSquareSize();    // once per draw, as the orientation

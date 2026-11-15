@@ -14,6 +14,9 @@ namespace BECore::Chess {
         StringView label;
     };
 
+    /// The id of the section of the opponent panel, for code that has to know when it opens
+    inline constexpr StringView kOpponentSectionId = "opponent";
+
     /// Every section of the menu, in the order of the buttons of the list. A feature that has no panel yet has no row
     [[nodiscard]] Span<const MenuSection> MenuSections();
 

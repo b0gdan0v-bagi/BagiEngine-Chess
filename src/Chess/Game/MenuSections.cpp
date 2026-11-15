@@ -5,7 +5,7 @@ namespace BECore::Chess {
     namespace {
 
         constexpr Array<MenuSection, 1> kSections{{
-            {"opponent", "OpponentPanel", "Opponent"},
+            {kOpponentSectionId, "OpponentPanel", "Opponent"},
         }};
 
     }  // namespace
