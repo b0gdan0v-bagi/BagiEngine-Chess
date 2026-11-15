@@ -200,7 +200,7 @@ namespace BECore::Chess::Tests {
             const PoolString action = ClickerOf(PanelButton(segment.name.c_str()))->action;
             const bool known = action == PoolString::Intern(kSetModeAction) || action == PoolString::Intern(kSetColorAction) || action == PoolString::Intern(kSetEngineAction) ||
                                action == PoolString::Intern(kSetLevelAction);
-            EXPECT_TRUE(known) << segment.name.c_str() << " emits " << action.CStr() << ", which the board does not answer";
+            EXPECT_TRUE(known) << segment.name.c_str() << " emits " << action.CStr() << ", which ChessOpponentPanelComponent does not answer";
         }
         EXPECT_EQ(ClickerOf(PanelButton("OpponentBack"))->action, PoolString::Intern("ChessOpenMenu"));
         EXPECT_EQ(ClickerOf(PanelButton("OpponentClose"))->action, PoolString::Intern("ChessCloseMenu"));
@@ -1133,7 +1133,7 @@ namespace BECore::Chess::Tests {
                 EXPECT_EQ(log.LastAction(), PoolString::Intern(segment.action));
                 EXPECT_EQ(log.LastValue(), PoolString::Intern(segment.id.c_str()));
 
-                Draw();  // the board answered with the variable; the next draw moves the selection
+                Draw();  // the HUD published the variable; the next draw moves the selection
                 for (const PanelSegment& other : segments) {
                     if (StringView(other.group) == group && IsShown(other)) {
                         EXPECT_EQ(PanelButton(other.name.c_str()).selected, other.name == segment.name) << other.name.c_str();
@@ -1607,7 +1607,7 @@ namespace BECore::Chess::Tests {
             EXPECT_EQ(action.find(kRemovedActions), StringView::npos) << found.node().attribute("name").value() << " emits " << ToStd(action);
             const bool known = action == "ChessReset" || action == "ChessOpenMenu" || action == "ChessOpenSection" || action == "ChessCloseMenu" || action == kSetModeAction ||
                                action == kSetColorAction || action == kSetEngineAction || action == kSetLevelAction || action == kPromoteAction || action == kCancelPromotionAction;
-            EXPECT_TRUE(known) << found.node().attribute("name").value() << " emits " << ToStd(action) << ", which the board does not answer";
+            EXPECT_TRUE(known) << found.node().attribute("name").value() << " emits " << ToStd(action) << ", which no component of the scene answers";
         }
         for (const pugi::xpath_node found : document.select_nodes("//element[@text]")) {
             const StringView text = found.node().attribute("text").value();
