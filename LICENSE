@@ -1,0 +1,14 @@
+"THE BEER-WARE LICENSE" (Revision 42):
+Andrey Bogdanov wrote this software. As long as you retain this notice you
+can do whatever you want with this stuff. If we meet some day, and you think
+this stuff is worth it, you can buy me a beer in return.
+
+This licence covers the code of the game written for it (the Chess module, the
+tools, the tests and the scripts) and its own art (assets/chess_test.png). The
+BagiEngine in the engine/ folder is a git submodule with its own LICENSE
+(Beerware too); the libraries, fonts and other files of other authors that the
+engine or this repository carries keep their own licences: THIRD_PARTY_NOTICES.md
+of the game and engine/THIRD_PARTY_NOTICES.md list them, and a game that ships
+them must carry their notices. Stockfish, the chess program the game can start
+when a person has installed it, is not part of this repository and keeps its own
+licence (GPL-3.0): see THIRD_PARTY_NOTICES.md.

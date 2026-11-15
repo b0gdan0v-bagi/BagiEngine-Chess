@@ -198,6 +198,10 @@ python tools/uci_match.py --referee build/windows-clang-release/bin/BagiChess.ex
 
 The ladder (`OpponentLevels`, `ownDepth`) is retuned only by the owner, from numbers like these; the tool changes nothing. `BagiChessUci` can also be put into cutechess-cli or fastchess as an engine (command: its path, protocol `uci`, `option.Level=hard`); that is not tested here, `tools/uci_match.py` is the documented way.
 
+## Licence
+
+The game and its own art are under the Beerware licence (`LICENSE`). `THIRD_PARTY_NOTICES.md` lists what this repository carries of other authors and says why Stockfish (GPL, installed by you, started as a separate process) does not touch the game's licence; the engine's notices are in `engine/THIRD_PARTY_NOTICES.md`. `python tests/check_notices.py` checks them against the tree.
+
 ## Layout
 
 | Path | What |
@@ -206,6 +210,7 @@ The ladder (`OpponentLevels`, `ownDepth`) is retuned only by the owner, from num
 | `uci/` | `main.cpp` of `BagiChessUci`, the own engine as a UCI program (the server is `src/Chess/Uci/`) |
 | `dev.json` | what the `bagi-dev` panel of VS Code and `engine/tools/dev/dev.py` build and run: the game, `BagiChessUci`, the tests and the browser page, and the tools (the Stockfish bridge, the match, the screenshots, format, the docs budget). The browser page has not been run with emsdk (see "Browser build") |
 | `config/`, `assets/` | scene, texture library, application config, piece atlas |
+| `LICENSE`, `THIRD_PARTY_NOTICES.md` | the licence of the game and the notices of what it carries (see "Licence") |
 | `cmake/` | `ChessWeb.cmake`: the files of the browser package (see "Browser build") |
 | `tests/` | gtest cases, `control_smoke.py`, the recorded control scenarios `scenarios/*.jsonl`, `uci_smoke.py` and `match_smoke.py` |
 | `tools/` | the Stockfish bridge and its pytest tests (`engine/.venv/bin/python -m pytest tools/tests`), the match tool `uci_match.py` (with `elo_rating.py` and `match_steps.py`) and its unit tests (`python3 -m unittest discover -s tools/tests -p "test_match_*.py"`), and `ui_shots.py`, the screenshot command (`python tools/ui_shots.py --list`) |
