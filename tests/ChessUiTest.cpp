@@ -7,6 +7,7 @@
 #include <BECore/Scene/Scene.h>
 #include <BECore/Scene/SceneManager.h>
 #include <BECore/Scene/SceneNode.h>
+#include <BECore/Scene/SceneView.h>
 #include <BECore/Text/FontAtlasLibrary.h>
 #include <BECore/UI/UICanvasComponent.h>
 #include <BECore/UI/UIElement.h>
@@ -62,7 +63,19 @@ namespace BECore::Chess::Tests {
         constexpr float kMinGap = 8.0f;                     // two controls of the HUD keep this much between them, in view units
         constexpr float kButtonAir = 8.0f;                  // the text of a button keeps this much from each edge of its fill
         constexpr float kNarrowestWidth = 480.0f;           // the narrowest window of the size matrix, in pixels
-        constexpr float kNarrowestHeight = 853.0f;          // 9:16 at that width
+        constexpr float kNarrowestHeight = 480.0f;          // the narrowest window with the default (landscape) view: 480 x 480 is a square, which keeps it, at the scale 0.571
+        constexpr float kNarrowestPortraitHeight = 853.0f;  // 9:16 at that width: the Portrait view, at the scale 0.667
+
+        // The second view of the scene (SceneConfig.xml, `viewVariants`): 720 x 960, the board at (40, 144), a square 80 units as in the default view
+        constexpr float kPortraitViewWidth = 720.0f;
+        constexpr float kPortraitViewHeight = 960.0f;
+        constexpr float kPortraitBoardLeft = 40.0f;
+        constexpr float kPortraitBoardTop = 144.0f;
+        constexpr float kPortraitBoardBottom = 784.0f;
+        constexpr float kPortraitHudBottom = 68.0f;   // Turn, Menu and Reset: 56 units high at y 12
+        constexpr float kPortraitStatusTop = 892.0f;  // Status: 56 units high, 12 above the bottom of the view
+        constexpr float kPortraitNotchUnits = 50.4f;  // the top inset of a notch (7 % of the short side) when the view fills the window: 7 % of its 720 units
+        constexpr const char* kPortraitViewName = "Portrait";
 
         // The colors the board fills a full square with (ChessBoardComponent.cpp)
         const Color kSelectedColor{120, 200, 120, 200};
@@ -89,8 +102,9 @@ namespace BECore::Chess::Tests {
         constexpr float kPointerOffsetY = -50.0f;
         constexpr float kHalfSquare = 40.0f;  // half the 80 units of a square: the piece in the hand is centered on the pointer
         constexpr int32_t kPieceLayer = 0;
-        constexpr int32_t kDragLayer = 6;        // the layer of a piece in the hand: over the chips (5), under the HUD (10)
-        constexpr float kGlyphTolerance = 1.0f;  // a glyph of a label is laid out to the pixel of the font, not to the unit
+        constexpr int32_t kDragLayer = 6;  // the layer of a piece in the hand: over the chips (5), under the HUD (10)
+        constexpr float kGlyphTolerance =
+            2.0f;  // a glyph of a label is laid out to the pixel of the font, not to the unit: at the scale of the Portrait view a narrow glyph reaches past its box by more than a pixel
 
         constexpr int kManyFrames = 200;  // frames that must pass with nothing happening
 
@@ -193,7 +207,7 @@ namespace BECore::Chess::Tests {
             text.replace(at, what.size(), with);
         }
 
-        /// The `<elements>` of the canvas on the node @p nodeName of the shipped scene, as the content of a screen; empty when there is none
+        /// The `<elements>` and the `<variants>` of the canvas on the node @p nodeName of the shipped scene, as the content of a screen; empty when there is none
         String ShippedElementsXml(const char* nodeName) {
             pugi::xml_document document;
             if (!document.load_file(ShippedSceneConfig().string().c_str())) {
@@ -207,6 +221,9 @@ namespace BECore::Chess::Tests {
             std::ostringstream out;
             out << "<ui>";
             elements.print(out, "", pugi::format_raw);
+            if (const pugi::xml_node variants = node.select_node(".//component[@type='UICanvasComponent']/variants").node()) {
+                variants.print(out, "", pugi::format_raw);
+            }
             out << "</ui>";
             return FromStdString(out.str());
         }
@@ -381,11 +398,31 @@ namespace BECore::Chess::Tests {
         // The letters and numbers at the edges of the board (the node BoardCoordinates of SceneConfig.xml): a label sits in the corner of an edge cell that a piece does not reach
         constexpr float kCellSize = 80.0f;
         constexpr float kBoardLeft = 100.0f;
+
+        /// A view of the scene as a test walks it: an output that shows it, where its board is and the narrowest window it is shown in (480 px wide, with side insets)
+        struct ViewShape {
+            const char* name;
+            Pair<float, float> output;
+            Pair<float, float> narrowest;
+            float viewWidth;
+            float boardLeft;
+            float boardTop;
+            bool portrait;
+        };
+
+        const ViewShape kViewShapes[] = {
+            {"default view", {1280.0f, 720.0f}, {kNarrowestWidth, kNarrowestHeight}, kViewWidth, kBoardLeft, kBoardTop, false},
+            {"Portrait view", {kNarrowestWidth, kNarrowestPortraitHeight}, {kNarrowestWidth, kNarrowestPortraitHeight}, kPortraitViewWidth, kPortraitBoardLeft, kPortraitBoardTop, true}};
         constexpr size_t kBoardEdgeCells = kLastBoardIndex + 1;
         constexpr float kPieceWidth = kCellSize * kCellWidth / kCellHeight;  // a piece fitted by Contain is as high as its cell, as wide as the aspect of its atlas cell, and centered
         constexpr float kPieceLeft = (kCellSize - kPieceWidth) * 0.5f;       // 15.5 units from the left edge of the cell
         constexpr float kPieceRight = kPieceLeft + kPieceWidth;              // 64.5 units
         constexpr float kLabelBand = 30.0f;                                  // a rank number lies in the top 30 units of its cell, a file letter in the bottom 30 (the boxes are 2..28 and 52..78)
+
+        /// Whether a canvas was laid out for the Portrait view: its bounds are the view in units
+        bool LaidOutForPortrait(const UICanvasLayout& layout) {
+            return layout.GetResolved().bounds.w == kPortraitViewWidth;
+        }
 
         /// One label of the board coordinates: its name and the drawn cell it sits in (the rank labels are in the left column, one per row; the file labels in the bottom row, one per column)
         struct BoardLabel {
@@ -418,6 +455,10 @@ namespace BECore::Chess::Tests {
         String BoardLabelProblems(const UICanvasLayout& layout) {
             String problems;
             const float scale = layout.GetResolved().scale;
+            // The board of the view the canvas was laid out for: its bounds are that view in units
+            const bool portrait = LaidOutForPortrait(layout);
+            const float boardLeft = portrait ? kPortraitBoardLeft : kBoardLeft;
+            const float boardTop = portrait ? kPortraitBoardTop : kBoardTop;
             for (const BoardLabel& spec : ExpectedBoardLabels()) {
                 const UIElement* element = layout.root->FindByName(PoolString::Intern(spec.name));
                 if (element == nullptr) {
@@ -433,8 +474,8 @@ namespace BECore::Chess::Tests {
                 if (fit.hasContent && !fit.fits) {
                     problems += Format("{} cuts '{}': {:.1f} x {:.1f} units at scale {:.3f}\n", spec.name.c_str(), ShownText(*element).c_str(), rect.w, rect.h, scale);
                 }
-                const float cellX = kBoardLeft + static_cast<float>(spec.column) * kCellSize;
-                const float cellY = kBoardTop + static_cast<float>(spec.row) * kCellSize;
+                const float cellX = boardLeft + static_cast<float>(spec.column) * kCellSize;
+                const float cellY = boardTop + static_cast<float>(spec.row) * kCellSize;
                 const float low = spec.file ? cellX + kPieceRight : cellX;
                 const float high = spec.file ? cellX + kCellSize : cellX + kPieceLeft;
                 const float top = spec.file ? cellY + kCellSize - kLabelBand : cellY;
@@ -455,6 +496,7 @@ namespace BECore::Chess::Tests {
         // ---- the node Material of SceneConfig.xml: the layout checks (the behavior tests are further down) ----
         constexpr float kMaterialMarginRight = 100.0f;  // the left margin ends where the board begins
         constexpr float kMaterialRowHeight = 40.0f;     // a row is at least this high
+        constexpr float kMaterialRowWidth = 64.0f;      // and this wide, in both views
         constexpr size_t kMaterialRounds = 99;          // one round per sign, "+1" to "+99"
         constexpr int kMostCaptured = 8;                // the longest count word is "x8": the most a row can show is the eight pawns (a test holds it to the summary of two bare kings)
         constexpr const char* kMaterialGroups[] = {"Top", "Bottom"};
@@ -486,13 +528,17 @@ namespace BECore::Chess::Tests {
 
         /// What is wrong with the canvas Material as it is laid out with all ten rows shown, one problem to a line, nothing when it is right. The text that a count or a sign cuts is checked
         /// here because the validator does not see a Clip label's cut; the lists must lie inside the safe area only while their box does (the rule of Game/MaterialLayout.h, so the rows would
-        /// be shown), a balance box always
+        /// be shown), a balance box always. A group stays in its place of the view it was laid out for: the left margin of the default view, the band above the board (the upper group) or
+        /// below it (the lower one) in Portrait, where the rows go along x and not along y
         String MaterialProblems(const UICanvasLayout& layout) {
             String problems;
             const float scale = layout.GetResolved().scale;
             const Rect safe = layout.GetResolved().safeBounds;
-            const bool listsFit = MaterialListFits(safe.x, safe.y, safe.x + safe.w, safe.y + safe.h);
+            const bool portrait = LaidOutForPortrait(layout);
+            const bool listsFit = MaterialListFits(safe.x, safe.y, safe.x + safe.w, safe.y + safe.h, portrait ? MaterialView::Portrait : MaterialView::Default);
             const Rect margin{0.0f, kBoardTop, kMaterialMarginRight, kBoardBottom - kBoardTop};
+            const Rect upperBand{0.0f, kPortraitHudBottom, kPortraitViewWidth, kPortraitBoardTop - kPortraitHudBottom};
+            const Rect lowerBand{0.0f, kPortraitBoardBottom, kPortraitViewWidth, kPortraitStatusTop - kPortraitBoardBottom};
 
             const auto find = [&](const String& name) -> const UIElement* {
                 const UIElement* element = layout.root->FindByName(PoolString::Intern(name.c_str()));
@@ -504,10 +550,11 @@ namespace BECore::Chess::Tests {
                 }
                 return element;
             };
-            const auto place = [&](const UIElement& element, bool inSafeArea) {
-                if (!LiesIn(element.rect, margin)) {
-                    problems += Format("{} ({:.1f}, {:.1f}, {:.1f}, {:.1f}) leaves the margin (x 0 to {:.0f}, y {:.0f} to {:.0f})\n", element.name.ToStringView(), element.rect.x, element.rect.y,
-                                       element.rect.w, element.rect.h, margin.w, margin.y, margin.y + margin.h);
+            const auto place = [&](const UIElement& element, const char* group, bool inSafeArea) {
+                const Rect& where = !portrait ? margin : (group == kMaterialGroups[0] ? upperBand : lowerBand);
+                if (!LiesIn(element.rect, where)) {
+                    problems += Format("{} ({:.1f}, {:.1f}, {:.1f}, {:.1f}) leaves its place (x {:.0f} to {:.0f}, y {:.0f} to {:.0f})\n", element.name.ToStringView(), element.rect.x, element.rect.y,
+                                       element.rect.w, element.rect.h, where.x, where.x + where.w, where.y, where.y + where.h);
                 }
                 if (inSafeArea && !LiesIn(element.rect, safe)) {
                     problems += Format("{} ({:.1f}, {:.1f}, {:.1f}, {:.1f}) leaves the safe area ({:.1f}, {:.1f}, {:.1f}, {:.1f})\n", element.name.ToStringView(), element.rect.x, element.rect.y,
@@ -525,13 +572,13 @@ namespace BECore::Chess::Tests {
             for (const char* group : kMaterialGroups) {
                 const UIElement* list = find(Format("Material{}List", group));
                 if (list != nullptr) {
-                    place(*list, listsFit);
+                    place(*list, group, listsFit);
                     if (list->rect.y < previousListBottom) {
                         problems += Format("{} ({:.1f}) starts above the end of the list before it ({:.1f})\n", list->name.ToStringView(), list->rect.y, previousListBottom);
                     }
                     previousListBottom = list->rect.y + list->rect.h;
                 }
-                float previousRowBottom = -1.0f;
+                float previousRowEnd = -1.0f;  // along the list: the bottom of the row before it in the default view, its right edge in Portrait
                 for (const char* piece : kMaterialPieces) {
                     const UIElement* row = find(Format("Material{}{}Row", group, piece));
                     const UIElement* icon = find(Format("Material{}{}Icon", group, piece));
@@ -539,14 +586,18 @@ namespace BECore::Chess::Tests {
                     if (row == nullptr) {
                         continue;
                     }
-                    place(*row, listsFit);
+                    place(*row, group, listsFit);
                     if (row->rect.h < kMaterialRowHeight - kPixelTolerance) {
                         problems += Format("{} is {:.1f} units high, under {:.0f}\n", row->name.ToStringView(), row->rect.h, kMaterialRowHeight);
                     }
-                    if (row->rect.y < previousRowBottom - kPixelTolerance) {
-                        problems += Format("{} starts at {:.1f}, above the end of the row before it ({:.1f})\n", row->name.ToStringView(), row->rect.y, previousRowBottom);
+                    if (row->rect.w < kMaterialRowWidth - kPixelTolerance) {
+                        problems += Format("{} is {:.1f} units wide, under {:.0f}\n", row->name.ToStringView(), row->rect.w, kMaterialRowWidth);
                     }
-                    previousRowBottom = row->rect.y + row->rect.h;
+                    const float start = portrait ? row->rect.x : row->rect.y;
+                    if (start < previousRowEnd - kPixelTolerance) {
+                        problems += Format("{} starts at {:.1f}, before the end of the row before it ({:.1f})\n", row->name.ToStringView(), start, previousRowEnd);
+                    }
+                    previousRowEnd = portrait ? row->rect.x + row->rect.w : row->rect.y + row->rect.h;
                     if (list != nullptr && !LiesIn(row->rect, list->rect)) {
                         problems += Format("{} is not inside its list\n", row->name.ToStringView());
                     }
@@ -566,7 +617,7 @@ namespace BECore::Chess::Tests {
                     }
                 }
                 if (const UIElement* balance = find(Format("Material{}Balance", group))) {
-                    place(*balance, true);
+                    place(*balance, group, true);
                     fits(*balance);
                     if (list != nullptr && balance->rect.x < list->rect.x + list->rect.w) {
                         problems += Format("{} touches {}\n", balance->name.ToStringView(), list->name.ToStringView());
@@ -741,8 +792,7 @@ namespace BECore::Chess::Tests {
 
         /// The middle of an element as it was laid out in the last draw, in output pixels (the view is fitted into the output)
         Pair<float, float> ScreenCenter(const UIElement& element) const {
-            const ViewTransform fit = ViewTransform::Fit(kViewWidth, kViewHeight, _renderer->width, _renderer->height);
-            const Rect cell = fit.ToOutput(element.rect.x, element.rect.y, element.rect.w, element.rect.h);
+            const Rect cell = ActiveFit().ToOutput(element.rect.x, element.rect.y, element.rect.w, element.rect.h);
             return {cell.x + cell.w * 0.5f, cell.y + cell.h * 0.5f};
         }
 
@@ -1046,7 +1096,7 @@ namespace BECore::Chess::Tests {
 
         /// The output pixel of a point of the view in scene units, for the fit of the view into the current output
         Pair<float, float> PixelOf(float sceneX, float sceneY) const {
-            const Rect at = ViewTransform::Fit(kViewWidth, kViewHeight, _renderer->width, _renderer->height).ToOutput(sceneX, sceneY, 0.0f, 0.0f);
+            const Rect at = ActiveFit().ToOutput(sceneX, sceneY, 0.0f, 0.0f);
             return {at.x, at.y};
         }
 
@@ -1135,9 +1185,41 @@ namespace BECore::Chess::Tests {
             ASSERT_EQ(Opponent().GetError()->kind, EngineErrorKind::LaunchFailed);
         }
 
+        /// A frame of the game as it is a few frames after a window has changed its shape: when the draw picked another view of the scene, the next update announces it to the board
+        /// (SceneViewChangedEvent), and the frame is drawn again with the geometry of that view
         void Draw() {
+            const uint32_t viewBefore = GetScene().GetViewVersion();
             _renderer->ClearCalls();
             _manager->DrawAll();
+            if (GetScene().GetViewVersion() != viewBefore) {
+                _manager->UpdateAll();
+                _renderer->ClearCalls();
+                _manager->DrawAll();
+            }
+        }
+
+        /// Whether the scene draws its Portrait view now (the last draw picked it)
+        bool PortraitIsActive() const {
+            return GetScene().GetActiveView().name == PoolString::Intern(kPortraitViewName);
+        }
+
+        /// The size of the view the scene draws now, in scene units
+        float ViewWidth() const {
+            return GetScene().GetViewWidth();
+        }
+        float ViewHeight() const {
+            return GetScene().GetViewHeight();
+        }
+
+        /// Draws the scene in @p output (width, height in pixels); whether it shows the Portrait view then, with the board following it
+        bool ShowPortrait(const Pair<float, float>& output) {
+            DrawAt(output.first, output.second);
+            return PortraitIsActive();
+        }
+
+        /// The fit of the active view into the current output, as the scene draws it
+        ViewTransform ActiveFit() const {
+            return ViewTransform::Fit(GetScene().GetViewWidth(), GetScene().GetViewHeight(), _renderer->width, _renderer->height);
         }
 
         /// The middle, in output pixels, of the fill that a button was drawn with in the last frame; none when no fill of that color was drawn (a hidden button draws nothing)
@@ -1164,14 +1246,11 @@ namespace BECore::Chess::Tests {
 
         /// Lays the canvas out on every case of the size matrix and calls @p check(label, layout) after each. A SceneView canvas ignores the scale mode and the user scale, so one
         /// run per case is all there is; the layout is left to be laid out again afterwards
+        /// With @p pickView every case takes the view the scene would draw for its output (as ValidateOnMatrix() does with the views of the scene), else the view that is active now
         template <typename Check>
-        void OnEveryCaseOfTheMatrix(UICanvasLayout& layout, Check check) const {
+        void OnEveryCaseOfTheMatrix(UICanvasLayout& layout, Check check, bool pickView = false) const {
             for (const UIMatrixCase& matrixCase : UILayoutMatrix()) {
-                UILayoutContext context = ViewContext();
-                context.outputWidth = matrixCase.context.outputWidth;
-                context.outputHeight = matrixCase.context.outputHeight;
-                context.safeArea = matrixCase.context.safeArea;
-                layout.Update(context);
+                layout.Update(ContextOf(matrixCase, pickView));
                 check(matrixCase.label, layout);
             }
             layout.Invalidate();
@@ -1228,16 +1307,19 @@ namespace BECore::Chess::Tests {
             String report;
             for (size_t round = 0; round < words.Rounds(); ++round) {
                 words.Publish(round);
-                const auto failures = ValidateOnMatrix(canvas->GetLayout(), options, base);
+                const auto failures = ValidateOnMatrix(canvas->GetLayout(), options, base, SceneViews());
                 if (!failures.empty() && ++failed <= kReportedFailures) {
                     report += Format("round {}: {}", round, DescribeMatrixFailures(failures).c_str());
                 }
-                OnEveryCaseOfTheMatrix(canvas->GetLayout(), [&](const String& label, const UICanvasLayout& layout) {
-                    const String problems = HudProblems(layout);
-                    if (!problems.empty() && ++failed <= kReportedFailures) {
-                        report += Format("round {}, {}:\n{}", round, label.c_str(), problems.c_str());
-                    }
-                });
+                OnEveryCaseOfTheMatrix(
+                    canvas->GetLayout(),
+                    [&](const String& label, const UICanvasLayout& layout) {
+                        const String problems = HudProblems(layout);
+                        if (!problems.empty() && ++failed <= kReportedFailures) {
+                            report += Format("round {}, {}:\n{}", round, label.c_str(), problems.c_str());
+                        }
+                    },
+                    true);
             }
             EXPECT_EQ(failed, 0u) << report.c_str();
         }
@@ -1250,35 +1332,47 @@ namespace BECore::Chess::Tests {
             Vector<UIMatrixFailure> all;
             for (size_t round = 0; round < words.Rounds(); ++round) {
                 words.Publish(round);
-                const auto failures = ValidateOnMatrix(layout, options, ViewContext());
+                const auto failures = ValidateOnMatrix(layout, options, ViewContext(), SceneViews());
                 all.insert(all.end(), failures.begin(), failures.end());
             }
             return all;
         }
 
-        /// PanelProblems() on every case of the matrix for each round of words: the lines of the first @p reportedCases cases that have any
+        /// PanelProblems() on every case of the matrix, in the view the scene picks for it, for each round of words: the lines of the first @p reportedCases cases that have any
         String PanelProblemsOnMatrix(UICanvasLayout& layout, size_t reportedCases = kReportedCases, const char* plateName = "Plate") const {
             String report;
             size_t reported = 0;
             const HudWords words = AllHudWords();
             for (size_t round = 0; round < words.Rounds(); ++round) {
                 words.Publish(round);
-                OnEveryCaseOfTheMatrix(layout, [&](const String& label, const UICanvasLayout& laidOut) {
-                    const String problems = PanelProblems(laidOut, plateName);
-                    if (!problems.empty() && reported++ < reportedCases) {
-                        report += Format("round {}, {}:\n{}", round, label.c_str(), problems.c_str());
-                    }
-                });
+                OnEveryCaseOfTheMatrix(
+                    layout,
+                    [&](const String& label, const UICanvasLayout& laidOut) {
+                        const String problems = PanelProblems(laidOut, plateName);
+                        if (!problems.empty() && reported++ < reportedCases) {
+                            report += Format("round {}, {}:\n{}", round, label.c_str(), problems.c_str());
+                        }
+                    },
+                    true);
             }
             return report;
         }
 
-        /// The canvas alone in the narrowest window of the matrix: 480 px wide with the side insets of a phone held sideways
-        void LayOutInTheNarrowestWindow(UICanvasLayout& layout) const {
+        /// The views of the scene as the matrix picks from: the default size and the variants
+        UIMatrixViews SceneViews() const {
+            return UIMatrixViews{kViewWidth, kViewHeight, GetScene().GetViewVariants()};
+        }
+
+        /// The canvas alone in the narrowest window of a view: 480 px wide with the side insets of a phone held sideways, 480 x 480 for the default view and 480 x 853 for Portrait; the view
+        /// is the one the scene picks for that window
+        void LayOutInTheNarrowestWindow(UICanvasLayout& layout, const ViewShape& shape = kViewShapes[0]) const {
             UILayoutContext context = ViewContext();
-            context.outputWidth = kNarrowestWidth;
-            context.outputHeight = kNarrowestHeight;
-            context.safeArea = UIPreview::SimulatedSafeArea(SafeAreaSimulation::SideInsets, kNarrowestWidth, kNarrowestHeight);
+            context.outputWidth = shape.narrowest.first;
+            context.outputHeight = shape.narrowest.second;
+            context.safeArea = UIPreview::SimulatedSafeArea(SafeAreaSimulation::SideInsets, context.outputWidth, context.outputHeight);
+            const ActiveSceneView view = SceneViewSelector::Pick(kViewWidth, kViewHeight, GetScene().GetViewVariants(), context.outputWidth, context.outputHeight);
+            context.sceneViewWidth = view.width;
+            context.sceneViewHeight = view.height;
             layout.Update(context);
         }
 
@@ -1388,7 +1482,7 @@ namespace BECore::Chess::Tests {
 
         /// A rect of the view in output pixels, for the fit of the view into the current output
         Rect OutputRect(const Rect& view) const {
-            return ViewTransform::Fit(kViewWidth, kViewHeight, _renderer->width, _renderer->height).ToOutput(view.x, view.y, view.w, view.h);
+            return ActiveFit().ToOutput(view.x, view.y, view.w, view.h);
         }
 
         /// Sets the 16 variables of the labels to round @p round of the 8: every letter and every digit stands at every label once over the rounds, so the widest one is laid out in each box
@@ -1403,42 +1497,55 @@ namespace BECore::Chess::Tests {
         }
 
         /// BoardLabelProblems() on every case of the matrix for each of the 8 rounds of letters: the lines of the first @p reportedCases cases that have any
-        String BoardLabelProblemsOnMatrix(UICanvasLayout& layout, size_t reportedCases = kReportedCases) const {
+        String BoardLabelProblemsOnMatrix(UICanvasLayout& layout, size_t reportedCases = kReportedCases, bool pickView = true) const {
             String report;
             size_t reported = 0;
             for (size_t round = 0; round < kBoardEdgeCells; ++round) {
                 PublishCoordinateRound(round);
-                OnEveryCaseOfTheMatrix(layout, [&](const String& label, const UICanvasLayout& laidOut) {
-                    const String problems = BoardLabelProblems(laidOut);
-                    if (!problems.empty() && reported++ < reportedCases) {
-                        report += Format("round {}, {}:\n{}", round, label.c_str(), problems.c_str());
-                    }
-                });
+                OnEveryCaseOfTheMatrix(
+                    layout,
+                    [&](const String& label, const UICanvasLayout& laidOut) {
+                        const String problems = BoardLabelProblems(laidOut);
+                        if (!problems.empty() && reported++ < reportedCases) {
+                            report += Format("round {}, {}:\n{}", round, label.c_str(), problems.c_str());
+                        }
+                    },
+                    pickView);
             }
             return report;
         }
 
-        /// The context a case of the size matrix lays a canvas out in: the view of the scene, and the window and the safe area of the case
-        UILayoutContext ContextOf(const UIMatrixCase& matrixCase) const {
+        /// The context a case of the size matrix lays a canvas out in: the view of the scene (with @p pickView the view the scene would draw for the output of the case), and the window and
+        /// the safe area of the case
+        UILayoutContext ContextOf(const UIMatrixCase& matrixCase, bool pickView = false) const {
             UILayoutContext context = ViewContext();
             context.outputWidth = matrixCase.context.outputWidth;
             context.outputHeight = matrixCase.context.outputHeight;
             context.safeArea = matrixCase.context.safeArea;
+            if (pickView) {
+                const ActiveSceneView view = SceneViewSelector::Pick(kViewWidth, kViewHeight, GetScene().GetViewVariants(), context.outputWidth, context.outputHeight);
+                context.sceneViewWidth = view.width;
+                context.sceneViewHeight = view.height;
+            }
             return context;
         }
 
-        /// MaterialProblems() on every case of the matrix for the first @p rounds rounds of words (rows already shown): the lines of the first @p reportedCases cases that have any
+        /// MaterialProblems() on every case of the matrix, in the view the scene picks for it, for the first @p rounds rounds of words (rows already shown): the lines of the first
+        /// @p reportedCases cases that have any
         String MaterialProblemsOnMatrix(UICanvasLayout& layout, size_t rounds = kMaterialRounds, size_t reportedCases = kReportedCases) const {
             String report;
             size_t reported = 0;
             for (size_t round = 0; round < rounds; ++round) {
                 PublishMaterialRound(round);
-                OnEveryCaseOfTheMatrix(layout, [&](const String& label, const UICanvasLayout& laidOut) {
-                    const String problems = MaterialProblems(laidOut);
-                    if (!problems.empty() && reported++ < reportedCases) {
-                        report += Format("round {}, {}:\n{}", round, label.c_str(), problems.c_str());
-                    }
-                });
+                OnEveryCaseOfTheMatrix(
+                    layout,
+                    [&](const String& label, const UICanvasLayout& laidOut) {
+                        const String problems = MaterialProblems(laidOut);
+                        if (!problems.empty() && reported++ < reportedCases) {
+                            report += Format("round {}, {}:\n{}", round, label.c_str(), problems.c_str());
+                        }
+                    },
+                    true);
             }
             return report;
         }
@@ -1456,8 +1563,10 @@ namespace BECore::Chess::Tests {
         }
 
         /// The top left corner of a cell of the board in view units: @p column from the left, @p rowFromTop from the top
-        static Pair<float, float> CellOrigin(int column, int rowFromTop) {
-            return {100.0f + static_cast<float>(column) * 80.0f, kBoardTop + static_cast<float>(rowFromTop) * 80.0f};
+        Pair<float, float> CellOrigin(int column, int rowFromTop) const {
+            const float left = PortraitIsActive() ? kPortraitBoardLeft : kBoardLeft;
+            const float top = PortraitIsActive() ? kPortraitBoardTop : kBoardTop;
+            return {left + static_cast<float>(column) * 80.0f, top + static_cast<float>(rowFromTop) * 80.0f};
         }
 
         /// The cell a square is drawn in, written out here and not taken from BoardOrientation.h: White at the bottom has a1 at the bottom left, Black at the bottom has the grid turned by 180 degrees
@@ -1467,9 +1576,8 @@ namespace BECore::Chess::Tests {
 
         /// A cell of the board in output pixels, for the fit of the view into the current output
         Rect CellRect(int column, int rowFromTop) const {
-            const ViewTransform fit = ViewTransform::Fit(kViewWidth, kViewHeight, _renderer->width, _renderer->height);
             const auto [x, y] = CellOrigin(column, rowFromTop);
-            return fit.ToOutput(x, y, 80.0f, 80.0f);
+            return ActiveFit().ToOutput(x, y, 80.0f, 80.0f);
         }
 
         /// A square of the board in output pixels, for the fit of the view into the current output and the orientation the opponent gives
@@ -1549,24 +1657,27 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(canvas);
         canvas->UpdateLayout(1280.0f, 720.0f);
 
-        // 480 px wide, with the side insets of a phone held sideways: the narrowest the matrix has. The view is 840 units wide, so the scale is 0.57 and the safe area
-        // about 689 units, which is what every row of the HUD has to fit in
+        // 480 px wide, with the side insets of a phone held sideways: the narrowest the matrix has. The default view is 840 units wide, so the scale is 0.57 and the safe area
+        // about 689 units, which is what every row of the HUD has to fit in; Portrait is 720 wide, at the scale 0.667 the safe area is about 590 units
         UICanvasLayout& layout = canvas->GetLayout();
-        LayOutInTheNarrowestWindow(layout);
-        const float scale = kNarrowestWidth / kViewWidth;
-        EXPECT_NEAR(layout.GetResolved().scale, scale, 0.01f);
-        EXPECT_NEAR(layout.root->rect.w, kNarrowestWidth * (1.0f - 2.0f * UIPreview::kSideInsetShare) / scale, 0.5f) << "the safe area, in view units";
-
         const HudWords words = AllHudWords();
-        for (size_t round = 0; round < words.Rounds(); ++round) {
-            words.Publish(round);
-            const String problems = HudProblems(layout);
-            EXPECT_TRUE(problems.empty()) << "round " << round << ":\n" << problems.c_str();
-        }
-        for (const char* name : {"Turn", "Menu", "Reset", "Status"}) {
-            const UIElement* element = layout.root->FindByName(PoolString::Intern(name));
-            ASSERT_NE(element, nullptr) << name;
-            EXPECT_FALSE(element->rect.IsEmpty()) << name << " is shown";
+        for (const ViewShape& shape : kViewShapes) {
+            SCOPED_TRACE(shape.name);
+            LayOutInTheNarrowestWindow(layout, shape);
+            const float scale = kNarrowestWidth / shape.viewWidth;
+            EXPECT_NEAR(layout.GetResolved().scale, scale, 0.01f);
+            EXPECT_NEAR(layout.root->rect.w, kNarrowestWidth * (1.0f - 2.0f * UIPreview::kSideInsetShare) / scale, 0.5f) << "the safe area, in view units";
+
+            for (size_t round = 0; round < words.Rounds(); ++round) {
+                words.Publish(round);
+                const String problems = HudProblems(layout);
+                EXPECT_TRUE(problems.empty()) << "round " << round << ":\n" << problems.c_str();
+            }
+            for (const char* name : {"Turn", "Menu", "Reset", "Status"}) {
+                const UIElement* element = layout.root->FindByName(PoolString::Intern(name));
+                ASSERT_NE(element, nullptr) << name;
+                EXPECT_FALSE(element->rect.IsEmpty()) << name << " is shown";
+            }
         }
         layout.Invalidate();
     }
@@ -1594,30 +1705,32 @@ namespace BECore::Chess::Tests {
         for (const auto& size : {Pair<float, float>{1280.0f, 720.0f}, Pair<float, float>{720.0f, 1280.0f}, Pair<float, float>{1024.0f, 768.0f}, Pair<float, float>{800.0f, 800.0f},
                                  Pair<float, float>{2560.0f, 1080.0f}}) {
             DrawAt(size.first, size.second);
+            const float boardTop = PortraitIsActive() ? kPortraitBoardTop : kBoardTop;
+            const float boardBottom = PortraitIsActive() ? kPortraitBoardBottom : kBoardBottom;
             for (const char* name : {"Turn", "Menu", "Reset"}) {
                 const UIElement* element = canvas->GetRoot().FindByName(PoolString::Intern(name));
                 ASSERT_NE(element, nullptr);
                 ASSERT_FALSE(element->rect.IsEmpty()) << name << " is shown at " << size.first << "x" << size.second;
-                EXPECT_LE(element->rect.y + element->rect.h, kBoardTop + 0.01f) << name << " at " << size.first << "x" << size.second;
+                EXPECT_LE(element->rect.y + element->rect.h, boardTop + 0.01f) << name << " at " << size.first << "x" << size.second;
             }
             const UIElement* status = canvas->GetRoot().FindByName(PoolString::Intern("Status"));
             ASSERT_NE(status, nullptr);
             ASSERT_FALSE(status->rect.IsEmpty()) << "Status is shown at " << size.first << "x" << size.second;
-            EXPECT_GE(status->rect.y, kBoardBottom - 0.01f) << "Status at " << size.first << "x" << size.second;
+            EXPECT_GE(status->rect.y, boardBottom - 0.01f) << "Status at " << size.first << "x" << size.second;
         }
 
         // The panel is not a part of the margins (it covers the board while it is open) but its plate stays inside the view, in every one of the shapes
         ASSERT_TRUE(OpenThePanel());
         for (const auto& size : {Pair<float, float>{1280.0f, 720.0f}, Pair<float, float>{720.0f, 1280.0f}, Pair<float, float>{1024.0f, 768.0f}, Pair<float, float>{800.0f, 800.0f},
-                                 Pair<float, float>{2560.0f, 1080.0f}}) {
+                                 Pair<float, float>{2560.0f, 1080.0f}, Pair<float, float>{480.0f, 853.0f}, Pair<float, float>{768.0f, 1024.0f}}) {
             DrawAt(size.first, size.second);
             const UIElement& plate = PanelControl<UIStack>("Plate");
             ASSERT_FALSE(plate.rect.IsEmpty()) << "the plate is shown at " << size.first << "x" << size.second;
             EXPECT_GE(plate.rect.x, -kPixelTolerance) << size.first << "x" << size.second;
             EXPECT_GE(plate.rect.y, -kPixelTolerance) << size.first << "x" << size.second;
-            EXPECT_LE(plate.rect.x + plate.rect.w, kViewWidth + kPixelTolerance) << size.first << "x" << size.second;
-            EXPECT_LE(plate.rect.y + plate.rect.h, kViewHeight + kPixelTolerance) << size.first << "x" << size.second;
-            EXPECT_NEAR(plate.rect.x + plate.rect.w * 0.5f, kViewWidth * 0.5f, 0.5f) << "the plate is centered in the view, at " << size.first << "x" << size.second;
+            EXPECT_LE(plate.rect.x + plate.rect.w, ViewWidth() + kPixelTolerance) << size.first << "x" << size.second;
+            EXPECT_LE(plate.rect.y + plate.rect.h, ViewHeight() + kPixelTolerance) << size.first << "x" << size.second;
+            EXPECT_NEAR(plate.rect.x + plate.rect.w * 0.5f, ViewWidth() * 0.5f, 0.5f) << "the plate is centered in the view, at " << size.first << "x" << size.second;
         }
     }
 
@@ -1647,30 +1760,34 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(panel);
         panel->UpdateLayout(1280.0f, 720.0f);
         UICanvasLayout& layout = panel->GetLayout();
-        LayOutInTheNarrowestWindow(layout);
-
-        const float scale = kNarrowestWidth / kViewWidth;
-        EXPECT_NEAR(layout.GetResolved().scale, scale, 0.01f);
-        EXPECT_NEAR(layout.root->rect.w, kNarrowestWidth * (1.0f - 2.0f * UIPreview::kSideInsetShare) / scale, 0.5f) << "the safe area, in view units: about 689";
-
         const HudWords words = AllHudWords();
-        for (size_t round = 0; round < words.Rounds(); ++round) {
-            words.Publish(round);
-            const String problems = PanelProblems(layout);
-            EXPECT_TRUE(problems.empty()) << "round " << round << ":\n" << problems.c_str();
-        }
-
         const float minTouch = CoreManager::GetUIEnvironment().GetSettings().minTouchSize;
-        size_t segments = 0;
-        for (const PanelSegment& segment : ExpectedPanelSegments()) {
-            const UIElement& button = PanelButton(segment.name.c_str());
-            ++segments;
-            EXPECT_GE(button.rect.h, kSegmentHeight - kPixelTolerance) << segment.name.c_str();
-            EXPECT_GE(std::min(button.rect.w, button.rect.h) * layout.GetResolved().scale, minTouch - kPixelTolerance) << segment.name.c_str() << " is a touch target on the smallest window";
-            const UIContentFit fit = button.CheckContent(button.rect.w - 2.0f * kButtonAir, button.rect.h, layout.GetResolved().scale);
-            EXPECT_TRUE(fit.hasContent && fit.fits) << segment.name.c_str() << " '" << ShownText(button).c_str() << "' in " << button.rect.w << " units";
+
+        for (const ViewShape& shape : kViewShapes) {
+            SCOPED_TRACE(shape.name);
+            LayOutInTheNarrowestWindow(layout, shape);
+
+            const float scale = kNarrowestWidth / shape.viewWidth;
+            EXPECT_NEAR(layout.GetResolved().scale, scale, 0.01f);
+            EXPECT_NEAR(layout.root->rect.w, kNarrowestWidth * (1.0f - 2.0f * UIPreview::kSideInsetShare) / scale, 0.5f) << "the safe area, in view units: about 689 and 590";
+
+            for (size_t round = 0; round < words.Rounds(); ++round) {
+                words.Publish(round);
+                const String problems = PanelProblems(layout);
+                EXPECT_TRUE(problems.empty()) << "round " << round << ":\n" << problems.c_str();
+            }
+
+            size_t segments = 0;
+            for (const PanelSegment& segment : ExpectedPanelSegments()) {
+                const UIElement& button = PanelButton(segment.name.c_str());
+                ++segments;
+                EXPECT_GE(button.rect.h, kSegmentHeight - kPixelTolerance) << segment.name.c_str();
+                EXPECT_GE(std::min(button.rect.w, button.rect.h) * layout.GetResolved().scale, minTouch - kPixelTolerance) << segment.name.c_str() << " is a touch target on the smallest window";
+                const UIContentFit fit = button.CheckContent(button.rect.w - 2.0f * kButtonAir, button.rect.h, layout.GetResolved().scale);
+                EXPECT_TRUE(fit.hasContent && fit.fits) << segment.name.c_str() << " '" << ShownText(button).c_str() << "' in " << button.rect.w << " units";
+            }
+            EXPECT_EQ(segments, kPanelSegments) << "two + two + two + four";
         }
-        EXPECT_EQ(segments, kPanelSegments) << "two + two + two + four";
         layout.Invalidate();
     }
 
@@ -1679,20 +1796,24 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(panel);
         panel->UpdateLayout(1280.0f, 720.0f);
         UICanvasLayout& layout = panel->GetLayout();
-        LayOutInTheNarrowestWindow(layout);
-        const UIElement& line = PanelLabel("OpponentError");
-        ASSERT_FALSE(line.rect.IsEmpty());
-        const float scale = layout.GetResolved().scale;
 
         size_t sentences = 0;
-        for (const EngineErrorKind kind : EnumUtils<EngineErrorKind>::Values()) {
-            const String sentence = OpponentText::Error(EngineError{kind, {}});
-            CoreManager::GetUIVars().Set("opponentError"_intern, StringView(sentence));
-            const UIContentFit fit = line.CheckContent(line.rect.w, line.rect.h, scale);
-            EXPECT_TRUE(fit.hasContent && fit.fits) << "'" << sentence.c_str() << "' in " << line.rect.w << " units";
-            ++sentences;
+        for (const ViewShape& shape : kViewShapes) {
+            SCOPED_TRACE(shape.name);
+            LayOutInTheNarrowestWindow(layout, shape);
+            const UIElement& line = PanelLabel("OpponentError");
+            ASSERT_FALSE(line.rect.IsEmpty());
+            const float scale = layout.GetResolved().scale;
+
+            for (const EngineErrorKind kind : EnumUtils<EngineErrorKind>::Values()) {
+                const String sentence = OpponentText::Error(EngineError{kind, {}});
+                CoreManager::GetUIVars().Set("opponentError"_intern, StringView(sentence));
+                const UIContentFit fit = line.CheckContent(line.rect.w, line.rect.h, scale);
+                EXPECT_TRUE(fit.hasContent && fit.fits) << "'" << sentence.c_str() << "' in " << line.rect.w << " units";
+                ++sentences;
+            }
         }
-        EXPECT_GE(sentences, 1u);
+        EXPECT_GE(sentences, 2u);
         layout.Invalidate();
     }
 
@@ -1963,23 +2084,28 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(panel);
         panel->UpdateLayout(1280.0f, 720.0f);
         UICanvasLayout& layout = panel->GetLayout();
-        LayOutInTheNarrowestWindow(layout);
-
-        const float scale = kNarrowestWidth / kViewWidth;
-        EXPECT_NEAR(layout.GetResolved().scale, scale, 0.01f);
-        const String problems = PanelProblems(layout, kMenuPlate);
-        EXPECT_TRUE(problems.empty()) << problems.c_str();
-        EXPECT_NEAR(ElementOf("MenuPanel", kMenuPlate).rect.w, 640.0f, kPixelTolerance) << "94% of the safe area is more than maxWidth";
-
         const float minTouch = CoreManager::GetUIEnvironment().GetSettings().minTouchSize;
         const Vector<String> buttons = MenuButtons();
         ASSERT_EQ(buttons.size(), MenuSections().size() + 1) << "a button per section and Close";
-        for (const String& name : buttons) {
-            const UIElement& button = MenuButton(name.c_str());
-            EXPECT_NEAR(button.rect.h, kSegmentHeight, kPixelTolerance) << name.c_str();
-            EXPECT_GE(std::min(button.rect.w, button.rect.h) * layout.GetResolved().scale, minTouch - kPixelTolerance) << name.c_str() << " is a touch target on the smallest window";
-            const UIContentFit fit = button.CheckContent(button.rect.w - 2.0f * kButtonAir, button.rect.h, layout.GetResolved().scale);
-            EXPECT_TRUE(fit.hasContent && fit.fits) << name.c_str() << " '" << ShownText(button).c_str() << "' in " << button.rect.w << " units";
+
+        for (const ViewShape& shape : kViewShapes) {
+            SCOPED_TRACE(shape.name);
+            LayOutInTheNarrowestWindow(layout, shape);
+
+            const float scale = kNarrowestWidth / shape.viewWidth;
+            EXPECT_NEAR(layout.GetResolved().scale, scale, 0.01f);
+            const String problems = PanelProblems(layout, kMenuPlate);
+            EXPECT_TRUE(problems.empty()) << problems.c_str();
+            EXPECT_NEAR(ElementOf("MenuPanel", kMenuPlate).rect.w, std::min(640.0f, 0.94f * layout.root->rect.w), kPixelTolerance)
+                << "94% of the safe area up to maxWidth: 640 in the default view, about 555 in the narrowest Portrait window";
+
+            for (const String& name : buttons) {
+                const UIElement& button = MenuButton(name.c_str());
+                EXPECT_NEAR(button.rect.h, kSegmentHeight, kPixelTolerance) << name.c_str();
+                EXPECT_GE(std::min(button.rect.w, button.rect.h) * layout.GetResolved().scale, minTouch - kPixelTolerance) << name.c_str() << " is a touch target on the smallest window";
+                const UIContentFit fit = button.CheckContent(button.rect.w - 2.0f * kButtonAir, button.rect.h, layout.GetResolved().scale);
+                EXPECT_TRUE(fit.hasContent && fit.fits) << name.c_str() << " '" << ShownText(button).c_str() << "' in " << button.rect.w << " units";
+            }
         }
         layout.Invalidate();
     }
@@ -1989,16 +2115,16 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(MenuList()->_visible);
 
         for (const auto& size : {Pair<float, float>{1280.0f, 720.0f}, Pair<float, float>{720.0f, 1280.0f}, Pair<float, float>{1024.0f, 768.0f}, Pair<float, float>{800.0f, 800.0f},
-                                 Pair<float, float>{2560.0f, 1080.0f}}) {
+                                 Pair<float, float>{2560.0f, 1080.0f}, Pair<float, float>{480.0f, 853.0f}, Pair<float, float>{768.0f, 1024.0f}}) {
             SCOPED_TRACE(Format("{}x{}", size.first, size.second).c_str());
             DrawAt(size.first, size.second);
             const UIElement& plate = ElementOf("MenuPanel", kMenuPlate);
             ASSERT_FALSE(plate.rect.IsEmpty()) << "the plate is shown";
             EXPECT_GE(plate.rect.x, -kPixelTolerance);
             EXPECT_GE(plate.rect.y, -kPixelTolerance);
-            EXPECT_LE(plate.rect.x + plate.rect.w, kViewWidth + kPixelTolerance);
-            EXPECT_LE(plate.rect.y + plate.rect.h, kViewHeight + kPixelTolerance);
-            EXPECT_NEAR(plate.rect.x + plate.rect.w * 0.5f, kViewWidth * 0.5f, 0.5f) << "the plate is centered in the view";
+            EXPECT_LE(plate.rect.x + plate.rect.w, ViewWidth() + kPixelTolerance);
+            EXPECT_LE(plate.rect.y + plate.rect.h, ViewHeight() + kPixelTolerance);
+            EXPECT_NEAR(plate.rect.x + plate.rect.w * 0.5f, ViewWidth() * 0.5f, 0.5f) << "the plate is centered in the view";
             EXPECT_LE(plate.rect.w, 640.0f + kPixelTolerance);
             EXPECT_NEAR(plate.rect.h, MenuPlateHeight(), kPixelTolerance) << "16 + 44 + 56 per section + 56 + 12 per gap + 16: 224 with one section";
 
@@ -2286,7 +2412,7 @@ namespace BECore::Chess::Tests {
         Model().OnSquareClicked(Sq("e2"));
         ASSERT_TRUE(Model().HasSelection());
 
-        // The view is 840 x 800: 1280 x 720 and 720 x 1280 are not its shape, so the view transform is a scale and a move
+        // 1280 x 720 and 2560 x 1080 draw the default view (840 x 800) with bars at the sides, 720 x 1280 the Portrait one (720 x 960) with bars above and below
         for (const auto& size : {Pair<float, float>{1280.0f, 720.0f}, Pair<float, float>{720.0f, 1280.0f}, Pair<float, float>{2560.0f, 1080.0f}}) {
             SCOPED_TRACE(Format("output {}x{}", size.first, size.second).c_str());
             DrawAt(size.first, size.second);
@@ -2329,6 +2455,126 @@ namespace BECore::Chess::Tests {
             EXPECT_TRUE(SameRect(check[0]->rect, SquareRect("e8")));
             EXPECT_TRUE(IsCenteredIn(king->rect, check[0]->rect));
             EXPECT_NEAR(king->rect.w / king->rect.h, kCellWidth / kCellHeight, 1e-4f) << "not stretched to the highlight";
+        }
+    }
+
+    // ---- the two views of the scene --------------------------------------------------------------------------------------------
+    // The default view is 840 x 800 and Portrait 720 x 960; the board is 640 x 640 in both, so the view that the scene picks for an output is the one in which the board is bigger on
+    // the screen. The board follows the active view: a square is 80 units in both, its origin is that of the view
+
+    namespace {
+
+        constexpr float kBoardUnits = 640.0f;
+        constexpr float kBoardPixelTolerance = 0.01f;
+
+        /// The outputs that decide which view is right: phones held upright and sideways, tablets, desktop windows, squares and the degenerate ones
+        const Pair<float, float> kViewOutputs[] = {{480.0f, 853.0f},  {390.0f, 844.0f},  {720.0f, 1280.0f},  {768.0f, 1024.0f}, {800.0f, 800.0f},
+                                                   {1024.0f, 768.0f}, {1280.0f, 720.0f}, {1920.0f, 1080.0f}, {480.0f, 480.0f},  {1.0f, 1.0f},
+                                                   {0.0f, 0.0f},      {874.0f, 1000.0f}, {875.0f, 1000.0f},  {876.0f, 1000.0f}, {2560.0f, 1080.0f}};
+
+        /// The board's side on the screen when a view of @p viewWidth x @p viewHeight is fitted into an output
+        float BoardPixels(float viewWidth, float viewHeight, float outputWidth, float outputHeight) {
+            return kBoardUnits * std::min(outputWidth / viewWidth, outputHeight / viewHeight);
+        }
+
+    }  // namespace
+
+    TEST_F(ChessUiTest, TheSceneHasTheDefaultViewAndThePortraitView) {
+        EXPECT_FLOAT_EQ(GetScene().GetViewWidth(), kViewWidth);
+        EXPECT_FLOAT_EQ(GetScene().GetViewHeight(), kViewHeight);
+        const auto variants = GetScene().GetViewVariants();
+        ASSERT_EQ(variants.size(), 1u);
+        EXPECT_EQ(variants[0].name, PoolString::Intern(kPortraitViewName));
+        EXPECT_FLOAT_EQ(variants[0].width, kPortraitViewWidth);
+        EXPECT_FLOAT_EQ(variants[0].height, kPortraitViewHeight);
+    }
+
+    TEST_F(ChessUiTest, TheSceneShowsTheViewWithTheBiggerBoardOnTheScreen) {
+        const auto variants = GetScene().GetViewVariants();
+        for (const auto& output : kViewOutputs) {
+            SCOPED_TRACE(Format("output {}x{}", output.first, output.second).c_str());
+            const ActiveSceneView picked = SceneViewSelector::Pick(kViewWidth, kViewHeight, variants, output.first, output.second);
+            const float pickedPixels = BoardPixels(picked.width, picked.height, output.first, output.second);
+            EXPECT_GE(pickedPixels, BoardPixels(kViewWidth, kViewHeight, output.first, output.second) - kBoardPixelTolerance);
+            EXPECT_GE(pickedPixels, BoardPixels(kPortraitViewWidth, kPortraitViewHeight, output.first, output.second) - kBoardPixelTolerance);
+
+            if (output.first > 0.0f) {
+                DrawAt(output.first, output.second);
+                EXPECT_EQ(GetScene().GetActiveView(), picked) << "the scene draws the view that the rule picks";
+            }
+        }
+        // The cases that name the rule: a phone held upright is Portrait, a window wider than 0.875 of its height (a square too) the default view
+        const auto nameOf = [&](float width, float height) { return SceneViewSelector::Pick(kViewWidth, kViewHeight, variants, width, height).name; };
+        EXPECT_EQ(nameOf(480.0f, 853.0f), PoolString::Intern(kPortraitViewName));
+        EXPECT_EQ(nameOf(768.0f, 1024.0f), PoolString::Intern(kPortraitViewName));
+        EXPECT_EQ(nameOf(874.0f, 1000.0f), PoolString::Intern(kPortraitViewName));
+        EXPECT_EQ(nameOf(876.0f, 1000.0f), PoolString());
+        EXPECT_EQ(nameOf(800.0f, 800.0f), PoolString());
+        EXPECT_EQ(nameOf(1920.0f, 1080.0f), PoolString());
+    }
+
+    TEST_F(ChessUiTest, TheNarrowestWindowOfEachViewHasItsOwnScale) {
+        DrawAt(kNarrowestWidth, kNarrowestHeight);
+        EXPECT_FALSE(PortraitIsActive()) << "a square window keeps the default view";
+        EXPECT_NEAR(ActiveFit().scale, kNarrowestWidth / kViewWidth, 1e-4f);
+
+        DrawAt(kNarrowestWidth, kNarrowestPortraitHeight);
+        EXPECT_TRUE(PortraitIsActive());
+        EXPECT_NEAR(ActiveFit().scale, kNarrowestWidth / kPortraitViewWidth, 1e-4f) << "the width is the limit: 9:16 is taller than the view";
+    }
+
+    TEST_F(ChessUiTest, TheBoardAndThePiecesFollowTheViewThatIsDrawn) {
+        const ChessBoardComponent* board = ChessBoardComponent::GetActive();
+        ASSERT_NE(board, nullptr);
+        _manager->UpdateAll();
+
+        struct Shape {
+            Pair<float, float> output;
+            bool portrait;
+        };
+        // Landscape, portrait, landscape again: the geometry goes there and back
+        for (const Shape& shape : {Shape{{1280.0f, 720.0f}, false}, Shape{{480.0f, 853.0f}, true}, Shape{{768.0f, 1024.0f}, true}, Shape{{1024.0f, 768.0f}, false}}) {
+            SCOPED_TRACE(Format("output {}x{}", shape.output.first, shape.output.second).c_str());
+            DrawAt(shape.output.first, shape.output.second);
+            ASSERT_EQ(PortraitIsActive(), shape.portrait);
+
+            const float left = shape.portrait ? kPortraitBoardLeft : kBoardLeft;
+            const float top = shape.portrait ? kPortraitBoardTop : kBoardTop;
+            EXPECT_FLOAT_EQ(board->GetOriginX(), left);
+            EXPECT_FLOAT_EQ(board->GetOriginY(), top);
+            EXPECT_FLOAT_EQ(board->GetSquareSize(), kCellSize);
+
+            // A square is where the fixture says, for both orientations of the board
+            for (const PieceColor bottom : {PieceColor::White, PieceColor::Black}) {
+                for (const char* name : {"a1", "h1", "a8", "h8", "e4"}) {
+                    const Square square = Sq(name);
+                    const auto [column, row] = CellOfSquare(square, bottom == PieceColor::Black);
+                    float x = 0.0f;
+                    float y = 0.0f;
+                    board->SquareToPixel(square.file, square.rank, bottom, x, y);
+                    EXPECT_FLOAT_EQ(x, left + static_cast<float>(column) * kCellSize) << name;
+                    EXPECT_FLOAT_EQ(y, top + static_cast<float>(row) * kCellSize) << name;
+                }
+            }
+
+            // The pieces stand on their squares and the 64 squares drawn make the board of the view, to the pixel
+            ExpectPiecesAtTheCellsOf(false);
+            float minX = 1e9f;
+            float minY = 1e9f;
+            float maxX = -1e9f;
+            float maxY = -1e9f;
+            size_t cells = 0;
+            for (const Color& color : {kLightSquareColor, kDarkSquareColor}) {
+                for (const DrawCall* call : RectCalls(color)) {
+                    minX = std::min(minX, call->rect.x);
+                    minY = std::min(minY, call->rect.y);
+                    maxX = std::max(maxX, call->rect.x + call->rect.w);
+                    maxY = std::max(maxY, call->rect.y + call->rect.h);
+                    ++cells;
+                }
+            }
+            EXPECT_EQ(cells, 64u);
+            EXPECT_TRUE(SameRect(Rect{minX, minY, maxX - minX, maxY - minY}, OutputRect(Rect{left, top, kBoardUnits, kBoardUnits})));
         }
     }
 
@@ -2510,6 +2756,45 @@ namespace BECore::Chess::Tests {
         Click("e1");
 
         EXPECT_TRUE(Model().HasPendingPromotion());
+        EXPECT_TRUE(PromotionShown());
+        EXPECT_TRUE(Model().GetMoves().empty()) << "nothing has moved";
+        const auto turned = plateOf();
+        ASSERT_TRUE(turned.has_value());
+        EXPECT_TRUE(SameRect(*turned, *plain)) << "the plate is fixed on the screen";
+
+        ClickPromotion("PromoteQueen");
+        ASSERT_EQ(Model().GetMoves().size(), 1u);
+        EXPECT_EQ(Model().GetMoves().back().ToUci(), "e2e1q");
+    }
+
+    TEST_F(ChessUiTest, APromotionInTheTurnedBoardOfThePortraitViewAsksInAPlateThatDoesNotMove) {
+        const auto plateOf = [this]() -> Optional<Rect> {
+            Draw();
+            const auto plate = RectCalls(kPromotionPlateColor);
+            return plate.empty() ? std::nullopt : Optional<Rect>(plate.front()->rect);
+        };
+        ResizeWithoutInsets(kNarrowestWidth, kNarrowestPortraitHeight);
+        ASSERT_TRUE(PortraitIsActive());
+
+        StartFrom(kBlackPromotesOnE1);
+        ClickMove("e2", "e1");
+        ASSERT_TRUE(PromotionShown());
+        const auto plain = plateOf();
+        ASSERT_TRUE(plain.has_value());
+        Press("ChessCancelPromotion");
+        _manager->UpdateAll();
+        ASSERT_FALSE(PromotionShown());
+
+        CountingFactory factory({MakeShared<InstantEngine>()});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        ControlPlays("white");
+        StartFrom(kBlackPromotesOnE1);
+        ASSERT_TRUE(BlackIsAtTheBottom());
+        ASSERT_TRUE(PortraitIsActive());
+        EXPECT_TRUE(SameRect(SquareRect("e1"), CellRect(3, 0))) << "e1 is on the top row of the Portrait board";
+
+        Click("e2");
+        Click("e1");
         EXPECT_TRUE(PromotionShown());
         EXPECT_TRUE(Model().GetMoves().empty()) << "nothing has moved";
         const auto turned = plateOf();
@@ -2781,7 +3066,7 @@ namespace BECore::Chess::Tests {
         options.minTouchSize = CoreManager::GetUIEnvironment().GetSettings().minTouchSize;
         for (size_t round = 0; round < kBoardEdgeCells; ++round) {
             PublishCoordinateRound(round);
-            const auto failures = ValidateOnMatrix(canvas->GetLayout(), options, ViewContext());
+            const auto failures = ValidateOnMatrix(canvas->GetLayout(), options, ViewContext(), SceneViews());
             EXPECT_TRUE(failures.empty()) << "round " << round << ": " << DescribeMatrixFailures(failures).c_str();
         }
         const String problems = BoardLabelProblemsOnMatrix(canvas->GetLayout());
@@ -2794,13 +3079,16 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(canvas);
         canvas->UpdateLayout(1280.0f, 720.0f);
         UICanvasLayout& layout = canvas->GetLayout();
-        LayOutInTheNarrowestWindow(layout);
-        EXPECT_NEAR(layout.GetResolved().scale, kNarrowestWidth / kViewWidth, 0.01f) << "about 10 px for a font of 18 units";
+        for (const ViewShape& shape : kViewShapes) {
+            SCOPED_TRACE(shape.name);
+            LayOutInTheNarrowestWindow(layout, shape);
+            EXPECT_NEAR(layout.GetResolved().scale, kNarrowestWidth / shape.viewWidth, 0.01f) << "about 10 px for a font of 18 units in the default view, 12 in Portrait";
 
-        for (size_t round = 0; round < kBoardEdgeCells; ++round) {
-            PublishCoordinateRound(round);
-            const String problems = BoardLabelProblems(layout);
-            EXPECT_TRUE(problems.empty()) << "round " << round << ":\n" << problems.c_str();
+            for (size_t round = 0; round < kBoardEdgeCells; ++round) {
+                PublishCoordinateRound(round);
+                const String problems = BoardLabelProblems(layout);
+                EXPECT_TRUE(problems.empty()) << "round " << round << ":\n" << problems.c_str();
+            }
         }
         layout.Invalidate();
     }
@@ -2825,27 +3113,32 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, EveryCoordinateLabelIsInTheCornerOfItsEdgeCellOnTheShippedScene) {
-        Draw();
-        for (const BoardLabel& spec : ExpectedBoardLabels()) {
-            SCOPED_TRACE(spec.name.c_str());
-            const UIElement* found = CoordinateLabel(spec.name.c_str());
-            ASSERT_NE(found, nullptr);
-            const UIElement& label = *found;
-            const float cellX = kBoardLeft + static_cast<float>(spec.column) * kCellSize;
-            const float cellY = kBoardTop + static_cast<float>(spec.row) * kCellSize;
-            const auto [expectedX, expectedY] = CellOrigin(spec.column, spec.row);
-            EXPECT_FLOAT_EQ(cellX, expectedX);
-            EXPECT_FLOAT_EQ(cellY, expectedY);
-            EXPECT_GE(label.rect.x, spec.file ? cellX + kPieceRight : cellX) << "the rank numbers are left of the piece, the file letters right of it";
-            EXPECT_LE(label.rect.x + label.rect.w, spec.file ? cellX + kCellSize : cellX + kPieceLeft);
-            EXPECT_GE(label.rect.y, spec.file ? cellY + kCellSize - kLabelBand : cellY) << "the rank numbers are at the top of the cell, the file letters at the bottom";
-            EXPECT_LE(label.rect.y + label.rect.h, spec.file ? cellY + kCellSize : cellY + kLabelBand);
-            EXPECT_GE(label.rect.x, kBoardLeft) << "inside the board";
-            EXPECT_LE(label.rect.x + label.rect.w, kBoardLeft + static_cast<float>(kBoardEdgeCells) * kCellSize);
-            EXPECT_GE(label.rect.y, kBoardTop);
-            EXPECT_LE(label.rect.y + label.rect.h, kBoardBottom);
+        for (const ViewShape& shape : kViewShapes) {
+            SCOPED_TRACE(shape.name);
+            DrawAt(shape.output.first, shape.output.second);
+            ASSERT_EQ(PortraitIsActive(), shape.portrait);
+            const float boardBottom = shape.boardTop + static_cast<float>(kBoardEdgeCells) * kCellSize;
+            for (const BoardLabel& spec : ExpectedBoardLabels()) {
+                SCOPED_TRACE(spec.name.c_str());
+                const UIElement* found = CoordinateLabel(spec.name.c_str());
+                ASSERT_NE(found, nullptr);
+                const UIElement& label = *found;
+                const float cellX = shape.boardLeft + static_cast<float>(spec.column) * kCellSize;
+                const float cellY = shape.boardTop + static_cast<float>(spec.row) * kCellSize;
+                const auto [expectedX, expectedY] = CellOrigin(spec.column, spec.row);
+                EXPECT_FLOAT_EQ(cellX, expectedX);
+                EXPECT_FLOAT_EQ(cellY, expectedY);
+                EXPECT_GE(label.rect.x, spec.file ? cellX + kPieceRight : cellX) << "the rank numbers are left of the piece, the file letters right of it";
+                EXPECT_LE(label.rect.x + label.rect.w, spec.file ? cellX + kCellSize : cellX + kPieceLeft);
+                EXPECT_GE(label.rect.y, spec.file ? cellY + kCellSize - kLabelBand : cellY) << "the rank numbers are at the top of the cell, the file letters at the bottom";
+                EXPECT_LE(label.rect.y + label.rect.h, spec.file ? cellY + kCellSize : cellY + kLabelBand);
+                EXPECT_GE(label.rect.x, shape.boardLeft) << "inside the board";
+                EXPECT_LE(label.rect.x + label.rect.w, shape.boardLeft + static_cast<float>(kBoardEdgeCells) * kCellSize);
+                EXPECT_GE(label.rect.y, shape.boardTop);
+                EXPECT_LE(label.rect.y + label.rect.h, boardBottom);
+            }
+            EXPECT_EQ(BoardLabelProblems(Coordinate()->GetLayout()), "") << "the same checks the matrix runs";
         }
-        EXPECT_EQ(BoardLabelProblems(Coordinate()->GetLayout()), "") << "the same checks the matrix runs";
     }
 
     TEST_F(ChessUiTest, NoCoordinateGlyphReachesAPieceInEitherOrientation) {
@@ -2859,40 +3152,43 @@ namespace BECore::Chess::Tests {
         CountingFactory factory({MakeShared<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
 
-        for (const bool turned : {false, true}) {
-            SCOPED_TRACE(turned ? "the program plays White: the board is turned" : "two people");
-            ControlPlays(turned ? "white" : nullptr);
-            _manager->UpdateAll();
-            Draw();
+        for (const ViewShape& shape : kViewShapes) {
+            for (const bool turned : {false, true}) {
+                SCOPED_TRACE(Format("{}, {}", shape.name, turned ? "the program plays White: the board is turned" : "two people").c_str());
+                ControlPlays(turned ? "white" : nullptr);
+                DrawAt(shape.output.first, shape.output.second);
+                _manager->UpdateAll();
+                Draw();
 
-            size_t pieces = 0;
-            size_t glyphs = 0;
-            for (const DrawCall& call : _renderer->calls) {
-                if (call.kind != DrawKind::Texture || std::find(std::begin(rooks), std::end(rooks), call.texture) == std::end(rooks)) {
-                    continue;
-                }
-                ++pieces;
-                // a rook is as wide as its atlas cell says, and the corner cells are the ones whose labels are closest
-                EXPECT_NEAR(call.rect.w / call.rect.h, kCellWidth / kCellHeight, 1e-4f);
-                for (const DrawCall& other : _renderer->calls) {
-                    if (IsLabelGlyph(other)) {
-                        EXPECT_FALSE(Touch(call.rect, other.rect, 0.0f))
-                            << "a glyph at (" << other.rect.x << ", " << other.rect.y << ") is on a piece at (" << call.rect.x << ", " << call.rect.y << ")";
+                size_t pieces = 0;
+                size_t glyphs = 0;
+                for (const DrawCall& call : _renderer->calls) {
+                    if (call.kind != DrawKind::Texture || std::find(std::begin(rooks), std::end(rooks), call.texture) == std::end(rooks)) {
+                        continue;
+                    }
+                    ++pieces;
+                    // a rook is as wide as its atlas cell says, and the corner cells are the ones whose labels are closest
+                    EXPECT_NEAR(call.rect.w / call.rect.h, kCellWidth / kCellHeight, 1e-4f);
+                    for (const DrawCall& other : _renderer->calls) {
+                        if (IsLabelGlyph(other)) {
+                            EXPECT_FALSE(Touch(call.rect, other.rect, 0.0f))
+                                << "a glyph at (" << other.rect.x << ", " << other.rect.y << ") is on a piece at (" << call.rect.x << ", " << call.rect.y << ")";
+                        }
                     }
                 }
-            }
-            for (const DrawCall& call : _renderer->calls) {
-                glyphs += IsLabelGlyph(call) ? 1 : 0;
-            }
-            EXPECT_EQ(pieces, 4u) << "a rook in each corner";
-            EXPECT_EQ(glyphs, 2 * kBoardEdgeCells) << "one glyph for each of the 16 labels";
+                for (const DrawCall& call : _renderer->calls) {
+                    glyphs += IsLabelGlyph(call) ? 1 : 0;
+                }
+                EXPECT_EQ(pieces, 4u) << "a rook in each corner";
+                EXPECT_EQ(glyphs, 2 * kBoardEdgeCells) << "one glyph for each of the 16 labels";
 
-            // the constants of the test are the piece of the game: a rook is drawn between kPieceLeft and kPieceRight of its corner cell, whole height
-            const DrawCall* rook = TextureCall(*whiteA1);
-            ASSERT_NE(rook, nullptr);
-            const auto [column, row] = CellOfSquare(Sq("a1"), turned);
-            const auto [x, y] = CellOrigin(column, row);
-            EXPECT_TRUE(SameRect(rook->rect, OutputRect(Rect{x + kPieceLeft, y, kPieceWidth, kCellSize})));
+                // the constants of the test are the piece of the game: a rook is drawn between kPieceLeft and kPieceRight of its corner cell, whole height
+                const DrawCall* rook = TextureCall(*whiteA1);
+                ASSERT_NE(rook, nullptr);
+                const auto [column, row] = CellOfSquare(Sq("a1"), turned);
+                const auto [x, y] = CellOrigin(column, row);
+                EXPECT_TRUE(SameRect(rook->rect, OutputRect(Rect{x + kPieceLeft, y, kPieceWidth, kCellSize})));
+            }
         }
     }
 
@@ -2901,44 +3197,47 @@ namespace BECore::Chess::Tests {
         CountingFactory factory({MakeShared<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
 
-        for (const bool turned : {false, true}) {
-            SCOPED_TRACE(turned ? "the program plays White: the board is turned" : "two people");
-            ControlPlays(turned ? "white" : nullptr);
-            _manager->UpdateAll();
-            Draw();
+        for (const ViewShape& shape : kViewShapes) {
+            for (const bool turned : {false, true}) {
+                SCOPED_TRACE(Format("{}, {}", shape.name, turned ? "the program plays White: the board is turned" : "two people").c_str());
+                ControlPlays(turned ? "white" : nullptr);
+                DrawAt(shape.output.first, shape.output.second);
+                _manager->UpdateAll();
+                Draw();
 
-            for (const BoardLabel& spec : ExpectedBoardLabels()) {
-                SCOPED_TRACE(spec.name.c_str());
-                const UIElement* found = CoordinateLabel(spec.name.c_str());
-                ASSERT_NE(found, nullptr);
-                const UIElement& label = *found;
-                const Rect cell = CellRect(spec.column, spec.row);
-                const bool light = (spec.column + spec.row) % 2 == 0;
+                for (const BoardLabel& spec : ExpectedBoardLabels()) {
+                    SCOPED_TRACE(spec.name.c_str());
+                    const UIElement* found = CoordinateLabel(spec.name.c_str());
+                    ASSERT_NE(found, nullptr);
+                    const UIElement& label = *found;
+                    const Rect cell = CellRect(spec.column, spec.row);
+                    const bool light = (spec.column + spec.row) % 2 == 0;
 
-                // the square the board really fills there
-                const DrawCall* square = nullptr;
-                for (const DrawCall& call : _renderer->calls) {
-                    if (call.kind == DrawKind::Rect && SameRect(call.rect, cell)) {
-                        square = &call;
-                        break;
+                    // the square the board really fills there
+                    const DrawCall* square = nullptr;
+                    for (const DrawCall& call : _renderer->calls) {
+                        if (call.kind == DrawKind::Rect && SameRect(call.rect, cell)) {
+                            square = &call;
+                            break;
+                        }
                     }
-                }
-                ASSERT_NE(square, nullptr);
-                EXPECT_TRUE(SameColor(square->color, light ? kLightSquareColor : kDarkSquareColor)) << (light ? "a light cell" : "a dark cell");
-                EXPECT_EQ(IsLightCell(spec.column, spec.row), light) << "BoardCoordinates.h says what the board paints";
-                EXPECT_TRUE(SameColor(TextOf(label)->textColor, light ? kDarkSquareColor : kLightSquareColor)) << "dark brown on a light cell, cream on a dark one";
+                    ASSERT_NE(square, nullptr);
+                    EXPECT_TRUE(SameColor(square->color, light ? kLightSquareColor : kDarkSquareColor)) << (light ? "a light cell" : "a dark cell");
+                    EXPECT_EQ(IsLightCell(spec.column, spec.row), light) << "BoardCoordinates.h says what the board paints";
+                    EXPECT_TRUE(SameColor(TextOf(label)->textColor, light ? kDarkSquareColor : kLightSquareColor)) << "dark brown on a light cell, cream on a dark one";
 
-                // and the glyph that is drawn in the label's box has that color
-                const Rect box = OutputRect(label.rect);
-                size_t inBox = 0;
-                for (const DrawCall& call : _renderer->calls) {
-                    if (call.kind == DrawKind::Texture && LiesIn(call.rect, box, kGlyphTolerance)) {
-                        ++inBox;
-                        EXPECT_TRUE(SameColor(call.color, TextOf(label)->textColor));
-                        EXPECT_TRUE(LiesIn(call.rect, cell, kGlyphTolerance)) << "inside the cell it labels";
+                    // and the glyph that is drawn in the label's box has that color
+                    const Rect box = OutputRect(label.rect);
+                    size_t inBox = 0;
+                    for (const DrawCall& call : _renderer->calls) {
+                        if (call.kind == DrawKind::Texture && LiesIn(call.rect, box, kGlyphTolerance)) {
+                            ++inBox;
+                            EXPECT_TRUE(SameColor(call.color, TextOf(label)->textColor));
+                            EXPECT_TRUE(LiesIn(call.rect, cell, kGlyphTolerance)) << "inside the cell it labels";
+                        }
                     }
+                    EXPECT_EQ(inBox, 1u) << "one glyph in the box";
                 }
-                EXPECT_EQ(inBox, 1u) << "one glyph in the box";
             }
         }
     }
@@ -3010,39 +3309,42 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheCoordinateLabelsTakeNoClickAndTheBoardGetsItInTheirCells) {
-        Draw();
-        const auto canvas = Coordinate();
-        ASSERT_TRUE(canvas);
-        for (const BoardLabel& spec : ExpectedBoardLabels()) {
-            const UIElement* label = CoordinateLabel(spec.name.c_str());
-            ASSERT_NE(label, nullptr);
-            const Rect& rect = label->rect;  // canvas units: the view units of a SceneView canvas
-            EXPECT_EQ(canvas->GetLayout().HitTest(rect.x + rect.w * 0.5f, rect.y + rect.h * 0.5f), nullptr) << spec.name.c_str() << " is not found by a hit test";
-        }
-
         CountingFactory factory({MakeShared<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         StartFrom(kFourRooks);  // a rook of Black in each corner, Black to move
         ASSERT_EQ(Model().GetTurn(), PieceColor::Black);
+        const auto canvas = Coordinate();
+        ASSERT_TRUE(canvas);
         const struct {
             bool turned;
             const char* label;
             const char* square;
         } presses[] = {{false, "RankLabel0", "a8"}, {false, "FileLabel0", "a1"}, {false, "FileLabel7", "h1"}, {false, "RankLabel7", "a1"},
                        {true, "RankLabel0", "h1"},  {true, "FileLabel0", "h8"},  {true, "FileLabel7", "a8"},  {true, "RankLabel7", "h8"}};
-        for (const auto& press : presses) {
-            SCOPED_TRACE(Format("{} with the board {}", press.label, press.turned ? "turned" : "upright").c_str());
-            ControlPlays(press.turned ? "white" : nullptr);
-            _manager->UpdateAll();
-            Model().ClearSelection();
-            Draw();
-            const UIElement* label = CoordinateLabel(press.label);
-            ASSERT_NE(label, nullptr);
-            const auto [x, y] = ScreenCenter(*label);
-            EXPECT_FALSE(CoreManager::GetUIInput().DispatchMouseButtonDown(Button(x, y, true))) << "the canvas does not take the press";
-            EXPECT_FALSE(CoreManager::GetUIInput().DispatchMouseButtonUp(Button(x, y, false)));
-            ASSERT_TRUE(Model().HasSelection()) << "the board got it";
-            EXPECT_EQ(Model().GetSelected(), Sq(press.square)) << "the square drawn in that cell";
+        for (const ViewShape& shape : kViewShapes) {
+            DrawAt(shape.output.first, shape.output.second);
+            for (const BoardLabel& spec : ExpectedBoardLabels()) {
+                SCOPED_TRACE(Format("{} {}", shape.name, spec.name).c_str());
+                const UIElement* label = CoordinateLabel(spec.name.c_str());
+                ASSERT_NE(label, nullptr);
+                const Rect& rect = label->rect;  // canvas units: the view units of a SceneView canvas
+                EXPECT_EQ(canvas->GetLayout().HitTest(rect.x + rect.w * 0.5f, rect.y + rect.h * 0.5f), nullptr) << "not found by a hit test";
+            }
+
+            for (const auto& press : presses) {
+                SCOPED_TRACE(Format("{}: {} with the board {}", shape.name, press.label, press.turned ? "turned" : "upright").c_str());
+                ControlPlays(press.turned ? "white" : nullptr);
+                _manager->UpdateAll();
+                Model().ClearSelection();
+                Draw();
+                const UIElement* label = CoordinateLabel(press.label);
+                ASSERT_NE(label, nullptr);
+                const auto [x, y] = ScreenCenter(*label);
+                EXPECT_FALSE(CoreManager::GetUIInput().DispatchMouseButtonDown(Button(x, y, true))) << "the canvas does not take the press";
+                EXPECT_FALSE(CoreManager::GetUIInput().DispatchMouseButtonUp(Button(x, y, false)));
+                ASSERT_TRUE(Model().HasSelection()) << "the board got it";
+                EXPECT_EQ(Model().GetSelected(), Sq(press.square)) << "the square drawn in that cell";
+            }
         }
     }
 
@@ -3070,24 +3372,30 @@ namespace BECore::Chess::Tests {
             return found;
         };
 
-        EXPECT_EQ(read(true), "abcdefgh") << "White at the bottom: a..h from the left";
-        EXPECT_EQ(read(false), "87654321") << "8 at the top";
-        const Vector<Rect> upright = rects();
+        for (const ViewShape& shape : kViewShapes) {
+            SCOPED_TRACE(shape.name);
+            ControlPlays(nullptr);
+            DrawAt(shape.output.first, shape.output.second);
+            _manager->UpdateAll();
+            EXPECT_EQ(read(true), "abcdefgh") << "White at the bottom: a..h from the left";
+            EXPECT_EQ(read(false), "87654321") << "8 at the top";
+            const Vector<Rect> upright = rects();
 
-        ControlPlays("white");
-        _manager->UpdateAll();
-        EXPECT_EQ(read(true), "hgfedcba") << "the board is turned by 180 degrees: h..a from the left";
-        EXPECT_EQ(read(false), "12345678") << "1 at the top";
-        const Vector<Rect> turned = rects();
-        ASSERT_EQ(turned.size(), upright.size());
-        for (size_t i = 0; i < turned.size(); ++i) {
-            EXPECT_TRUE(SameRect(turned[i], upright[i])) << "label " << i << " is fixed on the screen";
+            ControlPlays("white");
+            _manager->UpdateAll();
+            EXPECT_EQ(read(true), "hgfedcba") << "the board is turned by 180 degrees: h..a from the left";
+            EXPECT_EQ(read(false), "12345678") << "1 at the top";
+            const Vector<Rect> turned = rects();
+            ASSERT_EQ(turned.size(), upright.size());
+            for (size_t i = 0; i < turned.size(); ++i) {
+                EXPECT_TRUE(SameRect(turned[i], upright[i])) << "label " << i << " is fixed on the screen";
+            }
+
+            ControlPlays("black");
+            _manager->UpdateAll();
+            EXPECT_EQ(read(true), "abcdefgh");
+            EXPECT_EQ(read(false), "87654321");
         }
-
-        ControlPlays("black");
-        _manager->UpdateAll();
-        EXPECT_EQ(read(true), "abcdefgh");
-        EXPECT_EQ(read(false), "87654321");
     }
 
     TEST_F(ChessUiTest, TheCoordinateColorsAreTheSameWhenTheBoardIsTurned) {
@@ -3157,6 +3465,15 @@ namespace BECore::Chess::Tests {
         String missing = shipped;
         Replace(missing, "name=\"FileLabel7\"", "name=\"FileLabelX\"");
         EXPECT_NE(problemsOf(missing).find("FileLabel7 is missing"), String::npos);
+
+        // The Portrait view has its own numbers: a label left where the default view has it is not in a corner of its cell there, and a missing variant leaves all sixteen
+        String strayInPortrait = shipped;
+        Replace(strayInPortrait, "<set element=\"RankLabel3\" x=\"42\"", "<set element=\"RankLabel3\" x=\"102\"");
+        EXPECT_NE(problemsOf(strayInPortrait).find("RankLabel3 (102.0, 386.0"), String::npos) << "a rank number of the Portrait view that stayed in the default place";
+
+        String noVariant = shipped;
+        Replace(noVariant, "orientation:portrait", "orientation:landscape");
+        EXPECT_NE(problemsOf(noVariant).find("RankLabel0 (102.0, 82.0"), String::npos) << "without the variant the labels stay where the default view has them";
     }
 
     TEST_F(ChessUiTest, TheHudStillStaysOutsideTheBoardWithTheCoordinatesOnIt) {
@@ -3170,6 +3487,81 @@ namespace BECore::Chess::Tests {
             ASSERT_NE(element, nullptr) << name;
             EXPECT_LE(element->rect.y + element->rect.h, kBoardTop + 0.01f) << name;
         }
+    }
+
+    TEST_F(ChessUiTest, InEveryOutputTheHudIsAboveAndBelowTheBoardOfItsViewAndStatusIsUnderTheMaterialRows) {
+        StartFrom("4k3/8/8/8/8/8/8/4K3 w - - 0 1");  // every row of the material is shown
+        size_t portraitOutputs = 0;
+        for (const auto& output : kViewOutputs) {
+            if (output.first < 2.0f || output.second < 2.0f) {
+                continue;  // an output that is no window: the layout has nothing to say
+            }
+            SCOPED_TRACE(Format("{}x{}", output.first, output.second).c_str());
+            DrawAt(output.first, output.second);
+            DrawAt(output.first, output.second);
+            const bool portrait = PortraitIsActive();
+            portraitOutputs += portrait ? 1 : 0;
+            const float boardTop = portrait ? kPortraitBoardTop : kBoardTop;
+            const float boardBottom = portrait ? kPortraitBoardBottom : kBoardBottom;
+            for (const char* name : {"Turn", "Menu", "Reset"}) {
+                const UIElement& element = *HudElement(name);
+                ASSERT_FALSE(element.rect.IsEmpty()) << name;
+                EXPECT_LE(element.rect.y + element.rect.h, boardTop + kPixelTolerance) << name << " is above the board";
+            }
+            const UIElement& status = *HudElement("Status");
+            ASSERT_FALSE(status.rect.IsEmpty());
+            EXPECT_GE(status.rect.y, boardBottom - kPixelTolerance) << "Status is under the board";
+            if (portrait) {
+                EXPECT_GE(status.rect.y, kMaterialPortraitListBottom + kMinGap) << "and under the lower row of the material";
+                EXPECT_FLOAT_EQ(status.rect.y, kPortraitStatusTop);
+            }
+            EXPECT_EQ(MaterialClearance(Material()->GetLayout(), Hud()->GetLayout(), kMinGap), "") << "the rows of the material and the HUD keep apart";
+        }
+        EXPECT_GT(portraitOutputs, 3u);
+    }
+
+    TEST_F(ChessUiTest, InThePortraitViewTheHudKeepsAboveTheBoardAndUnderTheMaterialInEveryWindowOfTheMatrix) {
+        Draw();
+        auto hud = Hud();
+        auto material = Material();
+        ASSERT_TRUE(hud);
+        ASSERT_TRUE(material);
+        hud->UpdateLayout(1280.0f, 720.0f);
+        material->UpdateLayout(1280.0f, 720.0f);
+        ShowEveryMaterialRow(*material);
+
+        size_t portraitCases = 0;
+        size_t pushedDown = 0;
+        float lowestTopRow = 0.0f;
+        for (const UIMatrixCase& matrixCase : UILayoutMatrix()) {
+            const UILayoutContext context = ContextOf(matrixCase, true);
+            hud->GetLayout().Update(context);
+            if (!LaidOutForPortrait(hud->GetLayout())) {
+                continue;
+            }
+            material->GetLayout().Update(context);
+            ++portraitCases;
+            SCOPED_TRACE(matrixCase.label.c_str());
+            for (const char* name : {"Turn", "Menu", "Reset"}) {
+                const UIElement* element = hud->GetRoot().FindByName(PoolString::Intern(name));
+                ASSERT_NE(element, nullptr);
+                ASSERT_FALSE(element->rect.IsEmpty()) << name;
+                // A notch pushes the row down by 7 % of the width of the view at most: it stays above the board all the same, with the material rows in the band between (which it may cover:
+                // the known limit of the material, held by TheShownMaterialIsClearOfTheHudAndTheCoordinateLabelsOnTheSizeMatrix)
+                EXPECT_LE(element->rect.y + element->rect.h, kPortraitBoardTop) << name << " is above the board";
+                lowestTopRow = std::max(lowestTopRow, element->rect.y + element->rect.h);
+                pushedDown += element->rect.y > 12.0f + kPixelTolerance ? 1 : 0;
+            }
+            const UIElement* status = hud->GetRoot().FindByName(PoolString::Intern("Status"));
+            ASSERT_NE(status, nullptr);
+            ASSERT_FALSE(status->rect.IsEmpty());
+            EXPECT_GE(status->rect.y, kMaterialPortraitListBottom + kMinGap) << "Status is under the lower row of the material, whatever the inset at the bottom";
+        }
+        hud->GetLayout().Invalidate();
+        material->GetLayout().Invalidate();
+        EXPECT_EQ(portraitCases, 42u);
+        EXPECT_GT(pushedDown, 0u) << "the notch cases push the row down";
+        EXPECT_LE(lowestTopRow, kPortraitHudBottom + kPortraitNotchUnits + kPixelTolerance) << "by the notch and no more";
     }
 
     TEST_F(ChessUiTest, TheStateOfTheControlApiIsTheSameWhateverSideIsAtTheBottom) {
@@ -5281,29 +5673,33 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(panel);
         panel->UpdateLayout(1280.0f, 720.0f);
         UICanvasLayout& layout = panel->GetLayout();
-        LayOutInTheNarrowestWindow(layout);
-
-        const float scale = kNarrowestWidth / kViewWidth;
-        EXPECT_NEAR(layout.GetResolved().scale, scale, 0.01f);
-        EXPECT_NEAR(layout.root->rect.w, kNarrowestWidth * (1.0f - 2.0f * UIPreview::kSideInsetShare) / scale, 0.5f) << "the safe area, in view units: about 689";
-        const String problems = PanelProblems(layout, kPromotionPlate);
-        EXPECT_TRUE(problems.empty()) << problems.c_str();
-
-        // 94% of the safe area is more than maxWidth, so the plate is 640 here and in every other window
-        EXPECT_NEAR(PromotionElement(kPromotionPlate).rect.w, 640.0f, kPixelTolerance);
-
         const float minTouch = CoreManager::GetUIEnvironment().GetSettings().minTouchSize;
         Vector<String> buttons{"PromotionCancel"};
         for (const PieceType piece : PromotionPieces()) {
             buttons.push_back(PromoteButton(piece));
         }
         ASSERT_EQ(buttons.size(), 5u) << "four pieces and Cancel";
-        for (const String& name : buttons) {
-            const UIElement& button = PromotionButton(name.c_str());
-            EXPECT_GE(button.rect.h, kSegmentHeight - kPixelTolerance) << name.c_str();
-            EXPECT_GE(std::min(button.rect.w, button.rect.h) * layout.GetResolved().scale, minTouch - kPixelTolerance) << name.c_str() << " is a touch target on the smallest window";
-            const UIContentFit fit = button.CheckContent(button.rect.w - 2.0f * kButtonAir, button.rect.h, layout.GetResolved().scale);
-            EXPECT_TRUE(fit.hasContent && fit.fits) << name.c_str() << " '" << ShownText(button).c_str() << "' in " << button.rect.w << " units";
+
+        for (const ViewShape& shape : kViewShapes) {
+            SCOPED_TRACE(shape.name);
+            LayOutInTheNarrowestWindow(layout, shape);
+
+            const float scale = kNarrowestWidth / shape.viewWidth;
+            EXPECT_NEAR(layout.GetResolved().scale, scale, 0.01f);
+            EXPECT_NEAR(layout.root->rect.w, kNarrowestWidth * (1.0f - 2.0f * UIPreview::kSideInsetShare) / scale, 0.5f) << "the safe area, in view units: about 689 and 590";
+            const String problems = PanelProblems(layout, kPromotionPlate);
+            EXPECT_TRUE(problems.empty()) << problems.c_str();
+
+            // 94% of the safe area up to maxWidth: 640 in the default view (94% of even its narrowest safe area is more), about 555 in the narrowest Portrait window
+            EXPECT_NEAR(PromotionElement(kPromotionPlate).rect.w, std::min(640.0f, 0.94f * layout.root->rect.w), kPixelTolerance);
+
+            for (const String& name : buttons) {
+                const UIElement& button = PromotionButton(name.c_str());
+                EXPECT_GE(button.rect.h, kSegmentHeight - kPixelTolerance) << name.c_str();
+                EXPECT_GE(std::min(button.rect.w, button.rect.h) * layout.GetResolved().scale, minTouch - kPixelTolerance) << name.c_str() << " is a touch target on the smallest window";
+                const UIContentFit fit = button.CheckContent(button.rect.w - 2.0f * kButtonAir, button.rect.h, layout.GetResolved().scale);
+                EXPECT_TRUE(fit.hasContent && fit.fits) << name.c_str() << " '" << ShownText(button).c_str() << "' in " << button.rect.w << " units";
+            }
         }
         layout.Invalidate();
     }
@@ -5314,16 +5710,16 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(PromotionShown());
 
         for (const auto& size : {Pair<float, float>{1280.0f, 720.0f}, Pair<float, float>{720.0f, 1280.0f}, Pair<float, float>{1024.0f, 768.0f}, Pair<float, float>{800.0f, 800.0f},
-                                 Pair<float, float>{2560.0f, 1080.0f}}) {
+                                 Pair<float, float>{2560.0f, 1080.0f}, Pair<float, float>{480.0f, 853.0f}, Pair<float, float>{768.0f, 1024.0f}}) {
             SCOPED_TRACE(Format("{}x{}", size.first, size.second).c_str());
             DrawAt(size.first, size.second);
             const UIElement& plate = PromotionElement(kPromotionPlate);
             ASSERT_FALSE(plate.rect.IsEmpty()) << "the plate is shown";
             EXPECT_GE(plate.rect.x, -kPixelTolerance);
             EXPECT_GE(plate.rect.y, -kPixelTolerance);
-            EXPECT_LE(plate.rect.x + plate.rect.w, kViewWidth + kPixelTolerance);
-            EXPECT_LE(plate.rect.y + plate.rect.h, kViewHeight + kPixelTolerance);
-            EXPECT_NEAR(plate.rect.x + plate.rect.w * 0.5f, kViewWidth * 0.5f, 0.5f) << "the plate is centered in the view";
+            EXPECT_LE(plate.rect.x + plate.rect.w, ViewWidth() + kPixelTolerance);
+            EXPECT_LE(plate.rect.y + plate.rect.h, ViewHeight() + kPixelTolerance);
+            EXPECT_NEAR(plate.rect.x + plate.rect.w * 0.5f, ViewWidth() * 0.5f, 0.5f) << "the plate is centered in the view";
             EXPECT_LE(plate.rect.w, 640.0f + kPixelTolerance);
             EXPECT_NEAR(plate.rect.h, kPromotionPlateHeight, kPixelTolerance);
 
@@ -5425,6 +5821,93 @@ namespace BECore::Chess::Tests {
                 }
             }
         }
+    }
+
+    // ---- every canvas of the scene is walked through the views ----------------------------------------------------------------------------
+
+    namespace {
+
+        /// A canvas of the scene (its node) and the test of this file that lays it out on the size matrix with the views of the scene (SceneViews()), so that the Portrait view is checked
+        struct CanvasMatrixTest {
+            const char* node;
+            const char* test;
+        };
+
+        const CanvasMatrixTest kCanvasMatrixTests[] = {{"BoardCoordinates", "TheBoardCoordinatesPassTheSizeMatrixWithEveryLetterAndDigit"},
+                                                       {"Material", "TheMaterialCanvasPassesTheSizeMatrixWithEveryCountAndEverySign"},
+                                                       {"Hud", "TheHudPassesTheSizeMatrixWithTheLongestWords"},
+                                                       {"MenuPanel", "TheMenuPanelPassesTheSizeMatrix"},
+                                                       {"OpponentPanel", "ThePanelPassesTheSizeMatrix"},
+                                                       {"PromotionPanel", "ThePromotionPanelPassesTheSizeMatrix"}};
+
+        /// The canvases among @p canvases (node names) that no row of kCanvasMatrixTests covers
+        Vector<String> CanvasesWithoutMatrixTest(const Vector<String>& canvases) {
+            Vector<String> uncovered;
+            for (const String& canvas : canvases) {
+                const bool covered = eastl::any_of(eastl::begin(kCanvasMatrixTests), eastl::end(kCanvasMatrixTests), [&](const CanvasMatrixTest& row) { return canvas == row.node; });
+                if (!covered) {
+                    uncovered.push_back(canvas);
+                }
+            }
+            return uncovered;
+        }
+
+        bool IsRegisteredTestOfTheFixture(const char* name) {
+            const testing::UnitTest& unitTest = *testing::UnitTest::GetInstance();
+            for (int suite = 0; suite < unitTest.total_test_suite_count(); ++suite) {
+                const testing::TestSuite& testSuite = *unitTest.GetTestSuite(suite);
+                for (int test = 0; test < testSuite.total_test_count(); ++test) {
+                    if (String(testSuite.name()) == "ChessUiTest" && String(testSuite.GetTestInfo(test)->name()) == name) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        void CollectCanvasNodes(const SceneNode& node, Vector<IntrusivePtr<SceneNode>>& out) {
+            for (const auto& child : node.GetChildren()) {
+                if (child->GetComponent<UICanvasComponent>()) {
+                    out.push_back(child);
+                }
+                CollectCanvasNodes(*child, out);
+            }
+        }
+
+    }  // namespace
+
+    TEST_F(ChessUiTest, EveryCanvasOfTheSceneIsCoveredByAMatrixTestThatWalksTheViewsAndPassesIt) {
+        Vector<IntrusivePtr<SceneNode>> nodes;
+        CollectCanvasNodes(GetScene().GetRootNode(), nodes);
+        Vector<String> names;
+        for (const auto& node : nodes) {
+            names.push_back(String(node->GetName().ToStringView()));
+        }
+        ASSERT_EQ(names.size(), std::size(kCanvasMatrixTests)) << "a canvas was added or removed: its row of kCanvasMatrixTests too";
+
+        // A canvas without a matrix test would never see the Portrait view: it needs a row, and the test of the row must exist
+        const Vector<String> uncovered = CanvasesWithoutMatrixTest(names);
+        EXPECT_TRUE(uncovered.empty()) << "no matrix test with the views for the canvas " << (uncovered.empty() ? "" : uncovered.front().c_str());
+        for (const CanvasMatrixTest& row : kCanvasMatrixTests) {
+            EXPECT_TRUE(IsRegisteredTestOfTheFixture(row.test)) << row.node << ": there is no test " << row.test;
+        }
+
+        // And the sweep itself: every canvas through the matrix with the views, whatever the tests of its own check
+        for (const auto& node : nodes) {
+            SCOPED_TRACE(node->GetName().CStr());
+            const auto canvas = node->GetComponent<UICanvasComponent>();
+            canvas->UpdateLayout(1280.0f, 720.0f);
+            const auto failures = ValidateWithWords(canvas->GetLayout());
+            EXPECT_TRUE(failures.empty()) << DescribeMatrixFailures(failures).c_str();
+        }
+
+        // The check catches a canvas that is not on the list, and a row of a test that does not exist
+        Vector<String> withNew = names;
+        withNew.push_back("TabletPanel");
+        const Vector<String> caught = CanvasesWithoutMatrixTest(withNew);
+        ASSERT_EQ(caught.size(), 1u);
+        EXPECT_EQ(caught.front(), "TabletPanel");
+        EXPECT_FALSE(IsRegisteredTestOfTheFixture("ThePanelThatWasNeverWritten"));
     }
 
     // ---- the promotion panel: broken copies, so that the checks can fail ---------------------------------------------------------------------
@@ -5947,31 +6430,203 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(ShownMaterialRows(), "TopPawn BottomPawn");
     }
 
-    TEST_F(ChessUiTest, EveryBalanceFromPlusOneToPlusNinetyNineFitsItsBoxInTheNarrowestWindow) {
+    // ---- the captured material in the Portrait view ----------------------------------------------------------------------------------------
+    // The view is 720 x 960 (SceneConfig.xml): a 720 x 960 window shows it one to one, so a rect of the layout is the pixel it is drawn at
+
+    namespace {
+
+        constexpr float kPortraitWindowWidth = kPortraitViewWidth;
+        constexpr float kPortraitWindowHeight = kPortraitViewHeight;
+        constexpr float kPortraitRowStep = 68.0f;  // a row is 64 units wide and 4 apart
+        constexpr float kPortraitUpperListY = 92.0f;
+        constexpr float kPortraitLowerListY = 792.0f;
+
+    }  // namespace
+
+    TEST_F(ChessUiTest, InThePortraitViewTheGroupsAreTwoRowsAboveAndBelowTheBoardInTheBoxOfTheLayoutRule) {
+        StartFrom("4k3/8/8/8/8/8/8/4K3 w - - 0 1");
+        DrawAt(kPortraitWindowWidth, kPortraitWindowHeight);
+        DrawAt(kPortraitWindowWidth, kPortraitWindowHeight);
+        ASSERT_TRUE(PortraitIsActive());
+        ASSERT_EQ(ShownMaterialRows(), "TopQueen TopRook TopBishop TopKnight TopPawn BottomQueen BottomRook BottomBishop BottomKnight BottomPawn");
+
+        const Rect top = MaterialElement("MaterialTopList").rect;
+        const Rect bottom = MaterialElement("MaterialBottomList").rect;
+        EXPECT_TRUE(SameRect(top, Rect{40.0f, kPortraitUpperListY, 336.0f, 40.0f}));
+        EXPECT_TRUE(SameRect(bottom, Rect{40.0f, kPortraitLowerListY, 336.0f, 40.0f}));
+        // the box of Game/MaterialLayout.h is the one of the two lists
+        EXPECT_FLOAT_EQ(kMaterialPortraitListLeft, std::min(top.x, bottom.x));
+        EXPECT_FLOAT_EQ(kMaterialPortraitListTop, top.y);
+        EXPECT_FLOAT_EQ(kMaterialPortraitListRight, std::max(top.x + top.w, bottom.x + bottom.w));
+        EXPECT_FLOAT_EQ(kMaterialPortraitListBottom, bottom.y + bottom.h);
+        EXPECT_LE(top.y + top.h, kPortraitBoardTop) << "the upper list is above the board";
+        EXPECT_GE(bottom.y, kPortraitBoardBottom) << "the lower one is under it";
+
+        for (const char* group : kMaterialGroups) {
+            SCOPED_TRACE(group);
+            const Rect list = group == kMaterialGroups[0] ? top : bottom;
+            for (size_t index = 0; index < std::size(kMaterialPieces); ++index) {
+                const Rect& row = MaterialRow(group, kMaterialPieces[index]).rect;
+                EXPECT_TRUE(SameRect(row, Rect{list.x + static_cast<float>(index) * kPortraitRowStep, list.y, 64.0f, 40.0f})) << kMaterialPieces[index] << ": the rows go along the list, queen first";
+            }
+            const Rect balance = MaterialElement(Format("Material{}Balance", group).c_str()).rect;
+            EXPECT_TRUE(SameRect(balance, Rect{384.0f, list.y, 48.0f, 40.0f})) << "beside the end of the list";
+            EXPECT_GE(balance.x, list.x + list.w);
+        }
+    }
+
+    TEST_F(ChessUiTest, InThePortraitViewTheShownRowsPackAtTheStartOfTheirListAndAHiddenRowTakesNoRoom) {
+        StartFrom(kWhiteTookAPawn);
+        DrawAt(kPortraitWindowWidth, kPortraitWindowHeight);
+        DrawAt(kPortraitWindowWidth, kPortraitWindowHeight);
+        ASSERT_TRUE(PortraitIsActive());
+        ASSERT_EQ(ShownMaterialRows(), "BottomPawn");
+        EXPECT_TRUE(SameRect(MaterialRow("Bottom", "Pawn").rect, Rect{40.0f, kPortraitLowerListY, 64.0f, 40.0f})) << "the first place of the list: the four before it take no room";
+        EXPECT_TRUE(MaterialRow("Bottom", "Queen").rect.IsEmpty());
+
+        StartFrom(kEightPawnsAgainstNothing);
+        DrawAt(kPortraitWindowWidth, kPortraitWindowHeight);
+        DrawAt(kPortraitWindowWidth, kPortraitWindowHeight);
+        EXPECT_NEAR(MaterialRow("Bottom", "Rook").rect.x - MaterialRow("Bottom", "Queen").rect.x, kPortraitRowStep, kPixelTolerance) << "a row is 64 units wide and 4 apart";
+        EXPECT_NEAR(MaterialRow("Bottom", "Queen").rect.x, 40.0f, kPixelTolerance);
+        EXPECT_NEAR(MaterialRow("Bottom", "Pawn").rect.x, 40.0f + 4.0f * kPortraitRowStep, kPixelTolerance);
+    }
+
+    TEST_F(ChessUiTest, InThePortraitViewTheGroupsSwapWithTheBoardAndTheBalanceGoesWithItsGroup) {
+        CountingFactory factory({MakeShared<GatedEngine>(true)});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        StartFrom(kWhiteTookAPawn);
+        DrawAt(kPortraitWindowWidth, kPortraitWindowHeight);
+        DrawAt(kPortraitWindowWidth, kPortraitWindowHeight);
+        ASSERT_TRUE(PortraitIsActive());
+        ASSERT_EQ(ShownMaterialRows(), "BottomPawn") << "two people: White at the bottom, and White has taken the pawn";
+        EXPECT_NEAR(MaterialRow("Bottom", "Pawn").rect.y, kPortraitLowerListY, kPixelTolerance) << "under the board";
+        EXPECT_EQ(Var("materialBottomBalance"), "+1");
+
+        ControlPlays("white");
+        _manager->UpdateAll();
+        ASSERT_TRUE(BlackIsAtTheBottom());
+        DrawAt(kPortraitWindowWidth, kPortraitWindowHeight);
+        DrawAt(kPortraitWindowWidth, kPortraitWindowHeight);
+        EXPECT_EQ(ShownMaterialRows(), "TopPawn") << "Black is at the bottom now: White's capture is in the upper group, above the board";
+        EXPECT_NEAR(MaterialRow("Top", "Pawn").rect.y, kPortraitUpperListY, kPixelTolerance);
+        EXPECT_EQ(Var("materialTopBalance"), "+1");
+        EXPECT_EQ(ShownText(MaterialElement("MaterialTopBalance")), "+1");
+        EXPECT_NEAR(MaterialElement("MaterialTopBalance").rect.y, kPortraitUpperListY, kPixelTolerance);
+        EXPECT_EQ(Var("materialBottomBalance"), "");
+    }
+
+    TEST_F(ChessUiTest, InThePortraitViewTheListsAreHiddenWhereTheSafeAreaTakesTheirBoxAndTheEdgeCountsAsInside) {
+        StartFrom(kWhiteTookAPawn);
+        const auto resize = [&](const Rect& safeArea) {
+            _renderer->width = kPortraitWindowWidth;
+            _renderer->height = kPortraitWindowHeight;
+            CoreManager::GetUIEnvironment().SetSafeAreaOverride(safeArea);
+            Settle();
+            ASSERT_TRUE(PortraitIsActive());
+        };
+        resize(Rect{0.0f, 0.0f, kPortraitWindowWidth, kPortraitWindowHeight});
+        EXPECT_EQ(ShownMaterialRows(), "BottomPawn");
+        resize(Rect{kMaterialPortraitListLeft, kMaterialPortraitListTop, kMaterialPortraitListRight - kMaterialPortraitListLeft, kMaterialPortraitListBottom - kMaterialPortraitListTop});
+        EXPECT_EQ(ShownMaterialRows(), "BottomPawn") << "a safe area that is the box itself: the edge counts as inside";
+
+        resize(Rect{kMaterialPortraitListLeft + 1.0f, 0.0f, kPortraitWindowWidth - kMaterialPortraitListLeft - 1.0f, kPortraitWindowHeight});
+        EXPECT_EQ(ShownMaterialRows(), "") << "an inset on the left that reaches into the box";
+        resize(Rect{0.0f, kMaterialPortraitListTop + 1.0f, kPortraitWindowWidth, kPortraitWindowHeight - kMaterialPortraitListTop - 1.0f});
+        EXPECT_EQ(ShownMaterialRows(), "") << "a notch at the top that reaches into the upper row's place";
+        resize(Rect{0.0f, 0.0f, kPortraitWindowWidth, kMaterialPortraitListBottom - 1.0f});
+        EXPECT_EQ(ShownMaterialRows(), "") << "an inset at the bottom that reaches into the lower row";
+        resize(Rect{0.0f, 0.0f, kMaterialPortraitListRight - 1.0f, kPortraitWindowHeight});
+        EXPECT_EQ(ShownMaterialRows(), "") << "an inset on the right";
+        EXPECT_EQ(Var("materialBottomPawn"), "x1") << "the words are not taken away, only the rows";
+        EXPECT_EQ(ShownText(MaterialElement("MaterialBottomBalance")), "+1") << "the balance stays";
+
+        resize(Rect{0.0f, 0.0f, kPortraitWindowWidth, kPortraitWindowHeight});
+        EXPECT_EQ(ShownMaterialRows(), "BottomPawn") << "the room is back: so are the rows";
+    }
+
+    TEST_F(ChessUiTest, InThePortraitViewWithSideInsetsInTheNarrowestWindowTheListsAreHiddenAndTheBalanceStaysInsideTheSafeArea) {
+        StartFrom(kWhiteTookAPawn);
+        Settle();
+        ASSERT_EQ(ShownMaterialRows(), "BottomPawn") << "the default window: the lists are shown";
+
+        ResizeWithSideInsets(kNarrowestWidth, kNarrowestPortraitHeight);
+        ASSERT_TRUE(PortraitIsActive());
+        const Rect safe = Material()->GetLayout().GetResolved().safeBounds;
+        EXPECT_NEAR(safe.x, 64.8f, 0.2f) << "9 % of 480 px at the fit scale 0.667";
+        EXPECT_EQ(ShownMaterialRows(), "") << "the box of the lists starts at x 40, left of the safe area";
+        EXPECT_EQ(Var("materialBottomPawn"), "x1");
+        EXPECT_EQ(Var("materialBottomBalance"), "+1");
+        const UIElement& balance = MaterialElement("MaterialBottomBalance");
+        ASSERT_TRUE(IsLabel(balance));
+        EXPECT_EQ(ShownText(balance), "+1");
+        EXPECT_TRUE(LiesIn(balance.rect, safe)) << "the balance is inside the safe area";
+        EXPECT_FALSE(balance.rect.IsEmpty());
+
+        ResizeWithoutInsets(kNarrowestWidth, kNarrowestPortraitHeight);
+        EXPECT_EQ(ShownMaterialRows(), "BottomPawn") << "no insets: the rows come back";
+    }
+
+    TEST_F(ChessUiTest, TheMaterialFollowsTheViewWhenTheWindowTurns) {
+        StartFrom(kWhiteTookAPawn);
+        Settle();
+        ASSERT_FALSE(PortraitIsActive());
+        ASSERT_EQ(ShownMaterialRows(), "BottomPawn");
+        EXPECT_TRUE(SameRect(MaterialRow("Bottom", "Pawn").rect, Rect{8.0f, 500.0f, 64.0f, 40.0f}));
+
+        ResizeWithoutInsets(kPortraitWindowWidth, kPortraitWindowHeight);
+        ASSERT_TRUE(PortraitIsActive());
+        EXPECT_EQ(ShownMaterialRows(), "BottomPawn");
+        EXPECT_TRUE(SameRect(MaterialRow("Bottom", "Pawn").rect, Rect{40.0f, kPortraitLowerListY, 64.0f, 40.0f})) << "under the board";
+
+        ResizeWithoutInsets(1280.0f, 720.0f);
+        ASSERT_FALSE(PortraitIsActive());
+        EXPECT_EQ(ShownMaterialRows(), "BottomPawn");
+        EXPECT_TRUE(SameRect(MaterialRow("Bottom", "Pawn").rect, Rect{8.0f, 500.0f, 64.0f, 40.0f})) << "back in the margin left of the board";
+    }
+
+    TEST_F(ChessUiTest, InThePortraitViewTheMaterialTakesNoClick) {
+        StartFrom("4k3/8/8/8/8/8/8/4K3 w - - 0 1");
+        DrawAt(kPortraitWindowWidth, kPortraitWindowHeight);
+        DrawAt(kPortraitWindowWidth, kPortraitWindowHeight);
+        ASSERT_TRUE(PortraitIsActive());
+        ASSERT_NE(ShownMaterialRows(), "");
+        for (const char* name : {"MaterialTopQueenRow", "MaterialBottomPawnRow", "MaterialTopBalance", "MaterialBottomBalance", "MaterialTopList", "MaterialBottomList"}) {
+            const auto [x, y] = ScreenCenter(MaterialElement(name));
+            EXPECT_FALSE(CoreManager::GetUIInput().DispatchMouseButtonDown(Button(x, y, true))) << name;
+            EXPECT_FALSE(CoreManager::GetUIInput().DispatchMouseButtonUp(Button(x, y, false))) << name;
+        }
+    }
+
+    TEST_F(ChessUiTest, EveryBalanceFromPlusOneToPlusNinetyNineFitsItsBoxInTheNarrowestWindowOfEachView) {
         Draw();
         auto canvas = Material();
         ASSERT_TRUE(canvas);
         canvas->UpdateLayout(1280.0f, 720.0f);  // the reflected fields of the component reach the layout on its first update
         UICanvasLayout& layout = canvas->GetLayout();
-        LayOutInTheNarrowestWindow(layout);
-        EXPECT_NEAR(layout.GetResolved().scale, kNarrowestWidth / kViewWidth, 0.01f);
-        const float scale = layout.GetResolved().scale;
 
         size_t checked = 0;
-        for (const char* group : {"Top", "Bottom"}) {
-            const UIElement* label = &MaterialElement(Format("Material{}Balance", group).c_str());
-            ASSERT_TRUE(IsLabel(*label));
-            const PoolString variable = PoolString::Intern(Format("material{}Balance", group).c_str());
-            for (int points = 1; points <= 99; ++points) {
-                const String text = BalanceText(points);
-                CoreManager::GetUIVars().Set(variable, StringView(text));
-                const UIContentFit fit = label->CheckContent(label->rect.w, label->rect.h, scale);
-                ASSERT_TRUE(fit.hasContent) << text.c_str();
-                EXPECT_TRUE(fit.fits) << group << ": " << text.c_str() << " is cut in a box of " << label->rect.w << " x " << label->rect.h << " units at scale " << scale;
-                ++checked;
+        for (const ViewShape& shape : kViewShapes) {
+            SCOPED_TRACE(shape.name);
+            LayOutInTheNarrowestWindow(layout, shape);
+            EXPECT_NEAR(layout.GetResolved().scale, kNarrowestWidth / shape.viewWidth, 0.01f);
+            const float scale = layout.GetResolved().scale;
+            for (const char* group : {"Top", "Bottom"}) {
+                const UIElement* label = &MaterialElement(Format("Material{}Balance", group).c_str());
+                ASSERT_TRUE(IsLabel(*label));
+                const PoolString variable = PoolString::Intern(Format("material{}Balance", group).c_str());
+                for (int points = 1; points <= 99; ++points) {
+                    const String text = BalanceText(points);
+                    CoreManager::GetUIVars().Set(variable, StringView(text));
+                    const UIContentFit fit = label->CheckContent(label->rect.w, label->rect.h, scale);
+                    ASSERT_TRUE(fit.hasContent) << text.c_str();
+                    EXPECT_TRUE(fit.fits) << group << ": " << text.c_str() << " is cut in a box of " << label->rect.w << " x " << label->rect.h << " units at scale " << scale;
+                    ++checked;
+                }
             }
         }
-        EXPECT_EQ(checked, 198u);
+        EXPECT_EQ(checked, 2 * 198u);
         layout.Invalidate();
     }
 
@@ -6033,7 +6688,7 @@ namespace BECore::Chess::Tests {
         options.minTouchSize = CoreManager::GetUIEnvironment().GetSettings().minTouchSize;
         for (size_t round = 0; round < kMaterialRounds; ++round) {
             PublishMaterialRound(round);
-            const auto failures = ValidateOnMatrix(canvas->GetLayout(), options, ViewContext());
+            const auto failures = ValidateOnMatrix(canvas->GetLayout(), options, ViewContext(), SceneViews());
             ASSERT_TRUE(failures.empty()) << "round " << round << ": " << DescribeMatrixFailures(failures).c_str();
         }
         const String problems = MaterialProblemsOnMatrix(canvas->GetLayout());
@@ -6053,38 +6708,45 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(most, kMostCaptured) << "the pawns: the longest count word is 'x" << most << "'";
     }
 
-    TEST_F(ChessUiTest, TheListsAreHiddenOnlyInTheWindowsWhoseSideInsetsTakeTheMarginOfTheView) {
+    TEST_F(ChessUiTest, TheListsAreHiddenOnlyInTheWindowsWhoseSideInsetsTakeTheBoxOfTheirView) {
         Draw();
         auto canvas = Material();
         ASSERT_TRUE(canvas);
         canvas->UpdateLayout(1280.0f, 720.0f);
         UICanvasLayout& layout = canvas->GetLayout();
 
-        size_t hidden = 0;
-        size_t shown = 0;
+        size_t hidden[2] = {};  // the default view, then Portrait
+        size_t shown[2] = {};
         String hiddenCases;
         for (const UIMatrixCase& matrixCase : UILayoutMatrix()) {
-            layout.Update(ContextOf(matrixCase));
+            layout.Update(ContextOf(matrixCase, true));
+            const bool portrait = LaidOutForPortrait(layout);
             const Rect safe = layout.GetResolved().safeBounds;
-            const bool fits = MaterialListFits(safe.x, safe.y, safe.x + safe.w, safe.y + safe.h);
+            const bool fits = MaterialListFits(safe.x, safe.y, safe.x + safe.w, safe.y + safe.h, portrait ? MaterialView::Portrait : MaterialView::Default);
             const bool sideInsets = matrixCase.label.find("side insets") != String::npos;
+            const float boxLeft = portrait ? kMaterialPortraitListLeft : kMaterialListLeft;
             if (!fits) {
-                EXPECT_TRUE(sideInsets) << matrixCase.label.c_str() << ": only side insets take the margin (a notch takes the top 7 % of the short side, which is above the lists)";
-                EXPECT_GT(safe.x, kMaterialListLeft) << matrixCase.label.c_str();
-                ++hidden;
-                hiddenCases += Format("  {} (safe area from x = {:.1f})\n", matrixCase.label.c_str(), safe.x);
+                EXPECT_TRUE(sideInsets) << matrixCase.label.c_str() << ": only side insets take the box (a notch takes the top 7 % of the short side, which is above the lists)";
+                EXPECT_GT(safe.x, boxLeft) << matrixCase.label.c_str();
+                ++hidden[portrait ? 1 : 0];
+                hiddenCases += Format("  {} (safe area from x = {:.1f}, {})\n", matrixCase.label.c_str(), safe.x, portrait ? "Portrait" : "default view");
             } else {
-                ++shown;
-                EXPECT_LE(safe.x, kMaterialListLeft) << matrixCase.label.c_str();
+                ++shown[portrait ? 1 : 0];
+                EXPECT_LE(safe.x, boxLeft) << matrixCase.label.c_str();
             }
         }
         layout.Invalidate();
-        // The side inset is 9 % of the short side in pixels. Where the short side is the width (1:1 and the three portrait shapes: all 19 hidden cases) the view fills the width and the inset is 9 %
-        // of the 840 units, 75.6, whatever the size. In a landscape window the view is fitted to the height, the inset is 72 units at most, and the bars at the sides of the view (113 units or more,
-        // at 4:3) are wider than that
-        EXPECT_GT(hidden, 0u) << "the narrowest window of the matrix is one of them";
-        EXPECT_GT(shown, hidden);
-        std::cout << "[   INFO   ] the lists are hidden in " << hidden << " of " << hidden + shown << " cases of the size matrix:\n" << hiddenCases.c_str();
+        // The side inset is 9 % of the short side in pixels. Where the short side is the width (1:1 and the three portrait shapes) the view fills the width and the inset is 9 % of its
+        // width in units, whatever the size: 75.6 of the 840 of the default view, 64.8 of the 720 of Portrait (more than the 40 its box starts at). In a landscape window the view is
+        // fitted to the height, the inset is 72 units at most, and the bars at the sides of the view (113 units or more, at 4:3) are wider than that
+        for (const size_t view : {size_t{0}, size_t{1}}) {
+            EXPECT_GT(hidden[view], 0u) << (view == 0 ? "default view" : "Portrait") << ": the narrowest window of the matrix is one of them";
+            EXPECT_GT(shown[view], 0u) << (view == 0 ? "default view" : "Portrait");
+        }
+        EXPECT_GT(shown[0], hidden[0]);
+        std::cout << "[   INFO   ] the lists are hidden in " << hidden[0] << " of " << hidden[0] + shown[0] << " cases of the default view and in " << hidden[1] << " of " << hidden[1] + shown[1]
+                  << " of Portrait, over the size matrix:\n"
+                  << hiddenCases.c_str();
     }
 
     TEST_F(ChessUiTest, NoMaterialElementIsCutOrOutOfPlaceInTheNarrowestWindow) {
@@ -6094,21 +6756,26 @@ namespace BECore::Chess::Tests {
         canvas->UpdateLayout(1280.0f, 720.0f);
         ShowEveryMaterialRow(*canvas);
         UICanvasLayout& layout = canvas->GetLayout();
-        LayOutInTheNarrowestWindow(layout);
-        const Rect safe = layout.GetResolved().safeBounds;
-        EXPECT_NEAR(safe.x, 75.6f, 0.2f) << "9 % of 480 px at the fit scale 0.571";
-        EXPECT_FALSE(MaterialListFits(safe.x, safe.y, safe.x + safe.w, safe.y + safe.h)) << "the lists are hidden here: the component shows no row";
+        for (const ViewShape& shape : kViewShapes) {
+            SCOPED_TRACE(shape.name);
+            const bool portrait = shape.portrait;
+            LayOutInTheNarrowestWindow(layout, shape);
+            const Rect safe = layout.GetResolved().safeBounds;
+            EXPECT_NEAR(safe.x, portrait ? 64.8f : 75.6f, 0.2f) << "9 % of 480 px at the fit scale";
+            EXPECT_FALSE(MaterialListFits(safe.x, safe.y, safe.x + safe.w, safe.y + safe.h, portrait ? MaterialView::Portrait : MaterialView::Default))
+                << "the lists are hidden here: the component shows no row";
 
-        for (size_t round = 0; round < kMaterialRounds; ++round) {
-            PublishMaterialRound(round);
-            const String problems = MaterialProblems(layout);
-            ASSERT_TRUE(problems.empty()) << "round " << round << ":\n" << problems.c_str();
-        }
-        // The balance boxes are the part that stays: inside the safe area, inside the margin, clear of the board (x 100) and of the coordinate labels (x 102)
-        for (const char* group : kMaterialGroups) {
-            const UIElement& balance = MaterialElement(Format("Material{}Balance", group).c_str());
-            EXPECT_GE(balance.rect.x, safe.x) << group;
-            EXPECT_LE(balance.rect.x + balance.rect.w, kMaterialMarginRight) << group;
+            for (size_t round = 0; round < kMaterialRounds; ++round) {
+                PublishMaterialRound(round);
+                const String problems = MaterialProblems(layout);
+                ASSERT_TRUE(problems.empty()) << "round " << round << ":\n" << problems.c_str();
+            }
+            // The balance boxes are the part that stays: inside the safe area, and clear of the board and of the coordinate labels (the default view: the margin ends at x 100)
+            for (const char* group : kMaterialGroups) {
+                const UIElement& balance = MaterialElement(Format("Material{}Balance", group).c_str());
+                EXPECT_GE(balance.rect.x, safe.x) << group;
+                EXPECT_LE(balance.rect.x + balance.rect.w, portrait ? safe.x + safe.w : kMaterialMarginRight) << group;
+            }
         }
         layout.Invalidate();
     }
@@ -6127,23 +6794,30 @@ namespace BECore::Chess::Tests {
         ShowEveryMaterialRow(*material);
         PublishMaterialRound(0);
 
-        size_t notchCasesWithAnOverlap = 0;
-        size_t notchCases = 0;
+        size_t notchCasesWithAnOverlap[2] = {};  // the default view, then Portrait
+        size_t notchCases[2] = {};
+        String portraitOverlaps;
         for (const UIMatrixCase& matrixCase : UILayoutMatrix()) {
-            const UILayoutContext context = ContextOf(matrixCase);
+            const UILayoutContext context = ContextOf(matrixCase, true);
             material->GetLayout().Update(context);
             hud->GetLayout().Update(context);
             coordinates->GetLayout().Update(context);
+            const bool portrait = LaidOutForPortrait(material->GetLayout());
             const String labels = MaterialClearance(material->GetLayout(), coordinates->GetLayout(), 1.0f);
             EXPECT_TRUE(labels.empty()) << matrixCase.label.c_str() << ":\n" << labels.c_str();
             const String controls = MaterialClearance(material->GetLayout(), hud->GetLayout(), kMinGap);
             if (matrixCase.label.find("notch") != String::npos) {
-                ++notchCases;
+                const size_t view = portrait ? 1 : 0;
+                ++notchCases[view];
                 if (!controls.empty()) {
-                    ++notchCasesWithAnOverlap;
-                    // Not only close: the Turn label lies on top of the balance of the upper group, and of its first rows (src/Chess/Components/CLAUDE.md, "The captured material", "Known limits")
+                    ++notchCasesWithAnOverlap[view];
+                    if (portrait) {
+                        portraitOverlaps += Format("  {}\n", matrixCase.label.c_str());
+                    }
+                    // Not only close: the Turn label lies on top of the first row of the upper group, and in the default view of its balance too (src/Chess/Components/CLAUDE.md, "The captured
+                    // material", "Known limits"); in Portrait the balance is beside the rows, to the right of the label
                     const String touching = MaterialClearance(material->GetLayout(), hud->GetLayout(), 0.0f);
-                    EXPECT_NE(touching.find("MaterialTopBalance ("), String::npos) << matrixCase.label.c_str() << ":\n" << touching.c_str();
+                    EXPECT_EQ(touching.find("MaterialTopBalance (") != String::npos, !portrait) << matrixCase.label.c_str() << ":\n" << touching.c_str();
                     EXPECT_NE(touching.find("MaterialTopQueenRow ("), String::npos) << matrixCase.label.c_str() << ":\n" << touching.c_str();
                     EXPECT_NE(touching.find(") and Turn ("), String::npos) << matrixCase.label.c_str() << ":\n" << touching.c_str();
                 }
@@ -6155,16 +6829,21 @@ namespace BECore::Chess::Tests {
         hud->GetLayout().Invalidate();
         coordinates->GetLayout().Invalidate();
         // The counts are pinned: a change of the layout or of the matrix moves them and has to be looked at
-        EXPECT_EQ(notchCases, 46u);
-        EXPECT_EQ(notchCasesWithAnOverlap, 32u);
-        // The HUD keeps inside the safe area, and a notch pushes its top row down by 7 % of the short side, onto the balance and the first row of the upper group
-        std::cout << "[   INFO   ] the HUD reaches the top group in " << notchCasesWithAnOverlap << " of " << notchCases << " notch cases\n";
+        EXPECT_EQ(notchCases[0], 32u);
+        EXPECT_EQ(notchCasesWithAnOverlap[0], 32u);
+        EXPECT_EQ(notchCases[1], 14u);
+        EXPECT_EQ(notchCasesWithAnOverlap[1], 5u) << "only where the view fills the window (a taller window has a bar above it, which takes the notch)";
+        // The HUD keeps inside the safe area, and a notch pushes its top row down by 7 % of the short side, onto the first row of the upper group
+        std::cout << "[   INFO   ] the HUD reaches the top group in " << notchCasesWithAnOverlap[0] << " of " << notchCases[0] << " notch cases of the default view and in "
+                  << notchCasesWithAnOverlap[1] << " of " << notchCases[1] << " of Portrait:\n"
+                  << portraitOverlaps.c_str() << "\n";
     }
 
-    TEST_F(ChessUiTest, TheShownMaterialStaysInTheMarginAndClearOfTheHudAndTheCoordinatesInFiveWindowShapes) {
+    TEST_F(ChessUiTest, TheShownMaterialStaysInItsPlaceAndClearOfTheHudAndTheCoordinatesInSevenWindowShapes) {
+        // The shapes of the default view and of Portrait: in the first the groups are in the margin left of the board, in the second in the bands above and below it
         StartFrom("4k3/8/8/8/8/8/8/4K3 w - - 0 1");
-        for (const auto& size : {Pair<float, float>{1280.0f, 720.0f}, Pair<float, float>{720.0f, 1280.0f}, Pair<float, float>{1024.0f, 768.0f}, Pair<float, float>{800.0f, 800.0f},
-                                 Pair<float, float>{2560.0f, 1080.0f}}) {
+        for (const auto& size : {Pair<float, float>{1280.0f, 720.0f}, Pair<float, float>{1024.0f, 768.0f}, Pair<float, float>{800.0f, 800.0f}, Pair<float, float>{2560.0f, 1080.0f},
+                                 Pair<float, float>{720.0f, 1280.0f}, Pair<float, float>{768.0f, 1024.0f}, Pair<float, float>{480.0f, 853.0f}}) {
             SCOPED_TRACE(Format("{}x{}", size.first, size.second).c_str());
             DrawAt(size.first, size.second);
             DrawAt(size.first, size.second);  // the rows wait for the first layout
@@ -6176,7 +6855,14 @@ namespace BECore::Chess::Tests {
             for (const char* group : kMaterialGroups) {
                 for (const char* piece : kMaterialPieces) {
                     const Rect& rect = MaterialRow(group, piece).rect;
-                    EXPECT_LE(rect.x + rect.w, kMaterialMarginRight) << group << piece << " does not reach the board";
+                    if (PortraitIsActive()) {
+                        const bool upper = group == kMaterialGroups[0];
+                        EXPECT_LE(rect.x + rect.w, kPortraitViewWidth) << group << piece << " is inside the view";
+                        EXPECT_EQ(rect.y + rect.h <= kPortraitBoardTop, upper) << group << piece << ": the upper group is above the board, the lower one is not";
+                        EXPECT_EQ(rect.y >= kPortraitBoardBottom, !upper) << group << piece << ": the lower group is under the board, the upper one is not";
+                    } else {
+                        EXPECT_LE(rect.x + rect.w, kMaterialMarginRight) << group << piece << " does not reach the board";
+                    }
                     EXPECT_GE(rect.x, 0.0f) << group << piece;
                 }
             }
@@ -7586,6 +8272,266 @@ namespace BECore::Chess::Tests {
         _manager->UpdateAll();
         EXPECT_EQ(PieceOrigin("WhitePawn_e2"), home) << "a new position";
         EXPECT_EQ(NodeLayer("WhitePawn_e2"), kPieceLayer);
+    }
+
+    // ---- the board in the Portrait view ------------------------------------------------------------------------------------------
+    // What the entry asks of the board holds in the Portrait view as in the default one: a click and a drag go by the cells that are drawn, in both orientations, and the dim and the bar
+    // cover the board. The expected cells are written out here from the numbers of the view (the fit of 720 x 960, the board at (40, 144)), not taken from the board component
+
+    namespace {
+
+        // 480 x 853 has bars above and below the view, 1000 x 1200 at the sides, 768 x 1024 (3:4) none
+        const Pair<float, float> kPortraitOutputs[] = {{480.0f, 853.0f}, {768.0f, 1024.0f}, {1000.0f, 1200.0f}};
+        constexpr int kPawnRow = 6;    // the row of the pawns of the person at the bottom, from the top
+        constexpr int kTargetRow = 4;  // where a pawn goes with its double step
+
+        /// The cell (column from the left, row from the top) of the board in the Portrait view, in the pixels of an output
+        Rect PortraitCell(const Pair<float, float>& output, int column, int row) {
+            const ViewTransform fit = ViewTransform::Fit(kPortraitViewWidth, kPortraitViewHeight, output.first, output.second);
+            return fit.ToOutput(kPortraitBoardLeft + static_cast<float>(column) * kCellSize, kPortraitBoardTop + static_cast<float>(row) * kCellSize, kCellSize, kCellSize);
+        }
+
+        Pair<float, float> MiddleOf(const Rect& rect) {
+            return {rect.x + rect.w * 0.5f, rect.y + rect.h * 0.5f};
+        }
+
+        /// The column of the e file: the fifth from the left with White at the bottom, the fourth with Black
+        int EColumn(bool turned) {
+            return turned ? 3 : 4;
+        }
+
+    }  // namespace
+
+    TEST_F(ChessUiTest, AClickOnADrawnSquareOfThePortraitBoardSelectsThatSquareInBothOrientations) {
+        CountingFactory factory({MakeShared<InstantEngine>()});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        for (const auto& output : kPortraitOutputs) {
+            for (const bool turned : {false, true}) {
+                SCOPED_TRACE(Format("output {}x{}, {}", output.first, output.second, turned ? "turned" : "White at the bottom").c_str());
+                ASSERT_TRUE(ShowPortrait(output));
+                ControlPlays(turned ? "white" : nullptr);
+                StartFrom(turned ? kBlackToMoveAfterE4 : Position::kStartFen.data());
+                ASSERT_EQ(BlackIsAtTheBottom(), turned);
+                Model().ClearSelection();
+
+                const int column = EColumn(turned);
+                const auto at = MiddleOf(PortraitCell(output, column, kPawnRow));
+                CoreManager::GetUIInput().DispatchMouseButtonDown(Button(at.first, at.second, true));
+                ASSERT_TRUE(Model().HasSelection());
+                EXPECT_EQ(Model().GetSelected(), Sq(turned ? "e7" : "e2"));
+
+                Draw();
+                const auto selected = RectCalls(kSelectedColor);
+                ASSERT_EQ(selected.size(), 1u);
+                EXPECT_TRUE(SameRect(selected[0]->rect, PortraitCell(output, column, kPawnRow)));
+                const auto moves = RectCalls(kLegalMoveColor);
+                ASSERT_EQ(moves.size(), 2u);
+                for (const int row : {kPawnRow - 1, kTargetRow}) {
+                    const Rect cell = PortraitCell(output, column, row);
+                    EXPECT_TRUE(std::any_of(moves.begin(), moves.end(), [&](const DrawCall* call) { return SameRect(call->rect, cell); })) << "row " << row;
+                }
+                Release(at.first, at.second);
+            }
+        }
+    }
+
+    TEST_F(ChessUiTest, TheFourCornersOfThePortraitBoardAreTheSquaresTheyShowInBothOrientations) {
+        CountingFactory factory({MakeShared<InstantEngine>()});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        for (const auto& output : kPortraitOutputs) {
+            for (const bool turned : {false, true}) {
+                SCOPED_TRACE(Format("output {}x{}, {}", output.first, output.second, turned ? "turned" : "White at the bottom").c_str());
+                ASSERT_TRUE(ShowPortrait(output));
+                ControlPlays(turned ? "white" : nullptr);
+                StartFrom(kFourRooks);
+                ASSERT_EQ(BlackIsAtTheBottom(), turned);
+
+                // By their place on the screen; a rook of Black stands on each corner square
+                const struct {
+                    int column;
+                    int row;
+                    const char* square;
+                } corners[] = {{0, 7, turned ? "h8" : "a1"}, {7, 7, turned ? "a8" : "h1"}, {0, 0, turned ? "h1" : "a8"}, {7, 0, turned ? "a1" : "h8"}};
+                for (const auto& corner : corners) {
+                    SCOPED_TRACE(corner.square);
+                    Model().ClearSelection();
+                    const auto at = MiddleOf(PortraitCell(output, corner.column, corner.row));
+                    CoreManager::GetUIInput().DispatchMouseButtonDown(Button(at.first, at.second, true));
+                    ASSERT_TRUE(Model().HasSelection());
+                    EXPECT_EQ(Model().GetSelected(), Sq(corner.square));
+                    EXPECT_TRUE(SameRect(SquareRect(corner.square), PortraitCell(output, corner.column, corner.row)));
+                    Release(at.first, at.second);
+                }
+            }
+        }
+    }
+
+    TEST_F(ChessUiTest, AClickInABarOutsideThePortraitViewSelectsNothingAndAClickInsideItDoes) {
+        // 480 x 853: the view is 480 x 640 pixels, bars of 106.5 above and below; 1000 x 1200: the view is 900 wide, bars of 50 at the sides
+        StartFrom(kFourRooks);
+        const struct {
+            Pair<float, float> output;
+            Pair<float, float> inBar;
+        } shapes[] = {{{480.0f, 853.0f}, {240.0f, 50.0f}}, {{480.0f, 853.0f}, {240.0f, 800.0f}}, {{1000.0f, 1200.0f}, {25.0f, 600.0f}}, {{1000.0f, 1200.0f}, {975.0f, 600.0f}}};
+        for (const auto& shape : shapes) {
+            SCOPED_TRACE(Format("output {}x{}, click ({}, {})", shape.output.first, shape.output.second, shape.inBar.first, shape.inBar.second).c_str());
+            ASSERT_TRUE(ShowPortrait(shape.output));
+            Model().ClearSelection();
+            CoreManager::GetUIInput().DispatchMouseButtonDown(Button(shape.inBar.first, shape.inBar.second, true));
+            Release(shape.inBar.first, shape.inBar.second);
+            EXPECT_FALSE(Model().HasSelection()) << "a bar is not the board";
+
+            const auto a1 = MiddleOf(PortraitCell(shape.output, 0, 7));
+            CoreManager::GetUIInput().DispatchMouseButtonDown(Button(a1.first, a1.second, true));
+            Release(a1.first, a1.second);
+            EXPECT_TRUE(Model().HasSelection()) << "the same board takes a click on a1";
+        }
+    }
+
+    TEST_F(ChessUiTest, TheDimAndTheResultBarCoverThePortraitBoardInBothOrientations) {
+        CountingFactory factory({MakeShared<InstantEngine>()});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        for (const auto& output : {kPortraitOutputs[0], kPortraitOutputs[2]}) {
+            for (const bool turned : {false, true}) {
+                SCOPED_TRACE(Format("output {}x{}, {}", output.first, output.second, turned ? "turned" : "White at the bottom").c_str());
+                ASSERT_TRUE(ShowPortrait(output));
+                ControlPlays(turned ? "white" : nullptr);
+                StartFrom(kBlackMatesOnA1);
+                ASSERT_EQ(BlackIsAtTheBottom(), turned);
+
+                ClickMove("a8", "a1");
+                ASSERT_TRUE(Model().IsGameOver());
+                Draw();
+
+                const ViewTransform fit = ViewTransform::Fit(kPortraitViewWidth, kPortraitViewHeight, output.first, output.second);
+                const auto dim = RectCalls(kBoardDimColor);
+                ASSERT_EQ(dim.size(), 1u);
+                EXPECT_TRUE(SameRect(dim[0]->rect, fit.ToOutput(kPortraitBoardLeft, kPortraitBoardTop, kBoardUnits, kBoardUnits))) << "the whole board";
+                const auto bar = RectCalls(kResultBarColor);
+                ASSERT_EQ(bar.size(), 1u);
+                const float middle = kPortraitBoardTop + (kBoardUnits - kCellSize) * 0.5f;
+                EXPECT_TRUE(SameRect(bar[0]->rect, fit.ToOutput(kPortraitBoardLeft, middle, kBoardUnits, kCellSize))) << "one square high, across the middle of the board";
+            }
+        }
+    }
+
+    TEST_F(ChessUiTest, TheMarksOfThePortraitBoardSitAroundTheirPiecesInBothOrientations) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        CountingFactory factory({MakeShared<GatedEngine>(true)});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        const auto output = kPortraitOutputs[0];
+        for (const bool turned : {false, true}) {
+            SCOPED_TRACE(turned ? "turned" : "White at the bottom");
+            ASSERT_TRUE(ShowPortrait(output));
+            ControlPlays(turned ? "white" : nullptr);
+            StartFrom(turned ? kBlackToMoveAfterE4 : Position::kStartFen.data());
+            const auto texture = GiveAtlasCell(turned ? "BlackPawn_e7" : "WhitePawn_e2");
+            _manager->UpdateAll();
+
+            const int column = EColumn(turned);
+            const auto from = MiddleOf(PortraitCell(output, column, kPawnRow));
+            CoreManager::GetUIInput().DispatchMouseButtonDown(Button(from.first, from.second, true));
+            Release(from.first, from.second);
+            ASSERT_TRUE(Model().HasSelection());
+            Draw();
+            const DrawCall* piece = TextureCall(*texture);
+            ASSERT_NE(piece, nullptr);
+            const auto selected = RectCalls(kSelectedColor);
+            ASSERT_EQ(selected.size(), 1u);
+            EXPECT_TRUE(SameRect(selected[0]->rect, PortraitCell(output, column, kPawnRow)));
+            EXPECT_TRUE(IsCenteredIn(piece->rect, selected[0]->rect)) << "the piece is inside its selected square";
+
+            // The move marks the two squares it joins, and the pawn stands on the second
+            const auto to = MiddleOf(PortraitCell(output, column, kTargetRow));
+            CoreManager::GetUIInput().DispatchMouseButtonDown(Button(to.first, to.second, true));
+            Release(to.first, to.second);
+            ASSERT_EQ(Model().GetMoves().size(), 1u);
+            _manager->UpdateAll();
+            Draw();
+            const auto marks = LastMoveFills();
+            ASSERT_EQ(marks.size(), 2u);
+            EXPECT_TRUE(SameRect(marks[0]->rect, PortraitCell(output, column, kPawnRow)));
+            EXPECT_TRUE(SameRect(marks[1]->rect, PortraitCell(output, column, kTargetRow)));
+            const DrawCall* moved = TextureCall(*texture);
+            ASSERT_NE(moved, nullptr);
+            EXPECT_TRUE(IsCenteredIn(moved->rect, marks[1]->rect)) << "the pawn stands on the square the move went to";
+        }
+    }
+
+    TEST_F(ChessUiTest, ADragOnThePortraitBoardLiftsThePieceUnderThePointerAndAReleaseOnATargetPlaysTheMove) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        CountingFactory factory({MakeShared<GatedEngine>(true)});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        for (const auto& output : kPortraitOutputs) {
+            for (const bool turned : {false, true}) {
+                SCOPED_TRACE(Format("output {}x{}, {}", output.first, output.second, turned ? "turned" : "White at the bottom").c_str());
+                ASSERT_TRUE(ShowPortrait(output));
+                ControlPlays(turned ? "white" : nullptr);
+                StartFrom(turned ? kBlackToMoveAfterE4 : Position::kStartFen.data());
+                const int column = EColumn(turned);
+                const char* node = turned ? "BlackPawn_e7" : "WhitePawn_e2";
+                const auto from = MiddleOf(PortraitCell(output, column, kPawnRow));
+                const auto to = MiddleOf(PortraitCell(output, column, kTargetRow));
+
+                // In the hand: the piece is a square centered on the pointer, in the units of the Portrait view
+                CoreManager::GetUIInput().DispatchMouseButtonDown(Button(from.first, from.second, true));
+                const float pointerX = from.first + kPointerOffsetX;
+                const float pointerY = from.second + kPointerOffsetY;
+                MouseMove(pointerX, pointerY, true);
+                _manager->UpdateAll();
+                ASSERT_TRUE(Lifted().has_value());
+                EXPECT_NEAR(PieceOrigin(node).first, GetScene().ScreenToSceneX(pointerX) - kHalfSquare, kPixelTolerance);
+                EXPECT_NEAR(PieceOrigin(node).second, GetScene().ScreenToSceneY(pointerY) - kHalfSquare, kPixelTolerance);
+                EXPECT_EQ(NodeLayer(node), kDragLayer);
+
+                // Let go on a square that is no target: nothing is played, the piece goes back to its cell and stays selected
+                const auto off = MiddleOf(PortraitCell(output, turned ? 7 : 0, 0));
+                MouseMove(off.first, off.second, true);
+                Release(off.first, off.second);
+                _manager->UpdateAll();
+                EXPECT_EQ(Model().GetMoves().size(), 0u);
+                EXPECT_TRUE(Model().HasSelection());
+                ExpectPiecesAtTheCellsOf(turned);
+
+                // And the drag to the target plays it
+                CoreManager::GetUIInput().DispatchMouseButtonDown(Button(from.first, from.second, true));
+                MouseMove(from.first + kDragStepPixels, from.second, true);
+                MouseMove(to.first, to.second, true);
+                Release(to.first, to.second);
+                ASSERT_EQ(Model().GetMoves().size(), 1u);
+                EXPECT_EQ(Model().GetMoves().back().ToUci(), turned ? "e7e5" : "e2e4");
+                _manager->UpdateAll();
+                EXPECT_EQ(NodeLayer(node), kPieceLayer);
+                ExpectPiecesAtTheCellsOf(turned);
+            }
+        }
+    }
+
+    TEST_F(ChessUiTest, AWindowThatTurnsToPortraitInTheMiddleOfADragEndsTheDragWithoutAMove) {
+        DrawAt(1280.0f, 720.0f);
+        ASSERT_FALSE(PortraitIsActive());
+        _manager->UpdateAll();
+        const auto from = SquareCenter("e2");
+        CoreManager::GetUIInput().DispatchMouseButtonDown(Button(from.first, from.second, true));
+        MouseMove(from.first + kDragStepPixels, from.second, true);
+        _manager->UpdateAll();
+        ASSERT_TRUE(Lifted().has_value());
+        ASSERT_EQ(Model().GetSelected(), Sq("e2"));
+
+        // The window is turned upright while the button is held: the scene units of the drag are those of the other view
+        ASSERT_TRUE(ShowPortrait(kPortraitOutputs[0]));
+        EXPECT_FALSE(Lifted().has_value());
+        const auto target = MiddleOf(PortraitCell(kPortraitOutputs[0], 4, kTargetRow));
+        MouseMove(target.first, target.second, true);
+        Release(target.first, target.second);
+        _manager->UpdateAll();
+
+        EXPECT_TRUE(Model().GetMoves().empty()) << "e2e4 was not played";
+        EXPECT_TRUE(Model().HasSelection());
+        EXPECT_EQ(Model().GetSelected(), Sq("e2"));
+        EXPECT_EQ(NodeLayer("WhitePawn_e2"), kPieceLayer);
+        ExpectPiecesAtTheCellsOf(false);
+        EXPECT_FALSE(Lifted().has_value());
     }
 
 }  // namespace BECore::Chess::Tests

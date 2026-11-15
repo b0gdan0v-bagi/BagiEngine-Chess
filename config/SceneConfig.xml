@@ -6,20 +6,31 @@
       name="ChessScene"
       viewWidth="840"
       viewHeight="800">
+      <!-- Two views. The default one is 840 x 800 (the board 640 x 640 at (100, 80), the HUD in the margins), the view named Portrait 720 x 960 (the board at (40, 144), the material above and below it).
+           The board is 640 x 640 and a square 80 units in both, so a piece, a drag and a label keep their numbers. `when` is tested on the OUTPUT in pixels: with the board 640 units in both views
+           it is 640 * min(W / viewW, H / viewH) pixels, which is bigger in Portrait exactly while W / H is under 840 / 960 = 0.875 (a width-bound landscape view against a height-bound portrait one),
+           so the view with the bigger board on the screen is picked; a square window keeps the default view. maxAspect holds up to and including its number, so the tie (0.875) is Portrait.
+           ChessBoardComponent follows the active view (its portraitOrigin* and portraitSquareSize are the board of Portrait); a canvas lays out per view with a variant `orientation:portrait`
+           (a canvas variant is conditioned on the bounds of its own canvas, here the view in units: 720 x 960 is portrait, 840 x 800 is not). -->
+      <viewVariants>
+        <view name="Portrait" when="maxAspect:0.875" width="720" height="960" />
+      </viewVariants>
       <nodes>
         <!-- Background layer: nodes with a lower layer are drawn first, the pieces (layer 0) on top. -->
         <node name="Board" layer="-1">
           <components>
-            <component type="ChessBoardComponent" originX="100" originY="80" squareSize="80" />
+            <component type="ChessBoardComponent" originX="100" originY="80" squareSize="80" portraitOriginX="40" portraitOriginY="144" portraitSquareSize="80" />
           </components>
         </node>
 
         <!-- The letters and numbers at the edges of the board. A canvas of UILabels (the renderer has no text primitive) on the same layer as the Board, written right after it:
              same layer, scene order, so it is drawn after the squares and the highlights of ChessBoardComponent and before the pieces (layer 0), the result bar (1), the HUD (10) and
-             the panels (20). The canvas has no safe area: the board stands at fixed scene units (view 840 x 800, the board 640 x 640 at (100, 80)) and an inset must not move a label.
+             the panels (20). The canvas has no safe area: the board stands at fixed scene units (view 840 x 800, the board 640 x 640 at (100, 80); in the Portrait view 720 x 960 at (40, 144)) and an inset must not move a label.
              The labels take no click (no blocksInput, not interactive), so the board gets every press. Rank numbers sit in the left column of cells (RankLabel<row>, row from the
              top), top-left in the cell; file letters in the bottom row (FileLabel<column>), bottom-right in the cell. The rects are fixed on the screen; the text is a variable that
              ChessBoardComponent publishes from Game/BoardCoordinates.h (coordRank<row>, coordFile<column>), so it turns with the board (h..a and 1..8 while the program plays White).
+             The numbers of the elements are those of the default view; the variant for orientation:portrait (a canvas variant is conditioned on the bounds of the canvas, which are the view in units: 720 x 960 is portrait,
+             840 x 800 is not) sets x and y of each label for the board of the Portrait view, (40, 144): the same offsets from its corner, so every label moves by (-60, +64).
              A box is 13 x 26 units (the line of an 18-unit font is about 24 units high, and a box under it cuts the glyph) in the 13-unit corner (x 2..15 or 65..78 of the 80-unit cell) that a piece never reaches: a Contain-fitted piece covers about 15.5..64.5.
              The contrast is static: a turn by 180 degrees keeps the color of a cell, so a label has the dark brown of the dark squares on a light cell and the cream on a dark one
              (a cell is light when column + row is even; the rank labels are in column 0, the file labels in row 7). Font 18: about 10 px at the narrowest fit scale (0.57). -->
@@ -108,6 +119,28 @@
                   </components>
                 </element>
               </elements>
+              <variants>
+                <variant when="orientation:portrait">
+                  <overrides>
+                    <set element="RankLabel0" x="42" y="146" />
+                    <set element="RankLabel1" x="42" y="226" />
+                    <set element="RankLabel2" x="42" y="306" />
+                    <set element="RankLabel3" x="42" y="386" />
+                    <set element="RankLabel4" x="42" y="466" />
+                    <set element="RankLabel5" x="42" y="546" />
+                    <set element="RankLabel6" x="42" y="626" />
+                    <set element="RankLabel7" x="42" y="706" />
+                    <set element="FileLabel0" x="105" y="756" />
+                    <set element="FileLabel1" x="185" y="756" />
+                    <set element="FileLabel2" x="265" y="756" />
+                    <set element="FileLabel3" x="345" y="756" />
+                    <set element="FileLabel4" x="425" y="756" />
+                    <set element="FileLabel5" x="505" y="756" />
+                    <set element="FileLabel6" x="585" y="756" />
+                    <set element="FileLabel7" x="665" y="756" />
+                  </overrides>
+                </variant>
+              </variants>
             </component>
           </components>
         </node>
@@ -123,7 +156,11 @@
              box lies inside the safe area (in the narrowest case of the size matrix, a 480 px window with side insets, the safe area starts at about x = 75.6 and about 24 units of the margin are left). The balance, "+3" on the side that is ahead and nothing
              on the other, is a box of 23 x 28 units at the board's edge (x 77 to 100) whose AutoFit shrinks the text (to 12 units at the smallest, which is 7 px at the smallest fit scale, 0.571: the sizes are whole pixels and the smallest is rounded up) instead of cutting it, and it is never hidden. The names all start with
              Material because elements are found by name in every canvas of the scene. The chip is a cream a little darker than the light squares (so that a test can tell a chip from a square), the text
-             a dark brown that is not one of the two colors of the board's labels. The look (the colors, the sizes of the font, the pictures at this size) is a first guess nobody has seen in a window. -->
+             a dark brown that is not one of the two colors of the board's labels. The look (the colors, the sizes of the font, the pictures at this size) is a first guess nobody has seen in a window.
+             The numbers above are those of the default view. In the Portrait view (the variant for orientation:portrait; the board is at (40, 144) to (680, 784)) the two lists are horizontal: the upper group
+             above the board at (40, 92), 336 x 40 (5 x 64 + 4 x 4; a horizontal list stretches the 40-unit height to its rows, which take a width of 64 here), the lower group under it at (40, 792); they
+             mirror and swap with the turn of the board as before. Their box, (40, 92) to (376, 832), is the Portrait one of Game/MaterialLayout.h (the rows show while it lies inside the safe area).
+             A balance is a 48 x 40 box at x 384, beside the end of its list, never hidden. -->
         <node name="Material" layer="5">
           <components>
             <component type="ChessMaterialComponent" />
@@ -288,6 +325,26 @@
                   </components>
                 </element>
               </elements>
+              <variants>
+                <variant when="orientation:portrait">
+                  <overrides>
+                    <set element="MaterialTopList" x="40" y="92" width="336" height="40" direction="Horizontal" />
+                    <set element="MaterialTopQueenRow" width="64" />
+                    <set element="MaterialTopRookRow" width="64" />
+                    <set element="MaterialTopBishopRow" width="64" />
+                    <set element="MaterialTopKnightRow" width="64" />
+                    <set element="MaterialTopPawnRow" width="64" />
+                    <set element="MaterialTopBalance" x="384" y="92" width="48" height="40" />
+                    <set element="MaterialBottomList" x="40" y="792" width="336" height="40" direction="Horizontal" />
+                    <set element="MaterialBottomQueenRow" width="64" />
+                    <set element="MaterialBottomRookRow" width="64" />
+                    <set element="MaterialBottomBishopRow" width="64" />
+                    <set element="MaterialBottomKnightRow" width="64" />
+                    <set element="MaterialBottomPawnRow" width="64" />
+                    <set element="MaterialBottomBalance" x="384" y="792" width="48" height="40" />
+                  </overrides>
+                </variant>
+              </variants>
             </component>
           </components>
         </node>
@@ -299,7 +356,10 @@
              as wide as the safe area, which is about 689 units in the narrowest window of the matrix (480 px with side insets): Turn (320), Menu (110) and Reset (110) with
              their gaps add up to less than that, and ChessUiTest lays every word the game can show into them. Menu is the one button that opens the menu (the list panel
              MenuPanel below): it emits ChessOpenMenu, is always shown, and its text is the fixed word "Menu", not a state; the side, the engine and the level
-             are chosen in the opponent panel, which the list opens and which also shows what is picked now, and not on buttons of the HUD: the margins are full. -->
+             are chosen in the opponent panel, which the list opens and which also shows what is picked now, and not on buttons of the HUD: the margins are full.
+             The numbers are those of the default view. The Portrait view (720 x 960, the board at (40, 144) to (680, 784)) has the same rows: the top row at y 12 to 68 above the upper row of the
+             material (y 92) and the board, Status at y 892 to 948 under the board and the lower row (y 832); the anchors keep them there. Only Status is wider there (60 % of the safe area): the
+             safe area of the narrowest window with side insets is 590 units and 48 % of it, 283, cuts the longest sentence, which the 330 of the default view's narrowest window holds. -->
         <node name="Hud" layer="10">
           <components>
             <component type="UICanvasComponent" space="SceneView" useSafeArea="true">
@@ -327,6 +387,13 @@
                   </components>
                 </element>
               </elements>
+              <variants>
+                <variant when="orientation:portrait">
+                  <overrides>
+                    <set element="Status" width="60%" />
+                  </overrides>
+                </variant>
+              </variants>
             </component>
           </components>
         </node>
@@ -339,7 +406,8 @@
              exactly Menu). The sections are one 56-unit button MenuSection<Name> each, in the order of MenuSections(). To add a section: a row in Game/MenuSections.cpp, a
              MenuSection<Name> button here (and 68 units more in the height of MenuPlate: 56 for the button and 12 for the gap) and the panel node of the row. The plate is 94% of
              the safe area up to 640 units: 16 + 44 (title) + 56 (Opponent) + 56 (Close) + 3 x 12 (spacing) + 16 = 224 units high.
-             The view is a fixed 840 x 800, so there is no portrait variant. -->
+             The plate is centered in the safe area of either view (840 x 800 or Portrait 720 x 960) and needs no variant: it is 224 units high, and the buttons fit the 555 units of the
+             narrowest Portrait window (94% of its 590 safe units) as well as the 640 of the default view. -->
         <node name="MenuPanel" layer="20">
           <components>
             <component type="UICanvasComponent" space="SceneView" useSafeArea="true" modal="true" visible="false">
@@ -379,8 +447,9 @@
              while two people play is remembered and applies when Computer is picked, and the engine can be picked at any time (the person needs it exactly when the Stockfish
              pick was refused). A pick of an engine that cannot be had changes nothing, the error line says why. The groups are named ModeGroup, ColorGroup, EngineGroup and LevelGroup and not Mode, Engine and Level on purpose: elements are found by name in every
              canvas of the scene. OpponentError is the sentence of the engine's error ({opponentError}, empty when there is none). A segment needs an explicit height (a flex
-             segment without one gets a rect of height 0). The plate is 16 + 44 (title) + 4 x 56 (rows) + 32 (error) + 56 (Back and Close) + 6 x 12 (spacing) + 16 = 460 units high. The view
-             is a fixed 840 x 800, so there is no portrait variant. -->
+             segment without one gets a rect of height 0). The plate is 16 + 44 (title) + 4 x 56 (rows) + 32 (error) + 56 (Back and Close) + 6 x 12 (spacing) + 16 = 460 units high, which both views have room for. The plate is centered in the safe area
+             of either view. The segments of a row are the narrowest part: in the narrowest Portrait window (590 safe units) 94% of the area leaves "Medium" less than its text needs with the
+             air of a button, so the Portrait variant makes the plate the whole safe area and the four captions 120 units wide (every other window of the matrix has more room). -->
         <node name="OpponentPanel" layer="20">
           <components>
             <component type="UICanvasComponent" space="SceneView" useSafeArea="true" modal="true" visible="false">
@@ -529,6 +598,17 @@
                   </children>
                 </element>
               </elements>
+              <variants>
+                <variant when="orientation:portrait">
+                  <overrides>
+                    <set element="Plate" width="100%" />
+                    <set element="ModeCaption" width="120" />
+                    <set element="ColorCaption" width="120" />
+                    <set element="EngineCaption" width="120" />
+                    <set element="LevelCaption" width="120" />
+                  </overrides>
+                </variant>
+              </variants>
             </component>
           </components>
         </node>
@@ -540,9 +620,10 @@
              click, so the board and the buttons of the HUD under it get none; there is no Escape and no click outside to cancel. Plain text buttons, no pieces drawn in them. The names
              start with Promotion or Promote because elements are found by name in every canvas of the scene (the opponent panel has Dim, Plate and Title). The four piece buttons share
              one row. The plate is 94% of the safe area up to 640 units, and 94% of even the narrowest safe area (about 689 units, so 647) is more than 640: the plate is 640 wide in
-             every window of the size matrix, 608 inside the padding, so a button is 146 units wide and keeps 8 units of air around "Knight" at font 26 everywhere (ChessUiTest holds
-             it). The plate is 16 + 44 (title) + 56 (pieces) + 56 (Cancel) + 3 x 12 (spacing) + 16 = 224 units high.
-             The view is a fixed 840 x 800, so there is no portrait variant. -->
+             every window of the size matrix with the default view, 608 inside the padding, so a button is 146 units wide and keeps 8 units of air around "Knight" at font 26 there
+             (ChessUiTest holds it). The plate is 16 + 44 (title) + 56 (pieces) + 56 (Cancel) + 3 x 12 (spacing) + 16 = 224 units high.
+             In the Portrait view (720 wide) the plate is 640 too, but in the narrowest window the safe area is 590 units and the plate 555, a button 124 units wide: it still fits, and
+             the height fits both views. The plate is centered in the safe area of either view and does not move with the turn of the board. -->
         <node name="PromotionPanel" layer="20">
           <components>
             <component type="UICanvasComponent" space="SceneView" useSafeArea="true" modal="true" visible="false">

@@ -87,6 +87,12 @@ namespace BECore::Chess {
         SubscribeInScene<SDLEvents::MouseMotionEvent, &ChessBoardComponent::OnMouseMotion>(this);
         SubscribeInScene<InputEvents::ActionEvent, &ChessBoardComponent::OnAction>(this);
         SubscribeInScene<SceneEvents::SceneUpdateEvent, &ChessBoardComponent::OnUpdate>(this);
+        SubscribeInScene<SceneEvents::SceneViewChangedEvent, &ChessBoardComponent::OnViewChanged>(this);
+    }
+
+    void ChessBoardComponent::OnViewChanged(const SceneEvents::SceneViewChangedEvent& event) {
+        _portraitActive = event.view.name == PoolString::Intern(kPortraitView);
+        _drag.reset();
     }
 
     void ChessBoardComponent::HideUnavailableEngines() {
@@ -290,14 +296,16 @@ namespace BECore::Chess {
 
     void ChessBoardComponent::SquareToPixel(int file, int rank, PieceColor bottom, float& outX, float& outY) const {
         const BoardCell cell = CellOf(Square{static_cast<int8_t>(file), static_cast<int8_t>(rank)}, bottom);
-        outX = _originX + static_cast<float>(cell.column) * _squareSize;
-        outY = _originY + static_cast<float>(cell.rowFromTop) * _squareSize;
+        const float square = GetSquareSize();
+        outX = GetOriginX() + static_cast<float>(cell.column) * square;
+        outY = GetOriginY() + static_cast<float>(cell.rowFromTop) * square;
     }
 
     void ChessBoardComponent::OnDraw() {
         HideUnavailableEngines();  // the panel is drawn after the board, so a frame with no update before it already lacks the segment
         PublishUiVars();
         auto& renderer = *CoreManager::GetRenderer();
+        const float squareSize = GetSquareSize();    // once per draw, as the orientation
         const PieceColor bottom = GetBottomColor();  // once per draw: every square of this frame is placed for the same orientation
         PublishCoordinates(bottom);                  // before the model check: the labels show also when no game is active
 
@@ -307,7 +315,7 @@ namespace BECore::Chess {
                 float py = 0.0f;
                 SquareToPixel(file, rank, bottom, px, py);
                 const bool isLight = IsLightSquare(file, rank);
-                renderer.DrawFilledRect(px, py, _squareSize, _squareSize, isLight ? kLightSquare : kDarkSquare);
+                renderer.DrawFilledRect(px, py, squareSize, squareSize, isLight ? kLightSquare : kDarkSquare);
             }
         }
 
@@ -322,9 +330,9 @@ namespace BECore::Chess {
             float mx = 0.0f;
             float my = 0.0f;
             SquareToPixel(last.From().file, last.From().rank, bottom, mx, my);
-            renderer.DrawFilledRect(mx, my, _squareSize, _squareSize, kLastMoveSquare);
+            renderer.DrawFilledRect(mx, my, squareSize, squareSize, kLastMoveSquare);
             SquareToPixel(last.To().file, last.To().rank, bottom, mx, my);
-            renderer.DrawFilledRect(mx, my, _squareSize, _squareSize, kLastMoveSquare);
+            renderer.DrawFilledRect(mx, my, squareSize, squareSize, kLastMoveSquare);
         }
 
         if (model->IsInCheck()) {
@@ -332,7 +340,7 @@ namespace BECore::Chess {
             float kx = 0.0f;
             float ky = 0.0f;
             SquareToPixel(king.file, king.rank, bottom, kx, ky);
-            renderer.DrawFilledRect(kx, ky, _squareSize, _squareSize, model->IsGameOver() ? kMateSquare : kCheckSquare);
+            renderer.DrawFilledRect(kx, ky, squareSize, squareSize, model->IsGameOver() ? kMateSquare : kCheckSquare);
         }
 
         // The hint, under the selection, once the engine has answered for this very position: the analyst gives nothing for another version, so any change of the position takes it off at the next
@@ -342,9 +350,9 @@ namespace BECore::Chess {
                 float hx = 0.0f;
                 float hy = 0.0f;
                 SquareToPixel(hint->move.From().file, hint->move.From().rank, bottom, hx, hy);
-                renderer.DrawFilledRect(hx, hy, _squareSize, _squareSize, kHintFromSquare);
+                renderer.DrawFilledRect(hx, hy, squareSize, squareSize, kHintFromSquare);
                 SquareToPixel(hint->move.To().file, hint->move.To().rank, bottom, hx, hy);
-                renderer.DrawFilledRect(hx, hy, _squareSize, _squareSize, kHintToSquare);
+                renderer.DrawFilledRect(hx, hy, squareSize, squareSize, kHintToSquare);
             }
         }
 
@@ -353,9 +361,9 @@ namespace BECore::Chess {
             float qx = 0.0f;
             float qy = 0.0f;
             SquareToPixel(premove.from.file, premove.from.rank, bottom, qx, qy);
-            renderer.DrawFilledRect(qx, qy, _squareSize, _squareSize, kPremoveSquare);
+            renderer.DrawFilledRect(qx, qy, squareSize, squareSize, kPremoveSquare);
             SquareToPixel(premove.to.file, premove.to.rank, bottom, qx, qy);
-            renderer.DrawFilledRect(qx, qy, _squareSize, _squareSize, kPremoveSquare);
+            renderer.DrawFilledRect(qx, qy, squareSize, squareSize, kPremoveSquare);
         }
 
         if (model->HasSelection()) {
@@ -363,24 +371,25 @@ namespace BECore::Chess {
             float px = 0.0f;
             float py = 0.0f;
             SquareToPixel(sel.file, sel.rank, bottom, px, py);
-            renderer.DrawFilledRect(px, py, _squareSize, _squareSize, kSelectedSquare);
+            renderer.DrawFilledRect(px, py, squareSize, squareSize, kSelectedSquare);
 
             for (const auto target : model->GetLegalMoves()) {
                 SquareToPixel(target.file, target.rank, bottom, px, py);
                 const bool isCapture = !model->GetPieceAt(target).IsEmpty();
-                renderer.DrawFilledRect(px, py, _squareSize, _squareSize, isCapture ? kLegalCaptureSquare : kLegalMoveSquare);
+                renderer.DrawFilledRect(px, py, squareSize, squareSize, isCapture ? kLegalCaptureSquare : kLegalMoveSquare);
             }
         }
     }
 
     Optional<Square> ChessBoardComponent::SquareUnder(float screenX, float screenY) const {
-        const float boardSize = _squareSize * 8.0f;
-        const float localX = GetScene().ScreenToSceneX(screenX) - _originX;
-        const float localY = GetScene().ScreenToSceneY(screenY) - _originY;
+        const float squareSize = GetSquareSize();
+        const float boardSize = squareSize * 8.0f;
+        const float localX = GetScene().ScreenToSceneX(screenX) - GetOriginX();
+        const float localY = GetScene().ScreenToSceneY(screenY) - GetOriginY();
         if (localX < 0.0f || localY < 0.0f || localX >= boardSize || localY >= boardSize) {
             return std::nullopt;
         }
-        return SquareAt(static_cast<int>(localX / _squareSize), static_cast<int>(localY / _squareSize), GetBottomColor());
+        return SquareAt(static_cast<int>(localX / squareSize), static_cast<int>(localY / squareSize), GetBottomColor());
     }
 
     void ChessBoardComponent::OnMouseDown(const SDLEvents::MouseButtonDownEvent& e) {
@@ -479,7 +488,7 @@ namespace BECore::Chess {
         if (!_drag || !_drag->lifted || !IsDragValid(*_drag, ChessGame::GetActiveModel())) {
             return std::nullopt;
         }
-        const float half = _squareSize * 0.5f;
+        const float half = GetSquareSize() * 0.5f;
         return LiftedPiece{_drag->from, _drag->pointerX - half, _drag->pointerY - half};
     }
 
