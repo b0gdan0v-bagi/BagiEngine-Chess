@@ -4984,7 +4984,7 @@ namespace BECore::Chess::Tests {
         }
 
         constexpr const char* kPromotionPlate = "PromotionPlate";
-        constexpr float kPromotionPlateHeight = 224.0f;  // 16 + 44 + 56 + 56 + 3 x 12 + 16, the comment of the scene
+        constexpr float kPromotionPlateHeight = 224.0f;  // written out from the comment of the scene, not read from the XML
 
     }  // namespace
 
@@ -5090,7 +5090,6 @@ namespace BECore::Chess::Tests {
         ActionLog log;
         const uint64_t version = Model().GetVersion();
 
-        // The board (two corners and the target), the dim, the Reset and the Menu button of the HUD: the panel takes all of them
         const Pair<float, float> points[] = {
             SquareCenter("a1"), SquareCenter("h8"), SquareCenter("a8"), ScreenCenter(*HudElement("Reset")), ScreenCenter(*HudElement("Menu")), ScreenCenter(PromotionElement("PromotionTitle"))};
         for (const auto& [x, y] : points) {
@@ -5258,9 +5257,8 @@ namespace BECore::Chess::Tests {
     }
 
     // ---- the promotion panel: the layout ---------------------------------------------------------------------------------------------
-    // The checks of the opponent panel on the node PromotionPanel: the validator on the size matrix, no word cut on any case and in the narrowest window, the touch targets, the plate
-    // inside the view, the words and ids held to the table of PromotionChoices, the names of the five canvases apart and broken copies. The panel has no HTML + CSS twin in
-    // ChessHudWebTest: that file holds the HUD and the opponent panel, and the web front end has no entry for this panel yet
+    // The checks of the opponent panel (the size matrix, PanelProblems) run on the node PromotionPanel. The panel has no HTML + CSS twin: ChessHudWebTest holds the HUD, the opponent panel
+    // and the menu list
 
     TEST_F(ChessUiTest, ThePromotionPanelPassesTheSizeMatrix) {
         auto panel = Promotion();
@@ -5291,7 +5289,7 @@ namespace BECore::Chess::Tests {
         const String problems = PanelProblems(layout, kPromotionPlate);
         EXPECT_TRUE(problems.empty()) << problems.c_str();
 
-        // 94% of the safe area is more than maxWidth, so the plate is 640 here and in every other window: 608 inside the padding, 146 a piece button
+        // 94% of the safe area is more than maxWidth, so the plate is 640 here and in every other window
         EXPECT_NEAR(PromotionElement(kPromotionPlate).rect.w, 640.0f, kPixelTolerance);
 
         const float minTouch = CoreManager::GetUIEnvironment().GetSettings().minTouchSize;
@@ -5329,7 +5327,6 @@ namespace BECore::Chess::Tests {
             EXPECT_LE(plate.rect.w, 640.0f + kPixelTolerance);
             EXPECT_NEAR(plate.rect.h, kPromotionPlateHeight, kPixelTolerance);
 
-            // The four pieces share one row of equal buttons that fills it; Cancel is the row below, the title the one above
             const UIElement& row = PromotionControl<UIStack>("PromotionPieces");
             float left = row.rect.x;
             float width = -1.0f;
@@ -5380,7 +5377,6 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, EveryActionOfThePromotionPanelIsOneTheBoardAnswers) {
-        // Every button of the canvas emits ChessPromote or ChessCancelPromotion, and the board answers both (pressed here as the buttons would)
         auto panel = Promotion();
         ASSERT_TRUE(panel);
         Vector<const UIElement*> controls;
@@ -5409,8 +5405,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, NoElementNameIsInTwoCanvasesOfTheScene) {
-        // Elements are found by name in every canvas of the scene (SetVisibleByName and the lookups of the tests): the HUD, the board coordinates, the captured material, the menu list, the opponent
-        // panel and the promotion panel keep their own names
+        // Elements are found by name in every canvas of the scene (SetVisibleByName and the lookups of the tests), so no two canvases may share a name
         const struct {
             const char* node;
             IntrusivePtr<UICanvasComponent> canvas;
@@ -5463,7 +5458,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, APromotionPlateTooNarrowForTheFourButtonsIsCaught) {
-        // A plate of 300 units leaves about 61 for a button, which cannot hold "Knight" with its air; the shipped 640 can
+        // A plate of 300 units leaves a button too narrow for "Knight" with its air; the shipped 640 does not
         String xml = ShippedElementsXml("PromotionPanel");
         ASSERT_NO_FATAL_FAILURE(Replace(xml, R"(maxWidth="640")", R"(maxWidth="300")"));
         CanvasCopy copy(xml);
@@ -5482,8 +5477,8 @@ namespace BECore::Chess::Tests {
 
     // ---- the captured material: the node Material ---------------------------------------------------------------------------------------
     // A canvas in the left margin (SceneConfig.xml has the reasons for its numbers) that ChessMaterialComponent gives its words and its sprites. Two groups: the lower one shows what the color at
-    // the bottom of the board has taken, the upper one what the other color has taken. The rows are shown while the lists lie inside the safe area (Game/MaterialLayout.h). Here: the behavior on
-    // the shipped scene; the library of textures is empty in the test, so an icon has its sprite name and draws nothing
+    // the bottom of the board has taken, the upper one what the other color has taken. The rows are shown while the lists lie inside the safe area (Game/MaterialLayout.h). The library of
+    // textures is empty in the test, so an icon has its sprite name and draws nothing
 
     namespace {
 
@@ -5630,7 +5625,6 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(Var("materialTopBalance"), "");
         EXPECT_EQ(Var("materialBottomBalance"), "+1");
 
-        // Black takes back: both groups have a pawn and the lead is gone
         ClickMove("d8", "d5");
         ASSERT_EQ(Model().GetMoves().size(), 4u);
         EXPECT_EQ(MaterialCount("Top", "Pawn"), "x1");
@@ -5671,7 +5665,7 @@ namespace BECore::Chess::Tests {
         EXPECT_NEAR(step, 44.0f, kPixelTolerance) << "a row is 40 units high and 4 apart";
         EXPECT_NEAR(MaterialRow("Bottom", "Queen").rect.y, 500.0f, kPixelTolerance);
 
-        StartFrom(kWhiteTookAPawn);  // only the pawn of Black is gone
+        StartFrom(kWhiteTookAPawn);
         Settle();
         ASSERT_EQ(ShownMaterialRows(), "BottomPawn");
         EXPECT_NEAR(MaterialRow("Bottom", "Pawn").rect.y, 500.0f, kPixelTolerance) << "the first row of the list: the four above it take no room";
@@ -5933,7 +5927,7 @@ namespace BECore::Chess::Tests {
             EXPECT_TRUE(fit.fits) << lead << " is inside its box";
         }
 
-        ResizeWithoutInsets(1280.0f, 720.0f);  // and the other way
+        ResizeWithoutInsets(1280.0f, 720.0f);
         EXPECT_EQ(ShownMaterialRows(), "BottomPawn") << "the window grows again: the rows come back";
         ResizeWithSideInsets(kNarrowestWidth, kNarrowestHeight);
         EXPECT_EQ(ShownMaterialRows(), "");
@@ -5982,9 +5976,7 @@ namespace BECore::Chess::Tests {
     }
 
     // ---- the captured material: the layout ---------------------------------------------------------------------------------------------
-    // The checks of the coordinates and of the panels on the node Material: the validator on the size matrix and the content of every box, with every count word and every sign, the narrowest
-    // window alone, the shown rects against the margin, the HUD and the coordinate labels, the aspect of an icon, and broken copies built from the text of the shipped XML. The rows are shown
-    // by hand for the matrix (the component shows only the rows of the pieces that are gone), so the lists are laid out at their full size
+    // The layout of the node Material. The rows are shown by hand for the matrix (the component shows only the rows of the pieces that are gone), so the lists are laid out at their full size
 
     namespace {
 
@@ -6162,11 +6154,10 @@ namespace BECore::Chess::Tests {
         material->GetLayout().Invalidate();
         hud->GetLayout().Invalidate();
         coordinates->GetLayout().Invalidate();
-        // The count is pinned: src/Chess/Components/CLAUDE.md names 32 of 46 notch cases, and each of them was asserted above
+        // The counts are pinned: a change of the layout or of the matrix moves them and has to be looked at
         EXPECT_EQ(notchCases, 46u);
         EXPECT_EQ(notchCasesWithAnOverlap, 32u);
-        // The HUD keeps clear of the safe area, and a notch pushes its top row down by 7 % of the short side, onto the first rows and the balance of the upper group (as it does onto the board:
-        // src/Chess/Components/CLAUDE.md, "The HUD")
+        // The HUD keeps inside the safe area, and a notch pushes its top row down by 7 % of the short side, onto the balance and the first row of the upper group
         std::cout << "[   INFO   ] the HUD reaches the top group in " << notchCasesWithAnOverlap << " of " << notchCases << " notch cases\n";
     }
 
