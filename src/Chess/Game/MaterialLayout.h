@@ -17,7 +17,7 @@ namespace BECore::Chess {
     constexpr float kMaterialPortraitListBottom = 832.0f;
 
     /// The view of the scene whose box the rule asks for
-    enum class MaterialView { Default, Portrait };
+    CORE_ENUM(MaterialView, uint8_t, Default, Portrait)
 
     /// The two groups of the display (the upper and the lower one) and the pieces in a group (`CapturableTypes()`)
     constexpr size_t kMaterialGroupCount = 2;

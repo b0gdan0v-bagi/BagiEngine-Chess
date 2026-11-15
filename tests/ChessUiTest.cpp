@@ -407,16 +407,22 @@ namespace BECore::Chess::Tests {
             float viewWidth;
             float boardLeft;
             float boardTop;
+            bool portrait;
         };
 
         const ViewShape kViewShapes[] = {
-            {"default view", {1280.0f, 720.0f}, {kNarrowestWidth, kNarrowestHeight}, kViewWidth, kBoardLeft, kBoardTop},
-            {"Portrait view", {kNarrowestWidth, kNarrowestPortraitHeight}, {kNarrowestWidth, kNarrowestPortraitHeight}, kPortraitViewWidth, kPortraitBoardLeft, kPortraitBoardTop}};
+            {"default view", {1280.0f, 720.0f}, {kNarrowestWidth, kNarrowestHeight}, kViewWidth, kBoardLeft, kBoardTop, false},
+            {"Portrait view", {kNarrowestWidth, kNarrowestPortraitHeight}, {kNarrowestWidth, kNarrowestPortraitHeight}, kPortraitViewWidth, kPortraitBoardLeft, kPortraitBoardTop, true}};
         constexpr size_t kBoardEdgeCells = kLastBoardIndex + 1;
         constexpr float kPieceWidth = kCellSize * kCellWidth / kCellHeight;  // a piece fitted by Contain is as high as its cell, as wide as the aspect of its atlas cell, and centered
         constexpr float kPieceLeft = (kCellSize - kPieceWidth) * 0.5f;       // 15.5 units from the left edge of the cell
         constexpr float kPieceRight = kPieceLeft + kPieceWidth;              // 64.5 units
         constexpr float kLabelBand = 30.0f;                                  // a rank number lies in the top 30 units of its cell, a file letter in the bottom 30 (the boxes are 2..28 and 52..78)
+
+        /// Whether a canvas was laid out for the Portrait view: its bounds are the view in units
+        bool LaidOutForPortrait(const UICanvasLayout& layout) {
+            return layout.GetResolved().bounds.w == kPortraitViewWidth;
+        }
 
         /// One label of the board coordinates: its name and the drawn cell it sits in (the rank labels are in the left column, one per row; the file labels in the bottom row, one per column)
         struct BoardLabel {
@@ -450,7 +456,7 @@ namespace BECore::Chess::Tests {
             String problems;
             const float scale = layout.GetResolved().scale;
             // The board of the view the canvas was laid out for: its bounds are that view in units
-            const bool portrait = layout.GetResolved().bounds.w == kPortraitViewWidth;
+            const bool portrait = LaidOutForPortrait(layout);
             const float boardLeft = portrait ? kPortraitBoardLeft : kBoardLeft;
             const float boardTop = portrait ? kPortraitBoardTop : kBoardTop;
             for (const BoardLabel& spec : ExpectedBoardLabels()) {
@@ -518,11 +524,6 @@ namespace BECore::Chess::Tests {
                     EXPECT_TRUE(canvas.SetElementVisible(PoolString::Intern(Format("Material{}{}Row", group, piece).c_str()), true)) << group << piece;
                 }
             }
-        }
-
-        /// Whether a canvas was laid out for the Portrait view: its bounds are the view in units
-        bool LaidOutForPortrait(const UICanvasLayout& layout) {
-            return layout.GetResolved().bounds.w == kPortraitViewWidth;
         }
 
         /// What is wrong with the canvas Material as it is laid out with all ten rows shown, one problem to a line, nothing when it is right. The text that a count or a sign cuts is checked
@@ -3115,7 +3116,7 @@ namespace BECore::Chess::Tests {
         for (const ViewShape& shape : kViewShapes) {
             SCOPED_TRACE(shape.name);
             DrawAt(shape.output.first, shape.output.second);
-            ASSERT_EQ(PortraitIsActive(), shape.boardLeft == kPortraitBoardLeft);
+            ASSERT_EQ(PortraitIsActive(), shape.portrait);
             const float boardBottom = shape.boardTop + static_cast<float>(kBoardEdgeCells) * kCellSize;
             for (const BoardLabel& spec : ExpectedBoardLabels()) {
                 SCOPED_TRACE(spec.name.c_str());
@@ -6757,7 +6758,7 @@ namespace BECore::Chess::Tests {
         UICanvasLayout& layout = canvas->GetLayout();
         for (const ViewShape& shape : kViewShapes) {
             SCOPED_TRACE(shape.name);
-            const bool portrait = shape.boardLeft == kPortraitBoardLeft;
+            const bool portrait = shape.portrait;
             LayOutInTheNarrowestWindow(layout, shape);
             const Rect safe = layout.GetResolved().safeBounds;
             EXPECT_NEAR(safe.x, portrait ? 64.8f : 75.6f, 0.2f) << "9 % of 480 px at the fit scale";
@@ -6811,7 +6812,7 @@ namespace BECore::Chess::Tests {
                 if (!controls.empty()) {
                     ++notchCasesWithAnOverlap[view];
                     if (portrait) {
-                        portraitOverlaps += "  " + matrixCase.label + "\n";
+                        portraitOverlaps += Format("  {}\n", matrixCase.label.c_str());
                     }
                     // Not only close: the Turn label lies on top of the first row of the upper group, and in the default view of its balance too (src/Chess/Components/CLAUDE.md, "The captured
                     // material", "Known limits"); in Portrait the balance is beside the rows, to the right of the label

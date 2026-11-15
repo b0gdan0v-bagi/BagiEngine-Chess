@@ -39,7 +39,8 @@ namespace BECore::Chess {
      * The scene has two views, so the geometry has two sets: the default fields and the `portrait*` ones, for the view named kPortraitView. Which set holds is changed only on
      * SceneViewChangedEvent (sent from Scene::Update(), before every update of the frame) and every accessor reads that one choice: the squares drawn, the pieces placed from the same
      * update and the result bar then always agree, which they would not if each asked the scene for its active view at its own moment (a draw may run after the view was picked and before
-     * the pieces have moved). Before the first event the default set holds.
+     * the pieces have moved). Before the first event the default set holds. The event comes one Update after the Draw that picked the view, so for one frame the canvases are already
+     * laid out in the new view while the board still draws in the old one.
      *
      * It publishes the UIVars that the HUD, the panels and the coordinate labels show, only when something they say changed, and answers their actions: the HUD and the menu (`ChessReset`,
      * `ChessOpenMenu`, `ChessOpenSection`, `ChessCloseMenu`), the four of the opponent panel's groups (`ChessSetMode`, `ChessSetColor`, `ChessSetEngine`, `ChessSetLevel`) and the promotion pair
