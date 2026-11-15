@@ -25,7 +25,7 @@ foreach(_name
 endforeach()
 foreach(_name
         config/ApplicationConfig.xml config/ChessSettings.xml config/SceneConfig.xml config/TextureLibrary.xml
-        assets/chess_test.png config/localxml.xml assets/imgui.png)
+        assets/chess_test.png config/localxml.xml assets/imgui.png config/nodes/ChessHud.xml)
     chess_web_excluded("${_name}" OUT _excluded)
     check_equal("not excluded: ${_name}" "${_excluded}" "FALSE")
 endforeach()
@@ -36,7 +36,15 @@ set(expected
     config/ApplicationConfig.xml
     config/ChessSettings.xml
     config/SceneConfig.xml
-    config/TextureLibrary.xml)
+    config/TextureLibrary.xml
+    config/nodes/ChessBoard.xml
+    config/nodes/ChessBoardCoordinates.xml
+    config/nodes/ChessHud.xml
+    config/nodes/ChessMaterial.xml
+    config/nodes/ChessMenuPanel.xml
+    config/nodes/ChessOpponentPanel.xml
+    config/nodes/ChessPromotionPanel.xml
+    config/nodes/ChessResult.xml)
 chess_web_package_files(OUT files GAME_ROOT "${GAME_ROOT}")
 check_equal("the files of the preload package (a new file in config/ or assets/ must be added here, or excluded in cmake/ChessWeb.cmake)" "${files}" "${expected}")
 

@@ -1,0 +1,174 @@
+<?xml version="1.0"?>
+<!-- The opponent panel: a modal canvas over everything (layer 20, above the HUD and the end-of-game bar), started hidden. The Opponent button of the menu list shows it
+     (ChessOpenSection, value opponent); Back returns to the list (ChessOpenMenu) and Close hides both (ChessCloseMenu); while it is shown the dim takes every click, so the board gets none. Four choice groups (UISegmented), a
+     caption beside each. A segment emits its action with its id as the value (ChessSetMode / ChessSetColor / ChessSetEngine / ChessSetLevel); ChessBoardComponent applies
+     the pick at once and publishes the ids the groups are bound to (opponentMode, opponentColor, opponentEngine, opponentLevel), so the panel stays open and always shows
+     what the game really has. The ids are those of the control API; the color is the PERSON's color (the program plays the other one). No group is greyed: a color or a level picked
+     while two people play is remembered and applies when Computer is picked, and the engine can be picked at any time (the person needs it exactly when the Stockfish
+     pick was refused). A pick of an engine that cannot be had changes nothing, the error line says why. The groups are named ModeGroup, ColorGroup, EngineGroup and LevelGroup and not Mode, Engine and Level on purpose: elements are found by name in every
+     canvas of the scene. OpponentError is the sentence of the engine's error ({opponentError}, empty when there is none). A segment needs an explicit height (a flex
+     segment without one gets a rect of height 0). The plate is 16 + 44 (title) + 4 x 56 (rows) + 32 (error) + 56 (Back and Close) + 6 x 12 (spacing) + 16 = 460 units high, which both views have room for. The plate is centered in the safe area
+     of either view. The segments of a row are the narrowest part: in the narrowest Portrait window (590 safe units) 94% of the area leaves "Medium" less than its text needs with the
+     air of a button, so the Portrait variant makes the plate the whole safe area and the four captions 120 units wide (every other window of the matrix has more room). -->
+<node name="OpponentPanel" layer="20" contentVersion="5">
+  <components>
+    <component type="UICanvasComponent" space="SceneView" useSafeArea="true" modal="true" visible="false">
+      <elements>
+        <element type="UIElement" name="Dim" anchor="Stretch" ignoreSafeArea="true" color="0,0,0,150" blocksInput="true" />
+        <element type="UIStack" name="Plate" anchor="Center" width="94%" maxWidth="640" height="460" direction="Vertical" spacing="12" padding="16" crossAlign="Stretch" color="36,40,52,255" blocksInput="true">
+          <children>
+            <element type="UIElement" name="Title" height="44" fontSize="30">
+              <components>
+                <component type="UITextComponent" text="Opponent" align="Center"/>
+              </components>
+            </element>
+            <element type="UIStack" name="ModeRow" height="56" direction="Horizontal" spacing="8" crossAlign="Stretch">
+              <children>
+                <element type="UIElement" name="ModeCaption" width="150" height="56" fontSize="24">
+                  <components>
+                    <component type="UITextComponent" text="Opponent" verticalAlign="Center"/>
+                  </components>
+                </element>
+                <element type="UISegmented" name="ModeGroup" bind="opponentMode" flex="1" height="56" direction="Horizontal" spacing="4" color="30,30,30,255">
+                  <children>
+                    <element type="UIElement" name="ModeTwo" flex="1" height="56" fontSize="24" color="70,70,100,255">
+                      <components>
+                        <component type="UITextComponent" text="Two players" align="Center" verticalAlign="Center" wrap="false"/>
+                        <component type="UIInputClicker" action="ChessSetMode" value="two"/>
+                      </components>
+                    </element>
+                    <element type="UIElement" name="ModeComputer" flex="1" height="56" fontSize="24" color="70,70,100,255">
+                      <components>
+                        <component type="UITextComponent" text="Computer" align="Center" verticalAlign="Center" wrap="false"/>
+                        <component type="UIInputClicker" action="ChessSetMode" value="computer"/>
+                      </components>
+                    </element>
+                  </children>
+                </element>
+              </children>
+            </element>
+            <element type="UIStack" name="ColorRow" height="56" direction="Horizontal" spacing="8" crossAlign="Stretch">
+              <children>
+                <element type="UIElement" name="ColorCaption" width="150" height="56" fontSize="24">
+                  <components>
+                    <component type="UITextComponent" text="Play as" verticalAlign="Center"/>
+                  </components>
+                </element>
+                <element type="UISegmented" name="ColorGroup" bind="opponentColor" flex="1" height="56" direction="Horizontal" spacing="4" color="30,30,30,255">
+                  <children>
+                    <element type="UIElement" name="ColorWhite" flex="1" height="56" fontSize="24" color="70,70,100,255">
+                      <components>
+                        <component type="UITextComponent" text="White" align="Center" verticalAlign="Center" wrap="false"/>
+                        <component type="UIInputClicker" action="ChessSetColor" value="white"/>
+                      </components>
+                    </element>
+                    <element type="UIElement" name="ColorBlack" flex="1" height="56" fontSize="24" color="70,70,100,255">
+                      <components>
+                        <component type="UITextComponent" text="Black" align="Center" verticalAlign="Center" wrap="false"/>
+                        <component type="UIInputClicker" action="ChessSetColor" value="black"/>
+                      </components>
+                    </element>
+                  </children>
+                </element>
+              </children>
+            </element>
+            <element type="UIStack" name="EngineRow" height="56" direction="Horizontal" spacing="8" crossAlign="Stretch">
+              <children>
+                <element type="UIElement" name="EngineCaption" width="150" height="56" fontSize="24">
+                  <components>
+                    <component type="UITextComponent" text="Engine" verticalAlign="Center"/>
+                  </components>
+                </element>
+                <element type="UISegmented" name="EngineGroup" bind="opponentEngine" flex="1" height="56" direction="Horizontal" spacing="4" color="30,30,30,255">
+                  <children>
+                    <element type="UIElement" name="EngineStockfish" flex="1" height="56" fontSize="24" color="70,70,100,255">
+                      <components>
+                        <component type="UITextComponent" text="Stockfish" align="Center" verticalAlign="Center" wrap="false"/>
+                        <component type="UIInputClicker" action="ChessSetEngine" value="stockfish"/>
+                      </components>
+                    </element>
+                    <element type="UIElement" name="EngineOwn" flex="1" height="56" fontSize="24" color="70,70,100,255">
+                      <components>
+                        <component type="UITextComponent" text="Own engine" align="Center" verticalAlign="Center" wrap="false"/>
+                        <component type="UIInputClicker" action="ChessSetEngine" value="own"/>
+                      </components>
+                    </element>
+                  </children>
+                </element>
+              </children>
+            </element>
+            <element type="UIStack" name="LevelRow" height="56" direction="Horizontal" spacing="8" crossAlign="Stretch">
+              <children>
+                <element type="UIElement" name="LevelCaption" width="150" height="56" fontSize="24">
+                  <components>
+                    <component type="UITextComponent" text="Level" verticalAlign="Center"/>
+                  </components>
+                </element>
+                <element type="UISegmented" name="LevelGroup" bind="opponentLevel" flex="1" height="56" direction="Horizontal" spacing="4" color="30,30,30,255">
+                  <children>
+                    <element type="UIElement" name="LevelEasy" flex="1" height="56" fontSize="24" color="70,70,100,255">
+                      <components>
+                        <component type="UITextComponent" text="Easy" align="Center" verticalAlign="Center" wrap="false"/>
+                        <component type="UIInputClicker" action="ChessSetLevel" value="easy"/>
+                      </components>
+                    </element>
+                    <element type="UIElement" name="LevelMedium" flex="1" height="56" fontSize="24" color="70,70,100,255">
+                      <components>
+                        <component type="UITextComponent" text="Medium" align="Center" verticalAlign="Center" wrap="false"/>
+                        <component type="UIInputClicker" action="ChessSetLevel" value="medium"/>
+                      </components>
+                    </element>
+                    <element type="UIElement" name="LevelHard" flex="1" height="56" fontSize="24" color="70,70,100,255">
+                      <components>
+                        <component type="UITextComponent" text="Hard" align="Center" verticalAlign="Center" wrap="false"/>
+                        <component type="UIInputClicker" action="ChessSetLevel" value="hard"/>
+                      </components>
+                    </element>
+                    <element type="UIElement" name="LevelMax" flex="1" height="56" fontSize="24" color="70,70,100,255">
+                      <components>
+                        <component type="UITextComponent" text="Max" align="Center" verticalAlign="Center" wrap="false"/>
+                        <component type="UIInputClicker" action="ChessSetLevel" value="max"/>
+                      </components>
+                    </element>
+                  </children>
+                </element>
+              </children>
+            </element>
+            <element type="UIElement" name="OpponentError" height="32" fontSize="22">
+              <components>
+                <component type="UITextComponent" text="{opponentError}" textColor="240,120,120,255" align="Center" verticalAlign="Center"/>
+              </components>
+            </element>
+            <element type="UIStack" name="OpponentButtons" height="56" direction="Horizontal" spacing="8" crossAlign="Stretch">
+              <children>
+                <element type="UIElement" name="OpponentBack" flex="1" height="56" fontSize="26" color="50,115,85,255">
+                  <components>
+                    <component type="UITextComponent" text="Back" align="Center" verticalAlign="Center" wrap="false"/>
+                    <component type="UIInputClicker" action="ChessOpenMenu"/>
+                  </components>
+                </element>
+                <element type="UIElement" name="OpponentClose" flex="1" height="56" fontSize="26" color="110,60,60,255">
+                  <components>
+                    <component type="UITextComponent" text="Close" align="Center" verticalAlign="Center" wrap="false"/>
+                    <component type="UIInputClicker" action="ChessCloseMenu"/>
+                  </components>
+                </element>
+              </children>
+            </element>
+          </children>
+        </element>
+      </elements>
+      <variants>
+        <variant when="orientation:portrait">
+          <overrides>
+            <set element="Plate" width="100%" />
+            <set element="ModeCaption" width="120" />
+            <set element="ColorCaption" width="120" />
+            <set element="EngineCaption" width="120" />
+            <set element="LevelCaption" width="120" />
+          </overrides>
+        </variant>
+      </variants>
+    </component>
+  </components>
+</node>

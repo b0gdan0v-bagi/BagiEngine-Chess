@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<!-- Background layer: nodes with a lower layer are drawn first, the pieces (layer 0) on top. -->
+<node name="Board" layer="-1" contentVersion="5">
+  <components>
+    <component type="ChessBoardComponent" originX="100" originY="80" squareSize="80" portraitOriginX="40" portraitOriginY="144" portraitSquareSize="80" />
+  </components>
+</node>
