@@ -356,7 +356,10 @@
              as wide as the safe area, which is about 689 units in the narrowest window of the matrix (480 px with side insets): Turn (320), Menu (110) and Reset (110) with
              their gaps add up to less than that, and ChessUiTest lays every word the game can show into them. Menu is the one button that opens the menu (the list panel
              MenuPanel below): it emits ChessOpenMenu, is always shown, and its text is the fixed word "Menu", not a state; the side, the engine and the level
-             are chosen in the opponent panel, which the list opens and which also shows what is picked now, and not on buttons of the HUD: the margins are full. -->
+             are chosen in the opponent panel, which the list opens and which also shows what is picked now, and not on buttons of the HUD: the margins are full.
+             The numbers are those of the default view. The Portrait view (720 x 960, the board at (40, 144) to (680, 784)) has the same rows: the top row at y 12 to 68 above the upper row of the
+             material (y 92) and the board, Status at y 892 to 948 under the board and the lower row (y 832); the anchors keep them there. Only Status is wider there (60 % of the safe area): the
+             safe area of the narrowest window with side insets is 590 units and 48 % of it, 283, cuts the longest sentence, which the 330 of the default view's narrowest window holds. -->
         <node name="Hud" layer="10">
           <components>
             <component type="UICanvasComponent" space="SceneView" useSafeArea="true">
@@ -384,6 +387,13 @@
                   </components>
                 </element>
               </elements>
+              <variants>
+                <variant when="orientation:portrait">
+                  <overrides>
+                    <set element="Status" width="60%" />
+                  </overrides>
+                </variant>
+              </variants>
             </component>
           </components>
         </node>
