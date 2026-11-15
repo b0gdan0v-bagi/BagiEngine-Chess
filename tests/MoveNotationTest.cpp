@@ -213,11 +213,24 @@ namespace BECore::Chess::Tests {
         const String fen = position.ToFen();
         const ZobristKey key = position.Key();
         for (const Move move : MoveGenerator::GenerateLegal(position)) {
-            (void)SanOf(position, move);
+            static_cast<void>(SanOf(position, move));
         }
         EXPECT_EQ(position.ToFen(), fen);
         EXPECT_EQ(position.Key(), key);
         EXPECT_FALSE(position.CanUndo());
+    }
+
+    // ---- The overload with the legal moves ----
+
+    TEST(MoveNotationTest, TheOverloadWithTheLegalMovesGivesTheSameText) {
+        for (const StringView fen : {kStartFen, kKiwipeteFen, kPosition3Fen, kPosition4Fen, kPosition5Fen, kPosition6Fen}) {
+            SCOPED_TRACE(String(fen).c_str());
+            const Position position = PositionFromFen(fen);
+            const MoveList legal = MoveGenerator::GenerateLegal(position);
+            for (const Move move : legal) {
+                EXPECT_EQ(SanOf(position, move, legal), SanOf(position, move)) << move.ToUci().c_str();
+            }
+        }
     }
 
     // ---- Property over the perft positions ----
