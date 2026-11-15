@@ -3,7 +3,8 @@
      leaves the promotion pending (ChessGameModel::HasPendingPromotion) and ChessBoardComponent shows this canvas for as long as it is, on every update, so a reset, a set_state or
      a move of the program or of the control API closes a panel that has become stale. A piece button emits ChessPromote with the id of the piece as the value ("queen", "rook",
      "bishop", "knight": the table of PromotionChoices) and plays the move; Cancel emits ChessCancelPromotion and the pawn stays selected. While it is shown the dim takes every
-     click, so the board and the buttons of the HUD under it get none; there is no Escape and no click outside to cancel. Plain text buttons, no pieces drawn in them. The names
+     click, so the board and the buttons of the HUD under it get none. The dim is a button of its own that does what Cancel does (ChessCancelPromotion), so a click beside
+     the plate cancels; its clicker has stateLook="false", or the dim would lighten under the pointer. Escape is not wired. Plain text buttons, no pieces drawn in them. The names
      start with Promotion or Promote because elements are found by name in every canvas of the scene (the opponent panel has Dim, Plate and Title). The four piece buttons share
      one row. The plate is 94% of the safe area up to 640 units, and 94% of even the narrowest safe area (about 689 units, so 647) is more than 640: the plate is 640 wide in
      every window of the size matrix with the default view, 608 inside the padding, so a button is 146 units wide and keeps 8 units of air around "Knight" at font 26 there
@@ -14,7 +15,11 @@
   <components>
     <component type="UICanvasComponent" space="SceneView" useSafeArea="true" modal="true" visible="false">
       <elements>
-        <element type="UIElement" name="PromotionDim" anchor="Stretch" ignoreSafeArea="true" color="0,0,0,150" blocksInput="true" />
+        <element type="UIElement" name="PromotionDim" anchor="Stretch" ignoreSafeArea="true" color="0,0,0,150" blocksInput="true">
+          <components>
+            <component type="UIInputClicker" action="ChessCancelPromotion" stateLook="false"/>
+          </components>
+        </element>
         <element type="UIStack" name="PromotionPlate" anchor="Center" width="94%" maxWidth="640" height="224" direction="Vertical" spacing="12" padding="16" crossAlign="Stretch" color="44,38,52,255" blocksInput="true">
           <children>
             <element type="UIElement" name="PromotionTitle" height="44" fontSize="30">

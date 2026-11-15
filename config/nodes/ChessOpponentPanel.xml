@@ -1,6 +1,7 @@
 <?xml version="1.0"?>
 <!-- The opponent panel: a modal canvas over everything (layer 20, above the HUD and the end-of-game bar), started hidden. The Opponent button of the menu list shows it
-     (ChessOpenSection, value opponent); Back returns to the list (ChessOpenMenu) and Close hides both (ChessCloseMenu); while it is shown the dim takes every click, so the board gets none. Four choice groups (UISegmented), a
+     (ChessOpenSection, value opponent); Back returns to the list (ChessOpenMenu) and Close hides both (ChessCloseMenu); while it is shown the dim takes every click, so the board gets none. The dim is a button of its own that does what Close does
+     (ChessCloseMenu), so a click beside the plate closes both; its clicker has stateLook="false", or the dim would lighten under the pointer. Escape is not wired. Four choice groups (UISegmented), a
      caption beside each. A segment emits its action with its id as the value (ChessSetMode / ChessSetColor / ChessSetEngine / ChessSetLevel); ChessBoardComponent applies
      the pick at once and publishes the ids the groups are bound to (opponentMode, opponentColor, opponentEngine, opponentLevel), so the panel stays open and always shows
      what the game really has. The ids are those of the control API; the color is the PERSON's color (the program plays the other one). No group is greyed: a color or a level picked
@@ -14,7 +15,11 @@
   <components>
     <component type="UICanvasComponent" space="SceneView" useSafeArea="true" modal="true" visible="false">
       <elements>
-        <element type="UIElement" name="Dim" anchor="Stretch" ignoreSafeArea="true" color="0,0,0,150" blocksInput="true" />
+        <element type="UIElement" name="Dim" anchor="Stretch" ignoreSafeArea="true" color="0,0,0,150" blocksInput="true">
+          <components>
+            <component type="UIInputClicker" action="ChessCloseMenu" stateLook="false"/>
+          </components>
+        </element>
         <element type="UIStack" name="Plate" anchor="Center" width="94%" maxWidth="640" height="460" direction="Vertical" spacing="12" padding="16" crossAlign="Stretch" color="36,40,52,255" blocksInput="true">
           <children>
             <element type="UIElement" name="Title" height="44" fontSize="30">
