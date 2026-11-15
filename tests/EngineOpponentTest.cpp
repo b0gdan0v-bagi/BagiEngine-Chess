@@ -68,16 +68,16 @@ namespace BECore::Chess::Tests {
         }
 
         /// The fake UCI engine with @p flags, as the engine of an opponent
-        SharedPtr<UciEngine> MakeFakeEngine(std::initializer_list<StringView> flags) {
+        IntrusivePtrAtomic<UciEngine> MakeFakeEngine(std::initializer_list<StringView> flags) {
             UciEngineSettings settings;
             settings.launch = FakeEngineLaunch(flags);
-            return MakeShared<UciEngine>(std::move(settings));
+            return New<UciEngine>(std::move(settings));
         }
 
         /// Counts how often the engine inside it is asked
         class CountingEngine final : public IChessEngine {
         public:
-            explicit CountingEngine(SharedPtr<IChessEngine> inner) : _inner(std::move(inner)) {}
+            explicit CountingEngine(ChessEnginePtr inner) : _inner(std::move(inner)) {}
 
             std::expected<Move, EngineError> FindMove(const SearchRequest& request, const CancellationToken& token) override {
                 _calls.fetch_add(1);
@@ -89,7 +89,7 @@ namespace BECore::Chess::Tests {
             }
 
         private:
-            SharedPtr<IChessEngine> _inner;
+            ChessEnginePtr _inner;
             std::atomic<int> _calls{0};
         };
 
@@ -128,8 +128,8 @@ namespace BECore::Chess::Tests {
             std::atomic<bool> _open;
         };
 
-        SharedPtr<ScriptedEngine> MakeScripted(std::initializer_list<StringView> moves, bool gated = false) {
-            return MakeShared<ScriptedEngine>(moves, gated);
+        IntrusivePtrAtomic<ScriptedEngine> MakeScripted(std::initializer_list<StringView> moves, bool gated = false) {
+            return New<ScriptedEngine>(moves, gated);
         }
 
         /// The plainest engine there is: the first legal move of the final position, at once. It stands for any IChessEngine
@@ -332,7 +332,7 @@ namespace BECore::Chess::Tests {
     TEST_F(EngineOpponentTest, AMissingProgramIsAnErrorThatIsNotRetriedUntilItIsCleared) {
         UciEngineSettings settings;
         settings.launch.path = "/nonexistent-directory/engine";
-        const auto engine = MakeShared<CountingEngine>(MakeShared<UciEngine>(std::move(settings)));
+        const auto engine = New<CountingEngine>(New<UciEngine>(std::move(settings)));
         ChessGameModel model;
         EngineOpponent opponent(engine, PieceColor::Black, kLimits);
         ASSERT_TRUE(Play(model, "e2e4"));
@@ -460,7 +460,7 @@ namespace BECore::Chess::Tests {
         ChessGameModel model;
         const auto expected = OwnEngine().FindMove(SearchRequest::FromModel(model, kOwnLimits), CancellationToken::Create());
         ASSERT_TRUE(expected.has_value());
-        EngineOpponent opponent(MakeShared<OwnEngine>(), PieceColor::White, kOwnLimits);
+        EngineOpponent opponent(New<OwnEngine>(), PieceColor::White, kOwnLimits);
 
         opponent.Update(model);
         EXPECT_TRUE(opponent.IsThinking());
@@ -474,7 +474,7 @@ namespace BECore::Chess::Tests {
     TEST_F(EngineOpponentTest, TheOwnEnginesAnswerIsDroppedWhenTheVersionMovesMeanwhile) {
         constexpr SearchLimits kOwnLimits{0, 4};
         ChessGameModel model;
-        EngineOpponent opponent(MakeShared<OwnEngine>(), PieceColor::White, kOwnLimits);
+        EngineOpponent opponent(New<OwnEngine>(), PieceColor::White, kOwnLimits);
 
         opponent.Update(model);
         EXPECT_TRUE(opponent.IsThinking());
@@ -490,7 +490,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(EngineOpponentTest, AnyEngineWillDoAndTwoOpponentsCanPlayEachOther) {
         constexpr size_t kPlies = 24;
-        const auto engine = MakeShared<FirstLegalMoveEngine>();
+        const auto engine = New<FirstLegalMoveEngine>();
         ChessGameModel model;
         EngineOpponent white(engine, PieceColor::White, kLimits);
         EngineOpponent black(engine, PieceColor::Black, kLimits);

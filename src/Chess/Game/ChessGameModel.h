@@ -1,5 +1,6 @@
 #pragma once
 
+#include <BECore/Utils/MoveOnlyFunction.h>
 #include <Chess/Game/ChessTypes.h>
 #include <Chess/Game/GameStatus.h>
 #include <Chess/Game/Move.h>
@@ -44,7 +45,7 @@ namespace BECore::Chess {
 
         /// Where Reset() gets a new seed from; returns any value (a 0 becomes 1).
         //-NoStd: no callable alias yet (callables-move-only)
-        using SeedSource = eastl::function<uint32_t()>;
+        using SeedSource = MoveOnlyFunction<uint32_t()>;
 
         ChessGameModel();
 

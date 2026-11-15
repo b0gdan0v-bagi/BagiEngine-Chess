@@ -22,7 +22,7 @@ namespace BECore::Chess {
         return HintRefusalFor(model, ProgramSides::Of(programPlays));
     }
 
-    std::expected<SharedPtr<IChessEngine>, EngineError> MakeAnalysisEngine(OpponentEngine engine, const OpponentSettings& settings) {
+    std::expected<ChessEnginePtr, EngineError> MakeAnalysisEngine(OpponentEngine engine, const OpponentSettings& settings) {
         switch (engine) {
             case OpponentEngine::Stockfish: {
                 if (!IsOpponentEngineAvailable(OpponentEngine::Stockfish)) {
@@ -35,10 +35,10 @@ namespace BECore::Chess {
                 UciEngineSettings uci;
                 uci.launch.path = *program;
                 uci.quitGraceMs = OpponentController::kQuitGraceMs;
-                return MakeShared<UciEngine>(std::move(uci));
+                return New<UciEngine>(std::move(uci));
             }
             case OpponentEngine::Own:
-                return MakeShared<OwnEngine>();
+                return New<OwnEngine>();
         }
         return std::unexpected(EngineError{EngineErrorKind::BadRequest, "unknown engine"});
     }
@@ -48,8 +48,13 @@ namespace BECore::Chess {
     }
 
     void PositionAnalyst::SetEngineFactory(AnalysisEngineFactory factory) {
-        _rater.SetEngineFactory(factory);
         _factory = std::move(factory);
+        // A factory is move-only, so the rater asks through this one; the rater is a member and never outlives the analyst
+        _rater.SetEngineFactory([this](OpponentEngine engine) { return MakeEngine(engine); });
+    }
+
+    std::expected<ChessEnginePtr, EngineError> PositionAnalyst::MakeEngine(OpponentEngine engine) const {
+        return _factory ? _factory(engine) : MakeAnalysisEngine(engine, OpponentSettings{});
     }
 
     void PositionAnalyst::SetPicked(OpponentEngine picked) {
@@ -58,7 +63,7 @@ namespace BECore::Chess {
             _search->token.Cancel();
         }
         if (_engine && _engineKind != picked) {
-            _engine.reset();  // a running search keeps its own reference to the old one
+            _engine.Reset();  // a running search keeps its own reference to the old one
         }
         if (_result && _resultEngine != picked) {
             _result.reset();
@@ -141,7 +146,7 @@ namespace BECore::Chess {
         SetEvaluation(false);
         CancelHint();
         ClearError();
-        _engine.reset();
+        _engine.Reset();
         _rater.Shutdown();
     }
 
@@ -175,7 +180,7 @@ namespace BECore::Chess {
         return lines;
     }
 
-    Task<void> PositionAnalyst::RunSearch(SharedPtr<Search> search, SearchRequest request) {
+    Task<void> PositionAnalyst::RunSearch(IntrusivePtrAtomic<Search> search, SearchRequest request) {
         std::expected<Analysis, EngineError> answer = AnswerOfTask(co_await search->engine->AnalyseAsync(request, search->token));
         {
             const LockGuard lock(search->mutex);
@@ -198,7 +203,7 @@ namespace BECore::Chess {
         const bool wanted = !_search->token.IsCancelled() && _searchVersion == model.GetVersion() && _searchEngine == picked;
         const uint64_t version = _searchVersion;
         const OpponentEngine engine = _searchEngine;
-        _search.reset();
+        _search.Reset();
 
         if (!wanted) {
             LOG_INFO("Position analyst ({}): the answer of a cancelled or out-of-date search is dropped"_format(OpponentEngineId(engine)));
@@ -248,7 +253,7 @@ namespace BECore::Chess {
     void PositionAnalyst::StartSearch(const ChessGameModel& model, OpponentEngine picked) {
         const uint64_t version = model.GetVersion();
         if (!_engine) {
-            std::expected<SharedPtr<IChessEngine>, EngineError> made = _factory ? _factory(picked) : MakeAnalysisEngine(picked, OpponentSettings{});
+            std::expected<ChessEnginePtr, EngineError> made = MakeEngine(picked);
             if (!made) {
                 Fail(version, picked, std::move(made.error()));
                 return;
@@ -256,7 +261,7 @@ namespace BECore::Chess {
             _engine = std::move(*made);
             _engineKind = picked;
         }
-        _search = MakeShared<Search>(_engine);
+        _search = New<Search>(_engine);
         _searchVersion = version;
         _searchEngine = picked;
         const SearchLimits limits = LimitsOf(picked, GetOpponentLevels().back());

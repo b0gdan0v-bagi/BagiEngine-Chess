@@ -150,7 +150,7 @@ namespace BECore::Chess::Tests {
 
         /// The doubles of this test's engines (no process, nothing plays by itself while it is the person's turn)
         void UseDoubles() {
-            _factory = MakeUnique<CountingFactory>(std::initializer_list<SharedPtr<IChessEngine>>{MakeShared<InstantEngine>()});
+            _factory = MakeUnique<CountingFactory>(std::initializer_list<ChessEnginePtr>{New<InstantEngine>()});
             Game().GetOpponent().SetEngineFactory(_factory->AsFactory());
         }
 

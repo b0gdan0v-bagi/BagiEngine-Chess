@@ -14,7 +14,7 @@ namespace BECore::Chess::Tests {
 
     // The board's update lets the program move and the HUD publishes in its draw: if the HUD published first, the frame of the reply would show the words of the position before it
     TEST_F(ChessUiTest, TheFrameInWhichTheProgramAnswersShowsTheWordsOfItsAnswer) {
-        CountingFactory factory({MakeShared<InstantEngine>()});
+        CountingFactory factory({New<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         ControlPlays("black");
         ClickMove("e2", "e4");

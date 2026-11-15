@@ -39,8 +39,8 @@ namespace BECore::Chess::Tests {
             }
         }
 
-        SharedPtr<AnalysingEngine> MakeEngine(AnalysisScore score = kScore, Optional<Move> move = std::nullopt) {
-            return MakeShared<AnalysingEngine>(score, move);
+        IntrusivePtrAtomic<AnalysingEngine> MakeEngine(AnalysisScore score = kScore, Optional<Move> move = std::nullopt) {
+            return New<AnalysingEngine>(score, move);
         }
 
         /// An engine that only plays: it keeps the default Analyse() of the interface
@@ -316,7 +316,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(PositionAnalystTest, AnEngineThatDoesNotAnalyseIsAnErrorNotACrash) {
-        CountingAnalysisFactory factory{MakeShared<PlayingEngine>()};
+        CountingAnalysisFactory factory{New<PlayingEngine>()};
         ChessGameModel model;
         PositionAnalyst analyst;
         analyst.SetEngineFactory(factory.AsFactory());
@@ -791,7 +791,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(PositionAnalystTest, TheDefaultFactoryMakesTheOwnEngineWithoutAPath) {
-        const std::expected<SharedPtr<IChessEngine>, EngineError> engine = MakeAnalysisEngine(OpponentEngine::Own, OpponentSettings{});
+        const std::expected<ChessEnginePtr, EngineError> engine = MakeAnalysisEngine(OpponentEngine::Own, OpponentSettings{});
 
         ASSERT_TRUE(engine.has_value());
         ASSERT_NE(*engine, nullptr);
@@ -807,8 +807,8 @@ namespace BECore::Chess::Tests {
         OpponentSettings settings;
         settings.stockfishPath = "/no/such/file";
 
-        const std::expected<SharedPtr<IChessEngine>, EngineError> stockfish = MakeAnalysisEngine(OpponentEngine::Stockfish, settings);
-        const std::expected<SharedPtr<IChessEngine>, EngineError> own = MakeAnalysisEngine(OpponentEngine::Own, {});
+        const std::expected<ChessEnginePtr, EngineError> stockfish = MakeAnalysisEngine(OpponentEngine::Stockfish, settings);
+        const std::expected<ChessEnginePtr, EngineError> own = MakeAnalysisEngine(OpponentEngine::Own, {});
 
         ASSERT_FALSE(stockfish.has_value());
         EXPECT_EQ(stockfish.error().kind, EngineErrorKind::Unsupported) << "the path is not even looked at, and nothing falls back to the other engine";
@@ -823,7 +823,7 @@ namespace BECore::Chess::Tests {
         OpponentSettings settings;
         settings.stockfishPath = "/no/such/file";
 
-        const std::expected<SharedPtr<IChessEngine>, EngineError> engine = MakeAnalysisEngine(OpponentEngine::Stockfish, settings);
+        const std::expected<ChessEnginePtr, EngineError> engine = MakeAnalysisEngine(OpponentEngine::Stockfish, settings);
 
         ASSERT_FALSE(engine.has_value());
         EXPECT_EQ(engine.error().kind, EngineErrorKind::LaunchFailed);

@@ -180,7 +180,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, EveryActionOfThePanelIsOneTheBoardAnswers) {
         // Press each action with the id of a segment, as the segment would: the controller reads the pick back (the unknown action is ignored by ChessOpponentPanelComponent)
-        CountingFactory factory({MakeShared<InstantEngine>()});
+        CountingFactory factory({New<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         const struct {
@@ -285,7 +285,7 @@ namespace BECore::Chess::Tests {
     // this machine is never looked for. The scene is the shipped one, so a click is a click on the board and a frame is the update of every component
 
     TEST_F(ChessUiTest, WithNobodyAsTheOpponentTheGamePlaysAsTwoPeople) {
-        CountingFactory factory({MakeShared<InstantEngine>()});
+        CountingFactory factory({New<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
 
@@ -305,7 +305,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheProgramAnswersAPersonsMoveWithinAFewFrames) {
-        const auto engine = MakeShared<InstantEngine>();
+        const auto engine = New<InstantEngine>();
         CountingFactory factory({engine});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -330,7 +330,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, WhileTheProgramThinksAClickOnTheBoardNeverMovesTheGameOrCancelsItsSearch) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto engine = MakeShared<GatedEngine>(true);
+        const auto engine = New<GatedEngine>(true);
         CountingFactory factory({engine});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -381,7 +381,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, ModeAndColorThroughThePanelPickTheSideTheProgramPlays) {
         // The mode and the color are two choices, so the case goes by their segments
-        const auto engine = MakeShared<InstantEngine>();
+        const auto engine = New<InstantEngine>();
         CountingFactory factory({engine});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -427,7 +427,7 @@ namespace BECore::Chess::Tests {
     TEST_F(ChessUiTest, TheLevelActionPicksEveryLevelAndTheFactoryIsAskedOnlyWhenTheProgramPlays) {
         // The segments of LevelGroup emit ChessSetLevel with the id of their level; the test presses the action the same way
         const auto levels = GetOpponentLevels();
-        CountingFactory factory({MakeShared<InstantEngine>()});
+        CountingFactory factory({New<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
 
@@ -449,7 +449,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, TheEngineSegmentsPickBothEnginesAndTheDefaultIsStockfish) {
         SKIP_WITHOUT_STOCKFISH_SEGMENT();
-        CountingFactory factory({MakeShared<InstantEngine>()});
+        CountingFactory factory({New<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         StartFromTheStockfishName();
@@ -480,7 +480,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, WhileTheProgramThinksTheTurnSaysSoAndTheAnswerBringsTheUsualWordsBack) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto engine = MakeShared<GatedEngine>(true);
+        const auto engine = New<GatedEngine>(true);
         CountingFactory factory({engine});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -522,7 +522,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheSentenceOfASearchErrorIsInTheStatusUntilSomeoneMovesTheGame) {
-        const auto engine = MakeShared<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
+        const auto engine = New<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
         CountingFactory factory({engine});
         ASSERT_NO_FATAL_FAILURE(ProvokeAnEngineError(factory));
 
@@ -539,7 +539,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheSentenceOfASearchErrorWinsOverCheckAndTheResetButtonTakesItAway) {
-        const auto engine = MakeShared<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
+        const auto engine = New<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
         CountingFactory factory({engine});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -560,7 +560,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, TheEngineGroupTakesClicksWhetherOrNotTheProgramPlays) {
         // No group of the panel is greyed, and the EngineGroup works in every state
-        CountingFactory working({MakeShared<InstantEngine>()});
+        CountingFactory working({New<InstantEngine>()});
         Opponent().SetEngineFactory(working.AsFactory());
         _manager->UpdateAll();
         ASSERT_TRUE(OpenThePanel());
@@ -596,7 +596,7 @@ namespace BECore::Chess::Tests {
     // The fill of each button has a color of its own in SceneConfig.xml, which is how a test finds where the screen shows it (the way ClickingTheResetButtonOnTheScreen... does)
 
     TEST_F(ChessUiTest, ClickingTheModeAndColorSegmentsOnTheScreenPicksTheSideAndAPressAloneDoesNothing) {
-        CountingFactory factory({MakeShared<InstantEngine>()});
+        CountingFactory factory({New<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         ASSERT_TRUE(OpenThePanel());
@@ -619,7 +619,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, ClickingAnEngineSegmentOnTheScreenPicksTheEngineAndAPressAloneDoesNothing) {
         SKIP_WITHOUT_STOCKFISH_SEGMENT();
-        CountingFactory factory({MakeShared<InstantEngine>()});
+        CountingFactory factory({New<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         StartFromTheStockfishName();
@@ -649,7 +649,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, APressOnASegmentDoesNotChangeTheBoardSelection) {
-        CountingFactory factory({MakeShared<InstantEngine>()});
+        CountingFactory factory({New<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         Click("e2");
@@ -692,7 +692,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheResetButtonKeepsTheEngine) {
-        CountingFactory factory({MakeShared<InstantEngine>()});
+        CountingFactory factory({New<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         ASSERT_TRUE(OpenThePanel());
@@ -712,7 +712,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, TheResetButtonStillResetsWithTheMenuButtonAround) {
         // Reset keeps the opponent chosen in the panel; the Menu button beside it does not change that
-        CountingFactory factory({MakeShared<InstantEngine>()});
+        CountingFactory factory({New<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         ASSERT_TRUE(OpenThePanel());
@@ -730,7 +730,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, ThePressOfAHudButtonDoesNotReachTheBoardAndTheBoardStillGetsItsOwnClicks) {
-        CountingFactory factory({MakeShared<InstantEngine>()});
+        CountingFactory factory({New<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         ASSERT_TRUE(OpenThePanel());
@@ -764,7 +764,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, EachActionOfThePanelPicksWhatTheControlApiWouldRead) {
-        CountingFactory factory({MakeShared<InstantEngine>()});
+        CountingFactory factory({New<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         const size_t hard = *FindOpponentLevel("hard");
@@ -813,7 +813,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, ComputerAndThenBlackMakesTheProgramOpenAsWhite) {
-        CountingFactory factory({MakeShared<InstantEngine>()});
+        CountingFactory factory({New<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
 
@@ -830,7 +830,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, ThePersonsColorSurvivesTwoPlayersAndComesBack) {
-        CountingFactory factory({MakeShared<InstantEngine>()});
+        CountingFactory factory({New<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
 
@@ -858,7 +858,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, AnActionOfThePanelWithABadValueChangesNothing) {
-        CountingFactory factory({MakeShared<InstantEngine>()});
+        CountingFactory factory({New<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         StartFromTheStockfishName();
@@ -895,7 +895,7 @@ namespace BECore::Chess::Tests {
             if (engine == OpponentEngine::Stockfish) {
                 return std::unexpected(EngineError{EngineErrorKind::LaunchFailed, "no Stockfish in the test"});
             }
-            return MakeShared<InstantEngine>();
+            return New<InstantEngine>();
         });
         _manager->UpdateAll();
         StartFromTheStockfishName();
@@ -928,7 +928,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, AFailedSearchIsInTheErrorVariableToo) {
-        const auto engine = MakeShared<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
+        const auto engine = New<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
         CountingFactory factory({engine});
         ASSERT_NO_FATAL_FAILURE(ProvokeAnEngineError(factory));
 
@@ -942,7 +942,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheIdsAgreeWithWhatTheControlApiReportsAfterASetState) {
-        CountingFactory factory({MakeShared<InstantEngine>()});
+        CountingFactory factory({New<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         const auto agree = [&](const char* mode, const char* personColor, const char* plays) {
@@ -1110,7 +1110,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, EverySegmentEmitsItsActionAndValueAndTheSelectionFollowsTheController) {
-        CountingFactory factory({MakeShared<InstantEngine>()});
+        CountingFactory factory({New<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         ASSERT_TRUE(OpenThePanel());
@@ -1182,7 +1182,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, NoGroupOfThePanelIsGreyedAndALevelAndAColorPickedForTwoPeopleApplyAtComputer) {
         // A greyed group read as a dead button, so every group takes clicks in every mode and the pick is remembered until Computer is picked
-        CountingFactory working({MakeShared<InstantEngine>()});
+        CountingFactory working({New<InstantEngine>()});
         Opponent().SetEngineFactory(working.AsFactory());
         _manager->UpdateAll();
         ASSERT_TRUE(OpenThePanel());
@@ -1249,7 +1249,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, NoGroupOfThePanelIsGreyedWhateverTheControlApiSets) {
         // The control API picks the program's side without the panel and the groups stay whole while the choice follows it
-        CountingFactory factory({MakeShared<InstantEngine>()});
+        CountingFactory factory({New<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         ASSERT_TRUE(OpenThePanel());  // a hidden canvas is not drawn, so its segments take the choice only once it is shown
@@ -1291,7 +1291,7 @@ namespace BECore::Chess::Tests {
             if (engine == OpponentEngine::Stockfish) {
                 return std::unexpected(EngineError{EngineErrorKind::LaunchFailed, "no Stockfish in the test"});
             }
-            return MakeShared<InstantEngine>();
+            return New<InstantEngine>();
         });
         _manager->UpdateAll();
         ASSERT_TRUE(OpenThePanel());
@@ -1401,7 +1401,7 @@ namespace BECore::Chess::Tests {
     TEST_F(ChessUiTest, WithAFactoryOfATestTheStockfishSegmentIsShownWhateverIsFound) {
         SKIP_WITHOUT_STOCKFISH_SEGMENT();
         UseStockfishPath(MissingStockfishFile());
-        CountingFactory factory({MakeShared<InstantEngine>()});
+        CountingFactory factory({New<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         ASSERT_TRUE(Opponent().OffersStockfish());
         ASSERT_TRUE(OpenThePanel());
@@ -1456,7 +1456,7 @@ namespace BECore::Chess::Tests {
 #endif
 
     TEST_F(ChessUiTest, TheMenuButtonSaysMenuWhateverIsPickedAndThePanelNamesTheColors) {
-        CountingFactory factory({MakeShared<InstantEngine>()});
+        CountingFactory factory({New<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         ASSERT_TRUE(OpenThePanel());
@@ -1490,7 +1490,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, ThePersonPlaysTheColorThePanelNamesAndTheProgramTheOther) {
         // The person plays the color the PANEL names (the Menu button names nothing)
-        const auto engine = MakeShared<InstantEngine>();
+        const auto engine = New<InstantEngine>();
         CountingFactory factory({engine});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -1519,7 +1519,7 @@ namespace BECore::Chess::Tests {
             if (engine == OpponentEngine::Stockfish) {
                 return std::unexpected(EngineError{EngineErrorKind::LaunchFailed, "no Stockfish in the test"});
             }
-            return MakeShared<InstantEngine>();
+            return New<InstantEngine>();
         });
         _manager->UpdateAll();
         StartFromTheStockfishName();
@@ -1562,7 +1562,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, ASearchErrorIsOnTheErrorLineAndAnyPickOfThePanelLetsThePersonOut) {
         // Twin of ChangingTheSideLetsThePersonOut... and ChangingTheLevelLetsThePersonOut... through the segments: the error line empties and the new engine is asked once
-        const auto engine = MakeShared<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
+        const auto engine = New<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
         CountingFactory factory({engine});
         ASSERT_NO_FATAL_FAILURE(ProvokeAnEngineError(factory));
         ASSERT_TRUE(OpenThePanel());
@@ -1585,7 +1585,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheSentencesOfTheErrorLineAreTheOnesOfTheOpponentText) {
-        const auto engine = MakeShared<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
+        const auto engine = New<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
         CountingFactory factory({engine});
         ASSERT_NO_FATAL_FAILURE(ProvokeAnEngineError(factory));
         ASSERT_TRUE(OpenThePanel());

@@ -52,7 +52,7 @@ namespace BECore::Chess {
         SetOn(false);
         DropHistory();
         _startFen.clear();
-        _engine.reset();
+        _engine.Reset();
     }
 
     bool MoveRater::IsThinking() const {
@@ -68,7 +68,7 @@ namespace BECore::Chess {
         return ratings;
     }
 
-    Task<void> MoveRater::RunSearch(SharedPtr<Search> search, SearchRequest request) {
+    Task<void> MoveRater::RunSearch(IntrusivePtrAtomic<Search> search, SearchRequest request) {
         std::expected<Analysis, EngineError> answer = AnswerOfTask(co_await search->engine->AnalyseAsync(request, search->token));
         {
             const LockGuard lock(search->mutex);
@@ -119,7 +119,7 @@ namespace BECore::Chess {
         }
         const bool wanted = !_search->token.IsCancelled() && _searchGeneration == _generation;
         const size_t ply = _searchPly;
-        _search.reset();
+        _search.Reset();
 
         if (!wanted) {
             LOG_INFO("Move rater: the answer of a cancelled or out-of-date search is dropped");
@@ -139,7 +139,7 @@ namespace BECore::Chess {
 
     void MoveRater::StartSearch(size_t ply) {
         if (!_engine) {
-            std::expected<SharedPtr<IChessEngine>, EngineError> made = _factory ? _factory(OpponentEngine::Own) : MakeAnalysisEngine(OpponentEngine::Own, OpponentSettings{});
+            std::expected<ChessEnginePtr, EngineError> made = _factory ? _factory(OpponentEngine::Own) : MakeAnalysisEngine(OpponentEngine::Own, OpponentSettings{});
             if (!made) {
                 Fail(std::nullopt, std::move(made.error()));
                 return;
@@ -155,7 +155,7 @@ namespace BECore::Chess {
         request.moves.assign(_moves.begin(), _moves.begin() + ply);
         request.limits = SearchLimits{0, kRatingDepth};
         request.lines = kRatingLines;
-        _search = MakeShared<Search>(_engine);
+        _search = New<Search>(_engine);
         _searchPly = ply;
         _searchGeneration = _generation;
         // Fire and forget: the task keeps itself alive until it ends, and the answer comes through _search, not through the handle

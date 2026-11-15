@@ -1,5 +1,6 @@
 #pragma once
 
+#include <BECore/Utils/MoveOnlyFunction.h>
 #include <Chess/Engine/ChessEngine.h>
 #include <Chess/Engine/SearchRequest.h>
 #include <Chess/Game/ChessGameModel.h>
@@ -14,8 +15,7 @@ namespace BECore::Chess::Tests {
     inline constexpr size_t kDefaultPlyCap = 120;
 
     /// What a player of a test game is: the next move for the side to move of @p model
-    //-NoStd: no callable alias yet (callables-move-only)
-    using Player = std::function<Move(const ChessGameModel&)>;
+    using Player = MoveOnlyFunction<Move(const ChessGameModel&)>;
 
     /// Asks @p engine with @p limits through SearchRequest::FromModel (the history goes with the request). An error fails the test and gives a null move, which the model refuses
     inline Player EnginePlayer(IChessEngine& engine, SearchLimits limits) {

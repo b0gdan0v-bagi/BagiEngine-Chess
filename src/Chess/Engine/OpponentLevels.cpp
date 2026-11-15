@@ -57,11 +57,11 @@ namespace BECore::Chess {
         return std::nullopt;
     }
 
-    SharedPtr<IChessEngine> WithHandicap(SharedPtr<IChessEngine> engine, const OpponentLevel& level) {
+    ChessEnginePtr WithHandicap(ChessEnginePtr engine, const OpponentLevel& level) {
         if (level.blunderPercent <= 0) {
             return engine;
         }
-        return MakeShared<BlunderEngine>(std::move(engine), level.blunderPercent);
+        return New<BlunderEngine>(std::move(engine), level.blunderPercent);
     }
 
     SearchLimits LimitsOf(OpponentEngine engine, const OpponentLevel& level) {

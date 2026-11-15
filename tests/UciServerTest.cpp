@@ -119,7 +119,7 @@ namespace BECore::Chess::Tests {
         /// A server and the lines it printed. The lines are declared first, so that they outlive the server (its worker may still print while it is destroyed)
         class Session {
         public:
-            explicit Session(SharedPtr<IChessEngine> engine = MakeShared<OwnEngine>())
+            explicit Session(ChessEnginePtr engine = New<OwnEngine>())
                 : _server(std::move(engine), [this](StringView line) {
                       const std::lock_guard lock(_mutex);
                       _lines.emplace_back(line.data(), line.size());
@@ -195,7 +195,7 @@ namespace BECore::Chess::Tests {
 
         /// The move that BlunderEngine over OwnEngine answers for @p request
         String BlunderAnswer(int percent, const SearchRequest& request) {
-            BlunderEngine engine(MakeShared<OwnEngine>(), percent);
+            BlunderEngine engine(New<OwnEngine>(), percent);
             const auto move = engine.FindMove(request, CancellationToken::Create());
             EXPECT_TRUE(move.has_value());
             return move ? move->ToUci() : String();
@@ -206,8 +206,8 @@ namespace BECore::Chess::Tests {
             return position && MoveGenerator::ParseUci(*position, StringView(uci)).has_value();
         }
 
-        SharedPtr<ScriptedEngine> MakeScripted() {
-            return MakeShared<ScriptedEngine>();
+        IntrusivePtrAtomic<ScriptedEngine> MakeScripted() {
+            return New<ScriptedEngine>();
         }
 
     }  // namespace

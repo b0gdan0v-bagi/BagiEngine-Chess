@@ -21,7 +21,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, WithTheProgramAsWhiteTheBoardAndThePiecesAreTurnedBy180Degrees) {
         SKIP_WITHOUT_WORKER_THREADS();
-        CountingFactory factory({MakeShared<GatedEngine>(true)});
+        CountingFactory factory({New<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         EXPECT_EQ(PieceOrigin("WhiteRook_a1"), (Pair<float, float>{100.0f, 640.0f})) << "two people: a1 at the bottom left";
@@ -58,7 +58,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, AClickOnTheDrawnSquareSelectsThatSquareInTheTurnedBoard) {
-        CountingFactory factory({MakeShared<InstantEngine>()});
+        CountingFactory factory({New<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         ControlPlays("white");
         StartFrom(kBlackToMoveAfterE4);
@@ -100,7 +100,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, APersonsMoveByClicksInTheTurnedBoardIsPlayed) {
         SKIP_WITHOUT_WORKER_THREADS();
-        CountingFactory factory({MakeShared<GatedEngine>(true)});
+        CountingFactory factory({New<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         ControlPlays("white");
         StartFrom(kBlackToMoveAfterE4);
@@ -116,7 +116,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheFourCornersOfTheTurnedBoardAreTheSquaresTheyShow) {
-        CountingFactory factory({MakeShared<InstantEngine>()});
+        CountingFactory factory({New<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         ControlPlays("white");
         StartFrom(kFourRooks);
@@ -139,7 +139,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheCheckSitsOnTheKingsTurnedCell) {
-        CountingFactory factory({MakeShared<InstantEngine>()});
+        CountingFactory factory({New<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         ControlPlays("white");
         StartFrom(kBlackInCheck);
@@ -169,7 +169,7 @@ namespace BECore::Chess::Tests {
         _manager->UpdateAll();
         ASSERT_FALSE(PromotionShown());
 
-        CountingFactory factory({MakeShared<InstantEngine>()});
+        CountingFactory factory({New<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         ControlPlays("white");
         StartFrom(kBlackPromotesOnE1);
@@ -209,7 +209,7 @@ namespace BECore::Chess::Tests {
         _manager->UpdateAll();
         ASSERT_FALSE(PromotionShown());
 
-        CountingFactory factory({MakeShared<InstantEngine>()});
+        CountingFactory factory({New<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         ControlPlays("white");
         StartFrom(kBlackPromotesOnE1);
@@ -237,7 +237,7 @@ namespace BECore::Chess::Tests {
             return dim.empty() ? std::nullopt : Optional<Rect>(dim.front()->rect);
         };
 
-        CountingFactory factory({MakeShared<InstantEngine>()});
+        CountingFactory factory({New<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         ControlPlays("white");
         StartFrom(kBlackMatesOnA1);
@@ -256,7 +256,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, TheBoardTurnsBackWhenNobodyOrBlackIsTheProgram) {
         SKIP_WITHOUT_WORKER_THREADS();
-        CountingFactory factory({MakeShared<GatedEngine>(true)});
+        CountingFactory factory({New<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         ExpectPiecesAtTheCellsOf(false);
@@ -279,7 +279,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheColorSegmentsAndTheModeTurnTheBoardAtTheNextFrame) {
-        CountingFactory factory({MakeShared<InstantEngine>()});
+        CountingFactory factory({New<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
 
@@ -304,7 +304,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, ABlackPickedWhileTwoPlayDoesNotTurnTheBoardUntilComputerIsPicked) {
         SKIP_WITHOUT_WORKER_THREADS();
-        CountingFactory factory({MakeShared<GatedEngine>(true)});
+        CountingFactory factory({New<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
 
@@ -332,7 +332,7 @@ namespace BECore::Chess::Tests {
             if (engine == OpponentEngine::Stockfish) {
                 return std::unexpected(EngineError{EngineErrorKind::LaunchFailed, "no Stockfish in the test"});
             }
-            return MakeShared<GatedEngine>(true);
+            return New<GatedEngine>(true);
         });
         _manager->UpdateAll();
         StartFromTheStockfishName();
@@ -361,7 +361,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, ResetAndSetStateKeepTheTurnedBoardAndDealThePiecesToItsCells) {
         SKIP_WITHOUT_WORKER_THREADS();
-        CountingFactory factory({MakeShared<GatedEngine>(true)});
+        CountingFactory factory({New<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         ControlPlays("white");
         _manager->UpdateAll();
@@ -393,7 +393,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, WithTheProgramAsWhiteTheCoordinateVariablesReadFromBlacksSide) {
         SKIP_WITHOUT_WORKER_THREADS();
-        CountingFactory factory({MakeShared<GatedEngine>(true)});
+        CountingFactory factory({New<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         ControlPlays("white");
         _manager->UpdateAll();
@@ -404,7 +404,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, TheCoordinateVariablesTurnBackWithTwoPeopleAndWithTheProgramAsBlack) {
         SKIP_WITHOUT_WORKER_THREADS();
-        CountingFactory factory({MakeShared<GatedEngine>(true)});
+        CountingFactory factory({New<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         ControlPlays("white");
         _manager->UpdateAll();
@@ -426,7 +426,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, TheCoordinateVariablesFollowTheColorSegmentsAndTheModeOfThePanel) {
         SKIP_WITHOUT_WORKER_THREADS();
-        CountingFactory factory({MakeShared<GatedEngine>(true)});
+        CountingFactory factory({New<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
 
@@ -444,7 +444,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, AResetAndASetStateKeepTheCoordinatesOfTheBoardThatIsTurned) {
         SKIP_WITHOUT_WORKER_THREADS();
-        CountingFactory factory({MakeShared<GatedEngine>(true)});
+        CountingFactory factory({New<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         ControlPlays("white");
         _manager->UpdateAll();
@@ -564,7 +564,7 @@ namespace BECore::Chess::Tests {
         const auto blackA8 = GiveAtlasCell("BlackRook_a8");
         const auto blackH8 = GiveAtlasCell("BlackRook_h8");
         const ITexture* const rooks[] = {whiteA1.Get(), whiteH1.Get(), blackA8.Get(), blackH8.Get()};
-        CountingFactory factory({MakeShared<GatedEngine>(true)});
+        CountingFactory factory({New<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
 
         for (const ViewShape& shape : kViewShapes) {
@@ -609,7 +609,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, TheCoordinateColorsReadOnTheSquaresThatAreDrawnInBothOrientations) {
         SKIP_WITHOUT_WORKER_THREADS();
-        CountingFactory factory({MakeShared<GatedEngine>(true)});
+        CountingFactory factory({New<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
 
         for (const ViewShape& shape : kViewShapes) {
@@ -724,7 +724,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheCoordinateLabelsTakeNoClickAndTheBoardGetsItInTheirCells) {
-        CountingFactory factory({MakeShared<InstantEngine>()});
+        CountingFactory factory({New<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         StartFrom(kFourRooks);  // a rook of Black in each corner, Black to move
         ASSERT_EQ(Model().GetTurn(), PieceColor::Black);
@@ -765,7 +765,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, TheCoordinateLabelsTurnTheirTextAndKeepTheirPlaceOnTheScreen) {
         SKIP_WITHOUT_WORKER_THREADS();
-        CountingFactory factory({MakeShared<GatedEngine>(true)});
+        CountingFactory factory({New<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         const auto read = [&](bool files) {
             Draw();
@@ -816,7 +816,7 @@ namespace BECore::Chess::Tests {
     TEST_F(ChessUiTest, TheCoordinateColorsAreTheSameWhenTheBoardIsTurned) {
         SKIP_WITHOUT_WORKER_THREADS();
         // The turn by 180 degrees keeps the color of every cell, which is why the colors of the labels are fixed in the XML
-        CountingFactory factory({MakeShared<GatedEngine>(true)});
+        CountingFactory factory({New<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         Draw();
         Vector<Color> before;
@@ -981,7 +981,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, TheStateOfTheControlApiIsTheSameWhateverSideIsAtTheBottom) {
         SKIP_WITHOUT_WORKER_THREADS();
-        CountingFactory factory({MakeShared<GatedEngine>(true)});
+        CountingFactory factory({New<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         ControlPlays("white");
         _manager->UpdateAll();
@@ -1003,7 +1003,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, WhileTheProgramThinksAClickOnAnOwnPieceSelectsItAndAClickOnItsTargetQueuesAPremove) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto engine = MakeShared<GatedEngine>(true);
+        const auto engine = New<GatedEngine>(true);
         CountingFactory factory({engine});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -1044,7 +1044,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, ASecondPremoveMovesThePieceTheFirstOneMovedAndAnotherOwnPieceReselects) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto engine = MakeShared<GatedEngine>(true);
+        const auto engine = New<GatedEngine>(true);
         CountingFactory factory({engine});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -1069,7 +1069,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, WhileTheProgramThinksAClickOnAnEmptyOrAnEnemySquareCancelsTheWholeQueue) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto engine = MakeShared<GatedEngine>(true);
+        const auto engine = New<GatedEngine>(true);
         CountingFactory factory({engine});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -1104,7 +1104,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, APremoveToThePromotionRankAsksNoPieceAndPlaysAsAQueen) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto engine = MakeShared<GatedEngine>(true);
+        const auto engine = New<GatedEngine>(true);
         CountingFactory factory({engine});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -1139,7 +1139,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, WithTheProgramAsWhiteAPremoveOfBlackIsClickedOnTheTurnedBoard) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto engine = MakeShared<GatedEngine>(true);
+        const auto engine = New<GatedEngine>(true);
         CountingFactory factory({engine});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -1168,7 +1168,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, TheResetButtonDropsTheQueue) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto engine = MakeShared<GatedEngine>(true);
+        const auto engine = New<GatedEngine>(true);
         CountingFactory factory({engine});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -1191,7 +1191,7 @@ namespace BECore::Chess::Tests {
         SKIP_WITHOUT_WORKER_THREADS();
         const auto mate = MoveGenerator::ParseUci(PositionFromFen(kBlackMatesOnA1), "a8a1");
         ASSERT_TRUE(mate.has_value());
-        const auto engine = MakeShared<GatedEngine>(true, *mate);
+        const auto engine = New<GatedEngine>(true, *mate);
         CountingFactory factory({engine});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -1212,7 +1212,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, AfterTheProgramsMateAClickStartsANewGameAndTheProgramMovesAgain) {
-        CountingFactory factory({MakeShared<MatingEngine>()});
+        CountingFactory factory({New<MatingEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         Model().SetPosition(PositionFromFen("6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1"));
@@ -1241,7 +1241,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, AResetWhileTheProgramThinksDropsItsAnswerAndANewSearchFollowsOnItsTurn) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto engine = MakeShared<GatedEngine>(false);  // ignores its token: its answer comes late and must still be thrown away
+        const auto engine = New<GatedEngine>(false);  // ignores its token: its answer comes late and must still be thrown away
         CountingFactory factory({engine});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -1286,7 +1286,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, AnEngineThatFailedLocksTheProgramsSideButNotTheGameAndNothingIsRetried) {
-        const auto engine = MakeShared<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
+        const auto engine = New<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
         CountingFactory factory({engine});
         ASSERT_NO_FATAL_FAILURE(ProvokeAnEngineError(factory));
 
@@ -1303,7 +1303,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheResetButtonLetsThePersonOutOfAnEngineError) {
-        const auto engine = MakeShared<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
+        const auto engine = New<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
         CountingFactory factory({engine});
         ASSERT_NO_FATAL_FAILURE(ProvokeAnEngineError(factory));
 
@@ -1319,7 +1319,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, ChangingTheSideLetsThePersonOutOfAnEngineErrorAndNobodyIsTheWayOutForGood) {
-        const auto engine = MakeShared<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
+        const auto engine = New<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
         CountingFactory factory({engine});
         ASSERT_NO_FATAL_FAILURE(ProvokeAnEngineError(factory));
         const uint64_t revision = Opponent().GetRevision();
@@ -1347,7 +1347,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, ChangingTheLevelLetsThePersonOutOfAnEngineErrorAndAsksTheNewEngineOnce) {
-        const auto engine = MakeShared<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
+        const auto engine = New<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
         CountingFactory factory({engine});
         ASSERT_NO_FATAL_FAILURE(ProvokeAnEngineError(factory));
 
@@ -1363,7 +1363,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, StoppingTheGameDestroysTheOpponentAndCancelsItsSearch) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto engine = MakeShared<GatedEngine>(true);
+        const auto engine = New<GatedEngine>(true);
         CountingFactory factory({engine});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -1383,7 +1383,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, ShuttingTheGameDownWithASearchInFlightJoinsNothing) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto engine = MakeShared<GatedEngine>(false);  // never looks at its token: only the gate can end its search
+        const auto engine = New<GatedEngine>(false);  // never looks at its token: only the gate can end its search
         CountingFactory factory({engine});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -1409,7 +1409,7 @@ namespace BECore::Chess::Tests {
     // scripted move e2e4 through the analyst's factory, and the frames are real ones
 
     TEST_F(ChessUiTest, WithNoHintAskedForNoExtraSquareIsFilled) {
-        CountingAnalysisFactory factory({MakeShared<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"))});
+        CountingAnalysisFactory factory({New<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"))});
         Analyst().SetEngineFactory(factory.AsFactory());
         Settle();
         EXPECT_TRUE(HintFills().first.empty());
@@ -1423,7 +1423,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, AReadyHintFillsTheTwoSquaresOfItsMoveInTheirOwnColorsWithWhiteAtTheBottom) {
-        CountingAnalysisFactory factory({MakeShared<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"))});
+        CountingAnalysisFactory factory({New<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"))});
         Analyst().SetEngineFactory(factory.AsFactory());
         ASSERT_TRUE(ShowTheHint());
         ASSERT_FALSE(BlackIsAtTheBottom());
@@ -1441,9 +1441,9 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, AReadyHintFillsTheTurnedCellsWhenTheProgramPlaysWhite) {
         SKIP_WITHOUT_WORKER_THREADS();
-        CountingFactory opponentFactory({MakeShared<GatedEngine>(true)});  // the program opens and holds its answer: the board stays as it is
+        CountingFactory opponentFactory({New<GatedEngine>(true)});  // the program opens and holds its answer: the board stays as it is
         Opponent().SetEngineFactory(opponentFactory.AsFactory());
-        CountingAnalysisFactory factory({MakeShared<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"))});
+        CountingAnalysisFactory factory({New<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"))});
         Analyst().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         ControlPlays("white");
@@ -1464,7 +1464,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, TheHintIsDrawnOverTheSquaresAndUnderThePiecesAndASelectionStaysOnTopOfIt) {
         const auto pawn = GiveAtlasCell("WhitePawn_e2");
-        CountingAnalysisFactory factory({MakeShared<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"))});
+        CountingAnalysisFactory factory({New<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"))});
         Analyst().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         ASSERT_TRUE(ShowTheHint());
@@ -1510,7 +1510,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, AMoveByClicksAResetASetPositionAndTheControlApiTakeTheHintOffAtTheNextFrame) {
-        CountingAnalysisFactory factory({MakeShared<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"))});
+        CountingAnalysisFactory factory({New<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"))});
         Analyst().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         const auto expectHint = [&](bool shown) {
@@ -1551,7 +1551,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, AFinishedGameShowsNoHint) {
-        CountingAnalysisFactory factory({MakeShared<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Mate, 1}, Mv("a8a1"))});
+        CountingAnalysisFactory factory({New<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Mate, 1}, Mv("a8a1"))});
         Analyst().SetEngineFactory(factory.AsFactory());
         StartFrom(kBlackMatesOnA1);
         ASSERT_TRUE(ShowTheHint());
@@ -1577,7 +1577,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, WhileTheEngineStillThinksNothingIsDrawnAndTheAnswerBringsTheHint) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto engine = MakeShared<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"));
+        const auto engine = New<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"));
         engine->Gate(true);
         CountingAnalysisFactory factory({engine});
         Analyst().SetEngineFactory(factory.AsFactory());
@@ -1599,7 +1599,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheHintPlaysNothingAndLeavesThePiecesAndTheStateOfTheGameAsTheyAre) {
-        CountingAnalysisFactory factory({MakeShared<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"))});
+        CountingAnalysisFactory factory({New<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"))});
         Analyst().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         const auto boardOf = [&] {
@@ -1625,7 +1625,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, WithNoGameActiveTheBoardDrawsNoHint) {
-        CountingAnalysisFactory factory({MakeShared<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"))});
+        CountingAnalysisFactory factory({New<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"))});
         Analyst().SetEngineFactory(factory.AsFactory());
         ASSERT_TRUE(ShowTheHint());
         Draw();
@@ -1691,7 +1691,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheProgramsAnswerMarksItsSquares) {
-        CountingFactory factory({MakeShared<InstantEngine>()});
+        CountingFactory factory({New<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         ASSERT_TRUE(Opponent().SetSide(PieceColor::Black).has_value());
@@ -1771,7 +1771,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, TheTurnedBoardMarksTheTurnedCells) {
         SKIP_WITHOUT_WORKER_THREADS();
-        CountingFactory opponentFactory({MakeShared<GatedEngine>(true)});  // the program opens and holds its answer: the board stays as it is
+        CountingFactory opponentFactory({New<GatedEngine>(true)});  // the program opens and holds its answer: the board stays as it is
         Opponent().SetEngineFactory(opponentFactory.AsFactory());
         _manager->UpdateAll();
         ControlPlays("white");
@@ -1789,7 +1789,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheLastMoveIsDrawnOverTheSquaresAndUnderTheCheckTheHintTheSelectionAndTheLegalMoves) {
-        CountingAnalysisFactory factory({MakeShared<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e8d8"))});
+        CountingAnalysisFactory factory({New<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e8d8"))});
         Analyst().SetEngineFactory(factory.AsFactory());
         StartFrom("4k3/8/8/8/8/8/8/3R1K2 w - - 0 1");
         ASSERT_TRUE(Play(Model(), "d1e1"));  // check: the rook's squares are marked and the king's square is red
@@ -1872,8 +1872,8 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, WatchTheBoardTakesNoClickOnWhitesTurnAndKeepsTheSearchAlone) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto white = MakeShared<GatedEngine>(true);
-        const auto black = MakeShared<GatedEngine>(true);
+        const auto white = New<GatedEngine>(true);
+        const auto black = New<GatedEngine>(true);
         CountingFactory factory({white, black});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -1900,8 +1900,8 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, WatchTheBoardTakesNoClickOnBlacksTurnEither) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto white = MakeShared<GatedEngine>(true);
-        const auto black = MakeShared<GatedEngine>(true);
+        const auto white = New<GatedEngine>(true);
+        const auto black = New<GatedEngine>(true);
         CountingFactory factory({white, black});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -1926,8 +1926,8 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, WatchNoClickQueuesAPremove) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto white = MakeShared<GatedEngine>(true);
-        const auto black = MakeShared<GatedEngine>(true);
+        const auto white = New<GatedEngine>(true);
+        const auto black = New<GatedEngine>(true);
         CountingFactory factory({white, black});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -1946,8 +1946,8 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, WatchNoClickStartsAPromotion) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto white = MakeShared<GatedEngine>(true);
-        const auto black = MakeShared<GatedEngine>(true);
+        const auto white = New<GatedEngine>(true);
+        const auto black = New<GatedEngine>(true);
         CountingFactory factory({white, black});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -1968,8 +1968,8 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, WatchStartingDropsTheSelectionOfThePersonWhoseTurnItIs) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto white = MakeShared<GatedEngine>(true);
-        const auto black = MakeShared<GatedEngine>(true);
+        const auto white = New<GatedEngine>(true);
+        const auto black = New<GatedEngine>(true);
         CountingFactory factory({white, black});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -1986,7 +1986,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, WatchWhiteStaysAtTheBottomAndTheMaterialGroupsAreNotSwapped) {
         SKIP_WITHOUT_WORKER_THREADS();
-        CountingFactory factory({MakeShared<GatedEngine>(true), MakeShared<GatedEngine>(true)});
+        CountingFactory factory({New<GatedEngine>(true), New<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         StartFrom(kWhiteTookAPawn);
@@ -2012,8 +2012,8 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, WatchAClickAfterTheEndStartsANewGameAndTheProgramsOpenIt) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto white = MakeShared<GatedEngine>(true);
-        const auto black = MakeShared<GatedEngine>(true);
+        const auto white = New<GatedEngine>(true);
+        const auto black = New<GatedEngine>(true);
         CountingFactory factory({white, black});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -2040,8 +2040,8 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, WatchTheResetButtonStartsAgainAndTheBoardStaysLocked) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto white = MakeShared<GatedEngine>(true);
-        const auto black = MakeShared<GatedEngine>(true);
+        const auto white = New<GatedEngine>(true);
+        const auto black = New<GatedEngine>(true);
         CountingFactory factory({white, black});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -2062,8 +2062,8 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, WatchTwoPlayersInThePanelGivesTheBoardBackToClicks) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto white = MakeShared<GatedEngine>(true);
-        const auto black = MakeShared<GatedEngine>(true);
+        const auto white = New<GatedEngine>(true);
+        const auto black = New<GatedEngine>(true);
         CountingFactory factory({white, black});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -2088,7 +2088,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, WatchNobodyThroughTheControlApiGivesTheBoardBackToClicks) {
         SKIP_WITHOUT_WORKER_THREADS();
-        CountingFactory factory({MakeShared<GatedEngine>(true), MakeShared<GatedEngine>(true)});
+        CountingFactory factory({New<GatedEngine>(true), New<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         ControlPlays("both");
@@ -2107,8 +2107,8 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, WatchATakeoverLeavesTheClicksToThePersonsColorOnly) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto white = MakeShared<GatedEngine>(true);
-        const auto black = MakeShared<GatedEngine>(true);
+        const auto white = New<GatedEngine>(true);
+        const auto black = New<GatedEngine>(true);
         CountingFactory factory({white, black});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -2136,8 +2136,8 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, WatchAnErrorOfOneSeatDoesNotUnlockTheBoard) {
-        const auto white = MakeShared<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "no engine in the test"});
-        const auto black = MakeShared<GatedEngine>(true);
+        const auto white = New<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "no engine in the test"});
+        const auto black = New<GatedEngine>(true);
         CountingFactory factory({white, black});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -2279,7 +2279,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, TheProgramsTurnTakesNoDragAndDoesNotCancelItsSearch) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto engine = MakeShared<GatedEngine>(true);
+        const auto engine = New<GatedEngine>(true);
         CountingFactory factory({engine});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -2304,8 +2304,8 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, WatchTheBoardTakesNoDragOnEitherTurn) {
         SKIP_WITHOUT_WORKER_THREADS();
-        const auto white = MakeShared<GatedEngine>(true);
-        const auto black = MakeShared<GatedEngine>(true);
+        const auto white = New<GatedEngine>(true);
+        const auto black = New<GatedEngine>(true);
         CountingFactory factory({white, black});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -2396,7 +2396,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, ADragInTheTurnedBoardGoesByTheDrawnCells) {
-        CountingFactory factory({MakeShared<GatedEngine>(true)});
+        CountingFactory factory({New<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         ControlPlays("white");
         StartFrom(kBlackToMoveAfterE4);
@@ -2470,7 +2470,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheLiftedPieceIsTheSquareItCameFromAndTheTopLeftIsThePointerMinusHalfASquare) {
-        CountingFactory factory({MakeShared<GatedEngine>(true)});
+        CountingFactory factory({New<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         for (const bool turned : {false, true}) {
             SCOPED_TRACE(turned ? "turned" : "White at the bottom");
@@ -2521,7 +2521,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, ADraggedPieceIsCenteredUnderThePointerOnTheDragLayerAndGoesBackOrLandsOnTheTargetOnLetGo) {
         SKIP_WITHOUT_WORKER_THREADS();
-        CountingFactory factory({MakeShared<GatedEngine>(true)});
+        CountingFactory factory({New<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         for (const bool turned : {false, true}) {
             SCOPED_TRACE(turned ? "turned" : "White at the bottom");
@@ -2738,7 +2738,7 @@ namespace BECore::Chess::Tests {
     }  // namespace
 
     TEST_F(ChessUiTest, AClickOnADrawnSquareOfThePortraitBoardSelectsThatSquareInBothOrientations) {
-        CountingFactory factory({MakeShared<InstantEngine>()});
+        CountingFactory factory({New<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         for (const auto& output : kPortraitOutputs) {
             for (const bool turned : {false, true}) {
@@ -2771,7 +2771,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheFourCornersOfThePortraitBoardAreTheSquaresTheyShowInBothOrientations) {
-        CountingFactory factory({MakeShared<InstantEngine>()});
+        CountingFactory factory({New<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         for (const auto& output : kPortraitOutputs) {
             for (const bool turned : {false, true}) {
@@ -2824,7 +2824,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheDimAndTheResultBarCoverThePortraitBoardInBothOrientations) {
-        CountingFactory factory({MakeShared<InstantEngine>()});
+        CountingFactory factory({New<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         for (const auto& output : {kPortraitOutputs[0], kPortraitOutputs[2]}) {
             for (const bool turned : {false, true}) {
@@ -2852,7 +2852,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, TheMarksOfThePortraitBoardSitAroundTheirPiecesInBothOrientations) {
         SKIP_WITHOUT_WORKER_THREADS();
-        CountingFactory factory({MakeShared<GatedEngine>(true)});
+        CountingFactory factory({New<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         const auto output = kPortraitOutputs[0];
         for (const bool turned : {false, true}) {
@@ -2895,7 +2895,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, ADragOnThePortraitBoardLiftsThePieceUnderThePointerAndAReleaseOnATargetPlaysTheMove) {
         SKIP_WITHOUT_WORKER_THREADS();
-        CountingFactory factory({MakeShared<GatedEngine>(true)});
+        CountingFactory factory({New<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         for (const auto& output : kPortraitOutputs) {
             for (const bool turned : {false, true}) {

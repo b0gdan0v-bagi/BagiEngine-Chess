@@ -5,7 +5,6 @@
 #include <Chess/Engine/OwnEngine.h>
 #include <Chess/Uci/UciServer.h>
 #include <cstdio>
-#include <cstring>
 
 namespace {
 
@@ -43,7 +42,7 @@ namespace {
 int main() {
     using namespace BECore;
 
-    Chess::Uci::UciServer server(MakeShared<Chess::OwnEngine>(), WriteLine);
+    Chess::Uci::UciServer server(New<Chess::OwnEngine>(), WriteLine);
 
     String line;  // reused over the loop: its capacity stays
     while (!server.WantsQuit() && ReadLine(line)) {

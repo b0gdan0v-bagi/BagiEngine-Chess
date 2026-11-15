@@ -311,7 +311,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, ALevelPickedInTheOpponentPanelSurvivesBackAndASecondOpponent) {
-        CountingFactory factory({MakeShared<InstantEngine>()});
+        CountingFactory factory({New<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         ASSERT_TRUE(OpenThePanel());

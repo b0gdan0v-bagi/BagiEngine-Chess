@@ -169,8 +169,8 @@ namespace BECore::Chess::Tests {
             std::atomic<int> _answered{0};
         };
 
-        SharedPtr<PlyEngine> MakeEngine(Vector<Move> best = {}, int gap = 25) {
-            return MakeShared<PlyEngine>(std::move(best), gap);
+        IntrusivePtrAtomic<PlyEngine> MakeEngine(Vector<Move> best = {}, int gap = 25) {
+            return New<PlyEngine>(std::move(best), gap);
         }
 
         const EngineError kBroken{EngineErrorKind::ProcessDied, "the engine fell over"};
@@ -628,7 +628,7 @@ namespace BECore::Chess::Tests {
                 return FirstLegalMove(request);
             }
         };
-        const SharedPtr<IChessEngine> engine = MakeShared<PlayingEngine>();
+        const ChessEnginePtr engine = New<PlayingEngine>();
         CountingAnalysisFactory factory{engine};
         ChessGameModel model;
         ASSERT_TRUE(Play(model, "e2e4"));

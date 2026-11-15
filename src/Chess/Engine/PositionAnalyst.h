@@ -30,7 +30,7 @@ namespace BECore::Chess {
      * configured path, when one is set); nothing falls back to the other engine, nor to `$STOCKFISH` after a path that names no file (FindStockfish's rule). With CHESS_NO_STOCKFISH,
      * Stockfish is `Unsupported` (UnavailableEngineError).
      */
-    [[nodiscard]] std::expected<SharedPtr<IChessEngine>, EngineError> MakeAnalysisEngine(OpponentEngine engine, const OpponentSettings& settings);
+    [[nodiscard]] std::expected<ChessEnginePtr, EngineError> MakeAnalysisEngine(OpponentEngine engine, const OpponentSettings& settings);
 
     /**
      * @brief Analyses the position of a ChessGameModel in the background and keeps the answer for exactly that version of the game: the evaluation and the hint.
@@ -57,7 +57,7 @@ namespace BECore::Chess {
      * program plays.
      *
      * **Threads and shutdown.** Main thread only, as EngineOpponent. The worker sees a copy of the request and a state of its own (the engine, a CancellationToken, the answer behind a mutex, an
-     * atomic `done`) shared through a SharedPtr, so nothing dangles whichever side ends first. The destructor, Cancel() and Shutdown() cancel the token and return at once; a search that
+     * atomic `done`) shared through an IntrusivePtrAtomic, so nothing dangles whichever side ends first. The destructor, Cancel() and Shutdown() cancel the token and return at once; a search that
      * ignores its token keeps the engine alive until it returns, and its answer is thrown away. Call Shutdown() (or destroy the analyst) before TaskManager::Shutdown(), which joins the pool and
      * would wait for a search nobody cancelled; a search started after that is dropped by the scheduler and never raises `done`, so Shutdown() also switches the evaluation off and drops the hint:
      * a later Update() starts nothing until a switch or a request. The destructor does not touch TaskManager.
@@ -166,10 +166,10 @@ namespace BECore::Chess {
 
     private:
         /// What the worker and the analyst share. The worker writes the answer and then raises `done`; the analyst reads the answer after it sees `done`
-        struct Search {
-            explicit Search(SharedPtr<IChessEngine> engineToAsk) : engine(std::move(engineToAsk)) {}
+        struct Search : RefCountedAtomic {
+            explicit Search(ChessEnginePtr engineToAsk) : engine(std::move(engineToAsk)) {}
 
-            SharedPtr<IChessEngine> engine;
+            ChessEnginePtr engine;
             CancellationToken token = CancellationToken::Create();
             Mutex mutex{BE_LOCK_SITE("PositionAnalyst")};  ///< guards `answer`
             std::expected<Analysis, EngineError> answer = std::unexpected(EngineError{EngineErrorKind::NoMove, "the search has not finished"});
@@ -177,7 +177,9 @@ namespace BECore::Chess {
         };
 
         /// Runs on the pool: asks the engine and leaves the answer in @p search. Its arguments are by value, so the frame owns everything it uses
-        static Task<void> RunSearch(SharedPtr<Search> search, SearchRequest request);
+        static Task<void> RunSearch(IntrusivePtrAtomic<Search> search, SearchRequest request);
+
+        [[nodiscard]] std::expected<ChessEnginePtr, EngineError> MakeEngine(OpponentEngine engine) const;
 
         /// Update() without the rater
         void UpdateSearch(const ChessGameModel& model, OpponentEngine picked);
@@ -191,14 +193,14 @@ namespace BECore::Chess {
         void ClearError();
 
         AnalysisEngineFactory _factory;  ///< empty: MakeAnalysisEngine over empty settings
-        SharedPtr<IChessEngine> _engine;
+        ChessEnginePtr _engine;
         OpponentEngine _engineKind = kDefaultOpponentEngine;  ///< what _engine was made for; meaningless while it is null
 
         bool _evaluationOn = false;
         Optional<uint64_t> _hintVersion;  ///< the version of the model a hint was asked at
 
-        SharedPtr<Search> _search;    ///< the search under way, null when none; main thread only
-        uint64_t _searchVersion = 0;  ///< the version of the model when _search was asked
+        IntrusivePtrAtomic<Search> _search;  ///< the search under way, null when none; main thread only
+        uint64_t _searchVersion = 0;         ///< the version of the model when _search was asked
         OpponentEngine _searchEngine = kDefaultOpponentEngine;
 
         Optional<AnalysisLine> _result;  ///< the answer, for _resultVersion and _resultEngine
