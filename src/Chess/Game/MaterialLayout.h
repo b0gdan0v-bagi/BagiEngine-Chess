@@ -2,8 +2,8 @@
 
 namespace BECore::Chess {
 
-    /// The box of the lists of captured pieces (the rows of the node `Material` of SceneConfig.xml) in the left margin of the default view, next to the board: the lists are
-    /// shown only while this whole box is inside the safe area of the canvas. SceneConfig.xml has to agree with these numbers. In view units
+    /// The box of the lists of captured pieces (the rows of the node `Material`, config/nodes/ChessMaterial.xml) in the left margin of the default view, next to the board: the lists are
+    /// shown only while this whole box is inside the safe area of the canvas. ChessMaterial.xml has to agree with these numbers. In view units
     constexpr float kMaterialListLeft = 8.0f;
     constexpr float kMaterialListTop = 84.0f;
     constexpr float kMaterialListRight = 72.0f;

@@ -182,7 +182,7 @@ namespace BECore::Chess {
             return;
         }
         model->RegisterPiece(this, Square{static_cast<int8_t>(_file), static_cast<int8_t>(_rank)});
-        _shownType = model->GetPieceOf(this).type;  // the sprite in SceneConfig.xml already shows it
+        _shownType = model->GetPieceOf(this).type;  // the sprite of the scene already shows it
         _registered = true;
     }
 

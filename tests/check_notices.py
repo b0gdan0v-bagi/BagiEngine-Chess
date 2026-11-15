@@ -12,6 +12,8 @@ The engine's own notices (engine/THIRD_PARTY_NOTICES.md) are the engine's ctest 
 Python 3, standard library only. Exit code: 0 passed, 1 failed.
 """
 
+from __future__ import annotations
+
 import re
 import sys
 from pathlib import Path
