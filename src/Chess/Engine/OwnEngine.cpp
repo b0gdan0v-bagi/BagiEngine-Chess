@@ -192,6 +192,7 @@ namespace BECore::Chess {
     }
 
     SearchProgress OwnSearch::Advance(uint64_t maxNodes) {
+        BE_PROFILE_SCOPE("Chess search slice");
         Impl& search = *_impl;
         if (search.result) {
             return SearchProgress::Done;

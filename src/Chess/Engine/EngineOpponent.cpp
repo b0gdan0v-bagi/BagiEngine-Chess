@@ -11,6 +11,7 @@ namespace BECore::Chess {
     }
 
     void EngineOpponent::Update(ChessGameModel& model) {
+        BE_PROFILE_SCOPE("Chess opponent update");
         if (_search) {
             if (!_search->done.load(std::memory_order_acquire)) {
                 CancelWhenStale(model);
@@ -48,7 +49,7 @@ namespace BECore::Chess {
         _search = New<Search>(_engine);
         _searchVersion = model.GetVersion();
         // Fire and forget: the task keeps itself alive until it ends, and the answer comes through _search, not through the handle
-        TaskManager::GetInstance().Run(RunSearch(_search, SearchRequest::FromModel(model, _limits)));
+        TaskManager::GetInstance().Run(RunSearch(_search, SearchRequest::FromModel(model, _limits)), TaskPriority::Normal, ThreadType::Background, BE_TASK_LABEL("Chess move search"));
     }
 
     void EngineOpponent::CancelWhenStale(const ChessGameModel& model) {
