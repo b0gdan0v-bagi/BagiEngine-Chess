@@ -80,4 +80,4 @@ By layer, not by place among the references of `SceneConfig.xml` (`engine/src/Mo
 
 ## Allocations
 
-A steady frame of the scene allocates nothing on the main thread, in every state a game sits in (the panels, a pending promotion, a hint, the evaluation, a turned board in another window, a search held on a worker, a finished game); `ChessUiAllocTest` pins it in a profile build (`ENGINE_PROFILER_ALLOC`) and `headless_frames.py` on that build reports `allocsPerFrame` 0 for the opening. Nothing is listed as engine-owned. A frame that changes something (a move, the start of a search) does allocate; a case measures a frame in which nothing changes.
+A steady frame of the scene allocates nothing on the main thread in any state a game sits in; `ChessUiAllocTest` pins it in a profile build (`ENGINE_PROFILER_ALLOC`), and a frame that changes something (a move, the start of a search) does allocate.
