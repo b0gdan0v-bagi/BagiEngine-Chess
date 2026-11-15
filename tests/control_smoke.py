@@ -122,14 +122,20 @@ def check_screenshots(client: BagiControlClient) -> None:
     client.call("reset")
     start = take_screenshot(client)
     check(len(start.colors()) >= BOARD_COLORS, f"the screenshot has {len(start.colors())} colours, it does not look like a board")
+    start_panel = panel_band(start)
+    check(band_has_color(start_panel, start.channels, PANEL_PLATE_COLOR), "the plate of the move panel is not drawn at the start")
+    check(not band_has_color(start_panel, start.channels, PANEL_MARK_COLOR), "the move panel marks a move at the start, before any is played")
 
     client.call("perform_action", move("e2e4"))
     moved = take_screenshot(client)
     check(moved.rows != start.rows, "the screenshot did not change after a move")
+    check(panel_band(moved) != start_panel, "the move panel did not change after a move")
+    check(band_has_color(panel_band(moved), moved.channels, PANEL_MARK_COLOR), "the move panel does not mark the move played")
 
     client.call("reset")
     again = take_screenshot(client)
     check(again.rows == start.rows, "the screenshot after a reset is not the one of the start position")
+    check(panel_band(again) == start_panel, "the move panel after a reset is not the one of the start position")
 
     # A position that is set from outside is drawn, and a pawn that promoted is drawn as its new piece
     client.call("set_state", {"fen": PROMOTION_FEN})
@@ -211,7 +217,12 @@ def run_moves_before_the_first_frame(client: BagiControlClient, headless: bool) 
     )
     client.call("reset")
     client.call("step", {"frames": 2})
-    check(by_moves.rows != take_screenshot(client).rows, "the scene still shows the opening after four moves")
+    after_reset = take_screenshot(client)
+    check(by_moves.rows != after_reset.rows, "the scene still shows the opening after four moves")
+    # The list is what a position set from a FEN does not have: the moves played before the first frame are in the panel, with the last one marked
+    check(panel_band(by_moves) != panel_band(after_reset), "the move panel shows no moves after four moves played before the first frame")
+    check(band_has_color(panel_band(by_moves), by_moves.channels, PANEL_MARK_COLOR), "the move panel does not mark the last of the moves played before the first frame")
+    check(not band_has_color(panel_band(by_fen), by_fen.channels, PANEL_MARK_COLOR), "the move panel marks a move in a position set from a FEN")
 
 
 PINNED_SEED = 1
@@ -734,13 +745,32 @@ BOARD_TOP, BOARD_BOTTOM = 80, 720
 BOARD_LEFT, SQUARE_SIZE = 100, 80  # the left edge of the board and the side of a square, in view units
 PANEL_LEFT, PANEL_TOP, PANEL_RIGHT, PANEL_BOTTOM = 760, 80, 1080, 720  # the box of the move panel in the Wide view (Game/MovePanel.h), in view units
 BOARD_BAND_INSET = 2  # rows kept away from the edge of the board, against rounding
+PANEL_INSET = 2  # rows and columns kept away from the edges of the panel, against rounding
+PANEL_PLATE_COLOR = (32, 44, 50)  # the plate of the panel (ChessMovePanel.xml), drawn only where the box lies inside the safe area
+PANEL_MARK_COLOR = (157, 138, 49)  # the gold mark of the last move (245, 205, 50 at alpha 150) over the plate
+
+
+def view_width_of(image) -> int:
+    """The width in units of the view the scene picks for a picture: Wide from the aspect 1.4 up (SceneConfig.xml), the default view below it."""
+    return WIDE_VIEW_WIDTH if image.width / image.height >= WIDE_VIEW_WIDTH / VIEW_HEIGHT else VIEW_WIDTH
 
 
 def view_in_picture(image) -> tuple:
     """Where the scene is in a screenshot: (scale, left, top)."""
-    view_width = WIDE_VIEW_WIDTH if image.width / image.height >= WIDE_VIEW_WIDTH / VIEW_HEIGHT else VIEW_WIDTH
+    view_width = view_width_of(image)
     scale = min(image.width / view_width, image.height / VIEW_HEIGHT)
     return scale, (image.width - view_width * scale) / 2, (image.height - VIEW_HEIGHT * scale) / 2
+
+
+def panel_band(image) -> list:
+    """The part of a screenshot that only the move panel covers: its box, kept PANEL_INSET away from the edges, so that what differs between two pictures of it is the list of moves.
+    The Wide view only has a panel, so a picture of another view is a defect of the run."""
+    check(view_width_of(image) == WIDE_VIEW_WIDTH, f"a picture {image.width}x{image.height} is not in the Wide view, the move panel is not drawn in it")
+    scale, left, top = view_in_picture(image)
+    first_row, last_row = int(top + PANEL_TOP * scale) + PANEL_INSET, int(top + PANEL_BOTTOM * scale) - PANEL_INSET
+    first_column, last_column = int(left + PANEL_LEFT * scale) + PANEL_INSET, int(left + PANEL_RIGHT * scale) - PANEL_INSET
+    check(0 <= first_row < last_row <= image.height and 0 <= first_column < last_column <= image.width, f"the panel band is outside a picture {image.width}x{image.height}")
+    return [row[first_column * image.channels : last_column * image.channels] for row in image.rows[first_row:last_row]]
 
 
 def board_rows(image) -> tuple:

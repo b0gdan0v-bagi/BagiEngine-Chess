@@ -16,7 +16,7 @@ src/Chess/
 ├── Engine/                   the opponent: IChessEngine, Stockfish over UCI, the own engine, levels, controller, analyst, MoveRater
 ├── Save/                     the game and the opponent choice kept between runs
 ├── Uci/                      the own engine as the UCI program BagiChessUci
-└── Components/               scene glue: board, pieces, result, material, HUD, panels
+└── Components/               scene glue: board, pieces, result, material, move panel, HUD, panels
 cmake/ChessWeb.cmake          what of config/ and assets/ stays out of the web package
 ```
 
