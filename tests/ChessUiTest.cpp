@@ -5676,7 +5676,7 @@ namespace BECore::Chess::Tests {
         }
         EXPECT_EQ(modals, std::size(rows));
 
-        // Shown, with the pointer over its dim, a dim is drawn as before: the same one rect of the dim color
+        // Shown, with the pointer over its dim, a dim is still one rect of the dim color
         const auto show = [&](const char* node) {
             if (StringView(node) == "MenuPanel") {
                 return ClickButton(kMenuColor);
