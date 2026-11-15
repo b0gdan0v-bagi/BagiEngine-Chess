@@ -27,6 +27,9 @@ namespace BECore::Chess {
 
     class ChessGameModel;
 
+    /// The name of the second view of SceneConfig.xml (`viewVariants`), which the components that differ per view pick by
+    inline constexpr const char* kPortraitView = "Portrait";
+
     /**
      * @brief The board of the scene: draws the squares and the highlights of the active model and turns clicks and drags into its moves.
      *

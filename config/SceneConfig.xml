@@ -156,7 +156,11 @@
              box lies inside the safe area (in the narrowest case of the size matrix, a 480 px window with side insets, the safe area starts at about x = 75.6 and about 24 units of the margin are left). The balance, "+3" on the side that is ahead and nothing
              on the other, is a box of 23 x 28 units at the board's edge (x 77 to 100) whose AutoFit shrinks the text (to 12 units at the smallest, which is 7 px at the smallest fit scale, 0.571: the sizes are whole pixels and the smallest is rounded up) instead of cutting it, and it is never hidden. The names all start with
              Material because elements are found by name in every canvas of the scene. The chip is a cream a little darker than the light squares (so that a test can tell a chip from a square), the text
-             a dark brown that is not one of the two colors of the board's labels. The look (the colors, the sizes of the font, the pictures at this size) is a first guess nobody has seen in a window. -->
+             a dark brown that is not one of the two colors of the board's labels. The look (the colors, the sizes of the font, the pictures at this size) is a first guess nobody has seen in a window.
+             The numbers above are those of the default view. In the Portrait view (the variant for orientation:portrait; the board is at (40, 144) to (680, 784)) the two lists are horizontal: the upper group
+             above the board at (40, 92), 336 x 40 (5 x 64 + 4 x 4; a horizontal list stretches the 40-unit height to its rows, which take a width of 64 here), the lower group under it at (40, 792); they
+             mirror and swap with the turn of the board as before. Their box, (40, 92) to (376, 832), is the Portrait one of Game/MaterialLayout.h (the rows show while it lies inside the safe area).
+             A balance is a 48 x 40 box at x 384, beside the end of its list, never hidden. -->
         <node name="Material" layer="5">
           <components>
             <component type="ChessMaterialComponent" />
@@ -321,6 +325,26 @@
                   </components>
                 </element>
               </elements>
+              <variants>
+                <variant when="orientation:portrait">
+                  <overrides>
+                    <set element="MaterialTopList" x="40" y="92" width="336" height="40" direction="Horizontal" />
+                    <set element="MaterialTopQueenRow" width="64" />
+                    <set element="MaterialTopRookRow" width="64" />
+                    <set element="MaterialTopBishopRow" width="64" />
+                    <set element="MaterialTopKnightRow" width="64" />
+                    <set element="MaterialTopPawnRow" width="64" />
+                    <set element="MaterialTopBalance" x="384" y="92" width="48" height="40" />
+                    <set element="MaterialBottomList" x="40" y="792" width="336" height="40" direction="Horizontal" />
+                    <set element="MaterialBottomQueenRow" width="64" />
+                    <set element="MaterialBottomRookRow" width="64" />
+                    <set element="MaterialBottomBishopRow" width="64" />
+                    <set element="MaterialBottomKnightRow" width="64" />
+                    <set element="MaterialBottomPawnRow" width="64" />
+                    <set element="MaterialBottomBalance" x="384" y="792" width="48" height="40" />
+                  </overrides>
+                </variant>
+              </variants>
             </component>
           </components>
         </node>

@@ -1,10 +1,12 @@
 #include "ChessMaterialComponent.h"
 
 #include <BECore/GameManager/CoreManager.h>
+#include <BECore/Scene/Scene.h>
 #include <BECore/Scene/SceneNode.h>
 #include <BECore/UI/UICanvasComponent.h>
 #include <BECore/UI/UIImageComponent.h>
 #include <Chess/ChessGame.h>
+#include <Chess/Components/ChessBoardComponent.h>
 #include <Chess/Game/BoardOrientation.h>
 #include <Chess/Game/CapturedMaterial.h>
 #include <Generated/ChessMaterialComponent.gen.hpp>
@@ -46,6 +48,12 @@ namespace BECore::Chess {
                 return made;
             }();
             return names;
+        }
+
+        // The box of the lists is asked per view; the scene's active view is already the one of this draw (it is picked at the start of Draw())
+        MaterialView ActiveMaterialView(const Scene& scene) {
+            static const PoolString portrait = PoolString::Intern(kPortraitView);
+            return scene.GetActiveView().name == portrait ? MaterialView::Portrait : MaterialView::Default;
         }
 
         // The color of a group: the lower one is the color at the bottom of the board, the upper one the other
@@ -96,7 +104,7 @@ namespace BECore::Chess {
         bool fits = false;
         if (layout.HasLayout()) {
             const Rect& safe = layout.GetResolved().safeBounds;
-            fits = MaterialListFits(safe.x, safe.y, safe.x + safe.w, safe.y + safe.h);
+            fits = MaterialListFits(safe.x, safe.y, safe.x + safe.w, safe.y + safe.h, ActiveMaterialView(GetScene()));
         }
         const MaterialNames& names = GetNames();
         for (size_t row = 0; row < _counts.size(); ++row) {

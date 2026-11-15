@@ -9,14 +9,16 @@ namespace BECore::Chess {
     class ChessGameModel;
 
     /**
-     * @brief Gives the canvas of the node `Material` (the captured pieces and the balance in the left margin) its words and its sprites from the game. Keeps no game state.
+     * @brief Gives the canvas of the node `Material` (the captured pieces and the balance: in the left margin, in the Portrait view above and below the board) its words and its sprites from the game.
+     * Keeps no game state.
      *
      * The lower group shows what the color at the bottom of the board has taken, the upper one what the other color has taken, so the groups swap when the board turns. OnDraw() runs before
      * the canvas on the same node draws: only when the model, its version or the bottom color changed it publishes the twelve `UIVars`, and when the bottom color changed (also at the first
      * draw) it gives the ten icons their sprites. With no game active the variables are empty and no row is shown.
      *
-     * A row is shown when its count is above 0 and the lists fit: Game/MaterialLayout.h says whether their box lies inside the safe area of the canvas, asked on every draw (the safe area
-     * changes with the window, not with the model). Before the canvas has been laid out once the rows stay hidden, so nothing flashes. The balance boxes are not hidden by this rule.
+     * A row is shown when its count is above 0 and the lists fit: Game/MaterialLayout.h says whether their box (the one of the active view) lies inside the safe area of the canvas, asked on every
+     * draw (the safe area changes with the window, not with the model). Before the canvas has been laid out once the rows stay hidden, so nothing flashes. The balance boxes are not hidden by this
+     * rule.
      */
     class ChessMaterialComponent : public IComponent {
         BE_CLASS(ChessMaterialComponent)

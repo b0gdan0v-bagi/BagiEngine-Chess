@@ -71,6 +71,9 @@ namespace BECore::Chess::Tests {
         constexpr float kPortraitViewHeight = 960.0f;
         constexpr float kPortraitBoardLeft = 40.0f;
         constexpr float kPortraitBoardTop = 144.0f;
+        constexpr float kPortraitBoardBottom = 784.0f;
+        constexpr float kPortraitHudBottom = 68.0f;   // Turn, Menu and Reset: 56 units high at y 12
+        constexpr float kPortraitStatusTop = 892.0f;  // Status: 56 units high, 12 above the bottom of the view
         constexpr const char* kPortraitViewName = "Portrait";
 
         // The colors the board fills a full square with (ChessBoardComponent.cpp)
@@ -486,6 +489,7 @@ namespace BECore::Chess::Tests {
         // ---- the node Material of SceneConfig.xml: the layout checks (the behavior tests are further down) ----
         constexpr float kMaterialMarginRight = 100.0f;  // the left margin ends where the board begins
         constexpr float kMaterialRowHeight = 40.0f;     // a row is at least this high
+        constexpr float kMaterialRowWidth = 64.0f;      // and this wide, in both views
         constexpr size_t kMaterialRounds = 99;          // one round per sign, "+1" to "+99"
         constexpr int kMostCaptured = 8;                // the longest count word is "x8": the most a row can show is the eight pawns (a test holds it to the summary of two bare kings)
         constexpr const char* kMaterialGroups[] = {"Top", "Bottom"};
@@ -515,15 +519,24 @@ namespace BECore::Chess::Tests {
             }
         }
 
+        /// Whether a canvas was laid out for the Portrait view: its bounds are the view in units
+        bool LaidOutForPortrait(const UICanvasLayout& layout) {
+            return layout.GetResolved().bounds.w == kPortraitViewWidth;
+        }
+
         /// What is wrong with the canvas Material as it is laid out with all ten rows shown, one problem to a line, nothing when it is right. The text that a count or a sign cuts is checked
         /// here because the validator does not see a Clip label's cut; the lists must lie inside the safe area only while their box does (the rule of Game/MaterialLayout.h, so the rows would
-        /// be shown), a balance box always
+        /// be shown), a balance box always. A group stays in its place of the view it was laid out for: the left margin of the default view, the band above the board (the upper group) or
+        /// below it (the lower one) in Portrait, where the rows go along x and not along y
         String MaterialProblems(const UICanvasLayout& layout) {
             String problems;
             const float scale = layout.GetResolved().scale;
             const Rect safe = layout.GetResolved().safeBounds;
-            const bool listsFit = MaterialListFits(safe.x, safe.y, safe.x + safe.w, safe.y + safe.h);
+            const bool portrait = LaidOutForPortrait(layout);
+            const bool listsFit = MaterialListFits(safe.x, safe.y, safe.x + safe.w, safe.y + safe.h, portrait ? MaterialView::Portrait : MaterialView::Default);
             const Rect margin{0.0f, kBoardTop, kMaterialMarginRight, kBoardBottom - kBoardTop};
+            const Rect upperBand{0.0f, kPortraitHudBottom, kPortraitViewWidth, kPortraitBoardTop - kPortraitHudBottom};
+            const Rect lowerBand{0.0f, kPortraitBoardBottom, kPortraitViewWidth, kPortraitStatusTop - kPortraitBoardBottom};
 
             const auto find = [&](const String& name) -> const UIElement* {
                 const UIElement* element = layout.root->FindByName(PoolString::Intern(name.c_str()));
@@ -535,10 +548,11 @@ namespace BECore::Chess::Tests {
                 }
                 return element;
             };
-            const auto place = [&](const UIElement& element, bool inSafeArea) {
-                if (!LiesIn(element.rect, margin)) {
-                    problems += Format("{} ({:.1f}, {:.1f}, {:.1f}, {:.1f}) leaves the margin (x 0 to {:.0f}, y {:.0f} to {:.0f})\n", element.name.ToStringView(), element.rect.x, element.rect.y,
-                                       element.rect.w, element.rect.h, margin.w, margin.y, margin.y + margin.h);
+            const auto place = [&](const UIElement& element, const char* group, bool inSafeArea) {
+                const Rect& where = !portrait ? margin : (group == kMaterialGroups[0] ? upperBand : lowerBand);
+                if (!LiesIn(element.rect, where)) {
+                    problems += Format("{} ({:.1f}, {:.1f}, {:.1f}, {:.1f}) leaves its place (x {:.0f} to {:.0f}, y {:.0f} to {:.0f})\n", element.name.ToStringView(), element.rect.x, element.rect.y,
+                                       element.rect.w, element.rect.h, where.x, where.x + where.w, where.y, where.y + where.h);
                 }
                 if (inSafeArea && !LiesIn(element.rect, safe)) {
                     problems += Format("{} ({:.1f}, {:.1f}, {:.1f}, {:.1f}) leaves the safe area ({:.1f}, {:.1f}, {:.1f}, {:.1f})\n", element.name.ToStringView(), element.rect.x, element.rect.y,
@@ -556,13 +570,13 @@ namespace BECore::Chess::Tests {
             for (const char* group : kMaterialGroups) {
                 const UIElement* list = find(Format("Material{}List", group));
                 if (list != nullptr) {
-                    place(*list, listsFit);
+                    place(*list, group, listsFit);
                     if (list->rect.y < previousListBottom) {
                         problems += Format("{} ({:.1f}) starts above the end of the list before it ({:.1f})\n", list->name.ToStringView(), list->rect.y, previousListBottom);
                     }
                     previousListBottom = list->rect.y + list->rect.h;
                 }
-                float previousRowBottom = -1.0f;
+                float previousRowEnd = -1.0f;  // along the list: the bottom of the row before it in the default view, its right edge in Portrait
                 for (const char* piece : kMaterialPieces) {
                     const UIElement* row = find(Format("Material{}{}Row", group, piece));
                     const UIElement* icon = find(Format("Material{}{}Icon", group, piece));
@@ -570,14 +584,18 @@ namespace BECore::Chess::Tests {
                     if (row == nullptr) {
                         continue;
                     }
-                    place(*row, listsFit);
+                    place(*row, group, listsFit);
                     if (row->rect.h < kMaterialRowHeight - kPixelTolerance) {
                         problems += Format("{} is {:.1f} units high, under {:.0f}\n", row->name.ToStringView(), row->rect.h, kMaterialRowHeight);
                     }
-                    if (row->rect.y < previousRowBottom - kPixelTolerance) {
-                        problems += Format("{} starts at {:.1f}, above the end of the row before it ({:.1f})\n", row->name.ToStringView(), row->rect.y, previousRowBottom);
+                    if (row->rect.w < kMaterialRowWidth - kPixelTolerance) {
+                        problems += Format("{} is {:.1f} units wide, under {:.0f}\n", row->name.ToStringView(), row->rect.w, kMaterialRowWidth);
                     }
-                    previousRowBottom = row->rect.y + row->rect.h;
+                    const float start = portrait ? row->rect.x : row->rect.y;
+                    if (start < previousRowEnd - kPixelTolerance) {
+                        problems += Format("{} starts at {:.1f}, before the end of the row before it ({:.1f})\n", row->name.ToStringView(), start, previousRowEnd);
+                    }
+                    previousRowEnd = portrait ? row->rect.x + row->rect.w : row->rect.y + row->rect.h;
                     if (list != nullptr && !LiesIn(row->rect, list->rect)) {
                         problems += Format("{} is not inside its list\n", row->name.ToStringView());
                     }
@@ -597,7 +615,7 @@ namespace BECore::Chess::Tests {
                     }
                 }
                 if (const UIElement* balance = find(Format("Material{}Balance", group))) {
-                    place(*balance, true);
+                    place(*balance, group, true);
                     fits(*balance);
                     if (list != nullptr && balance->rect.x < list->rect.x + list->rect.w) {
                         problems += Format("{} touches {}\n", balance->name.ToStringView(), list->name.ToStringView());
@@ -1230,16 +1248,7 @@ namespace BECore::Chess::Tests {
         template <typename Check>
         void OnEveryCaseOfTheMatrix(UICanvasLayout& layout, Check check, bool pickView = false) const {
             for (const UIMatrixCase& matrixCase : UILayoutMatrix()) {
-                UILayoutContext context = ViewContext();
-                context.outputWidth = matrixCase.context.outputWidth;
-                context.outputHeight = matrixCase.context.outputHeight;
-                context.safeArea = matrixCase.context.safeArea;
-                if (pickView) {
-                    const ActiveSceneView view = SceneViewSelector::Pick(kViewWidth, kViewHeight, GetScene().GetViewVariants(), context.outputWidth, context.outputHeight);
-                    context.sceneViewWidth = view.width;
-                    context.sceneViewHeight = view.height;
-                }
-                layout.Update(context);
+                layout.Update(ContextOf(matrixCase, pickView));
                 check(matrixCase.label, layout);
             }
             layout.Invalidate();
@@ -1498,27 +1507,37 @@ namespace BECore::Chess::Tests {
             return report;
         }
 
-        /// The context a case of the size matrix lays a canvas out in: the view of the scene, and the window and the safe area of the case
-        UILayoutContext ContextOf(const UIMatrixCase& matrixCase) const {
+        /// The context a case of the size matrix lays a canvas out in: the view of the scene (with @p pickView the view the scene would draw for the output of the case), and the window and
+        /// the safe area of the case
+        UILayoutContext ContextOf(const UIMatrixCase& matrixCase, bool pickView = false) const {
             UILayoutContext context = ViewContext();
             context.outputWidth = matrixCase.context.outputWidth;
             context.outputHeight = matrixCase.context.outputHeight;
             context.safeArea = matrixCase.context.safeArea;
+            if (pickView) {
+                const ActiveSceneView view = SceneViewSelector::Pick(kViewWidth, kViewHeight, GetScene().GetViewVariants(), context.outputWidth, context.outputHeight);
+                context.sceneViewWidth = view.width;
+                context.sceneViewHeight = view.height;
+            }
             return context;
         }
 
-        /// MaterialProblems() on every case of the matrix for the first @p rounds rounds of words (rows already shown): the lines of the first @p reportedCases cases that have any
+        /// MaterialProblems() on every case of the matrix, in the view the scene picks for it, for the first @p rounds rounds of words (rows already shown): the lines of the first
+        /// @p reportedCases cases that have any
         String MaterialProblemsOnMatrix(UICanvasLayout& layout, size_t rounds = kMaterialRounds, size_t reportedCases = kReportedCases) const {
             String report;
             size_t reported = 0;
             for (size_t round = 0; round < rounds; ++round) {
                 PublishMaterialRound(round);
-                OnEveryCaseOfTheMatrix(layout, [&](const String& label, const UICanvasLayout& laidOut) {
-                    const String problems = MaterialProblems(laidOut);
-                    if (!problems.empty() && reported++ < reportedCases) {
-                        report += Format("round {}, {}:\n{}", round, label.c_str(), problems.c_str());
-                    }
-                });
+                OnEveryCaseOfTheMatrix(
+                    layout,
+                    [&](const String& label, const UICanvasLayout& laidOut) {
+                        const String problems = MaterialProblems(laidOut);
+                        if (!problems.empty() && reported++ < reportedCases) {
+                            report += Format("round {}, {}:\n{}", round, label.c_str(), problems.c_str());
+                        }
+                    },
+                    true);
             }
             return report;
         }
@@ -6180,31 +6199,203 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(ShownMaterialRows(), "TopPawn BottomPawn");
     }
 
-    TEST_F(ChessUiTest, EveryBalanceFromPlusOneToPlusNinetyNineFitsItsBoxInTheNarrowestWindow) {
+    // ---- the captured material in the Portrait view ----------------------------------------------------------------------------------------
+    // The view is 720 x 960 (SceneConfig.xml): a 720 x 960 window shows it one to one, so a rect of the layout is the pixel it is drawn at
+
+    namespace {
+
+        constexpr float kPortraitWindowWidth = kPortraitViewWidth;
+        constexpr float kPortraitWindowHeight = kPortraitViewHeight;
+        constexpr float kPortraitRowStep = 68.0f;  // a row is 64 units wide and 4 apart
+        constexpr float kPortraitUpperListY = 92.0f;
+        constexpr float kPortraitLowerListY = 792.0f;
+
+    }  // namespace
+
+    TEST_F(ChessUiTest, InThePortraitViewTheGroupsAreTwoRowsAboveAndBelowTheBoardInTheBoxOfTheLayoutRule) {
+        StartFrom("4k3/8/8/8/8/8/8/4K3 w - - 0 1");
+        DrawAt(kPortraitWindowWidth, kPortraitWindowHeight);
+        DrawAt(kPortraitWindowWidth, kPortraitWindowHeight);
+        ASSERT_TRUE(PortraitIsActive());
+        ASSERT_EQ(ShownMaterialRows(), "TopQueen TopRook TopBishop TopKnight TopPawn BottomQueen BottomRook BottomBishop BottomKnight BottomPawn");
+
+        const Rect top = MaterialElement("MaterialTopList").rect;
+        const Rect bottom = MaterialElement("MaterialBottomList").rect;
+        EXPECT_TRUE(SameRect(top, Rect{40.0f, kPortraitUpperListY, 336.0f, 40.0f}));
+        EXPECT_TRUE(SameRect(bottom, Rect{40.0f, kPortraitLowerListY, 336.0f, 40.0f}));
+        // the box of Game/MaterialLayout.h is the one of the two lists
+        EXPECT_FLOAT_EQ(kMaterialPortraitListLeft, std::min(top.x, bottom.x));
+        EXPECT_FLOAT_EQ(kMaterialPortraitListTop, top.y);
+        EXPECT_FLOAT_EQ(kMaterialPortraitListRight, std::max(top.x + top.w, bottom.x + bottom.w));
+        EXPECT_FLOAT_EQ(kMaterialPortraitListBottom, bottom.y + bottom.h);
+        EXPECT_LE(top.y + top.h, kPortraitBoardTop) << "the upper list is above the board";
+        EXPECT_GE(bottom.y, kPortraitBoardBottom) << "the lower one is under it";
+
+        for (const char* group : kMaterialGroups) {
+            SCOPED_TRACE(group);
+            const Rect list = group == kMaterialGroups[0] ? top : bottom;
+            for (size_t index = 0; index < std::size(kMaterialPieces); ++index) {
+                const Rect& row = MaterialRow(group, kMaterialPieces[index]).rect;
+                EXPECT_TRUE(SameRect(row, Rect{list.x + static_cast<float>(index) * kPortraitRowStep, list.y, 64.0f, 40.0f})) << kMaterialPieces[index] << ": the rows go along the list, queen first";
+            }
+            const Rect balance = MaterialElement(Format("Material{}Balance", group).c_str()).rect;
+            EXPECT_TRUE(SameRect(balance, Rect{384.0f, list.y, 48.0f, 40.0f})) << "beside the end of the list";
+            EXPECT_GE(balance.x, list.x + list.w);
+        }
+    }
+
+    TEST_F(ChessUiTest, InThePortraitViewTheShownRowsPackAtTheStartOfTheirListAndAHiddenRowTakesNoRoom) {
+        StartFrom(kWhiteTookAPawn);
+        DrawAt(kPortraitWindowWidth, kPortraitWindowHeight);
+        DrawAt(kPortraitWindowWidth, kPortraitWindowHeight);
+        ASSERT_TRUE(PortraitIsActive());
+        ASSERT_EQ(ShownMaterialRows(), "BottomPawn");
+        EXPECT_TRUE(SameRect(MaterialRow("Bottom", "Pawn").rect, Rect{40.0f, kPortraitLowerListY, 64.0f, 40.0f})) << "the first place of the list: the four before it take no room";
+        EXPECT_TRUE(MaterialRow("Bottom", "Queen").rect.IsEmpty());
+
+        StartFrom(kEightPawnsAgainstNothing);
+        DrawAt(kPortraitWindowWidth, kPortraitWindowHeight);
+        DrawAt(kPortraitWindowWidth, kPortraitWindowHeight);
+        EXPECT_NEAR(MaterialRow("Bottom", "Rook").rect.x - MaterialRow("Bottom", "Queen").rect.x, kPortraitRowStep, kPixelTolerance) << "a row is 64 units wide and 4 apart";
+        EXPECT_NEAR(MaterialRow("Bottom", "Queen").rect.x, 40.0f, kPixelTolerance);
+        EXPECT_NEAR(MaterialRow("Bottom", "Pawn").rect.x, 40.0f + 4.0f * kPortraitRowStep, kPixelTolerance);
+    }
+
+    TEST_F(ChessUiTest, InThePortraitViewTheGroupsSwapWithTheBoardAndTheBalanceGoesWithItsGroup) {
+        CountingFactory factory({MakeShared<GatedEngine>(true)});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        StartFrom(kWhiteTookAPawn);
+        DrawAt(kPortraitWindowWidth, kPortraitWindowHeight);
+        DrawAt(kPortraitWindowWidth, kPortraitWindowHeight);
+        ASSERT_TRUE(PortraitIsActive());
+        ASSERT_EQ(ShownMaterialRows(), "BottomPawn") << "two people: White at the bottom, and White has taken the pawn";
+        EXPECT_NEAR(MaterialRow("Bottom", "Pawn").rect.y, kPortraitLowerListY, kPixelTolerance) << "under the board";
+        EXPECT_EQ(Var("materialBottomBalance"), "+1");
+
+        ControlPlays("white");
+        _manager->UpdateAll();
+        ASSERT_TRUE(BlackIsAtTheBottom());
+        DrawAt(kPortraitWindowWidth, kPortraitWindowHeight);
+        DrawAt(kPortraitWindowWidth, kPortraitWindowHeight);
+        EXPECT_EQ(ShownMaterialRows(), "TopPawn") << "Black is at the bottom now: White's capture is in the upper group, above the board";
+        EXPECT_NEAR(MaterialRow("Top", "Pawn").rect.y, kPortraitUpperListY, kPixelTolerance);
+        EXPECT_EQ(Var("materialTopBalance"), "+1");
+        EXPECT_EQ(ShownText(MaterialElement("MaterialTopBalance")), "+1");
+        EXPECT_NEAR(MaterialElement("MaterialTopBalance").rect.y, kPortraitUpperListY, kPixelTolerance);
+        EXPECT_EQ(Var("materialBottomBalance"), "");
+    }
+
+    TEST_F(ChessUiTest, InThePortraitViewTheListsAreHiddenWhereTheSafeAreaTakesTheirBoxAndTheEdgeCountsAsInside) {
+        StartFrom(kWhiteTookAPawn);
+        const auto resize = [&](const Rect& safeArea) {
+            _renderer->width = kPortraitWindowWidth;
+            _renderer->height = kPortraitWindowHeight;
+            CoreManager::GetUIEnvironment().SetSafeAreaOverride(safeArea);
+            Settle();
+            ASSERT_TRUE(PortraitIsActive());
+        };
+        resize(Rect{0.0f, 0.0f, kPortraitWindowWidth, kPortraitWindowHeight});
+        EXPECT_EQ(ShownMaterialRows(), "BottomPawn");
+        resize(Rect{kMaterialPortraitListLeft, kMaterialPortraitListTop, kMaterialPortraitListRight - kMaterialPortraitListLeft, kMaterialPortraitListBottom - kMaterialPortraitListTop});
+        EXPECT_EQ(ShownMaterialRows(), "BottomPawn") << "a safe area that is the box itself: the edge counts as inside";
+
+        resize(Rect{kMaterialPortraitListLeft + 1.0f, 0.0f, kPortraitWindowWidth - kMaterialPortraitListLeft - 1.0f, kPortraitWindowHeight});
+        EXPECT_EQ(ShownMaterialRows(), "") << "an inset on the left that reaches into the box";
+        resize(Rect{0.0f, kMaterialPortraitListTop + 1.0f, kPortraitWindowWidth, kPortraitWindowHeight - kMaterialPortraitListTop - 1.0f});
+        EXPECT_EQ(ShownMaterialRows(), "") << "a notch at the top that reaches into the upper row's place";
+        resize(Rect{0.0f, 0.0f, kPortraitWindowWidth, kMaterialPortraitListBottom - 1.0f});
+        EXPECT_EQ(ShownMaterialRows(), "") << "an inset at the bottom that reaches into the lower row";
+        resize(Rect{0.0f, 0.0f, kMaterialPortraitListRight - 1.0f, kPortraitWindowHeight});
+        EXPECT_EQ(ShownMaterialRows(), "") << "an inset on the right";
+        EXPECT_EQ(Var("materialBottomPawn"), "x1") << "the words are not taken away, only the rows";
+        EXPECT_EQ(ShownText(MaterialElement("MaterialBottomBalance")), "+1") << "the balance stays";
+
+        resize(Rect{0.0f, 0.0f, kPortraitWindowWidth, kPortraitWindowHeight});
+        EXPECT_EQ(ShownMaterialRows(), "BottomPawn") << "the room is back: so are the rows";
+    }
+
+    TEST_F(ChessUiTest, InThePortraitViewWithSideInsetsInTheNarrowestWindowTheListsAreHiddenAndTheBalanceStaysInsideTheSafeArea) {
+        StartFrom(kWhiteTookAPawn);
+        Settle();
+        ASSERT_EQ(ShownMaterialRows(), "BottomPawn") << "the default window: the lists are shown";
+
+        ResizeWithSideInsets(kNarrowestWidth, kNarrowestPortraitHeight);
+        ASSERT_TRUE(PortraitIsActive());
+        const Rect safe = Material()->GetLayout().GetResolved().safeBounds;
+        EXPECT_NEAR(safe.x, 64.8f, 0.2f) << "9 % of 480 px at the fit scale 0.667";
+        EXPECT_EQ(ShownMaterialRows(), "") << "the box of the lists starts at x 40, left of the safe area";
+        EXPECT_EQ(Var("materialBottomPawn"), "x1");
+        EXPECT_EQ(Var("materialBottomBalance"), "+1");
+        const UIElement& balance = MaterialElement("MaterialBottomBalance");
+        ASSERT_TRUE(IsLabel(balance));
+        EXPECT_EQ(ShownText(balance), "+1");
+        EXPECT_TRUE(LiesIn(balance.rect, safe)) << "the balance is inside the safe area";
+        EXPECT_FALSE(balance.rect.IsEmpty());
+
+        ResizeWithoutInsets(kNarrowestWidth, kNarrowestPortraitHeight);
+        EXPECT_EQ(ShownMaterialRows(), "BottomPawn") << "no insets: the rows come back";
+    }
+
+    TEST_F(ChessUiTest, TheMaterialFollowsTheViewWhenTheWindowTurns) {
+        StartFrom(kWhiteTookAPawn);
+        Settle();
+        ASSERT_FALSE(PortraitIsActive());
+        ASSERT_EQ(ShownMaterialRows(), "BottomPawn");
+        EXPECT_TRUE(SameRect(MaterialRow("Bottom", "Pawn").rect, Rect{8.0f, 500.0f, 64.0f, 40.0f}));
+
+        ResizeWithoutInsets(kPortraitWindowWidth, kPortraitWindowHeight);
+        ASSERT_TRUE(PortraitIsActive());
+        EXPECT_EQ(ShownMaterialRows(), "BottomPawn");
+        EXPECT_TRUE(SameRect(MaterialRow("Bottom", "Pawn").rect, Rect{40.0f, kPortraitLowerListY, 64.0f, 40.0f})) << "under the board";
+
+        ResizeWithoutInsets(1280.0f, 720.0f);
+        ASSERT_FALSE(PortraitIsActive());
+        EXPECT_EQ(ShownMaterialRows(), "BottomPawn");
+        EXPECT_TRUE(SameRect(MaterialRow("Bottom", "Pawn").rect, Rect{8.0f, 500.0f, 64.0f, 40.0f})) << "back in the margin left of the board";
+    }
+
+    TEST_F(ChessUiTest, InThePortraitViewTheMaterialTakesNoClick) {
+        StartFrom("4k3/8/8/8/8/8/8/4K3 w - - 0 1");
+        DrawAt(kPortraitWindowWidth, kPortraitWindowHeight);
+        DrawAt(kPortraitWindowWidth, kPortraitWindowHeight);
+        ASSERT_TRUE(PortraitIsActive());
+        ASSERT_NE(ShownMaterialRows(), "");
+        for (const char* name : {"MaterialTopQueenRow", "MaterialBottomPawnRow", "MaterialTopBalance", "MaterialBottomBalance", "MaterialTopList", "MaterialBottomList"}) {
+            const auto [x, y] = ScreenCenter(MaterialElement(name));
+            EXPECT_FALSE(CoreManager::GetUIInput().DispatchMouseButtonDown(Button(x, y, true))) << name;
+            EXPECT_FALSE(CoreManager::GetUIInput().DispatchMouseButtonUp(Button(x, y, false))) << name;
+        }
+    }
+
+    TEST_F(ChessUiTest, EveryBalanceFromPlusOneToPlusNinetyNineFitsItsBoxInTheNarrowestWindowOfEachView) {
         Draw();
         auto canvas = Material();
         ASSERT_TRUE(canvas);
         canvas->UpdateLayout(1280.0f, 720.0f);  // the reflected fields of the component reach the layout on its first update
         UICanvasLayout& layout = canvas->GetLayout();
-        LayOutInTheNarrowestWindow(layout);
-        EXPECT_NEAR(layout.GetResolved().scale, kNarrowestWidth / kViewWidth, 0.01f);
-        const float scale = layout.GetResolved().scale;
 
         size_t checked = 0;
-        for (const char* group : {"Top", "Bottom"}) {
-            const UIElement* label = &MaterialElement(Format("Material{}Balance", group).c_str());
-            ASSERT_TRUE(IsLabel(*label));
-            const PoolString variable = PoolString::Intern(Format("material{}Balance", group).c_str());
-            for (int points = 1; points <= 99; ++points) {
-                const String text = BalanceText(points);
-                CoreManager::GetUIVars().Set(variable, StringView(text));
-                const UIContentFit fit = label->CheckContent(label->rect.w, label->rect.h, scale);
-                ASSERT_TRUE(fit.hasContent) << text.c_str();
-                EXPECT_TRUE(fit.fits) << group << ": " << text.c_str() << " is cut in a box of " << label->rect.w << " x " << label->rect.h << " units at scale " << scale;
-                ++checked;
+        for (const ViewShape& shape : kViewShapes) {
+            SCOPED_TRACE(shape.name);
+            LayOutInTheNarrowestWindow(layout, shape);
+            EXPECT_NEAR(layout.GetResolved().scale, kNarrowestWidth / shape.viewWidth, 0.01f);
+            const float scale = layout.GetResolved().scale;
+            for (const char* group : {"Top", "Bottom"}) {
+                const UIElement* label = &MaterialElement(Format("Material{}Balance", group).c_str());
+                ASSERT_TRUE(IsLabel(*label));
+                const PoolString variable = PoolString::Intern(Format("material{}Balance", group).c_str());
+                for (int points = 1; points <= 99; ++points) {
+                    const String text = BalanceText(points);
+                    CoreManager::GetUIVars().Set(variable, StringView(text));
+                    const UIContentFit fit = label->CheckContent(label->rect.w, label->rect.h, scale);
+                    ASSERT_TRUE(fit.hasContent) << text.c_str();
+                    EXPECT_TRUE(fit.fits) << group << ": " << text.c_str() << " is cut in a box of " << label->rect.w << " x " << label->rect.h << " units at scale " << scale;
+                    ++checked;
+                }
             }
         }
-        EXPECT_EQ(checked, 198u);
+        EXPECT_EQ(checked, 2 * 198u);
         layout.Invalidate();
     }
 
@@ -6266,7 +6457,7 @@ namespace BECore::Chess::Tests {
         options.minTouchSize = CoreManager::GetUIEnvironment().GetSettings().minTouchSize;
         for (size_t round = 0; round < kMaterialRounds; ++round) {
             PublishMaterialRound(round);
-            const auto failures = ValidateOnMatrix(canvas->GetLayout(), options, ViewContext());
+            const auto failures = ValidateOnMatrix(canvas->GetLayout(), options, ViewContext(), SceneViews());
             ASSERT_TRUE(failures.empty()) << "round " << round << ": " << DescribeMatrixFailures(failures).c_str();
         }
         const String problems = MaterialProblemsOnMatrix(canvas->GetLayout());
@@ -6286,38 +6477,45 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(most, kMostCaptured) << "the pawns: the longest count word is 'x" << most << "'";
     }
 
-    TEST_F(ChessUiTest, TheListsAreHiddenOnlyInTheWindowsWhoseSideInsetsTakeTheMarginOfTheView) {
+    TEST_F(ChessUiTest, TheListsAreHiddenOnlyInTheWindowsWhoseSideInsetsTakeTheBoxOfTheirView) {
         Draw();
         auto canvas = Material();
         ASSERT_TRUE(canvas);
         canvas->UpdateLayout(1280.0f, 720.0f);
         UICanvasLayout& layout = canvas->GetLayout();
 
-        size_t hidden = 0;
-        size_t shown = 0;
+        size_t hidden[2] = {};  // the default view, then Portrait
+        size_t shown[2] = {};
         String hiddenCases;
         for (const UIMatrixCase& matrixCase : UILayoutMatrix()) {
-            layout.Update(ContextOf(matrixCase));
+            layout.Update(ContextOf(matrixCase, true));
+            const bool portrait = LaidOutForPortrait(layout);
             const Rect safe = layout.GetResolved().safeBounds;
-            const bool fits = MaterialListFits(safe.x, safe.y, safe.x + safe.w, safe.y + safe.h);
+            const bool fits = MaterialListFits(safe.x, safe.y, safe.x + safe.w, safe.y + safe.h, portrait ? MaterialView::Portrait : MaterialView::Default);
             const bool sideInsets = matrixCase.label.find("side insets") != String::npos;
+            const float boxLeft = portrait ? kMaterialPortraitListLeft : kMaterialListLeft;
             if (!fits) {
-                EXPECT_TRUE(sideInsets) << matrixCase.label.c_str() << ": only side insets take the margin (a notch takes the top 7 % of the short side, which is above the lists)";
-                EXPECT_GT(safe.x, kMaterialListLeft) << matrixCase.label.c_str();
-                ++hidden;
-                hiddenCases += Format("  {} (safe area from x = {:.1f})\n", matrixCase.label.c_str(), safe.x);
+                EXPECT_TRUE(sideInsets) << matrixCase.label.c_str() << ": only side insets take the box (a notch takes the top 7 % of the short side, which is above the lists)";
+                EXPECT_GT(safe.x, boxLeft) << matrixCase.label.c_str();
+                ++hidden[portrait ? 1 : 0];
+                hiddenCases += Format("  {} (safe area from x = {:.1f}, {})\n", matrixCase.label.c_str(), safe.x, portrait ? "Portrait" : "default view");
             } else {
-                ++shown;
-                EXPECT_LE(safe.x, kMaterialListLeft) << matrixCase.label.c_str();
+                ++shown[portrait ? 1 : 0];
+                EXPECT_LE(safe.x, boxLeft) << matrixCase.label.c_str();
             }
         }
         layout.Invalidate();
-        // The side inset is 9 % of the short side in pixels. Where the short side is the width (1:1 and the three portrait shapes: all 19 hidden cases) the view fills the width and the inset is 9 %
-        // of the 840 units, 75.6, whatever the size. In a landscape window the view is fitted to the height, the inset is 72 units at most, and the bars at the sides of the view (113 units or more,
-        // at 4:3) are wider than that
-        EXPECT_GT(hidden, 0u) << "the narrowest window of the matrix is one of them";
-        EXPECT_GT(shown, hidden);
-        std::cout << "[   INFO   ] the lists are hidden in " << hidden << " of " << hidden + shown << " cases of the size matrix:\n" << hiddenCases.c_str();
+        // The side inset is 9 % of the short side in pixels. Where the short side is the width (1:1 and the three portrait shapes) the view fills the width and the inset is 9 % of its
+        // width in units, whatever the size: 75.6 of the 840 of the default view, 64.8 of the 720 of Portrait (more than the 40 its box starts at). In a landscape window the view is
+        // fitted to the height, the inset is 72 units at most, and the bars at the sides of the view (113 units or more, at 4:3) are wider than that
+        for (const size_t view : {size_t{0}, size_t{1}}) {
+            EXPECT_GT(hidden[view], 0u) << (view == 0 ? "default view" : "Portrait") << ": the narrowest window of the matrix is one of them";
+            EXPECT_GT(shown[view], 0u) << (view == 0 ? "default view" : "Portrait");
+        }
+        EXPECT_GT(shown[0], hidden[0]);
+        std::cout << "[   INFO   ] the lists are hidden in " << hidden[0] << " of " << hidden[0] + shown[0] << " cases of the default view and in " << hidden[1] << " of " << hidden[1] + shown[1]
+                  << " of Portrait, over the size matrix:\n"
+                  << hiddenCases.c_str();
     }
 
     TEST_F(ChessUiTest, NoMaterialElementIsCutOrOutOfPlaceInTheNarrowestWindow) {
@@ -6327,21 +6525,26 @@ namespace BECore::Chess::Tests {
         canvas->UpdateLayout(1280.0f, 720.0f);
         ShowEveryMaterialRow(*canvas);
         UICanvasLayout& layout = canvas->GetLayout();
-        LayOutInTheNarrowestWindow(layout);
-        const Rect safe = layout.GetResolved().safeBounds;
-        EXPECT_NEAR(safe.x, 75.6f, 0.2f) << "9 % of 480 px at the fit scale 0.571";
-        EXPECT_FALSE(MaterialListFits(safe.x, safe.y, safe.x + safe.w, safe.y + safe.h)) << "the lists are hidden here: the component shows no row";
+        for (const ViewShape& shape : kViewShapes) {
+            SCOPED_TRACE(shape.name);
+            const bool portrait = shape.boardLeft == kPortraitBoardLeft;
+            LayOutInTheNarrowestWindow(layout, shape);
+            const Rect safe = layout.GetResolved().safeBounds;
+            EXPECT_NEAR(safe.x, portrait ? 64.8f : 75.6f, 0.2f) << "9 % of 480 px at the fit scale";
+            EXPECT_FALSE(MaterialListFits(safe.x, safe.y, safe.x + safe.w, safe.y + safe.h, portrait ? MaterialView::Portrait : MaterialView::Default))
+                << "the lists are hidden here: the component shows no row";
 
-        for (size_t round = 0; round < kMaterialRounds; ++round) {
-            PublishMaterialRound(round);
-            const String problems = MaterialProblems(layout);
-            ASSERT_TRUE(problems.empty()) << "round " << round << ":\n" << problems.c_str();
-        }
-        // The balance boxes are the part that stays: inside the safe area, inside the margin, clear of the board (x 100) and of the coordinate labels (x 102)
-        for (const char* group : kMaterialGroups) {
-            const UIElement& balance = MaterialElement(Format("Material{}Balance", group).c_str());
-            EXPECT_GE(balance.rect.x, safe.x) << group;
-            EXPECT_LE(balance.rect.x + balance.rect.w, kMaterialMarginRight) << group;
+            for (size_t round = 0; round < kMaterialRounds; ++round) {
+                PublishMaterialRound(round);
+                const String problems = MaterialProblems(layout);
+                ASSERT_TRUE(problems.empty()) << "round " << round << ":\n" << problems.c_str();
+            }
+            // The balance boxes are the part that stays: inside the safe area, and clear of the board and of the coordinate labels (the default view: the margin ends at x 100)
+            for (const char* group : kMaterialGroups) {
+                const UIElement& balance = MaterialElement(Format("Material{}Balance", group).c_str());
+                EXPECT_GE(balance.rect.x, safe.x) << group;
+                EXPECT_LE(balance.rect.x + balance.rect.w, portrait ? safe.x + safe.w : kMaterialMarginRight) << group;
+            }
         }
         layout.Invalidate();
     }
@@ -6360,23 +6563,30 @@ namespace BECore::Chess::Tests {
         ShowEveryMaterialRow(*material);
         PublishMaterialRound(0);
 
-        size_t notchCasesWithAnOverlap = 0;
-        size_t notchCases = 0;
+        size_t notchCasesWithAnOverlap[2] = {};  // the default view, then Portrait
+        size_t notchCases[2] = {};
+        String portraitOverlaps;
         for (const UIMatrixCase& matrixCase : UILayoutMatrix()) {
-            const UILayoutContext context = ContextOf(matrixCase);
+            const UILayoutContext context = ContextOf(matrixCase, true);
             material->GetLayout().Update(context);
             hud->GetLayout().Update(context);
             coordinates->GetLayout().Update(context);
+            const bool portrait = LaidOutForPortrait(material->GetLayout());
             const String labels = MaterialClearance(material->GetLayout(), coordinates->GetLayout(), 1.0f);
             EXPECT_TRUE(labels.empty()) << matrixCase.label.c_str() << ":\n" << labels.c_str();
             const String controls = MaterialClearance(material->GetLayout(), hud->GetLayout(), kMinGap);
             if (matrixCase.label.find("notch") != String::npos) {
-                ++notchCases;
+                const size_t view = portrait ? 1 : 0;
+                ++notchCases[view];
                 if (!controls.empty()) {
-                    ++notchCasesWithAnOverlap;
-                    // Not only close: the Turn label lies on top of the balance of the upper group, and of its first rows (src/Chess/Components/CLAUDE.md, "The captured material", "Known limits")
+                    ++notchCasesWithAnOverlap[view];
+                    if (portrait) {
+                        portraitOverlaps += "  " + matrixCase.label + "\n";
+                    }
+                    // Not only close: the Turn label lies on top of the first row of the upper group, and in the default view of its balance too (src/Chess/Components/CLAUDE.md, "The captured
+                    // material", "Known limits"); in Portrait the balance is beside the rows, to the right of the label
                     const String touching = MaterialClearance(material->GetLayout(), hud->GetLayout(), 0.0f);
-                    EXPECT_NE(touching.find("MaterialTopBalance ("), String::npos) << matrixCase.label.c_str() << ":\n" << touching.c_str();
+                    EXPECT_EQ(touching.find("MaterialTopBalance (") != String::npos, !portrait) << matrixCase.label.c_str() << ":\n" << touching.c_str();
                     EXPECT_NE(touching.find("MaterialTopQueenRow ("), String::npos) << matrixCase.label.c_str() << ":\n" << touching.c_str();
                     EXPECT_NE(touching.find(") and Turn ("), String::npos) << matrixCase.label.c_str() << ":\n" << touching.c_str();
                 }
@@ -6388,16 +6598,21 @@ namespace BECore::Chess::Tests {
         hud->GetLayout().Invalidate();
         coordinates->GetLayout().Invalidate();
         // The counts are pinned: a change of the layout or of the matrix moves them and has to be looked at
-        EXPECT_EQ(notchCases, 46u);
-        EXPECT_EQ(notchCasesWithAnOverlap, 32u);
-        // The HUD keeps inside the safe area, and a notch pushes its top row down by 7 % of the short side, onto the balance and the first row of the upper group
-        std::cout << "[   INFO   ] the HUD reaches the top group in " << notchCasesWithAnOverlap << " of " << notchCases << " notch cases\n";
+        EXPECT_EQ(notchCases[0], 32u);
+        EXPECT_EQ(notchCasesWithAnOverlap[0], 32u);
+        EXPECT_EQ(notchCases[1], 14u);
+        EXPECT_EQ(notchCasesWithAnOverlap[1], 5u) << "only where the view fills the window (a taller window has a bar above it, which takes the notch)";
+        // The HUD keeps inside the safe area, and a notch pushes its top row down by 7 % of the short side, onto the first row of the upper group
+        std::cout << "[   INFO   ] the HUD reaches the top group in " << notchCasesWithAnOverlap[0] << " of " << notchCases[0] << " notch cases of the default view and in "
+                  << notchCasesWithAnOverlap[1] << " of " << notchCases[1] << " of Portrait:\n"
+                  << portraitOverlaps.c_str() << "\n";
     }
 
-    TEST_F(ChessUiTest, TheShownMaterialStaysInTheMarginAndClearOfTheHudAndTheCoordinatesInFiveWindowShapes) {
-        // The shapes of the default view (the Portrait view has its own layout of the material)
+    TEST_F(ChessUiTest, TheShownMaterialStaysInItsPlaceAndClearOfTheHudAndTheCoordinatesInSevenWindowShapes) {
+        // The shapes of the default view and of Portrait: in the first the groups are in the margin left of the board, in the second in the bands above and below it
         StartFrom("4k3/8/8/8/8/8/8/4K3 w - - 0 1");
-        for (const auto& size : {Pair<float, float>{1280.0f, 720.0f}, Pair<float, float>{1024.0f, 768.0f}, Pair<float, float>{800.0f, 800.0f}, Pair<float, float>{2560.0f, 1080.0f}}) {
+        for (const auto& size : {Pair<float, float>{1280.0f, 720.0f}, Pair<float, float>{1024.0f, 768.0f}, Pair<float, float>{800.0f, 800.0f}, Pair<float, float>{2560.0f, 1080.0f},
+                                 Pair<float, float>{720.0f, 1280.0f}, Pair<float, float>{768.0f, 1024.0f}, Pair<float, float>{480.0f, 853.0f}}) {
             SCOPED_TRACE(Format("{}x{}", size.first, size.second).c_str());
             DrawAt(size.first, size.second);
             DrawAt(size.first, size.second);  // the rows wait for the first layout
@@ -6409,7 +6624,14 @@ namespace BECore::Chess::Tests {
             for (const char* group : kMaterialGroups) {
                 for (const char* piece : kMaterialPieces) {
                     const Rect& rect = MaterialRow(group, piece).rect;
-                    EXPECT_LE(rect.x + rect.w, kMaterialMarginRight) << group << piece << " does not reach the board";
+                    if (PortraitIsActive()) {
+                        const bool upper = group == kMaterialGroups[0];
+                        EXPECT_LE(rect.x + rect.w, kPortraitViewWidth) << group << piece << " is inside the view";
+                        EXPECT_EQ(rect.y + rect.h <= kPortraitBoardTop, upper) << group << piece << ": the upper group is above the board, the lower one is not";
+                        EXPECT_EQ(rect.y >= kPortraitBoardBottom, !upper) << group << piece << ": the lower group is under the board, the upper one is not";
+                    } else {
+                        EXPECT_LE(rect.x + rect.w, kMaterialMarginRight) << group << piece << " does not reach the board";
+                    }
                     EXPECT_GE(rect.x, 0.0f) << group << piece;
                 }
             }

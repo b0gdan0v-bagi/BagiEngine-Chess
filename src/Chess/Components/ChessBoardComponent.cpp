@@ -42,9 +42,6 @@ namespace BECore::Chess {
         // How far, in scene units, the pointer must go from the press before the piece is lifted: a click with a shaky hand never lifts one. It decides only the picture, not the move
         constexpr float kDragThreshold = 6.0f;
 
-        // The view of SceneConfig.xml (`viewVariants`) that the `portrait*` fields are the geometry of
-        constexpr const char* kPortraitView = "Portrait";
-
         // One line in the log when a game ends; the board has no text to show it in.
         void LogResult(const ChessGameModel& model) {
             const auto status = EnumUtils<GameStatus>::ToString(model.GetStatus());
