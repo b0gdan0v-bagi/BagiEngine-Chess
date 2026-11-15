@@ -717,8 +717,8 @@ def run_analysis_scenario(client: BagiControlClient, headless: bool) -> None:
     client.call("perform_action", move(last_move))  # a move for the evaluation to follow, so the game quits with a search under way
 
 
-# The scene is 840 x 800 units, the board 640 x 640 at y 80..720; the window fits the scene by the smaller scale and centers it
-VIEW_WIDTH, VIEW_HEIGHT = 840, 800
+# The scene is 840 x 800 units (1120 x 800, its Wide view, from the aspect 1.4 up), the board 640 x 640 at y 80..720; the window fits the view by the smaller scale and centers it
+VIEW_WIDTH, WIDE_VIEW_WIDTH, VIEW_HEIGHT = 840, 1120, 800
 BOARD_TOP, BOARD_BOTTOM = 80, 720
 BOARD_LEFT, SQUARE_SIZE = 100, 80  # the left edge of the board and the side of a square, in view units
 BOARD_BAND_INSET = 2  # rows kept away from the edge of the board, against rounding
@@ -726,8 +726,9 @@ BOARD_BAND_INSET = 2  # rows kept away from the edge of the board, against round
 
 def view_in_picture(image) -> tuple:
     """Where the scene is in a screenshot: (scale, left, top)."""
-    scale = min(image.width / VIEW_WIDTH, image.height / VIEW_HEIGHT)
-    return scale, (image.width - VIEW_WIDTH * scale) / 2, (image.height - VIEW_HEIGHT * scale) / 2
+    view_width = WIDE_VIEW_WIDTH if image.width / image.height >= WIDE_VIEW_WIDTH / VIEW_HEIGHT else VIEW_WIDTH
+    scale = min(image.width / view_width, image.height / VIEW_HEIGHT)
+    return scale, (image.width - view_width * scale) / 2, (image.height - VIEW_HEIGHT * scale) / 2
 
 
 def board_rows(image) -> tuple:

@@ -41,9 +41,7 @@ namespace BECore::Chess::Tests {
         constexpr float kThreeQuarters = 0.75f;
         constexpr float kDefaultSlide = 0.15f;  // what SceneConfig.xml gets from the code
         constexpr int kStepsToEnd = 4;          // tween steps (frames after the first) until the slide ends
-        // The view of the scene (config/SceneConfig.xml) and half a square, to turn a square into the output pixel of its middle
-        constexpr float kViewWidth = 840.0f;
-        constexpr float kViewHeight = 800.0f;
+        // Half a square, to turn a square into the output pixel of its middle
         constexpr float kHalfSquare = 40.0f;
         constexpr float kPortraitBoardLeft = 40.0f;  // the board of the Portrait view (720 x 960), the squares 80 units as in the default one
         constexpr float kPortraitBoardTop = 144.0f;
@@ -272,10 +270,15 @@ namespace BECore::Chess::Tests {
             return node;
         }
 
+        /// The fit of the view the scene draws now (the 1280 x 720 of this fixture picks the Wide view after the first draw) into the output
+        ViewTransform ActiveFit() const {
+            return ViewTransform::Fit(GetScene().GetViewWidth(), GetScene().GetViewHeight(), _renderer->width, _renderer->height);
+        }
+
         /// The middle of a square in output pixels, for the fit of the view into the output and the orientation the board has now
         Origin ScreenOf(const char* square) const {
             const Origin cell = PixelOf(square);
-            const Rect at = ViewTransform::Fit(kViewWidth, kViewHeight, _renderer->width, _renderer->height).ToOutput(cell.first + kHalfSquare, cell.second + kHalfSquare, 0.0f, 0.0f);
+            const Rect at = ActiveFit().ToOutput(cell.first + kHalfSquare, cell.second + kHalfSquare, 0.0f, 0.0f);
             return {at.x, at.y};
         }
 
@@ -298,9 +301,15 @@ namespace BECore::Chess::Tests {
             CoreManager::GetUIInput().DispatchMouseMotion(event);
         }
 
-        /// The output is mapped back to the view of the last draw, so the scene is drawn once before the first event
+        /// The output is mapped back to the view of the last draw, so the scene is drawn once before the first event. A draw that picks another view (the first one, here: the 1280 x 720 of
+        /// the fixture is a Wide window) is followed by an update that tells the board, and a draw again, as a frame of the game does
         void PressOn(const char* square) {
+            const uint32_t viewBefore = GetScene().GetViewVersion();
             _manager->DrawAll();
+            if (GetScene().GetViewVersion() != viewBefore) {
+                _manager->UpdateAll();
+                _manager->DrawAll();
+            }
             CoreManager::GetUIInput().DispatchMouseButtonDown(Button(ScreenOf(square), true));
         }
 

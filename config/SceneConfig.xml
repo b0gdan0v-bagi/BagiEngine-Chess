@@ -6,14 +6,19 @@
       name="ChessScene"
       viewWidth="840"
       viewHeight="800">
-      <!-- Two views. The default one is 840 x 800 (the board 640 x 640 at (100, 80), the HUD in the margins), the view named Portrait 720 x 960 (the board at (40, 144), the material above and below it).
-           The board is 640 x 640 and a square 80 units in both, so a piece, a drag and a label keep their numbers. `when` is tested on the OUTPUT in pixels: with the board 640 units in both views
+      <!-- Three views. The default one is 840 x 800 (the board 640 x 640 at (100, 80), the HUD in the margins), the view named Portrait 720 x 960 (the board at (40, 144), the material above and below it)
+           and the view named Wide 1120 x 800 (the same board and margin, 280 more units on the right for the move panel).
+           The board is 640 x 640 and a square 80 units in all three, so a piece, a drag and a label keep their numbers. `when` is tested on the OUTPUT in pixels: with the board 640 units in both views
            it is 640 * min(W / viewW, H / viewH) pixels, which is bigger in Portrait exactly while W / H is under 840 / 960 = 0.875 (a width-bound landscape view against a height-bound portrait one),
            so the view with the bigger board on the screen is picked; a square window keeps the default view. maxAspect holds up to and including its number, so the tie (0.875) is Portrait.
+           Wide is picked from the aspect 1120 / 800 = 1.4 up (minAspect holds from its number): there the height already limits the default view, so the scale is outputHeight / 800 in both and the board,
+           the HUD and every font keep their size; the free letterbox beside the view is what the panel takes. Below 1.4 the width limits the default view, and widening it would shrink everything, so
+           those windows keep the view they have. A view is never picked for being wider, only where that costs no scale.
            ChessBoardComponent follows the active view (its portraitOrigin* and portraitSquareSize are the board of Portrait); a canvas lays out per view with a variant `orientation:portrait`
-           (a canvas variant is conditioned on the bounds of its own canvas, here the view in units: 720 x 960 is portrait, 840 x 800 is not). -->
+           (a canvas variant is conditioned on the bounds of its own canvas, here the view in units: 720 x 960 is portrait, 840 x 800 and 1120 x 800 are not). -->
       <viewVariants>
         <view name="Portrait" when="maxAspect:0.875" width="720" height="960" />
+        <view name="Wide" when="minAspect:1.4" width="1120" height="800" />
       </viewVariants>
       <nodes>
         <node ref="nodes/ChessBoard" />

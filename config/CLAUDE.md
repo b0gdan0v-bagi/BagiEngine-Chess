@@ -4,7 +4,7 @@ The scene is `SceneConfig.xml` plus the node files of `config/nodes/` (the engin
 
 | File | Holds |
 |------|-------|
-| `SceneConfig.xml` | the `scene` element (`ChessScene`), `viewVariants` (the default view 840 x 800 and `Portrait` 720 x 960) with its comment, and the 40 `<node ref>` in the draw and input order (the order of the references decides it for one layer, so do not reorder): the eight UI nodes, then the 32 piece references with their group comments |
+| `SceneConfig.xml` | the `scene` element (`ChessScene`), `viewVariants` (the default view 840 x 800, `Portrait` 720 x 960 and `Wide` 1120 x 800 from the aspect 1.4) with its comment, and the 40 `<node ref>` in the draw and input order (the order of the references decides it for one layer, so do not reorder): the eight UI nodes, then the 32 piece references with their group comments |
 | `nodes/ChessBoard.xml`, `ChessBoardCoordinates.xml`, `ChessMaterial.xml`, `ChessHud.xml`, `ChessMenuPanel.xml`, `ChessOpponentPanel.xml`, `ChessPromotionPanel.xml`, `ChessResult.xml` | the nodes `Board`, `BoardCoordinates`, `Material`, `Hud`, `MenuPanel`, `OpponentPanel`, `PromotionPanel`, `Result` (the node name has no prefix; the layer is the node's own) |
 | `nodes/ChessPiece.xml` | the prefab of a piece; each of the 32 references overrides `name`, `spriteId`, `file` and `rank` (spelled out even when equal to the prefab's) |
 

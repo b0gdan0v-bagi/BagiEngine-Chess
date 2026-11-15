@@ -81,6 +81,12 @@ namespace BECore::Chess::Tests {
         constexpr float kPortraitNotchUnits = 50.4f;  // the top inset of a notch (7 % of the short side) when the view fills the window: 7 % of its 720 units
         constexpr const char* kPortraitViewName = "Portrait";
 
+        // The third view (SceneConfig.xml): 1120 x 800, the board and the margins of the default view and the room for the move panel at the right; picked from the aspect 1.4 up
+        constexpr float kWideViewWidth = 1120.0f;
+        constexpr const char* kWideViewName = "Wide";
+        constexpr float kWideMinAspect = kWideViewWidth / kViewHeight;
+        constexpr float kWideNarrowestWidth = 700.0f;  // 700 x 480 is the narrowest Wide window with side insets (672 x 480 is the aspect 1.4 itself, a knife edge), at the scale 0.6
+
         // The colors the board fills a full square with (ChessBoardComponent.cpp)
         const Color kSelectedColor{120, 200, 120, 200};
         const Color kLegalMoveColor{120, 200, 120, 120};
@@ -408,14 +414,37 @@ namespace BECore::Chess::Tests {
             Pair<float, float> output;
             Pair<float, float> narrowest;
             float viewWidth;
+            float viewHeight;
             float boardLeft;
             float boardTop;
             bool portrait;
+
+            /// The fit scale of the view in its narrowest window: the width limits the default and the Portrait view there, the height the Wide one
+            [[nodiscard]] float NarrowestScale() const {
+                return std::min(narrowest.first / viewWidth, narrowest.second / viewHeight);
+            }
+            /// Where the safe area of that window (SideInsets: a share of the short side at each side) begins in view units, past the letterbox of the view if it has one
+            [[nodiscard]] float NarrowestSafeLeft() const {
+                const float scale = NarrowestScale();
+                const float letterbox = (narrowest.first - viewWidth * scale) * 0.5f;
+                return std::max(0.0f, (std::min(narrowest.first, narrowest.second) * UIPreview::kSideInsetShare - letterbox) / scale);
+            }
+            /// The width of that safe area in view units
+            [[nodiscard]] float NarrowestSafeWidth() const {
+                return viewWidth - 2.0f * NarrowestSafeLeft();
+            }
         };
 
-        const ViewShape kViewShapes[] = {
-            {"default view", {1280.0f, 720.0f}, {kNarrowestWidth, kNarrowestHeight}, kViewWidth, kBoardLeft, kBoardTop, false},
-            {"Portrait view", {kNarrowestWidth, kNarrowestPortraitHeight}, {kNarrowestWidth, kNarrowestPortraitHeight}, kPortraitViewWidth, kPortraitBoardLeft, kPortraitBoardTop, true}};
+        const ViewShape kViewShapes[] = {{"default view", {1024.0f, 768.0f}, {kNarrowestWidth, kNarrowestHeight}, kViewWidth, kViewHeight, kBoardLeft, kBoardTop, false},
+                                         {"Portrait view",
+                                          {kNarrowestWidth, kNarrowestPortraitHeight},
+                                          {kNarrowestWidth, kNarrowestPortraitHeight},
+                                          kPortraitViewWidth,
+                                          kPortraitViewHeight,
+                                          kPortraitBoardLeft,
+                                          kPortraitBoardTop,
+                                          true},
+                                         {"Wide view", {1280.0f, 720.0f}, {kWideNarrowestWidth, kNarrowestHeight}, kWideViewWidth, kViewHeight, kBoardLeft, kBoardTop, false}};
         constexpr size_t kBoardEdgeCells = kLastBoardIndex + 1;
         constexpr float kPieceWidth = kCellSize * kCellWidth / kCellHeight;  // a piece fitted by Contain is as high as its cell, as wide as the aspect of its atlas cell, and centered
         constexpr float kPieceLeft = (kCellSize - kPieceWidth) * 0.5f;       // 15.5 units from the left edge of the cell
@@ -425,6 +454,11 @@ namespace BECore::Chess::Tests {
         /// Whether a canvas was laid out for the Portrait view: its bounds are the view in units
         bool LaidOutForPortrait(const UICanvasLayout& layout) {
             return layout.GetResolved().bounds.w == kPortraitViewWidth;
+        }
+
+        /// Whether a canvas was laid out for the Wide view: its bounds are the view in units
+        bool LaidOutForWide(const UICanvasLayout& layout) {
+            return layout.GetResolved().bounds.w == kWideViewWidth;
         }
 
         /// One label of the board coordinates: its name and the drawn cell it sits in (the rank labels are in the left column, one per row; the file labels in the bottom row, one per column)
@@ -661,9 +695,9 @@ namespace BECore::Chess::Tests {
         const Color kMaterialChipColor{232, 210, 170, 255};                                                    // the fill of a row (SceneConfig.xml)
         constexpr float kBoardUnits = 640.0f;
         /// The outputs that decide which view is right: phones held upright and sideways, tablets, desktop windows, squares and the degenerate ones
-        const Pair<float, float> kViewOutputs[] = {{480.0f, 853.0f},  {390.0f, 844.0f},  {720.0f, 1280.0f},  {768.0f, 1024.0f}, {800.0f, 800.0f},
-                                                   {1024.0f, 768.0f}, {1280.0f, 720.0f}, {1920.0f, 1080.0f}, {480.0f, 480.0f},  {1.0f, 1.0f},
-                                                   {0.0f, 0.0f},      {874.0f, 1000.0f}, {875.0f, 1000.0f},  {876.0f, 1000.0f}, {2560.0f, 1080.0f}};
+        const Pair<float, float> kViewOutputs[] = {{480.0f, 853.0f},  {390.0f, 844.0f},   {720.0f, 1280.0f},  {768.0f, 1024.0f},  {800.0f, 800.0f},  {1024.0f, 768.0f},
+                                                   {1280.0f, 720.0f}, {1920.0f, 1080.0f}, {480.0f, 480.0f},   {1.0f, 1.0f},       {0.0f, 0.0f},      {874.0f, 1000.0f},
+                                                   {875.0f, 1000.0f}, {876.0f, 1000.0f},  {2560.0f, 1080.0f}, {1390.0f, 1000.0f}, {1400.0f, 1000.0f}};
         const Color kBoardDimColor{0, 0, 0, 140};                                     // the dim of the result (ChessResultComponent.cpp)
         constexpr const char* kBlackMatesOnA1 = "r5k1/8/8/8/8/8/5PPP/6K1 b - - 0 1";  // Ra1 is mate
         /// A glyph of a label: a texture drawn with one of the two colors of the squares as its tint (the pieces are drawn white, and the text of the HUD too)
@@ -1197,11 +1231,13 @@ namespace BECore::Chess::Tests {
 
         /// A drag of the piece on a square to the middle of another one
         void Drag(const char* from, const char* to) {
+            Draw();  // the points are where the view this frame picks puts the squares
             DragBetween(SquareCenter(from), SquareCenter(to));
         }
 
         /// The same by drawn cells (column from the left, row from the top), for the turned board
         void DragCells(int fromColumn, int fromRow, int toColumn, int toRow) {
+            Draw();
             const Rect from = CellRect(fromColumn, fromRow);
             const Rect to = CellRect(toColumn, toRow);
             DragBetween({from.x + from.w * 0.5f, from.y + from.h * 0.5f}, {to.x + to.w * 0.5f, to.y + to.h * 0.5f});
@@ -1382,7 +1418,7 @@ namespace BECore::Chess::Tests {
             canvas->UpdateLayout(1280.0f, 720.0f);  // the reflected fields of the component reach the layout on its first update
 
             const UILayoutContext base = ViewContext();
-            ASSERT_FLOAT_EQ(base.sceneViewWidth, kViewWidth);
+            ASSERT_FLOAT_EQ(base.sceneViewWidth, kWideViewWidth) << "the 1280 x 720 of the fixture is a Wide window";
             ASSERT_FLOAT_EQ(base.sceneViewHeight, kViewHeight);
             UILayoutValidatorOptions options;
             options.minTouchSize = CoreManager::GetUIEnvironment().GetSettings().minTouchSize;

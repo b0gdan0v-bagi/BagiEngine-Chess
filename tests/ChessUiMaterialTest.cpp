@@ -127,7 +127,10 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, NoRowIsShownInTheFirstFrameWhateverTheGameSays) {
-        // The canvas has not been laid out when the component runs in the first frame, so the safe area is not known and the rows wait: nothing flashes for a frame
+        // The canvas has not been laid out when the component runs in the first frame, so the safe area is not known and the rows wait: nothing flashes for a frame.
+        // A window of the default view: where the first Draw() switches the view it draws a second frame, and that one has the layout
+        _renderer->width = kViewShapes[0].output.first;
+        _renderer->height = kViewShapes[0].output.second;
         StartFrom(kWhiteTookAPawn);
         Draw();
         EXPECT_EQ(CoreManager::GetUIVars().Get(PoolString::Intern("materialBottomPawn")), "x1") << "the words are there at once";
@@ -653,7 +656,7 @@ namespace BECore::Chess::Tests {
         for (const ViewShape& shape : kViewShapes) {
             SCOPED_TRACE(shape.name);
             LayOutInTheNarrowestWindow(layout, shape);
-            EXPECT_NEAR(layout.GetResolved().scale, kNarrowestWidth / shape.viewWidth, 0.01f);
+            EXPECT_NEAR(layout.GetResolved().scale, shape.NarrowestScale(), 0.01f);
             const float scale = layout.GetResolved().scale;
             for (const char* group : {"Top", "Bottom"}) {
                 const UIElement* label = &MaterialElement(Format("Material{}Balance", group).c_str());
@@ -669,7 +672,7 @@ namespace BECore::Chess::Tests {
                 }
             }
         }
-        EXPECT_EQ(checked, 2 * 198u);
+        EXPECT_EQ(checked, std::size(kViewShapes) * 198u);
         layout.Invalidate();
     }
 
@@ -804,7 +807,7 @@ namespace BECore::Chess::Tests {
             const bool portrait = shape.portrait;
             LayOutInTheNarrowestWindow(layout, shape);
             const Rect safe = layout.GetResolved().safeBounds;
-            EXPECT_NEAR(safe.x, portrait ? 64.8f : 75.6f, 0.2f) << "9 % of 480 px at the fit scale";
+            EXPECT_NEAR(safe.x, shape.NarrowestSafeLeft(), 0.2f) << "9 % of 480 px at the fit scale, less the letterbox of a view that does not fill the width";
             EXPECT_FALSE(MaterialListFits(safe.x, safe.y, safe.x + safe.w, safe.y + safe.h, portrait ? MaterialView::Portrait : MaterialView::Default))
                 << "the lists are hidden here: the component shows no row";
 

@@ -249,8 +249,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(Model().GetWinner(), Optional<PieceColor>(PieceColor::Black));
         const auto dim = dimOf();
         ASSERT_TRUE(dim.has_value());
-        const ViewTransform fit = ViewTransform::Fit(kViewWidth, kViewHeight, _renderer->width, _renderer->height);
-        EXPECT_TRUE(SameRect(*dim, fit.ToOutput(100.0f, kBoardTop, 640.0f, 640.0f))) << "the whole board, as with White at the bottom";
+        EXPECT_TRUE(SameRect(*dim, ActiveFit().ToOutput(100.0f, kBoardTop, 640.0f, 640.0f))) << "the whole board, as with White at the bottom";
         EXPECT_FALSE(RectCalls(kResultBarColor).empty()) << "the bar of the winner";
     }
 
@@ -497,7 +496,7 @@ namespace BECore::Chess::Tests {
         for (const ViewShape& shape : kViewShapes) {
             SCOPED_TRACE(shape.name);
             LayOutInTheNarrowestWindow(layout, shape);
-            EXPECT_NEAR(layout.GetResolved().scale, kNarrowestWidth / shape.viewWidth, 0.01f) << "about 10 px for a font of 18 units in the default view, 12 in Portrait";
+            EXPECT_NEAR(layout.GetResolved().scale, shape.NarrowestScale(), 0.01f) << "about 10 px for a font of 18 units in the default view, 12 in Portrait";
 
             for (size_t round = 0; round < kBoardEdgeCells; ++round) {
                 PublishCoordinateRound(round);

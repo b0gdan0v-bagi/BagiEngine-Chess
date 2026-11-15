@@ -451,9 +451,9 @@ namespace BECore::Chess::Tests {
             SCOPED_TRACE(shape.name);
             LayOutInTheNarrowestWindow(layout, shape);
 
-            const float scale = kNarrowestWidth / shape.viewWidth;
+            const float scale = shape.NarrowestScale();
             EXPECT_NEAR(layout.GetResolved().scale, scale, 0.01f);
-            EXPECT_NEAR(layout.root->rect.w, kNarrowestWidth * (1.0f - 2.0f * UIPreview::kSideInsetShare) / scale, 0.5f) << "the safe area, in view units: about 689 and 590";
+            EXPECT_NEAR(layout.root->rect.w, shape.NarrowestSafeWidth(), 0.5f) << "the safe area, in view units: about 689 and 590";
             const String problems = PanelProblems(layout, kPromotionPlate);
             EXPECT_TRUE(problems.empty()) << problems.c_str();
 

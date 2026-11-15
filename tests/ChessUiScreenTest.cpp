@@ -40,9 +40,9 @@ namespace BECore::Chess::Tests {
         for (const ViewShape& shape : kViewShapes) {
             SCOPED_TRACE(shape.name);
             LayOutInTheNarrowestWindow(layout, shape);
-            const float scale = kNarrowestWidth / shape.viewWidth;
+            const float scale = shape.NarrowestScale();
             EXPECT_NEAR(layout.GetResolved().scale, scale, 0.01f);
-            EXPECT_NEAR(layout.root->rect.w, kNarrowestWidth * (1.0f - 2.0f * UIPreview::kSideInsetShare) / scale, 0.5f) << "the safe area, in view units";
+            EXPECT_NEAR(layout.root->rect.w, shape.NarrowestSafeWidth(), 0.5f) << "the safe area, in view units";
 
             for (size_t round = 0; round < words.Rounds(); ++round) {
                 words.Publish(round);
@@ -139,8 +139,7 @@ namespace BECore::Chess::Tests {
 
         size_t glyphsInTurn = 0;
         const UIElement& turn = Label("Turn");
-        const ViewTransform fit = ViewTransform::Fit(kViewWidth, kViewHeight, _renderer->width, _renderer->height);
-        const Rect box = fit.ToOutput(turn.rect.x, turn.rect.y, turn.rect.w, turn.rect.h);
+        const Rect box = ActiveFit().ToOutput(turn.rect.x, turn.rect.y, turn.rect.w, turn.rect.h);
         for (const DrawCall& call : _renderer->calls) {
             if (call.kind == DrawKind::Texture && call.rect.x >= box.x - 1.0f && call.rect.x + call.rect.w <= box.x + box.w + 1.0f && call.rect.y >= box.y - 1.0f &&
                 call.rect.y + call.rect.h <= box.y + box.h + 1.0f) {
@@ -249,14 +248,17 @@ namespace BECore::Chess::Tests {
 
     }  // namespace
 
-    TEST_F(ChessUiTest, TheSceneHasTheDefaultViewAndThePortraitView) {
-        EXPECT_FLOAT_EQ(GetScene().GetViewWidth(), kViewWidth);
+    TEST_F(ChessUiTest, TheSceneHasTheDefaultViewThePortraitViewAndTheWideView) {
+        EXPECT_FLOAT_EQ(GetScene().GetViewWidth(), kViewWidth) << "the default view, until a frame picks another";
         EXPECT_FLOAT_EQ(GetScene().GetViewHeight(), kViewHeight);
         const auto variants = GetScene().GetViewVariants();
-        ASSERT_EQ(variants.size(), 1u);
+        ASSERT_EQ(variants.size(), 2u);
         EXPECT_EQ(variants[0].name, PoolString::Intern(kPortraitViewName));
         EXPECT_FLOAT_EQ(variants[0].width, kPortraitViewWidth);
         EXPECT_FLOAT_EQ(variants[0].height, kPortraitViewHeight);
+        EXPECT_EQ(variants[1].name, PoolString::Intern(kWideViewName));
+        EXPECT_FLOAT_EQ(variants[1].width, kWideViewWidth);
+        EXPECT_FLOAT_EQ(variants[1].height, kViewHeight);
     }
 
     TEST_F(ChessUiTest, TheSceneShowsTheViewWithTheBiggerBoardOnTheScreen) {
@@ -267,20 +269,73 @@ namespace BECore::Chess::Tests {
             const float pickedPixels = BoardPixels(picked.width, picked.height, output.first, output.second);
             EXPECT_GE(pickedPixels, BoardPixels(kViewWidth, kViewHeight, output.first, output.second) - kBoardPixelTolerance);
             EXPECT_GE(pickedPixels, BoardPixels(kPortraitViewWidth, kPortraitViewHeight, output.first, output.second) - kBoardPixelTolerance);
+            EXPECT_GE(pickedPixels, BoardPixels(kWideViewWidth, kViewHeight, output.first, output.second) - kBoardPixelTolerance);
 
             if (output.first > 0.0f) {
                 DrawAt(output.first, output.second);
                 EXPECT_EQ(GetScene().GetActiveView(), picked) << "the scene draws the view that the rule picks";
             }
         }
-        // The cases that name the rule: a phone held upright is Portrait, a window wider than 0.875 of its height (a square too) the default view
+        // The cases that name the rule: a phone held upright is Portrait, a window from 0.875 of its height up to 1.4 (a square too) the default view, 1.4 and wider the Wide view
         const auto nameOf = [&](float width, float height) { return SceneViewSelector::Pick(kViewWidth, kViewHeight, variants, width, height).name; };
         EXPECT_EQ(nameOf(480.0f, 853.0f), PoolString::Intern(kPortraitViewName));
         EXPECT_EQ(nameOf(768.0f, 1024.0f), PoolString::Intern(kPortraitViewName));
         EXPECT_EQ(nameOf(874.0f, 1000.0f), PoolString::Intern(kPortraitViewName));
         EXPECT_EQ(nameOf(876.0f, 1000.0f), PoolString());
         EXPECT_EQ(nameOf(800.0f, 800.0f), PoolString());
-        EXPECT_EQ(nameOf(1920.0f, 1080.0f), PoolString());
+        EXPECT_EQ(nameOf(1024.0f, 768.0f), PoolString());
+        EXPECT_EQ(nameOf(1390.0f, 1000.0f), PoolString()) << "just under 1.4";
+        EXPECT_EQ(nameOf(1400.0f, 1000.0f), PoolString::Intern(kWideViewName)) << "the edge itself is Wide";
+        EXPECT_EQ(nameOf(kWideMinAspect * 1000.0f, 1000.0f), PoolString::Intern(kWideViewName));
+        EXPECT_EQ(nameOf(1920.0f, 1080.0f), PoolString::Intern(kWideViewName));
+        EXPECT_EQ(nameOf(2560.0f, 1080.0f), PoolString::Intern(kWideViewName));
+    }
+
+    TEST_F(ChessUiTest, NoWindowOfTheMatrixDrawsTheSceneSmallerThanTheNarrowestOneOfTheDefaultView) {
+        // The reason the view is widened only from the aspect 1.4 up: a 56 unit control of the HUD is a 32 px touch target at this scale, so a view that shrank the scene further would break them
+        const float smallest = kNarrowestWidth / kViewWidth;
+        const auto variants = GetScene().GetViewVariants();
+        size_t checked = 0;
+        for (const UIMatrixCase& matrixCase : UILayoutMatrix()) {
+            const float width = matrixCase.context.outputWidth;
+            const float height = matrixCase.context.outputHeight;
+            const ActiveSceneView picked = SceneViewSelector::Pick(kViewWidth, kViewHeight, variants, width, height);
+            const float scale = std::min(width / picked.width, height / picked.height);
+            EXPECT_GE(scale, smallest - 1e-4f) << matrixCase.label.c_str() << " in the view " << picked.width << " x " << picked.height;
+            EXPECT_GE(scale * kSegmentHeight, CoreManager::GetUIEnvironment().GetSettings().minTouchSize - kPixelTolerance) << matrixCase.label.c_str();
+            ++checked;
+        }
+        EXPECT_GT(checked, 0u);
+    }
+
+    TEST_F(ChessUiTest, TheHudOfTheWideViewSitsInTheCornersOfItsSafeAreaAndLeavesTheRightFreeForThePanel) {
+        DrawAt(1920.0f, 1080.0f);
+        ASSERT_EQ(GetScene().GetActiveView().name, PoolString::Intern(kWideViewName));
+        constexpr float kEdge = 12.0f;  // the HUD's distance from the corners of the safe area (ChessHud.xml)
+        EXPECT_NEAR(HudElement("Turn")->rect.x, kEdge, kPixelTolerance);
+        EXPECT_NEAR(HudElement("Reset")->rect.x + HudElement("Reset")->rect.w, kWideViewWidth - kEdge, kPixelTolerance);
+        EXPECT_NEAR(HudElement("Status")->rect.x + HudElement("Status")->rect.w, kWideViewWidth - kEdge, kPixelTolerance);
+        EXPECT_NEAR(HudElement("Status")->rect.y + HudElement("Status")->rect.h, kViewHeight - kEdge, kPixelTolerance);
+        for (const char* name : {"Menu", "Reset"}) {
+            EXPECT_LE(HudElement(name)->rect.y + HudElement(name)->rect.h, kBoardTop) << name << " is above the row of the panel";
+        }
+    }
+
+    TEST_F(ChessUiTest, TheWideViewKeepsTheBoardAndTheScaleOfTheDefaultViewAndAddsTheRoomAtTheRight) {
+        const ChessBoardComponent* board = ChessBoardComponent::GetActive();
+        ASSERT_NE(board, nullptr);
+        for (const auto& output : {Pair<float, float>{1920.0f, 1080.0f}, {1280.0f, 720.0f}, {1400.0f, 1000.0f}, {2560.0f, 1080.0f}, {kWideNarrowestWidth, kNarrowestHeight}}) {
+            SCOPED_TRACE(Format("output {}x{}", output.first, output.second).c_str());
+            DrawAt(output.first, output.second);
+            ASSERT_EQ(GetScene().GetActiveView().name, PoolString::Intern(kWideViewName));
+            EXPECT_FLOAT_EQ(ViewWidth(), kWideViewWidth);
+            EXPECT_FLOAT_EQ(ViewHeight(), kViewHeight);
+            EXPECT_FLOAT_EQ(board->GetOriginX(), kBoardLeft);
+            EXPECT_FLOAT_EQ(board->GetOriginY(), kBoardTop);
+            EXPECT_FLOAT_EQ(board->GetSquareSize(), kCellSize);
+            const ViewTransform defaultFit = ViewTransform::Fit(kViewWidth, kViewHeight, output.first, output.second);
+            EXPECT_NEAR(ActiveFit().scale, defaultFit.scale, 1e-4f) << "the height limits both views: nothing gets smaller";
+        }
     }
 
     TEST_F(ChessUiTest, TheNarrowestWindowOfEachViewHasItsOwnScale) {
@@ -291,6 +346,10 @@ namespace BECore::Chess::Tests {
         DrawAt(kNarrowestWidth, kNarrowestPortraitHeight);
         EXPECT_TRUE(PortraitIsActive());
         EXPECT_NEAR(ActiveFit().scale, kNarrowestWidth / kPortraitViewWidth, 1e-4f) << "the width is the limit: 9:16 is taller than the view";
+
+        DrawAt(kWideNarrowestWidth, kNarrowestHeight);
+        EXPECT_EQ(GetScene().GetActiveView().name, PoolString::Intern(kWideViewName));
+        EXPECT_NEAR(ActiveFit().scale, kNarrowestHeight / kViewHeight, 1e-4f) << "the height is the limit, as in the default view: the scene is not smaller for being wider";
     }
 
     TEST_F(ChessUiTest, TheBoardAndThePiecesFollowTheViewThatIsDrawn) {

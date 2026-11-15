@@ -74,7 +74,7 @@ namespace BECore::Chess::Tests {
             SCOPED_TRACE(shape.name);
             LayOutInTheNarrowestWindow(layout, shape);
 
-            const float scale = kNarrowestWidth / shape.viewWidth;
+            const float scale = shape.NarrowestScale();
             EXPECT_NEAR(layout.GetResolved().scale, scale, 0.01f);
             const String problems = PanelProblems(layout, kMenuPlate);
             EXPECT_TRUE(problems.empty()) << problems.c_str();
