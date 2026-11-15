@@ -64,10 +64,10 @@ namespace BECore::Chess {
      * @brief The second half: puts a checked plan into the live game, and cannot fail halfway.
      *
      * The position is started from the plan's start and every move is played through ChessGameModel::TryMove() (a finished game is not played: the model keeps what it has). Then the
-     * opponent: one ChooseSeats() with the sides and the seats' choices, and the person's color when the program plays no single side (the color of one side derives from it). A pick the
-     * controller refuses (Stockfish saved, none found now) is not a failure of the restore: the position stands, the program plays nobody, GetError() has the reason through the usual
-     * route, nothing falls back to the other engine, and one warning says the saved opponent was not restored. Meant for a game that has just started (nobody plays); the analysis and its
-     * switches are not touched.
+     * opponent: one ChooseSeats() with the sides and the seats' choices, and the person's color when the program plays no single side (the color of one side derives from it). Stockfish saved for a
+     * seat that nobody plays, none found now, comes back as the default engine (the choice is only a memory). A pick the controller refuses (Stockfish saved for a seat that plays, none found now) is
+     * not a failure of the restore: the position stands, the program plays nobody, GetError() has the reason through the usual route, nothing falls back to the other engine, and one warning says the
+     * saved opponent was not restored. Meant for a game that has just started (nobody plays); the analysis and its switches are not touched.
      */
     void Apply(const RestorePlan& plan, ChessGameModel& model, OpponentController& controller, OpponentChoice& choice);
 

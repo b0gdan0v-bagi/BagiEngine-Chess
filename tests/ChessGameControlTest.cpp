@@ -914,6 +914,8 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessGameControlTest, AnEnginePickOfNobodyMovesTheVersionBothWays) {
+        CountingFactory factory({MakeShared<InstantEngine>()});  // the default factory would refuse "stockfish" on a machine that has none
+        opponent.SetEngineFactory(factory.AsFactory());
         uint64_t version = control.GetStateVersion();
         SetOpponent(EngineRequest(Json("own")));
         EXPECT_GT(control.GetStateVersion(), version);

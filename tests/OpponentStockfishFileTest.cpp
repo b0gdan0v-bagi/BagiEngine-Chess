@@ -14,19 +14,6 @@ namespace BECore::Chess::Tests {
     namespace {
 
         constexpr const char* kFileName = "stockfish-file";
-        constexpr std::filesystem::perms kExecutable =
-            std::filesystem::perms::owner_all | std::filesystem::perms::group_read | std::filesystem::perms::group_exec | std::filesystem::perms::others_read | std::filesystem::perms::others_exec;
-
-        /// The file FindStockfish() accepts: a regular file with the execute bit (what it holds is never read before a search)
-        void MakeStockfishFile(const std::filesystem::path& path) {
-            {
-                //-NoStd: file layer (engine-file-layer)
-                std::ofstream out(path);
-                out << "not an engine\n";
-            }
-            std::filesystem::permissions(path, kExecutable, std::filesystem::perm_options::replace);
-        }
-
         OpponentSettings SettingsAt(const std::filesystem::path& path) {
             return OpponentSettings{FromStdString(path.string())};
         }

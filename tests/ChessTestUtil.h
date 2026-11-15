@@ -7,6 +7,9 @@
 #include <Common/Printers.h>
 #include <TaskSystem/TaskManager.h>
 #include <TaskSystem/TaskScheduler.h>
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
 
 // A test that needs a worker thread (a gate that a worker holds while the test thread opens it, a wait for IsThinking()
 // while a search blocks, an engine that only stands in as "never answers") begins with this: under ENGINE_SINGLE_THREAD
@@ -44,6 +47,68 @@ namespace BECore::Chess::Tests {
         scheduler.ProcessMainThreadTasks();
         (void)scheduler.ProcessBackgroundSlices(TaskManager::GetInstance().GetFrameBudget());
 #endif
+    }
+
+    /// An environment variable set (or removed, for nullptr) for the length of a scope and put back after it. A test that starts a game reads STOCKFISH and PATH through
+    /// FindStockfish(), so it fixes them with this instead of taking the machine's
+    class ScopedEnvironment {
+    public:
+        ScopedEnvironment(const char* name, const char* value) : _name(name) {
+            _hadValue = Read(name, _old);
+            Set(value);
+        }
+        ~ScopedEnvironment() {
+            Set(_hadValue ? _old.c_str() : nullptr);
+        }
+        ScopedEnvironment(const ScopedEnvironment&) = delete;
+        ScopedEnvironment& operator=(const ScopedEnvironment&) = delete;
+
+    private:
+        static bool Read(const char* name, String& value) {
+#if defined(_WIN32)
+            char* text = nullptr;
+            size_t length = 0;
+            const bool found = _dupenv_s(&text, &length, name) == 0 && text != nullptr;
+            if (found) {
+                value = text;
+            }
+            std::free(text);
+            return found;
+#else
+            const char* text = std::getenv(name);
+            if (text != nullptr) {
+                value = text;
+            }
+            return text != nullptr;
+#endif
+        }
+
+        void Set(const char* value) const {
+#if defined(_WIN32)
+            _putenv_s(_name, value != nullptr ? value : "");  // an empty value removes the variable
+#else
+            if (value != nullptr) {
+                setenv(_name, value, 1);
+            } else {
+                unsetenv(_name);
+            }
+#endif
+        }
+
+        const char* _name;
+        String _old;
+        bool _hadValue = false;
+    };
+
+    /// The file FindStockfish() accepts: a regular file with the execute bit (what it holds is never read before a search)
+    inline void MakeStockfishFile(const std::filesystem::path& path) {
+        {
+            //-NoStd: file layer (engine-file-layer)
+            std::ofstream out(path);
+            out << "not an engine\n";
+        }
+        using std::filesystem::perms;
+        std::filesystem::permissions(path, perms::owner_all | perms::group_read | perms::group_exec | perms::others_read | perms::others_exec, std::filesystem::perm_options::replace);
     }
 
     /// Square from its algebraic name ("e4").

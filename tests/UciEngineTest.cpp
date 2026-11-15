@@ -7,10 +7,6 @@
 #include <tests/StockfishUtil.h>
 #include <thread>
 
-#if !defined(_WIN32)
-#include <cstdlib>
-#endif
-
 /// UciEngine against the fake engine (tests/fake_uci_engine.py): what it sends, how it answers, how it recovers. No fixed sleeps: a test that must
 /// not time out waits long, one that must is short. UciEngineStockfishTest runs the same class against a real Stockfish, when there is one
 namespace BECore::Chess::Tests {
@@ -1034,36 +1030,6 @@ namespace BECore::Chess::Tests {
 #if !defined(_WIN32) && !CHESS_NO_STOCKFISH
 
     namespace {
-
-        /// An environment variable set (or removed, for nullptr) for the length of a scope and put back after it
-        class ScopedEnvironment {
-        public:
-            ScopedEnvironment(const char* name, const char* value) : _name(name) {
-                if (const char* old = std::getenv(name)) {
-                    _old = old;
-                    _hadValue = true;
-                }
-                Set(value);
-            }
-            ~ScopedEnvironment() {
-                Set(_hadValue ? _old.c_str() : nullptr);
-            }
-            ScopedEnvironment(const ScopedEnvironment&) = delete;
-            ScopedEnvironment& operator=(const ScopedEnvironment&) = delete;
-
-        private:
-            void Set(const char* value) const {
-                if (value != nullptr) {
-                    setenv(_name, value, 1);
-                } else {
-                    unsetenv(_name);
-                }
-            }
-
-            const char* _name;
-            String _old;
-            bool _hadValue = false;
-        };
 
         void MakeFile(const std::filesystem::path& file, std::filesystem::perms permissions) {
             {
