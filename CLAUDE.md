@@ -28,6 +28,7 @@ State lives in `ChessGameModel`; components keep none. Each folder above (and `t
 - `set_state` (`fen`, `opponent` or `analysis`) checks everything first (`invalid_params` changes nothing), applies the opponent before the position, and a pick that changes nothing does nothing. `analysis` cannot be combined with the other two.
 - A pick that finds no engine (only Stockfish can fail) is refused as a whole (`engine_unavailable`): nothing changes, nothing falls back, `opponent.error` holds the reason until the version moves or the next pick.
 - `material` is derived from the position at every `get_state`. `analysis` is the picked engine, never handicapped, in a process of its own; evaluation and ratings are off at every game start; a hint belongs to its position, is for the person only and is never played; scores are from White's view, `hint.text` from the side to move's. Ratings always use the own engine (the same game rates the same twice).
+- `opponent.seed` (an integer, `set_state {"opponent": {"seed": n}}`, a valid pick alone) varies the own engine among near-equal moves and every handicap's blunder choice and move; 0 is no variety (the old answers). A new game (`Reset`, a start) draws a new one, `set_state {fen}` keeps it, it is not saved; Stockfish's own picks are not seeded. A client that compares answers across resets sets the seed after each.
 - The state version is the sum of the model's, the controller's and the analyst's revisions: it grows on every change of the state, not on a selection or `thinking`, and never goes back.
 
 ## The web build
