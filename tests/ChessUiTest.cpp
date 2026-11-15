@@ -40,6 +40,7 @@
 #include <chrono>
 #include <tests/ChessTestUtil.h>
 #include <tests/HudWords.h>
+#include <tests/ShippedScene.h>
 #include <tests/TestEngines.h>
 
 /**
@@ -107,10 +108,6 @@ namespace BECore::Chess::Tests {
             2.0f;  // a glyph of a label is laid out to the pixel of the font, not to the unit: at the scale of the Portrait view a narrow glyph reaches past its box by more than a pixel
 
         constexpr int kManyFrames = 200;  // frames that must pass with nothing happening
-
-        std::filesystem::path ShippedSceneConfig() {
-            return std::filesystem::path(__FILE__).parent_path().parent_path() / "config" / "SceneConfig.xml";
-        }
 
         SDL_MouseButtonEvent Button(float x, float y, bool down) {
             SDL_MouseButtonEvent event{};
@@ -210,7 +207,7 @@ namespace BECore::Chess::Tests {
         /// The `<elements>` and the `<variants>` of the canvas on the node @p nodeName of the shipped scene, as the content of a screen; empty when there is none
         String ShippedElementsXml(const char* nodeName) {
             pugi::xml_document document;
-            if (!document.load_file(ShippedSceneConfig().string().c_str())) {
+            if (!LoadShippedSceneDocument(document)) {
                 return {};
             }
             const pugi::xml_node node = document.select_node(Format("//node[@name='{}']", nodeName).c_str()).node();
@@ -675,11 +672,8 @@ namespace BECore::Chess::Tests {
             _renderer->height = 720.0f;
             CoreManager::GetRendererManager().SetRenderer(_renderer);
 
-            XmlDeserializer deserializer;
-            ASSERT_TRUE(deserializer.LoadFromFile(ShippedSceneConfig())) << ShippedSceneConfig().string();
-            _manager = New<SceneManager>();
-            _manager->Deserialize(deserializer);
-            ASSERT_FALSE(deserializer.HasErrors());
+            _manager = LoadShippedSceneManager();
+            ASSERT_TRUE(_manager);
             _manager->Initialize();
             EngineEnvironment::UseSceneManager(_manager);  // GameManager switches to the scene of the game through CoreManager
 
@@ -5281,7 +5275,7 @@ namespace BECore::Chess::Tests {
     TEST_F(ChessUiTest, NoSideEngineOrLevelElementAndNoCycleActionIsLeftInTheScene) {
         // A leftover would be a dead button: the board no longer answers the cycle actions, and the words {level} and {engine} are no longer published
         pugi::xml_document document;
-        ASSERT_TRUE(document.load_file(ShippedSceneConfig().string().c_str()));
+        ASSERT_TRUE(LoadShippedSceneDocument(document));
         EXPECT_TRUE(document.select_nodes("//element[@name='Side' or @name='Engine' or @name='Level']").empty()) << "the old HUD elements are gone, and nothing else takes their names";
         constexpr StringView kRemovedActions = "ChessCy"
                                                "cle";  // split, so that a search of the sources for the removed actions finds no leftover

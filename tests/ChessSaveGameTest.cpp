@@ -1,6 +1,5 @@
 #include <BECore/Control/Json.h>
 #include <BECore/GameManager/CoreManager.h>
-#include <BECore/Reflection/XmlDeserializer.h>
 #include <BECore/Save/SaveGame.h>
 #include <BECore/Scene/Components/TransformComponent.h>
 #include <BECore/Scene/Scene.h>
@@ -16,6 +15,7 @@
 #include <Common/TempPath.h>
 #include <Games/GameManager.h>
 #include <iterator>
+#include <tests/ShippedScene.h>
 #include <tests/TestEngines.h>
 
 /**
@@ -34,10 +34,6 @@ namespace BECore::Chess::Tests {
         constexpr StringView kGameInProgress = "e2e4 e7e5 g1f3 b8c6";
         constexpr const char* kFoolsMate = "f2f3 e7e5 g2g4 d8h4";
         constexpr const char* kOddStartFen = "4k3/8/8/8/8/8/4P3/4K3 w - - 0 1";
-
-        std::filesystem::path ShippedSceneConfig() {
-            return std::filesystem::path(__FILE__).parent_path().parent_path() / "config" / "SceneConfig.xml";
-        }
 
         bool Play(ChessGameModel& model, StringView line) {
             size_t begin = 0;
@@ -120,11 +116,8 @@ namespace BECore::Chess::Tests {
             _renderer->height = 720.0f;
             CoreManager::GetRendererManager().SetRenderer(_renderer);
 
-            XmlDeserializer deserializer;
-            ASSERT_TRUE(deserializer.LoadFromFile(ShippedSceneConfig())) << ShippedSceneConfig().string();
-            _manager = New<SceneManager>();
-            _manager->Deserialize(deserializer);
-            ASSERT_FALSE(deserializer.HasErrors());
+            _manager = LoadShippedSceneManager();
+            ASSERT_TRUE(_manager);
             _manager->Initialize();
             EngineEnvironment::UseSceneManager(_manager);
 
