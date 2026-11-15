@@ -2140,8 +2140,9 @@ namespace BECore::Chess::Tests {
         opponent.SetEngineFactory(factory.AsFactory());
         SetOpponent(OpponentRequest("both"));
 
-        ASSERT_TRUE(UpdateUntil([&] { return GetJsonBool(OpponentOfState(), "thinking") == true; })) << "White's seat searches";
-        EXPECT_EQ(whiteGate->Calls(), 1);
+        // thinking is true from the frame that hands the search to the pool, before a worker calls the engine: wait for the call itself
+        ASSERT_TRUE(UpdateUntil([&] { return whiteGate->Calls() == 1; })) << "White's seat searches";
+        EXPECT_EQ(GetJsonBool(OpponentOfState(), "thinking"), true);
         EXPECT_EQ(blackGate->Calls(), 0);
         whiteGate->Open();
         ASSERT_TRUE(UpdateUntil([&] { return blackGate->Calls() == 1; })) << "then Black's";
