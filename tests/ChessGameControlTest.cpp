@@ -70,17 +70,16 @@ namespace BECore::Chess::Tests {
         class ChessGameControlTest : public ::testing::Test {
         protected:
             static void SetUpTestSuite() {
-                ::BECore::Tests::EngineEnvironment::EnsureCoreServices();  // TaskManager: a search of the opponent runs on its pool
+                ::BECore::Tests::EngineEnvironment::EnsureCoreServices();  // TaskManager, which the searches run on
             }
 
             ChessGameControlTest() : opponent(model), control(model, opponent, analyst) {
 #if CHESS_NO_STOCKFISH
-                // The cases below are a world of doubles in which "stockfish" is only a name that a test factory answers (the opponent starts with it, as it does on the desktop). A build without
-                // Stockfish starts with the own engine, so the fixture picks the name first, through a factory that makes any double. What a real game of that
-                // build does is the cases that say `WithoutStockfish`
+                // The cases below are a world of doubles in which "stockfish" is a name a test factory answers. A build without Stockfish starts with the own engine, so the
+                // fixture picks the name first, through a factory that makes any double. The cases of a real game of that build are those that say `WithoutStockfish`
                 opponent.SetEngineFactory([](OpponentEngine, const OpponentLevel&) -> MadeEngine { return MakeShared<InstantEngine>(); });
                 [[maybe_unused]] const auto picked = opponent.SetEngine(OpponentEngine::Stockfish);
-                // The factory stays: the default one would refuse the name Stockfish at every pick that names it, also one that changes nothing. A case that needs another sets its own
+                // The factory stays: the default one would refuse the name at every pick that names it, also one that changes nothing. A case that needs another sets its own
 #endif
             }
 
@@ -119,7 +118,6 @@ namespace BECore::Chess::Tests {
                 return moves;
             }
 
-            /// The "opponent" object of the state
             Json OpponentOfState() {
                 const Json state = State();
                 const Json* found = FindJsonMember(state, "opponent");
@@ -172,7 +170,6 @@ namespace BECore::Chess::Tests {
                 });
             }
 
-            /// A few frames, no waiting for anything
             void Frames(int count = 100) {
                 for (int frame = 0; frame < count; ++frame) {
                     opponent.Update();
@@ -180,7 +177,6 @@ namespace BECore::Chess::Tests {
                 }
             }
 
-            /// The "analysis" object of the state
             Json AnalysisOfState() {
                 const Json state = State();
                 const Json* found = FindJsonMember(state, "analysis");
@@ -1341,7 +1337,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(GetJsonInt(*FindJsonMember(lines[1], "score"), "value"), -3);
         EXPECT_EQ(GetJsonInt(lines[1], "depth"), 5);
 
-        // the first line is what the evaluation and the hint say (the hint's text stays the side to move's)
+        // the first line is what the evaluation says
         EXPECT_EQ(StringMember(AnalysisMember("evaluation"), "text"), "-0.35");
         EXPECT_TRUE(AnalysisMember("hint").is_null()) << "no hint was asked for";
     }
@@ -2211,7 +2207,7 @@ namespace BECore::Chess::Tests {
         CountingAnalysisFactory factory{engine};
         analyst.SetEngineFactory(factory.AsFactory());
         SetOpponent(OpponentRequest("both"));
-        Perform("e2e4");  // Black to move
+        Perform("e2e4");
 
         SetOpponent(OpponentRequest("white"));  // the person takes Black
         AnalyseWith(std::nullopt, true);
@@ -2254,7 +2250,7 @@ namespace BECore::Chess::Tests {
             return reasons;
         }
 
-        /// The real OwnEngine that counts its analyses (the default factory's engine, with a count), for a test that must know a search really ran
+        /// The real OwnEngine that counts its analyses, for a test that must know a search really ran
         class CountingOwnEngine final : public IChessEngine {
         public:
             [[nodiscard]] std::expected<Move, EngineError> FindMove(const SearchRequest& request, const CancellationToken& token) override {
