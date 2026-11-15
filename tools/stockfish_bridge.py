@@ -28,8 +28,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, TextIO
 
-from bagi_control_client import DEFAULT_HOST, DEFAULT_PORT, BagiControlClient, ConnectionClosed, ControlError
-from game_process import DEFAULT_SHUTDOWN_TIMEOUT, DEFAULT_STARTUP_TIMEOUT, GameLaunchError, GameProcess, build_game_command, free_port
+ENGINE_CONTROL_DIR = Path(__file__).resolve().parent.parent / "engine" / "tools" / "control"
+if str(ENGINE_CONTROL_DIR) not in sys.path:
+    sys.path.insert(0, str(ENGINE_CONTROL_DIR))
+
+from bagi_control_client import DEFAULT_HOST, DEFAULT_PORT, BagiControlClient, ConnectionClosed, ControlError  # noqa: E402
+from game_process import DEFAULT_SHUTDOWN_TIMEOUT, DEFAULT_STARTUP_TIMEOUT, GameLaunchError, GameProcess, build_game_command, free_port  # noqa: E402
 
 EXIT_PASSED = 0
 EXIT_FAILED = 1
