@@ -1,3 +1,4 @@
+#include <Chess/Game/StatusText.h>
 #include <tests/ChessUiHarness.h>
 
 /// The HUD, the words, the pieces, the two views, the Reset button and the sweep of every canvas of the scene through the views. The scene, the helpers and the fixture ChessUiTest are
@@ -9,6 +10,21 @@ namespace BECore::Chess::Tests {
     TEST_F(ChessUiTest, TheHudPassesTheSizeMatrixWithTheLongestWords) {
         // The Menu button is always shown and says "Menu": there is no second state of the HUD to walk
         ExpectTheHudSurvivesTheMatrix();
+    }
+
+    // The board's update lets the program move and the HUD publishes in its draw: if the HUD published first, the frame of the reply would show the words of the position before it
+    TEST_F(ChessUiTest, TheFrameInWhichTheProgramAnswersShowsTheWordsOfItsAnswer) {
+        CountingFactory factory({MakeShared<InstantEngine>()});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        ControlPlays("black");
+        ClickMove("e2", "e4");
+        ASSERT_TRUE(WaitUntil([&] {
+            _manager->UpdateAll();
+            Draw();
+            return Model().GetMoves().size() == 2;
+        })) << "the program answers";
+        const StringView turn = CoreManager::GetUIVars().Get(PoolString::Intern("turn"));
+        EXPECT_EQ(String(turn.data(), turn.size()), StatusText::Turn(Model(), false)) << "read without another frame";
     }
 
     TEST_F(ChessUiTest, NoWordOfTheHudIsCutInTheNarrowestWindow) {

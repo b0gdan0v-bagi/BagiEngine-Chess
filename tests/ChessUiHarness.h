@@ -195,7 +195,7 @@ namespace BECore::Chess::Tests {
         constexpr size_t kPanelSegments = 10;    // two modes, two colors, two engines, four levels
         constexpr size_t kReportedCases = 4;     // how many cases of a matrix a failure message lists
 
-        /// The actions that the segments of the panel emit, and that ChessBoardComponent answers
+        /// The actions that the segments of the panel emit, and that ChessOpponentPanelComponent answers
         constexpr const char* kSetModeAction = "ChessSetMode";
         constexpr const char* kSetColorAction = "ChessSetColor";
         constexpr const char* kSetEngineAction = "ChessSetEngine";
@@ -681,7 +681,7 @@ namespace BECore::Chess::Tests {
         }
     }  // namespace
 
-// The panel of a build without Stockfish (CHESS_NO_STOCKFISH) hides the segment EngineStockfish (ChessBoardComponent::HideUnavailableEngines), so a case that clicks it, or counts ten
+// The panel of a build without Stockfish (CHESS_NO_STOCKFISH) hides the segment EngineStockfish (ChessOpponentPanelComponent::SyncStockfishSegment), so a case that clicks it, or counts ten
 // segments, has nothing to click there; the cases at "TheStockfishSegment..." and "WithoutStockfish..." say what that build does instead
 #if CHESS_NO_STOCKFISH
 #define SKIP_WITHOUT_STOCKFISH_SEGMENT() GTEST_SKIP() << "the Stockfish segment of the panel is hidden (CHESS_NO_STOCKFISH)"
@@ -1031,7 +1031,7 @@ namespace BECore::Chess::Tests {
             return *opponent;
         }
 
-        /// The text of a UI variable after a frame was drawn: the board publishes the words of the HUD when it draws
+        /// The text of a UI variable after a frame was drawn: ChessHudComponent publishes the words of the HUD when it draws
         String Var(const char* name) {
             Draw();
             const StringView value = CoreManager::GetUIVars().Get(PoolString::Intern(name));
@@ -1370,10 +1370,10 @@ namespace BECore::Chess::Tests {
             return problems;
         }
 
-        /// The HUD as the board leaves it after a frame, through the size matrix with every word it can show: the validator's findings, and HudProblems()
+        /// The HUD as a frame leaves it, through the size matrix with every word it can show: the validator's findings, and HudProblems()
         void ExpectTheHudSurvivesTheMatrix() {
             constexpr size_t kReportedFailures = 4;
-            Draw();  // the board publishes the words
+            Draw();  // the HUD publishes the words
 
             auto canvas = Hud();
             ASSERT_TRUE(canvas);

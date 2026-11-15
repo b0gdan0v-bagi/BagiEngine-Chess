@@ -5,11 +5,17 @@ Read this before changing `config/SceneConfig.xml` or a file of `config/nodes/` 
 ## Files
 
 ```
-ChessBoardComponent     the board: squares and highlights, clicks and drags, runs the opponent's and the analyst's Update() every SceneUpdateEvent, publishes the UIVars, answers the UI actions
+ChessBoardComponent     the board: squares, highlights and coordinates, clicks and drags, the frame (the opponent's and the analyst's Update() every SceneUpdateEvent, the keeper, the result log)
+ChessHudComponent       on Hud, before its canvas: publishes the UIVars of the HUD and the opponent panel in its draw, answers ChessReset
+ChessMenuComponent      on MenuPanel: ChessOpenMenu, ChessOpenSection, ChessCloseMenu
+ChessOpponentPanelComponent  on OpponentPanel, before its canvas: ChessSet*, the Stockfish segment
+ChessPromotionPanelComponent on PromotionPanel, before its canvas: shown while a promotion is pending, ChessPromote, ChessCancelPromotion
 ChessMaterialComponent  on the node Material, before its canvas: icons, the material... variables, rows shown or hidden
 ChessPieceComponent     one piece node: follows its piece in the model, slides a played move, switches its sprite after a promotion
 ChessResultComponent    its own node (layer 1): dims the board and draws the result bar once the game is over
 ```
+
+**Each UI node answers its own actions** with a component of its own; the board knows only the picker (`ChessPromotionPanelComponent::SyncActive()` after a click, since the order in which two components get one event is not defined). **A new panel** is a node file with its own component and its own `tests/ChessUi<Topic>Test.cpp`, no change to the board. The frame: the board's update lets the program move, then the HUD publishes in its draw (a test holds it).
 
 ## The board
 
@@ -17,7 +23,7 @@ ChessResultComponent    its own node (layer 1): dims the board and draws the res
 - **Geometry** is in scene units of the active view: `_originX/_originY/_squareSize` for the default view, (100, 80), and `_portraitOriginX/_portraitOriginY/_portraitSquareSize` for Portrait, (40, 144); change a pair with the numbers of the canvases around it. The component takes one set on `SceneViewChangedEvent` (`kPortraitView` is the name) and every accessor reads that choice, so the squares, the pieces and the result bar cannot disagree for a frame; a drag in the hand ends with the view. The board is not a named region. The mouse goes through `Scene::ScreenToSceneX/Y`.
 - **Orientation:** the board is drawn from Black's side exactly when the program plays White (`BottomColor(OpponentController::GetPlays())`, read live on every use). `SquareToPixel` and `OnMouseDown` map through `Game/BoardOrientation.h`; everything placed on a square uses them. The HUD, panels, model, control API and FEN do not turn.
 - **Coordinates:** 16 labels of a `SceneView` canvas on `BoardCoordinates` (layer -1, after `Board`, no safe area, no `blocksInput`). The rects are fixed per view (a variant sets each label for the Portrait origin), the text (`coordRank<row>`, `coordFile<column>` from `Game/BoardCoordinates.h`) turns. A turn keeps the parity of the grid, so the label colors are static; `IsLightSquare` is the one function for it.
-- The board hides the segment `EngineStockfish` exactly while `OpponentController::OffersStockfish()` is false (a `CHESS_NO_STOCKFISH` build, or no Stockfish file found) and shows it again when it turns true. Every update and draw compares the **cached** answer (no file lookup per frame); the lookup is `RefreshStockfish()`, made when the opponent section opens (`ChessOpenSection`), so a Stockfish installed while the game runs shows up at the next opening. The scene file is the same everywhere.
+- `ChessOpponentPanelComponent` hides the segment `EngineStockfish` exactly while `OpponentController::OffersStockfish()` is false (a `CHESS_NO_STOCKFISH` build, or no Stockfish file found) and shows it again when it turns true. Every update and draw compares the **cached** answer (no file lookup per frame); the lookup is `RefreshStockfish()`, made when the opponent section opens (`ChessOpenSection`), so a Stockfish installed while the game runs shows up at the next opening. The scene file is the same everywhere.
 
 ## Highlights
 
@@ -38,7 +44,7 @@ While the program thinks and the person has the other color, `OnMouseDown` hands
 
 ## The promotion picker
 
-A click on a promotion target leaves it pending in the model; the node `PromotionPanel` (`ChessPromotionPanel.xml`, modal `SceneView` canvas, layer 20, `visible="false"`) is shown exactly while `HasPendingPromotion()`, checked after a click and every update, so a reset, `set_state` or someone's move closes a stale one. Buttons `PromoteQueen` .. `PromoteKnight` (`ChessPromote`, the id from `Game/PromotionChoices.*` as `value`) and `PromotionCancel` (`ChessCancelPromotion`: the pawn stays selected); `PromotionDim` cancels too. Element names start with `Promotion` or `Promote`.
+A click on a promotion target leaves it pending in the model; the node `PromotionPanel` (`ChessPromotionPanel.xml`, modal `SceneView` canvas, layer 20, `visible="false"`) is shown by `ChessPromotionPanelComponent` exactly while `HasPendingPromotion()`, checked after a click and every update and draw, so a reset, `set_state` or someone's move closes a stale one. Buttons `PromoteQueen` .. `PromoteKnight` (`ChessPromote`, the id from `Game/PromotionChoices.*` as `value`) and `PromotionCancel` (`ChessCancelPromotion`: the pawn stays selected); `PromotionDim` cancels too. Element names start with `Promotion` or `Promote`.
 
 ## The captured material
 
@@ -52,7 +58,7 @@ Node `Material` (`ChessMaterial.xml`, layer 5, after `BoardCoordinates`): `Chess
 
 `SceneView` canvas on `Hud` (`ChessHud.xml`, layer 10), controls 56 units high in the margins: `Turn` (`{turn}`), `Menu` (fixed word, `ChessOpenMenu`; the owner wants no button named after a state, and no element is called `Opponent`), `Reset` (`ChessReset`), `Status` (`{status}`; wider in Portrait, where the narrowest safe area is 590 units). The anchors keep the top row above the board and `Status` under it in both views. The widest sentences only just fit the narrowest window (480 px with insets): a longer one needs a reword or a wider box; a sentence says what went wrong, never what to do. `ChessUiTest` holds the layout on the size matrix, with the views, with every word of `tests/HudWords.h`, `ChessHudWebTest` the HTML twin of the default view's HUD (no Portrait twin).
 
-The variables are republished when the model's version, the controller's revision, `IsThinking()` or the person's color changed: `turn` (`StatusText::Turn`, "Computer is thinking"), `status` (the opponent's error while one stands, it wins over "Check"; else the game status), `opponentError`, and the panel bindings `opponentMode`, `opponentColor` (**the person's** color), `opponentEngine`, `opponentLevel`.
+`ChessHudComponent` republishes the variables when the model's version, the controller's revision, `IsThinking()` or the person's color changed: `turn` (`StatusText::Turn`, "Computer is thinking"), `status` (the opponent's error while one stands, it wins over "Check"; else the game status), `opponentError`, and the panel bindings `opponentMode`, `opponentColor` (**the person's** color), `opponentEngine`, `opponentLevel`.
 
 ## The menu
 
@@ -62,7 +68,7 @@ Node `MenuPanel` (`ChessMenuPanel.xml`, layer 20, modal, `visible="false"`): `Me
 
 Node `OpponentPanel` (`ChessOpponentPanel.xml`, layer 20, modal, `visible="false"`), after the engine's choice-panel template (`engine/src/Modules/BECore/UI/CLAUDE.md`, "Choice panels"): `Dim` (a click on it closes the panel, as in "The menu"), `Plate`, four `UISegmented` rows with the control API ids as segment values, `ModeGroup` (`opponentMode`, `ChessSetMode`), `ColorGroup` (`opponentColor`, `ChessSetColor`), `EngineGroup` (`ChessSetEngine`), `LevelGroup` (`ChessSetLevel`), the `OpponentError` line and `OpponentBack` / `OpponentClose`. A segment needs an explicit `height`. The three modal panels are centered plates (94% of the safe area up to 640) and fit both views; only this one has a Portrait variant (the plate takes the whole safe area and the captions get narrower), for the 590 safe units of the narrowest Portrait window. A test lists the canvases of the scene and fails for one with no matrix test over the views.
 
-- The group owns no choice: a press emits the action, the board picks through `ChessGame::GetActiveChoice()` and publishes the variable, so the panel shows what the game has. An id in no table logs one warning.
+- The group owns no choice: a press emits the action, `ChessOpponentPanelComponent` picks through `ChessGame::GetActiveChoice()` and `ChessHudComponent` publishes the variable, so the panel shows what the game has. An id in no table logs one warning.
 - **The color is the person's**; `opponent.plays` of the control API is the program's.
 - A pick applies at once and the panel stays open. No group is greyed (a disabled group read as a dead button): a pick made while two people play is kept and applies when Computer is picked.
 - A refused pick changes nothing (no fallback, the program is not switched off); "Engine not found" stays in `OpponentError` and `Status` until someone's move, a reset, `set_state` or the next pick. The panel itself never offers a Stockfish that is not found, so the error shows for a hand-made press, a factory of a test, or a Stockfish that went away after it was picked.

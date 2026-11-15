@@ -179,7 +179,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, EveryActionOfThePanelIsOneTheBoardAnswers) {
-        // Press each action with the id of a segment through the board, as the segment would: the controller reads the pick back (the unknown action is ignored by the board)
+        // Press each action with the id of a segment, as the segment would: the controller reads the pick back (the unknown action is ignored by ChessOpponentPanelComponent)
         CountingFactory factory({MakeShared<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -200,7 +200,7 @@ namespace BECore::Chess::Tests {
             const PoolString action = ClickerOf(PanelButton(segment.name.c_str()))->action;
             const bool known = action == PoolString::Intern(kSetModeAction) || action == PoolString::Intern(kSetColorAction) || action == PoolString::Intern(kSetEngineAction) ||
                                action == PoolString::Intern(kSetLevelAction);
-            EXPECT_TRUE(known) << segment.name.c_str() << " emits " << action.CStr() << ", which the board does not answer";
+            EXPECT_TRUE(known) << segment.name.c_str() << " emits " << action.CStr() << ", which ChessOpponentPanelComponent does not answer";
         }
         EXPECT_EQ(ClickerOf(PanelButton("OpponentBack"))->action, PoolString::Intern("ChessOpenMenu"));
         EXPECT_EQ(ClickerOf(PanelButton("OpponentClose"))->action, PoolString::Intern("ChessCloseMenu"));
@@ -361,7 +361,7 @@ namespace BECore::Chess::Tests {
 
     // ---- the words and the actions of the opponent ------------------------------------------------------------------------
     // The HUD shows `turn` and `status` and the panel the ids of the choice; the layout is another matter, so these tests press the actions the segments emit (or
-    // click the segments where they are drawn) and read the variables the board publishes. The engines are the doubles of TestEngines.h
+    // click the segments where they are drawn) and read the variables the HUD publishes. The engines are the doubles of TestEngines.h
 
     TEST_F(ChessUiTest, TheOpponentWordsStartWithTwoPlayersAtTheMediumLevel) {
         EXPECT_EQ(Var("opponentMode"), "two");
@@ -372,7 +372,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, TheBoardDoesNotPublishASideVariable) {
         Draw();
-        EXPECT_TRUE(CoreManager::GetUIVars().Has(PoolString::Intern("opponentMode"))) << "the board publishes its variables: the check below is not about a missing frame";
+        EXPECT_TRUE(CoreManager::GetUIVars().Has(PoolString::Intern("opponentMode"))) << "the HUD publishes its variables: the check below is not about a missing frame";
         EXPECT_FALSE(CoreManager::GetUIVars().Has(PoolString::Intern("side")));
         PressWith("ChessSetLevel", "hard");  // a pick that needs no engine while nobody plays
         Draw();
@@ -752,8 +752,8 @@ namespace BECore::Chess::Tests {
     }
 
     // ---- the choice of the opponent panel: the actions with a value and the ids --------------------------------------------
-    // The segments of the panel emit ChessSetMode / ChessSetColor / ChessSetEngine / ChessSetLevel with the id as `value`; the board answers through OpponentChoice and
-    // publishes the ids. These tests press the actions the segments emit and read the variables
+    // The segments of the panel emit ChessSetMode / ChessSetColor / ChessSetEngine / ChessSetLevel with the id as `value`; ChessOpponentPanelComponent answers through OpponentChoice,
+    // ChessHudComponent publishes the ids. These tests press the actions the segments emit and read the variables
 
     TEST_F(ChessUiTest, TheIdsOfThePanelStartAsTwoWhiteTheDefaultEngineMediumAndNoError) {
         EXPECT_EQ(Var("opponentMode"), "two");
@@ -1133,7 +1133,7 @@ namespace BECore::Chess::Tests {
                 EXPECT_EQ(log.LastAction(), PoolString::Intern(segment.action));
                 EXPECT_EQ(log.LastValue(), PoolString::Intern(segment.id.c_str()));
 
-                Draw();  // the board answered with the variable; the next draw moves the selection
+                Draw();  // the HUD published the variable; the next draw moves the selection
                 for (const PanelSegment& other : segments) {
                     if (StringView(other.group) == group && IsShown(other)) {
                         EXPECT_EQ(PanelButton(other.name.c_str()).selected, other.name == segment.name) << other.name.c_str();
@@ -1607,7 +1607,7 @@ namespace BECore::Chess::Tests {
             EXPECT_EQ(action.find(kRemovedActions), StringView::npos) << found.node().attribute("name").value() << " emits " << ToStd(action);
             const bool known = action == "ChessReset" || action == "ChessOpenMenu" || action == "ChessOpenSection" || action == "ChessCloseMenu" || action == kSetModeAction ||
                                action == kSetColorAction || action == kSetEngineAction || action == kSetLevelAction || action == kPromoteAction || action == kCancelPromotionAction;
-            EXPECT_TRUE(known) << found.node().attribute("name").value() << " emits " << ToStd(action) << ", which the board does not answer";
+            EXPECT_TRUE(known) << found.node().attribute("name").value() << " emits " << ToStd(action) << ", which no component of the scene answers";
         }
         for (const pugi::xpath_node found : document.select_nodes("//element[@text]")) {
             const StringView text = found.node().attribute("text").value();

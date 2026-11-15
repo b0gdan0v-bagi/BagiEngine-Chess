@@ -13,6 +13,7 @@
      air of a button, so the Portrait variant makes the plate the whole safe area and the four captions 120 units wide (every other window of the matrix has more room). -->
 <node name="OpponentPanel" layer="20" contentVersion="5">
   <components>
+    <component type="ChessOpponentPanelComponent" />
     <component type="UICanvasComponent" space="SceneView" useSafeArea="true" modal="true" visible="false">
       <elements>
         <element type="UIElement" name="Dim" anchor="Stretch" ignoreSafeArea="true" color="0,0,0,150" blocksInput="true">

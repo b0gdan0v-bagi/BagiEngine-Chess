@@ -549,7 +549,7 @@ namespace BECore::Chess::Tests {
             if (const UIInputClicker* button = ClickerOf(*control)) {
                 ++buttons;
                 EXPECT_TRUE(button->action == PoolString::Intern(kPromoteAction) || button->action == PoolString::Intern(kCancelPromotionAction))
-                    << control->name.CStr() << " emits " << button->action.CStr() << ", which the board does not answer";
+                    << control->name.CStr() << " emits " << button->action.CStr() << ", which ChessPromotionPanelComponent does not answer";
             }
         }
         EXPECT_EQ(buttons, 5u);

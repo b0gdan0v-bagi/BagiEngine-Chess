@@ -13,6 +13,7 @@
      the height fits both views. The plate is centered in the safe area of either view and does not move with the turn of the board. -->
 <node name="PromotionPanel" layer="20" contentVersion="5">
   <components>
+    <component type="ChessPromotionPanelComponent" />
     <component type="UICanvasComponent" space="SceneView" useSafeArea="true" modal="true" visible="false">
       <elements>
         <element type="UIElement" name="PromotionDim" anchor="Stretch" ignoreSafeArea="true" color="0,0,0,150" blocksInput="true">

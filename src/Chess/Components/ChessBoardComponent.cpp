@@ -4,18 +4,12 @@
 #include <BECore/Renderer/IRenderer.h>
 #include <BECore/Scene/Scene.h>
 #include <BECore/Scene/SceneNode.h>
-#include <BECore/UI/UICanvasComponent.h>
 #include <Chess/ChessGame.h>
-#include <Chess/Engine/OpponentEngines.h>
-#include <Chess/Engine/OpponentText.h>
+#include <Chess/Components/ChessPromotionPanelComponent.h>
 #include <Chess/Engine/PositionAnalyst.h>
 #include <Chess/Game/BoardCoordinates.h>
 #include <Chess/Game/BoardOrientation.h>
-#include <Chess/Game/MenuSections.h>
-#include <Chess/Game/PromotionChoices.h>
-#include <Chess/Game/StatusText.h>
 #include <CoreSDL/SDLEvents.h>
-#include <Events/InputEvents.h>
 #include <Events/SceneEvents.h>
 #include <Generated/ChessBoardComponent.gen.hpp>
 
@@ -85,7 +79,6 @@ namespace BECore::Chess {
         SubscribeInScene<SDLEvents::MouseButtonDownEvent, &ChessBoardComponent::OnMouseDown>(this);
         SubscribeInScene<SDLEvents::MouseButtonUpEvent, &ChessBoardComponent::OnMouseUp>(this);
         SubscribeInScene<SDLEvents::MouseMotionEvent, &ChessBoardComponent::OnMouseMotion>(this);
-        SubscribeInScene<InputEvents::ActionEvent, &ChessBoardComponent::OnAction>(this);
         SubscribeInScene<SceneEvents::SceneUpdateEvent, &ChessBoardComponent::OnUpdate>(this);
         SubscribeInScene<SceneEvents::SceneViewChangedEvent, &ChessBoardComponent::OnViewChanged>(this);
     }
@@ -95,19 +88,7 @@ namespace BECore::Chess {
         _drag.reset();
     }
 
-    void ChessBoardComponent::SyncStockfishSegment() {
-        const OpponentController* opponent = ChessGame::GetActiveOpponent();
-        const bool offered = opponent ? opponent->OffersStockfish() : kStockfishAvailable;
-        if (offered == _stockfishShown) {
-            return;
-        }
-        _stockfishShown = offered;
-        // A scene without the panel has nothing to hide: the call does nothing
-        UICanvasComponent::SetElementVisibleByName(GetScene(), "EngineStockfish"_intern, offered);
-    }
-
     void ChessBoardComponent::OnUpdate(const SceneEvents::SceneUpdateEvent&) {
-        SyncStockfishSegment();
         ChessGame* game = ChessGame::GetActive();
         if (!game) {
             return;
@@ -118,18 +99,6 @@ namespace BECore::Chess {
         static_cast<void>(game->GetChoice().Color());  // reading it remembers the person's color of a side set from outside (the control API) before that side is cleared
         game->UpdateKeeper();                          // after the opponent and the choice: a move the program just played is saved in this frame's key
         LogResultOnce(game->GetModel());
-        // A reset, a set_state, a move of the program or of the control API drops a pending promotion without a click on the board
-        SyncPromotionPanel(game->GetModel());
-    }
-
-    void ChessBoardComponent::SyncPromotionPanel(const ChessGameModel& model) {
-        const bool wanted = model.HasPendingPromotion();
-        if (wanted == _promotionPanelShown) {
-            return;
-        }
-        _promotionPanelShown = wanted;
-        // A scene without the node has nothing to show
-        UICanvasComponent::SetVisibleByName(GetScene(), "PromotionPanel"_intern, wanted);
     }
 
     void ChessBoardComponent::LogResultOnce(const ChessGameModel& model) {
@@ -154,144 +123,6 @@ namespace BECore::Chess {
         }
     }
 
-    void ChessBoardComponent::PublishUiVars() {
-        const ChessGame* game = ChessGame::GetActive();
-        if (!game) {
-            return;
-        }
-        const ChessGameModel& model = game->GetModel();
-        const OpponentController& opponent = game->GetOpponent();
-        const OpponentChoice& choice = game->GetChoice();
-        // Read on every refresh, also when nothing else changed: it remembers the person's color, which a set_state of the control API could otherwise take with it
-        const PieceColor personColor = choice.Color();
-        // A search starts and ends without a move of the game, and a side or a level changes without one; the person's color changes without any of them while two people play
-        const bool thinking = opponent.IsThinking();
-        const bool opponentChanged = &model != _publishedModel || opponent.GetRevision() != _publishedRevision;
-        if (!opponentChanged && model.GetVersion() == _publishedVersion && thinking == _publishedThinking && personColor == _publishedColor) {
-            return;
-        }
-        _publishedModel = &model;
-        _publishedVersion = model.GetVersion();
-        _publishedRevision = opponent.GetRevision();
-        _publishedThinking = thinking;
-        _publishedColor = personColor;
-
-        // While an error of the opponent stands the game is stalled by it, so its sentence wins over "Check"
-        const Optional<EngineError>& error = opponent.GetError();
-        const String turn = StatusText::Turn(model, thinking);
-        const String status = error ? OpponentText::Error(*error) : StatusText::Status(model);
-        const String opponentError = error ? OpponentText::Error(*error) : String();
-        UIVars& vars = CoreManager::GetUIVars();
-        vars.Set("turn"_intern, StringView(turn));
-        vars.Set("status"_intern, StringView(status));
-        // The ids of the opponent panel, those of the control API (the person's color, not the program's)
-        vars.Set("opponentMode"_intern, choice.ModeId());
-        vars.Set("opponentColor"_intern, choice.ColorId());
-        vars.Set("opponentEngine"_intern, choice.EngineId());
-        vars.Set("opponentLevel"_intern, choice.LevelId());
-        vars.Set("opponentError"_intern, StringView(opponentError));
-    }
-
-    void ChessBoardComponent::AnswerSetAction(const InputEvents::ActionEvent& event) {
-        OpponentChoice* choice = ChessGame::GetActiveChoice();
-        if (!choice) {
-            return;
-        }
-        const StringView value = event.value.ToStringView();
-        std::expected<void, ChoiceError> picked;
-        if (event.action == "ChessSetMode"_intern) {
-            picked = choice->SetMode(value);
-        } else if (event.action == "ChessSetColor"_intern) {
-            picked = choice->SetColor(value);
-        } else if (event.action == "ChessSetEngine"_intern) {
-            picked = choice->SetEngine(value);
-        } else if (event.action == "ChessSetLevel"_intern) {
-            picked = choice->SetLevel(value);
-        } else {
-            return;
-        }
-        // A refused pick (no Stockfish found) is kept by the controller and shown through the variables, so only an id that is in no table (a hand-made press) is said here
-        if (!picked && picked.error().kind == ChoiceErrorKind::BadId) {
-            LOG_WARNING("{} ignored: {}"_format(event.action.ToStringView(), picked.error().detail));
-        }
-    }
-
-    bool ChessBoardComponent::AnswerPromotionAction(const InputEvents::ActionEvent& event) {
-        const bool promote = event.action == "ChessPromote"_intern;
-        if (!promote && event.action != "ChessCancelPromotion"_intern) {
-            return false;
-        }
-        ChessGameModel* model = ChessGame::GetActiveModel();
-        if (!model) {
-            return true;
-        }
-        if (!promote) {
-            model->CancelPromotion();
-        } else if (const Optional<PieceType> piece = FindPromotion(event.value.ToStringView())) {
-            // Nothing pending (a press that came late) is an IllegalMove of the model and changes nothing
-            if (model->ChoosePromotion(*piece)) {
-                LogResultOnce(*model);
-            }
-        } else {
-            LOG_WARNING("ChessPromote ignored: '{}' is not a piece a pawn can become"_format(event.value.ToStringView()));
-        }
-        SyncPromotionPanel(*model);
-        return true;
-    }
-
-    void ChessBoardComponent::ShowMenuSection(Optional<MenuSection> shown) {
-        // A scene without a section canvas has nothing to show or hide
-        for (const MenuSection& section : MenuSections()) {
-            UICanvasComponent::SetVisibleByName(GetScene(), PoolString::Intern(section.node), shown && shown->id == section.id);
-        }
-    }
-
-    bool ChessBoardComponent::AnswerMenuAction(const InputEvents::ActionEvent& event) {
-        const PoolString menuNode = "MenuPanel"_intern;
-        if (event.action == "ChessOpenMenu"_intern) {
-            ShowMenuSection(std::nullopt);
-            UICanvasComponent::SetVisibleByName(GetScene(), menuNode, true);
-        } else if (event.action == "ChessCloseMenu"_intern) {
-            ShowMenuSection(std::nullopt);
-            UICanvasComponent::SetVisibleByName(GetScene(), menuNode, false);
-        } else if (event.action == "ChessOpenSection"_intern) {
-            const Optional<MenuSection> section = FindMenuSection(event.value.ToStringView());
-            if (!section) {
-                LOG_WARNING("ChessOpenSection ignored: '{}' is not a section of the menu"_format(event.value.ToStringView()));
-                return true;
-            }
-            if (section->id == kOpponentSectionId) {
-                // The only look for a Stockfish installed since the game started; the panel is drawn from the same frame on
-                if (OpponentController* opponent = ChessGame::GetActiveOpponent()) {
-                    opponent->RefreshStockfish();
-                }
-                SyncStockfishSegment();
-            }
-            UICanvasComponent::SetVisibleByName(GetScene(), menuNode, false);
-            ShowMenuSection(section);
-        } else {
-            return false;
-        }
-        return true;
-    }
-
-    void ChessBoardComponent::OnAction(const InputEvents::ActionEvent& event) {
-        const PoolString resetAction = "ChessReset"_intern;
-        if (event.action == resetAction) {
-            if (ChessGameModel* model = ChessGame::GetActiveModel()) {
-                model->Reset();
-            }
-            return;
-        }
-        if (AnswerMenuAction(event)) {
-            return;
-        }
-        if (AnswerPromotionAction(event)) {
-            return;
-        }
-        AnswerSetAction(event);
-    }
-
     PieceColor ChessBoardComponent::GetBottomColor() const {
         const OpponentController* opponent = ChessGame::GetActiveOpponent();
         return BottomColor(opponent ? opponent->GetPlays() : std::nullopt);
@@ -309,8 +140,6 @@ namespace BECore::Chess {
     }
 
     void ChessBoardComponent::OnDraw() {
-        SyncStockfishSegment();  // the panel is drawn after the board, so a frame with no update before it already lacks the segment
-        PublishUiVars();
         auto& renderer = *CoreManager::GetRenderer();
         const float squareSize = GetSquareSize();    // once per draw, as the orientation
         const PieceColor bottom = GetBottomColor();  // once per draw: every square of this frame is placed for the same orientation
@@ -431,8 +260,8 @@ namespace BECore::Chess {
         if (model->OnSquareClicked(*clicked)) {
             LogResultOnce(*model);
         }
-        // The click may have left a promotion pending or dropped one
-        SyncPromotionPanel(*model);
+        // The click may have left a promotion pending or dropped one: the picker is shown before anything else reads the scene
+        ChessPromotionPanelComponent::SyncActive();
 
         // The press has acted as a click. When it left the piece on the pressed square selected (a press that played a move leaves no selection) the left button also arms a drag; the
         // release decides whether it plays a move
@@ -488,7 +317,7 @@ namespace BECore::Chess {
         if (model->OnSquareClicked(*target)) {
             LogResultOnce(*model);
         }
-        SyncPromotionPanel(*model);
+        ChessPromotionPanelComponent::SyncActive();
     }
 
     Optional<ChessBoardComponent::LiftedPiece> ChessBoardComponent::GetLiftedPiece() const {

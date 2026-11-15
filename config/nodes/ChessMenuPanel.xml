@@ -12,6 +12,7 @@
      narrowest Portrait window (94% of its 590 safe units) as well as the 640 of the default view. -->
 <node name="MenuPanel" layer="20" contentVersion="5">
   <components>
+    <component type="ChessMenuComponent" />
     <component type="UICanvasComponent" space="SceneView" useSafeArea="true" modal="true" visible="false">
       <elements>
         <element type="UIElement" name="MenuDim" anchor="Stretch" ignoreSafeArea="true" color="0,0,0,150" blocksInput="true">

@@ -2,7 +2,6 @@
 
 #include <BECore/Scene/IComponent.h>
 #include <Chess/Game/ChessTypes.h>
-#include <Chess/Game/MenuSections.h>
 
 namespace BECore {
 
@@ -11,10 +10,6 @@ namespace BECore {
         struct MouseButtonUpEvent;
         struct MouseMotionEvent;
     }  // namespace SDLEvents
-
-    namespace InputEvents {
-        struct ActionEvent;
-    }
 
     namespace SceneEvents {
         struct SceneUpdateEvent;
@@ -42,9 +37,8 @@ namespace BECore::Chess {
      * the pieces have moved). Before the first event the default set holds. The event comes one Update after the Draw that picked the view, so for one frame the canvases are already
      * laid out in the new view while the board still draws in the old one.
      *
-     * It publishes the UIVars that the HUD, the panels and the coordinate labels show, only when something they say changed, and answers their actions: the HUD and the menu (`ChessReset`,
-     * `ChessOpenMenu`, `ChessOpenSection`, `ChessCloseMenu`), the four of the opponent panel's groups (`ChessSetMode`, `ChessSetColor`, `ChessSetEngine`, `ChessSetLevel`) and the promotion pair
-     * (`ChessPromote`, `ChessCancelPromotion`). An id in no table changes nothing and logs one warning. `opponentColor` is the PERSON's color, the opposite of the control API's `opponent.plays`.
+     * It publishes the UIVars of the coordinate labels, only when the bottom color changed. The HUD, the menu and the panels answer their own actions, each a component on its own node
+     * (ChessHudComponent, ChessMenuComponent, ChessOpponentPanelComponent, ChessPromotionPanelComponent); after a click the board asks the promotion picker to look at the model at once.
      *
      * It is also the frame of the computer opponent and of the analysis: IGame has no per-frame hook, so on every SceneUpdateEvent it runs ChessGame::GetOpponent().Update() and
      * ChessGame::GetAnalyst().Update() (the one place that does either). The opponent plays into the model, so neither can run in OnDraw(). The result of a game is logged once, whoever
@@ -125,37 +119,13 @@ namespace BECore::Chess {
 
         /// Whether the drag still holds: the same game at the same version, not over, the dragged square still selected, no promotion pending and the program not to move
         [[nodiscard]] static bool IsDragValid(const Drag& drag, const ChessGameModel* model);
-        void OnAction(const InputEvents::ActionEvent&);
-
-        /// The four actions of the choice groups of the opponent panel (the id in `value`); any other action is ignored
-        void AnswerSetAction(const InputEvents::ActionEvent& event);
-
-        /// Shows the canvas of this section of the menu and hides the canvases of the others (none: hides them all); the list `MenuPanel` is not touched
-        void ShowMenuSection(Optional<MenuSection> shown);
-
-        /// The three actions of the menu (the id of the section in `value` of ChessOpenSection); false for any other action
-        bool AnswerMenuAction(const InputEvents::ActionEvent& event);
-
-        /// The two actions of the promotion panel (the id of the piece in `value` of ChessPromote); false for any other action
-        bool AnswerPromotionAction(const InputEvents::ActionEvent& event);
-
-        /// Shows the canvas of the node `PromotionPanel` while the model has a promotion pending and hides it otherwise (only when that differs from what was set last)
-        void SyncPromotionPanel(const ChessGameModel& model);
         void OnUpdate(const SceneEvents::SceneUpdateEvent&);
 
         /// Takes the geometry of the new view; a drag in the hand ends, since its scene units were those of the old one
         void OnViewChanged(const SceneEvents::SceneViewChangedEvent&);
 
-        /// Hides the segment of Stockfish in the opponent panel exactly while the opponent does not offer it (no Stockfish in the build or none found), so Own engine fills the group, and shows
-        /// it again when it is offered. Compares the cached answer of OffersStockfish() on every update and draw (no file lookup); the first call is at the first update or draw, when every node
-        /// of the scene is attached. The scene file is the same in every build and on every machine
-        void SyncStockfishSegment();
-
         /// One line in the log when a game has ended, the first time it is seen: whether the person, the program or the control API played the last move
         void LogResultOnce(const ChessGameModel& model);
-
-        /// Gives the UI labels the words for the state of the game and of the opponent, only when something they say changed (a label checks the version of the variables every frame)
-        void PublishUiVars();
 
         /// Gives the 16 labels at the edges of the board their letters and numbers for the orientation read in OnDraw(), only when the bottom color changed: the labels sit at fixed cells and
         /// only their text turns with the board
@@ -163,18 +133,10 @@ namespace BECore::Chess {
 
         Optional<PieceColor> _publishedBottom;
 
-        uint64_t _publishedVersion = 0;
-        const void* _publishedModel = nullptr;  // another game starts the count of versions again
-        uint64_t _publishedRevision = 0;
-        bool _publishedThinking = false;                 // a search starts and ends without a move of the game
-        PieceColor _publishedColor = PieceColor::White;  // changes with no revision of the controller while two people play
-
         uint64_t _loggedVersion = 0;
         const void* _loggedModel = nullptr;
 
-        bool _portraitActive = false;       // the geometry in effect: the `portrait*` fields, else the default ones
-        bool _promotionPanelShown = false;  // the canvas starts hidden
-        bool _stockfishShown = true;        // the segment starts visible in the scene file
+        bool _portraitActive = false;  // the geometry in effect: the `portrait*` fields, else the default ones
 
         Optional<Drag> _drag;
 
