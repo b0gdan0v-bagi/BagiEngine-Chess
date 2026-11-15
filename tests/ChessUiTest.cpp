@@ -1337,19 +1337,22 @@ namespace BECore::Chess::Tests {
             return all;
         }
 
-        /// PanelProblems() on every case of the matrix for each round of words: the lines of the first @p reportedCases cases that have any
+        /// PanelProblems() on every case of the matrix, in the view the scene picks for it, for each round of words: the lines of the first @p reportedCases cases that have any
         String PanelProblemsOnMatrix(UICanvasLayout& layout, size_t reportedCases = kReportedCases, const char* plateName = "Plate") const {
             String report;
             size_t reported = 0;
             const HudWords words = AllHudWords();
             for (size_t round = 0; round < words.Rounds(); ++round) {
                 words.Publish(round);
-                OnEveryCaseOfTheMatrix(layout, [&](const String& label, const UICanvasLayout& laidOut) {
-                    const String problems = PanelProblems(laidOut, plateName);
-                    if (!problems.empty() && reported++ < reportedCases) {
-                        report += Format("round {}, {}:\n{}", round, label.c_str(), problems.c_str());
-                    }
-                });
+                OnEveryCaseOfTheMatrix(
+                    layout,
+                    [&](const String& label, const UICanvasLayout& laidOut) {
+                        const String problems = PanelProblems(laidOut, plateName);
+                        if (!problems.empty() && reported++ < reportedCases) {
+                            report += Format("round {}, {}:\n{}", round, label.c_str(), problems.c_str());
+                        }
+                    },
+                    true);
             }
             return report;
         }
@@ -1718,7 +1721,7 @@ namespace BECore::Chess::Tests {
         // The panel is not a part of the margins (it covers the board while it is open) but its plate stays inside the view, in every one of the shapes
         ASSERT_TRUE(OpenThePanel());
         for (const auto& size : {Pair<float, float>{1280.0f, 720.0f}, Pair<float, float>{720.0f, 1280.0f}, Pair<float, float>{1024.0f, 768.0f}, Pair<float, float>{800.0f, 800.0f},
-                                 Pair<float, float>{2560.0f, 1080.0f}}) {
+                                 Pair<float, float>{2560.0f, 1080.0f}, Pair<float, float>{480.0f, 853.0f}, Pair<float, float>{768.0f, 1024.0f}}) {
             DrawAt(size.first, size.second);
             const UIElement& plate = PanelControl<UIStack>("Plate");
             ASSERT_FALSE(plate.rect.IsEmpty()) << "the plate is shown at " << size.first << "x" << size.second;
@@ -1756,30 +1759,34 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(panel);
         panel->UpdateLayout(1280.0f, 720.0f);
         UICanvasLayout& layout = panel->GetLayout();
-        LayOutInTheNarrowestWindow(layout);
-
-        const float scale = kNarrowestWidth / kViewWidth;
-        EXPECT_NEAR(layout.GetResolved().scale, scale, 0.01f);
-        EXPECT_NEAR(layout.root->rect.w, kNarrowestWidth * (1.0f - 2.0f * UIPreview::kSideInsetShare) / scale, 0.5f) << "the safe area, in view units: about 689";
-
         const HudWords words = AllHudWords();
-        for (size_t round = 0; round < words.Rounds(); ++round) {
-            words.Publish(round);
-            const String problems = PanelProblems(layout);
-            EXPECT_TRUE(problems.empty()) << "round " << round << ":\n" << problems.c_str();
-        }
-
         const float minTouch = CoreManager::GetUIEnvironment().GetSettings().minTouchSize;
-        size_t segments = 0;
-        for (const PanelSegment& segment : ExpectedPanelSegments()) {
-            const UIElement& button = PanelButton(segment.name.c_str());
-            ++segments;
-            EXPECT_GE(button.rect.h, kSegmentHeight - kPixelTolerance) << segment.name.c_str();
-            EXPECT_GE(std::min(button.rect.w, button.rect.h) * layout.GetResolved().scale, minTouch - kPixelTolerance) << segment.name.c_str() << " is a touch target on the smallest window";
-            const UIContentFit fit = button.CheckContent(button.rect.w - 2.0f * kButtonAir, button.rect.h, layout.GetResolved().scale);
-            EXPECT_TRUE(fit.hasContent && fit.fits) << segment.name.c_str() << " '" << ShownText(button).c_str() << "' in " << button.rect.w << " units";
+
+        for (const ViewShape& shape : kViewShapes) {
+            SCOPED_TRACE(shape.name);
+            LayOutInTheNarrowestWindow(layout, shape);
+
+            const float scale = kNarrowestWidth / shape.viewWidth;
+            EXPECT_NEAR(layout.GetResolved().scale, scale, 0.01f);
+            EXPECT_NEAR(layout.root->rect.w, kNarrowestWidth * (1.0f - 2.0f * UIPreview::kSideInsetShare) / scale, 0.5f) << "the safe area, in view units: about 689 and 590";
+
+            for (size_t round = 0; round < words.Rounds(); ++round) {
+                words.Publish(round);
+                const String problems = PanelProblems(layout);
+                EXPECT_TRUE(problems.empty()) << "round " << round << ":\n" << problems.c_str();
+            }
+
+            size_t segments = 0;
+            for (const PanelSegment& segment : ExpectedPanelSegments()) {
+                const UIElement& button = PanelButton(segment.name.c_str());
+                ++segments;
+                EXPECT_GE(button.rect.h, kSegmentHeight - kPixelTolerance) << segment.name.c_str();
+                EXPECT_GE(std::min(button.rect.w, button.rect.h) * layout.GetResolved().scale, minTouch - kPixelTolerance) << segment.name.c_str() << " is a touch target on the smallest window";
+                const UIContentFit fit = button.CheckContent(button.rect.w - 2.0f * kButtonAir, button.rect.h, layout.GetResolved().scale);
+                EXPECT_TRUE(fit.hasContent && fit.fits) << segment.name.c_str() << " '" << ShownText(button).c_str() << "' in " << button.rect.w << " units";
+            }
+            EXPECT_EQ(segments, kPanelSegments) << "two + two + two + four";
         }
-        EXPECT_EQ(segments, kPanelSegments) << "two + two + two + four";
         layout.Invalidate();
     }
 
@@ -1788,20 +1795,24 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(panel);
         panel->UpdateLayout(1280.0f, 720.0f);
         UICanvasLayout& layout = panel->GetLayout();
-        LayOutInTheNarrowestWindow(layout);
-        const UIElement& line = PanelLabel("OpponentError");
-        ASSERT_FALSE(line.rect.IsEmpty());
-        const float scale = layout.GetResolved().scale;
 
         size_t sentences = 0;
-        for (const EngineErrorKind kind : EnumUtils<EngineErrorKind>::Values()) {
-            const String sentence = OpponentText::Error(EngineError{kind, {}});
-            CoreManager::GetUIVars().Set("opponentError"_intern, StringView(sentence));
-            const UIContentFit fit = line.CheckContent(line.rect.w, line.rect.h, scale);
-            EXPECT_TRUE(fit.hasContent && fit.fits) << "'" << sentence.c_str() << "' in " << line.rect.w << " units";
-            ++sentences;
+        for (const ViewShape& shape : kViewShapes) {
+            SCOPED_TRACE(shape.name);
+            LayOutInTheNarrowestWindow(layout, shape);
+            const UIElement& line = PanelLabel("OpponentError");
+            ASSERT_FALSE(line.rect.IsEmpty());
+            const float scale = layout.GetResolved().scale;
+
+            for (const EngineErrorKind kind : EnumUtils<EngineErrorKind>::Values()) {
+                const String sentence = OpponentText::Error(EngineError{kind, {}});
+                CoreManager::GetUIVars().Set("opponentError"_intern, StringView(sentence));
+                const UIContentFit fit = line.CheckContent(line.rect.w, line.rect.h, scale);
+                EXPECT_TRUE(fit.hasContent && fit.fits) << "'" << sentence.c_str() << "' in " << line.rect.w << " units";
+                ++sentences;
+            }
         }
-        EXPECT_GE(sentences, 1u);
+        EXPECT_GE(sentences, 2u);
         layout.Invalidate();
     }
 
@@ -2072,23 +2083,28 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(panel);
         panel->UpdateLayout(1280.0f, 720.0f);
         UICanvasLayout& layout = panel->GetLayout();
-        LayOutInTheNarrowestWindow(layout);
-
-        const float scale = kNarrowestWidth / kViewWidth;
-        EXPECT_NEAR(layout.GetResolved().scale, scale, 0.01f);
-        const String problems = PanelProblems(layout, kMenuPlate);
-        EXPECT_TRUE(problems.empty()) << problems.c_str();
-        EXPECT_NEAR(ElementOf("MenuPanel", kMenuPlate).rect.w, 640.0f, kPixelTolerance) << "94% of the safe area is more than maxWidth";
-
         const float minTouch = CoreManager::GetUIEnvironment().GetSettings().minTouchSize;
         const Vector<String> buttons = MenuButtons();
         ASSERT_EQ(buttons.size(), MenuSections().size() + 1) << "a button per section and Close";
-        for (const String& name : buttons) {
-            const UIElement& button = MenuButton(name.c_str());
-            EXPECT_NEAR(button.rect.h, kSegmentHeight, kPixelTolerance) << name.c_str();
-            EXPECT_GE(std::min(button.rect.w, button.rect.h) * layout.GetResolved().scale, minTouch - kPixelTolerance) << name.c_str() << " is a touch target on the smallest window";
-            const UIContentFit fit = button.CheckContent(button.rect.w - 2.0f * kButtonAir, button.rect.h, layout.GetResolved().scale);
-            EXPECT_TRUE(fit.hasContent && fit.fits) << name.c_str() << " '" << ShownText(button).c_str() << "' in " << button.rect.w << " units";
+
+        for (const ViewShape& shape : kViewShapes) {
+            SCOPED_TRACE(shape.name);
+            LayOutInTheNarrowestWindow(layout, shape);
+
+            const float scale = kNarrowestWidth / shape.viewWidth;
+            EXPECT_NEAR(layout.GetResolved().scale, scale, 0.01f);
+            const String problems = PanelProblems(layout, kMenuPlate);
+            EXPECT_TRUE(problems.empty()) << problems.c_str();
+            EXPECT_NEAR(ElementOf("MenuPanel", kMenuPlate).rect.w, std::min(640.0f, 0.94f * layout.root->rect.w), kPixelTolerance)
+                << "94% of the safe area up to maxWidth: 640 in the default view, about 555 in the narrowest Portrait window";
+
+            for (const String& name : buttons) {
+                const UIElement& button = MenuButton(name.c_str());
+                EXPECT_NEAR(button.rect.h, kSegmentHeight, kPixelTolerance) << name.c_str();
+                EXPECT_GE(std::min(button.rect.w, button.rect.h) * layout.GetResolved().scale, minTouch - kPixelTolerance) << name.c_str() << " is a touch target on the smallest window";
+                const UIContentFit fit = button.CheckContent(button.rect.w - 2.0f * kButtonAir, button.rect.h, layout.GetResolved().scale);
+                EXPECT_TRUE(fit.hasContent && fit.fits) << name.c_str() << " '" << ShownText(button).c_str() << "' in " << button.rect.w << " units";
+            }
         }
         layout.Invalidate();
     }
@@ -2098,7 +2114,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(MenuList()->_visible);
 
         for (const auto& size : {Pair<float, float>{1280.0f, 720.0f}, Pair<float, float>{720.0f, 1280.0f}, Pair<float, float>{1024.0f, 768.0f}, Pair<float, float>{800.0f, 800.0f},
-                                 Pair<float, float>{2560.0f, 1080.0f}}) {
+                                 Pair<float, float>{2560.0f, 1080.0f}, Pair<float, float>{480.0f, 853.0f}, Pair<float, float>{768.0f, 1024.0f}}) {
             SCOPED_TRACE(Format("{}x{}", size.first, size.second).c_str());
             DrawAt(size.first, size.second);
             const UIElement& plate = ElementOf("MenuPanel", kMenuPlate);
@@ -2739,6 +2755,45 @@ namespace BECore::Chess::Tests {
         Click("e1");
 
         EXPECT_TRUE(Model().HasPendingPromotion());
+        EXPECT_TRUE(PromotionShown());
+        EXPECT_TRUE(Model().GetMoves().empty()) << "nothing has moved";
+        const auto turned = plateOf();
+        ASSERT_TRUE(turned.has_value());
+        EXPECT_TRUE(SameRect(*turned, *plain)) << "the plate is fixed on the screen";
+
+        ClickPromotion("PromoteQueen");
+        ASSERT_EQ(Model().GetMoves().size(), 1u);
+        EXPECT_EQ(Model().GetMoves().back().ToUci(), "e2e1q");
+    }
+
+    TEST_F(ChessUiTest, APromotionInTheTurnedBoardOfThePortraitViewAsksInAPlateThatDoesNotMove) {
+        const auto plateOf = [this]() -> Optional<Rect> {
+            Draw();
+            const auto plate = RectCalls(kPromotionPlateColor);
+            return plate.empty() ? std::nullopt : Optional<Rect>(plate.front()->rect);
+        };
+        ResizeWithoutInsets(kNarrowestWidth, kNarrowestPortraitHeight);
+        ASSERT_TRUE(PortraitIsActive());
+
+        StartFrom(kBlackPromotesOnE1);
+        ClickMove("e2", "e1");
+        ASSERT_TRUE(PromotionShown());
+        const auto plain = plateOf();
+        ASSERT_TRUE(plain.has_value());
+        Press("ChessCancelPromotion");
+        _manager->UpdateAll();
+        ASSERT_FALSE(PromotionShown());
+
+        CountingFactory factory({MakeShared<InstantEngine>()});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        ControlPlays("white");
+        StartFrom(kBlackPromotesOnE1);
+        ASSERT_TRUE(BlackIsAtTheBottom());
+        ASSERT_TRUE(PortraitIsActive());
+        EXPECT_TRUE(SameRect(SquareRect("e1"), CellRect(3, 0))) << "e1 is on the top row of the Portrait board";
+
+        Click("e2");
+        Click("e1");
         EXPECT_TRUE(PromotionShown());
         EXPECT_TRUE(Model().GetMoves().empty()) << "nothing has moved";
         const auto turned = plateOf();
@@ -5617,29 +5672,33 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(panel);
         panel->UpdateLayout(1280.0f, 720.0f);
         UICanvasLayout& layout = panel->GetLayout();
-        LayOutInTheNarrowestWindow(layout);
-
-        const float scale = kNarrowestWidth / kViewWidth;
-        EXPECT_NEAR(layout.GetResolved().scale, scale, 0.01f);
-        EXPECT_NEAR(layout.root->rect.w, kNarrowestWidth * (1.0f - 2.0f * UIPreview::kSideInsetShare) / scale, 0.5f) << "the safe area, in view units: about 689";
-        const String problems = PanelProblems(layout, kPromotionPlate);
-        EXPECT_TRUE(problems.empty()) << problems.c_str();
-
-        // 94% of the safe area is more than maxWidth, so the plate is 640 here and in every other window
-        EXPECT_NEAR(PromotionElement(kPromotionPlate).rect.w, 640.0f, kPixelTolerance);
-
         const float minTouch = CoreManager::GetUIEnvironment().GetSettings().minTouchSize;
         Vector<String> buttons{"PromotionCancel"};
         for (const PieceType piece : PromotionPieces()) {
             buttons.push_back(PromoteButton(piece));
         }
         ASSERT_EQ(buttons.size(), 5u) << "four pieces and Cancel";
-        for (const String& name : buttons) {
-            const UIElement& button = PromotionButton(name.c_str());
-            EXPECT_GE(button.rect.h, kSegmentHeight - kPixelTolerance) << name.c_str();
-            EXPECT_GE(std::min(button.rect.w, button.rect.h) * layout.GetResolved().scale, minTouch - kPixelTolerance) << name.c_str() << " is a touch target on the smallest window";
-            const UIContentFit fit = button.CheckContent(button.rect.w - 2.0f * kButtonAir, button.rect.h, layout.GetResolved().scale);
-            EXPECT_TRUE(fit.hasContent && fit.fits) << name.c_str() << " '" << ShownText(button).c_str() << "' in " << button.rect.w << " units";
+
+        for (const ViewShape& shape : kViewShapes) {
+            SCOPED_TRACE(shape.name);
+            LayOutInTheNarrowestWindow(layout, shape);
+
+            const float scale = kNarrowestWidth / shape.viewWidth;
+            EXPECT_NEAR(layout.GetResolved().scale, scale, 0.01f);
+            EXPECT_NEAR(layout.root->rect.w, kNarrowestWidth * (1.0f - 2.0f * UIPreview::kSideInsetShare) / scale, 0.5f) << "the safe area, in view units: about 689 and 590";
+            const String problems = PanelProblems(layout, kPromotionPlate);
+            EXPECT_TRUE(problems.empty()) << problems.c_str();
+
+            // 94% of the safe area up to maxWidth: 640 in the default view (94% of even its narrowest safe area is more), about 555 in the narrowest Portrait window
+            EXPECT_NEAR(PromotionElement(kPromotionPlate).rect.w, std::min(640.0f, 0.94f * layout.root->rect.w), kPixelTolerance);
+
+            for (const String& name : buttons) {
+                const UIElement& button = PromotionButton(name.c_str());
+                EXPECT_GE(button.rect.h, kSegmentHeight - kPixelTolerance) << name.c_str();
+                EXPECT_GE(std::min(button.rect.w, button.rect.h) * layout.GetResolved().scale, minTouch - kPixelTolerance) << name.c_str() << " is a touch target on the smallest window";
+                const UIContentFit fit = button.CheckContent(button.rect.w - 2.0f * kButtonAir, button.rect.h, layout.GetResolved().scale);
+                EXPECT_TRUE(fit.hasContent && fit.fits) << name.c_str() << " '" << ShownText(button).c_str() << "' in " << button.rect.w << " units";
+            }
         }
         layout.Invalidate();
     }
@@ -5650,7 +5709,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(PromotionShown());
 
         for (const auto& size : {Pair<float, float>{1280.0f, 720.0f}, Pair<float, float>{720.0f, 1280.0f}, Pair<float, float>{1024.0f, 768.0f}, Pair<float, float>{800.0f, 800.0f},
-                                 Pair<float, float>{2560.0f, 1080.0f}}) {
+                                 Pair<float, float>{2560.0f, 1080.0f}, Pair<float, float>{480.0f, 853.0f}, Pair<float, float>{768.0f, 1024.0f}}) {
             SCOPED_TRACE(Format("{}x{}", size.first, size.second).c_str());
             DrawAt(size.first, size.second);
             const UIElement& plate = PromotionElement(kPromotionPlate);
@@ -5761,6 +5820,93 @@ namespace BECore::Chess::Tests {
                 }
             }
         }
+    }
+
+    // ---- every canvas of the scene is walked through the views ----------------------------------------------------------------------------
+
+    namespace {
+
+        /// A canvas of the scene (its node) and the test of this file that lays it out on the size matrix with the views of the scene (SceneViews()), so that the Portrait view is checked
+        struct CanvasMatrixTest {
+            const char* node;
+            const char* test;
+        };
+
+        const CanvasMatrixTest kCanvasMatrixTests[] = {{"BoardCoordinates", "TheBoardCoordinatesPassTheSizeMatrixWithEveryLetterAndDigit"},
+                                                       {"Material", "TheMaterialCanvasPassesTheSizeMatrixWithEveryCountAndEverySign"},
+                                                       {"Hud", "TheHudPassesTheSizeMatrixWithTheLongestWords"},
+                                                       {"MenuPanel", "TheMenuPanelPassesTheSizeMatrix"},
+                                                       {"OpponentPanel", "ThePanelPassesTheSizeMatrix"},
+                                                       {"PromotionPanel", "ThePromotionPanelPassesTheSizeMatrix"}};
+
+        /// The canvases among @p canvases (node names) that no row of kCanvasMatrixTests covers
+        Vector<String> CanvasesWithoutMatrixTest(const Vector<String>& canvases) {
+            Vector<String> uncovered;
+            for (const String& canvas : canvases) {
+                const bool covered = eastl::any_of(eastl::begin(kCanvasMatrixTests), eastl::end(kCanvasMatrixTests), [&](const CanvasMatrixTest& row) { return canvas == row.node; });
+                if (!covered) {
+                    uncovered.push_back(canvas);
+                }
+            }
+            return uncovered;
+        }
+
+        bool IsRegisteredTestOfTheFixture(const char* name) {
+            const testing::UnitTest& unitTest = *testing::UnitTest::GetInstance();
+            for (int suite = 0; suite < unitTest.total_test_suite_count(); ++suite) {
+                const testing::TestSuite& testSuite = *unitTest.GetTestSuite(suite);
+                for (int test = 0; test < testSuite.total_test_count(); ++test) {
+                    if (String(testSuite.name()) == "ChessUiTest" && String(testSuite.GetTestInfo(test)->name()) == name) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        void CollectCanvasNodes(const SceneNode& node, Vector<IntrusivePtr<SceneNode>>& out) {
+            for (const auto& child : node.GetChildren()) {
+                if (child->GetComponent<UICanvasComponent>()) {
+                    out.push_back(child);
+                }
+                CollectCanvasNodes(*child, out);
+            }
+        }
+
+    }  // namespace
+
+    TEST_F(ChessUiTest, EveryCanvasOfTheSceneIsCoveredByAMatrixTestThatWalksTheViewsAndPassesIt) {
+        Vector<IntrusivePtr<SceneNode>> nodes;
+        CollectCanvasNodes(GetScene().GetRootNode(), nodes);
+        Vector<String> names;
+        for (const auto& node : nodes) {
+            names.push_back(String(node->GetName().ToStringView()));
+        }
+        ASSERT_EQ(names.size(), std::size(kCanvasMatrixTests)) << "a canvas was added or removed: its row of kCanvasMatrixTests too";
+
+        // A canvas without a matrix test would never see the Portrait view: it needs a row, and the test of the row must exist
+        const Vector<String> uncovered = CanvasesWithoutMatrixTest(names);
+        EXPECT_TRUE(uncovered.empty()) << "no matrix test with the views for the canvas " << (uncovered.empty() ? "" : uncovered.front().c_str());
+        for (const CanvasMatrixTest& row : kCanvasMatrixTests) {
+            EXPECT_TRUE(IsRegisteredTestOfTheFixture(row.test)) << row.node << ": there is no test " << row.test;
+        }
+
+        // And the sweep itself: every canvas through the matrix with the views, whatever the tests of its own check
+        for (const auto& node : nodes) {
+            SCOPED_TRACE(node->GetName().CStr());
+            const auto canvas = node->GetComponent<UICanvasComponent>();
+            canvas->UpdateLayout(1280.0f, 720.0f);
+            const auto failures = ValidateWithWords(canvas->GetLayout());
+            EXPECT_TRUE(failures.empty()) << DescribeMatrixFailures(failures).c_str();
+        }
+
+        // The check catches a canvas that is not on the list, and a row of a test that does not exist
+        Vector<String> withNew = names;
+        withNew.push_back("TabletPanel");
+        const Vector<String> caught = CanvasesWithoutMatrixTest(withNew);
+        ASSERT_EQ(caught.size(), 1u);
+        EXPECT_EQ(caught.front(), "TabletPanel");
+        EXPECT_FALSE(IsRegisteredTestOfTheFixture("ThePanelThatWasNeverWritten"));
     }
 
     // ---- the promotion panel: broken copies, so that the checks can fail ---------------------------------------------------------------------
