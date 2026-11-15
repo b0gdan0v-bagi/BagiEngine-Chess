@@ -11,12 +11,13 @@ namespace BECore::Chess {
     /// False with CHESS_NO_STOCKFISH (the web build has no child process)
     inline constexpr bool kStockfishAvailable = !CHESS_NO_STOCKFISH;
 
-    /// Own always, Stockfish when kStockfishAvailable (whether a Stockfish FILE is found is asked at the pick)
+    /// What this BUILD can run: Own always, Stockfish when kStockfishAvailable. Whether a Stockfish FILE is found is a fact of the machine and is looked up by OpponentController
+    /// (OffersStockfish())
     [[nodiscard]] constexpr bool IsOpponentEngineAvailable(OpponentEngine engine) noexcept {
         return engine == OpponentEngine::Own || kStockfishAvailable;
     }
 
-    /// The engine a game starts with: Stockfish, so a missing one stays "Engine not found" until the person picks the other; Own where Stockfish is not available
+    /// The engine this build prefers: Stockfish, Own where Stockfish is not available. What a game starts with is OpponentController::DefaultEngine(), which also asks for the file
     inline constexpr OpponentEngine kDefaultOpponentEngine = kStockfishAvailable ? OpponentEngine::Stockfish : OpponentEngine::Own;
 
     /// The id on the wire (the control API): "stockfish", "own"

@@ -904,7 +904,9 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OpponentControllerTest, AnEngineCycleWalksStockfishOwnStockfishWhereStockfishIsAvailableElseStaysOnOwn) {
         ChessGameModel model;
+        CountingFactory factory({MakeShared<InstantEngine>()});
         OpponentController controller(model);
+        controller.SetEngineFactory(factory.AsFactory());  // a factory of the test offers Stockfish whatever the machine has (OpponentStockfishFileTest holds the file rule)
 
         EXPECT_EQ(controller.GetEngine(), kDefaultOpponentEngine);
         if constexpr (kStockfishAvailable) {

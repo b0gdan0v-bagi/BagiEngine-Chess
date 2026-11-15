@@ -107,7 +107,7 @@ namespace BECore::Chess::Tests {
 #endif
     }
 
-    TEST(OpponentEnginesTest, AGameStartsWithStockfishAndWithTheOwnEngineWhereThereIsNone) {
+    TEST(OpponentEnginesTest, TheBuildPrefersStockfishAndTheOwnEngineWhereThereIsNone) {
         EXPECT_EQ(kDefaultOpponentEngine, kStockfishAvailable ? OpponentEngine::Stockfish : OpponentEngine::Own);
         EXPECT_TRUE(IsOpponentEngineAvailable(kDefaultOpponentEngine)) << "a default that cannot start would be an error at the first pick";
     }

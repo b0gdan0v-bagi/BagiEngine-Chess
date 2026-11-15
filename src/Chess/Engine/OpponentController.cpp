@@ -39,7 +39,9 @@ namespace BECore::Chess {
 
     }  // namespace
 
-    OpponentController::OpponentController(ChessGameModel& model, OpponentSettings settings) : _model(model), _settings(std::move(settings)) {}
+    OpponentController::OpponentController(ChessGameModel& model, OpponentSettings settings) : _model(model), _settings(std::move(settings)) {
+        RefreshStockfish();
+    }
 
     OpponentController::~OpponentController() {
         Shutdown();
@@ -47,6 +49,11 @@ namespace BECore::Chess {
 
     void OpponentController::SetSettings(OpponentSettings settings) {
         _settings = std::move(settings);
+        RefreshStockfish();
+    }
+
+    void OpponentController::RefreshStockfish() {
+        _stockfishFound = IsOpponentEngineAvailable(OpponentEngine::Stockfish) && FindStockfish(_settings.stockfishPath).has_value();
     }
 
     void OpponentController::SetEngineFactory(EngineFactory factory) {
@@ -89,7 +96,8 @@ namespace BECore::Chess {
     }
 
     std::expected<void, EngineError> OpponentController::CycleEngine() {
-        return SetEngine(NextOpponentEngine(GetEngine()));
+        const OpponentEngine next = NextOpponentEngine(GetEngine());
+        return SetEngine(next == OpponentEngine::Stockfish && !OffersStockfish() ? OpponentEngine::Own : next);
     }
 
     std::expected<void, EngineError> OpponentController::CycleSide() {
@@ -152,6 +160,13 @@ namespace BECore::Chess {
         if (const Optional<PieceColor> refused = FindUnavailableSeat(picked)) {
             const SeatChoice& choice = picked[SeatIndex(*refused)];
             FailPick(UnavailableEngineError(choice.engine), *refused, choice.engine, levels[choice.level]);
+            return std::unexpected(*_pickError);
+        }
+
+        // The same for Stockfish with no file to run: the file is looked for afresh, so one that appeared since the last look is used
+        if (const Optional<PieceColor> refused = FindSeatWithoutStockfish(picked)) {
+            const SeatChoice& choice = picked[SeatIndex(*refused)];
+            FailPick(EngineError{EngineErrorKind::LaunchFailed, NoStockfishDetail(_settings.stockfishPath)}, *refused, choice.engine, levels[choice.level]);
             return std::unexpected(*_pickError);
         }
 
@@ -245,6 +260,21 @@ namespace BECore::Chess {
         for (const PieceColor color : EnumUtils<PieceColor>::Values()) {
             if (!IsOpponentEngineAvailable(picked[SeatIndex(color)].engine)) {
                 return color;
+            }
+        }
+        return std::nullopt;
+    }
+
+    Optional<PieceColor> OpponentController::FindSeatWithoutStockfish(const Array<SeatChoice, kSeatCount>& picked) {
+        if (_factory) {
+            return std::nullopt;
+        }
+        for (const PieceColor color : EnumUtils<PieceColor>::Values()) {
+            // A seat that already holds Stockfish stays as it is (a file that went away after the pick, a fresh controller): the pick only gets refused where it matters, in the factory,
+            // when the seat plays and its engine is made
+            if (picked[SeatIndex(color)].engine == OpponentEngine::Stockfish && _seats[SeatIndex(color)].choice.engine != OpponentEngine::Stockfish) {
+                RefreshStockfish();
+                return _stockfishFound ? std::nullopt : Optional<PieceColor>(color);
             }
         }
         return std::nullopt;
