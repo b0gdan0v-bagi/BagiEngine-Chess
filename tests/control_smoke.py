@@ -202,6 +202,11 @@ def run_moves_before_the_first_frame(client: BagiControlClient, headless: bool) 
     check(by_moves.rows != take_screenshot(client).rows, "the scene still shows the opening after four moves")
 
 
+PINNED_SEED = 1
+VARIETY_SEEDS = [1, 2, 3, 4, 5, 6, 7, 8]
+VARIETY_ROUNDS = 3
+
+
 def get_opponent(client: BagiControlClient) -> dict:
     return client.call("get_state")["state"]["opponent"]
 
@@ -215,6 +220,12 @@ def default_engine(client: BagiControlClient) -> str:
 
 def get_moves(client: BagiControlClient) -> list:
     return client.call("get_state")["state"]["moves"]
+
+
+def pin_the_seed(client: BagiControlClient, seed: int = PINNED_SEED) -> None:
+    """A reset draws a new seed (it varies the own engine's pick among near-equal moves), so a scenario that compares the program's answers across resets sets the seed after each one."""
+    client.call("set_state", {"opponent": {"seed": seed}})
+    check(get_opponent(client)["seed"] == seed, f"the seed was not read back: {get_opponent(client)}")
 
 
 def let_frames_pass(client: BagiControlClient, frames: int) -> None:
@@ -301,6 +312,33 @@ def run_opponent_scenario(client: BagiControlClient, headless: bool) -> None:
     check(get_opponent(client)["thinking"] is False, "the opponent thinks with nobody picked")
 
 
+def play_a_short_game_against_the_own_engine(client: BagiControlClient, rounds: int) -> list:
+    """The person plays e2e4 and then, `rounds - 1` times, the first of the listed moves; the program (Black) answers each. Gives the moves of the game."""
+    client.call("perform_action", move("e2e4"))
+    for played in range(1, rounds + 1):
+        wait_until_the_program_played(client, lambda moves, count=2 * played: len(moves) == count, f"{2 * played} moves")
+        if played < rounds:
+            legal = [action["uci"] for action in client.call("list_actions")["actions"]]
+            check(bool(legal), "no legal move to play by hand")
+            client.call("perform_action", move(legal[0]))
+    return get_moves(client)
+
+
+def check_the_seed_varies_the_own_engine(client: BagiControlClient) -> None:
+    """After a reset the program plays its own game: the same moves of the person at `hard` give another game for another seed (somewhere among the seeds) and the same game for the same seed."""
+    games = {}
+    for seed in VARIETY_SEEDS:
+        client.call("reset")
+        client.call("set_state", {"opponent": {"seed": seed}})
+        check(get_opponent(client)["seed"] == seed and get_opponent(client)["plays"] == "black", f"the pick after a reset was not read back: {get_opponent(client)}")
+        games[seed] = play_a_short_game_against_the_own_engine(client, VARIETY_ROUNDS)
+    check(len({tuple(game) for game in games.values()}) > 1, f"the seeds {VARIETY_SEEDS} all gave the same game {games[VARIETY_SEEDS[0]]}: the seed varies nothing")
+    client.call("reset")
+    client.call("set_state", {"opponent": {"seed": VARIETY_SEEDS[0]}})
+    again = play_a_short_game_against_the_own_engine(client, VARIETY_ROUNDS)
+    check(again == games[VARIETY_SEEDS[0]], f"the seed {VARIETY_SEEDS[0]} gave {games[VARIETY_SEEDS[0]]}, then {again}")
+
+
 def play_against_the_own_engine(client: BagiControlClient) -> str:
     """The person plays e2e4 against the program as Black; gives the program's reply, after checking the standing."""
     client.call("perform_action", move("e2e4"))
@@ -322,7 +360,7 @@ def run_own_engine_scenario(client: BagiControlClient, headless: bool) -> None:
     default = default_engine(client)  # "stockfish", or "own" in a build without Stockfish: the switch back below goes to it
 
     version = client.call("get_state")["version"]
-    picked = client.call("set_state", {"opponent": {"engine": "own", "plays": "black", "level": "easy"}})
+    picked = client.call("set_state", {"opponent": {"engine": "own", "plays": "black", "level": "easy", "seed": PINNED_SEED}})
     check(picked["version"] > version, "picking the own engine did not move the state version")
     opponent = get_opponent(client)
     check(opponent["engine"] == "own" and opponent["plays"] == "black" and opponent["level"] == "easy" and opponent["error"] is None, f"the pick was not read back: {opponent}")
@@ -330,11 +368,19 @@ def run_own_engine_scenario(client: BagiControlClient, headless: bool) -> None:
 
     first = play_against_the_own_engine(client)
 
-    # A fixed depth is deterministic, and so is the handicap of "easy" (a pure function of the position): the same game after a reset gets the same reply, and the reset keeps the engine
+    # A fixed depth is deterministic, and so is the handicap of "easy" (a pure function of the position and the seed): the same game after a reset and the same seed gets the same reply, and the reset keeps the engine
     client.call("reset")
+    pin_the_seed(client)
     check(get_opponent(client)["engine"] == "own" and get_opponent(client)["plays"] == "black", f"a reset lost the pick: {get_opponent(client)}")
     second = play_against_the_own_engine(client)
     check(first == second, f"the own engine answered e2e4 with {first}, then with {second}")
+
+    client.call("set_state", {"opponent": {"level": "hard"}})
+    check_the_seed_varies_the_own_engine(client)
+    client.call("reset")  # the game below is the one of the first reply
+    pin_the_seed(client)
+    client.call("set_state", {"opponent": {"level": "easy"}})
+    check(play_against_the_own_engine(client) == second, "the own engine's reply changed after the seeds were tried")
 
     # Back to the engine of the start (Stockfish, or the own engine in a build without it) and to two people: the program stays out of the game
     client.call("set_state", {"opponent": {"engine": default, "plays": None}})
@@ -439,7 +485,7 @@ def run_watch_scenario(client: BagiControlClient, headless: bool) -> None:
     game = WatchedGame(client)
 
     version = client.call("get_state")["version"]
-    picked = client.call("set_state", {"opponent": {"plays": "both", "white": WATCH_SEATS["white"], "black": WATCH_SEATS["black"]}})
+    picked = client.call("set_state", {"opponent": {"plays": "both", "white": WATCH_SEATS["white"], "black": WATCH_SEATS["black"], "seed": PINNED_SEED}})
     check(picked["version"] > version, "picking two programs did not move the state version")
     check_the_watch_is_set(client, "both")
     opponent = get_opponent(client)
@@ -455,6 +501,7 @@ def run_watch_scenario(client: BagiControlClient, headless: bool) -> None:
 
     # A reset starts a new game and keeps both programs; on the manual clock the same two programs play the same game
     client.call("reset")
+    pin_the_seed(client)  # the reset drew another one, and the programs vary their moves by it
     game.forget_moves()
     check_the_watch_is_set(client, "both")
     if manual:
@@ -1064,7 +1111,9 @@ class RestartPhase:
     @staticmethod
     def read(client: BagiControlClient) -> dict:
         state = client.call("get_state")["state"]
-        return {key: state[key] for key in ("fen", "moves", "startFen", "opponent")}
+        read = {key: state[key] for key in ("fen", "moves", "startFen", "opponent")}
+        read["opponent"] = {key: value for key, value in read["opponent"].items() if key != "seed"}  # the seed is not saved: a started game draws its own
+        return read
 
     def play(self, client: BagiControlClient, headless: bool) -> None:
         check(not any(self.folder.iterdir()), "the folder of the save is not empty before the first game")

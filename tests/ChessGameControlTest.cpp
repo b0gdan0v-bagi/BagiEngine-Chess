@@ -60,6 +60,13 @@ namespace BECore::Chess::Tests {
             return OpponentState(opponent);
         }
 
+        /// {"opponent": {"seed": ..}} and nothing else
+        Json OpponentSeedRequest(const Json& seed) {
+            Json opponent = Json::object();
+            opponent["seed"] = seed;
+            return OpponentState(opponent);
+        }
+
         /// {"opponent": {"engine": ..}} and nothing else
         Json EngineRequest(const Json& engine) {
             Json opponent = Json::object();
@@ -1063,6 +1070,94 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(State(), before);
         EXPECT_EQ(control.GetStateVersion(), version);
         EXPECT_EQ(factory.Calls(), calls) << "no engine was asked for by a refused call";
+    }
+
+    // ---- The seed ----
+
+    TEST_F(ChessGameControlTest, TheSeedIsInTheOpponentAndIsZeroInABareGame) {
+        const Json seed = OpponentMember("seed");
+        ASSERT_TRUE(seed.is_number_integer());
+        EXPECT_EQ(seed.get<int64_t>(), 0);
+    }
+
+    TEST_F(ChessGameControlTest, ASeedAloneIsAValidPickAndIsReadBackAndMovesTheVersionOnce) {
+        CountingFactory factory({MakeShared<InstantEngine>()});
+        opponent.SetEngineFactory(factory.AsFactory());
+        const Json before = OpponentOfState();
+        const uint64_t version = control.GetStateVersion();
+
+        SetOpponent(OpponentSeedRequest(Json(12345)));
+
+        EXPECT_EQ(model.GetSeed(), 12345u);
+        EXPECT_EQ(OpponentMember("seed").get<int64_t>(), 12345);
+        EXPECT_GT(control.GetStateVersion(), version);
+        EXPECT_EQ(StringMember(OpponentOfState(), "level"), StringMember(before, "level")) << "no side, level or engine was needed, and none changed";
+        EXPECT_EQ(factory.Calls(), 0) << "a seed asks for no engine";
+
+        const uint64_t after = control.GetStateVersion();
+        SetOpponent(OpponentSeedRequest(Json(12345)));
+        EXPECT_EQ(control.GetStateVersion(), after) << "the same seed changes nothing";
+    }
+
+    TEST_F(ChessGameControlTest, TheSeedBoundsAreAccepted) {
+        SetOpponent(OpponentSeedRequest(Json(4294967295ULL)));
+        EXPECT_EQ(model.GetSeed(), 4294967295u);
+        SetOpponent(OpponentSeedRequest(Json(0)));
+        EXPECT_EQ(model.GetSeed(), 0u);
+    }
+
+    TEST_F(ChessGameControlTest, ASeedThatIsNotAnIntegerInRangeIsRefusedAndChangesNothing) {
+        SetOpponent(OpponentSeedRequest(Json(77)));
+        const Json before = State();
+        const uint64_t version = control.GetStateVersion();
+
+        const Json bad[] = {Json(-1), Json(4294967296ULL), Json(1.5), Json(7.0), Json("5"), Json(), Json(true), Json::array(), Json::object()};
+        for (const Json& seed : bad) {
+            EXPECT_EQ(SetStateError(OpponentSeedRequest(seed)), "invalid_params") << DumpJson(seed).c_str();
+            Json withPlays = OpponentRequest("black", "hard");  // a valid member beside it is not applied either
+            withPlays["opponent"]["seed"] = seed;
+            EXPECT_EQ(SetStateError(withPlays), "invalid_params") << DumpJson(seed).c_str();
+        }
+
+        EXPECT_EQ(State(), before);
+        EXPECT_EQ(model.GetSeed(), 77u);
+        EXPECT_EQ(control.GetStateVersion(), version);
+    }
+
+    TEST_F(ChessGameControlTest, ASeedBesideAFenIsAppliedAndTheFenKeepsIt) {
+        Json request = OpponentSeedRequest(Json(99));
+        request["fen"] = MakeJsonString(kMateInOneFen);
+        SetOpponent(request);
+
+        EXPECT_EQ(model.GetSeed(), 99u);
+        EXPECT_EQ(StringMember(State(), "fen"), String(kMateInOneFen.data(), kMateInOneFen.size()));
+        SetFen(kPromotionFen);
+        EXPECT_EQ(model.GetSeed(), 99u) << "a position set from outside is no new draw";
+    }
+
+    TEST_F(ChessGameControlTest, ASeedIsNotAppliedWhenThePickFindsNoEngine) {
+        CountingFactory factory(EngineError{EngineErrorKind::LaunchFailed, "no Stockfish in the test"});
+        opponent.SetEngineFactory(factory.AsFactory());
+
+        Json request = OpponentRequest("black", "hard");
+        request["opponent"]["seed"] = 5;
+        EXPECT_EQ(SetStateError(request), "engine_unavailable");
+        EXPECT_EQ(model.GetSeed(), 0u);
+    }
+
+    TEST_F(ChessGameControlTest, AResetDrawsANewSeedAndASeedAfterItPinsTheGame) {
+        model.SetSeedSource([] { return 4242u; });
+        ASSERT_TRUE(control.Reset(Json::object()).has_value());
+        EXPECT_EQ(OpponentMember("seed").get<int64_t>(), 4242);
+
+        SetOpponent(OpponentSeedRequest(Json(1)));
+        EXPECT_EQ(OpponentMember("seed").get<int64_t>(), 1);
+    }
+
+    TEST_F(ChessGameControlTest, NothingToSetNamesTheSeed) {
+        const auto result = control.SetState(Json::object());
+        ASSERT_FALSE(result.has_value());
+        EXPECT_NE(String(result.error().message.c_str()).find("seed"), String::npos);
     }
 
     TEST_F(ChessGameControlTest, NoEngineIsEngineUnavailableAndTheFenIsNotLoaded) {
