@@ -1,7 +1,6 @@
 #include <BECore/Animation/Easing.h>
 #include <BECore/Animation/Lerp.h>
 #include <BECore/GameManager/CoreManager.h>
-#include <BECore/Reflection/XmlDeserializer.h>
 #include <BECore/Renderer/ViewTransform.h>
 #include <BECore/Scene/Components/SpriteRendererComponent.h>
 #include <BECore/Scene/Components/TransformComponent.h>
@@ -18,6 +17,7 @@
 #include <CoreSDL/SDLEvents.h>
 #include <Games/GameManager.h>
 #include <tests/ChessTestUtil.h>
+#include <tests/ShippedScene.h>
 #include <tests/TestEngines.h>
 
 /**
@@ -59,10 +59,6 @@ namespace BECore::Chess::Tests {
         const char* const kCastlingFen = "4k3/8/8/8/8/8/8/4K2R w K - 0 1";      // e1g1 and the rook to f1
         const char* const kPromotionFen = "7k/P7/8/8/8/8/8/K7 w - - 0 1";       // a7a8q
 
-        std::filesystem::path ShippedSceneConfig() {
-            return std::filesystem::path(__FILE__).parent_path().parent_path() / "config" / "SceneConfig.xml";
-        }
-
         bool Play(ChessGameModel& model, StringView uci) {
             const auto move = MoveGenerator::ParseUci(model.GetPosition(), uci);
             return move.has_value() && model.TryMove(*move).has_value();
@@ -89,11 +85,8 @@ namespace BECore::Chess::Tests {
             _renderer->height = 720.0f;
             CoreManager::GetRendererManager().SetRenderer(_renderer);
 
-            XmlDeserializer deserializer;
-            ASSERT_TRUE(deserializer.LoadFromFile(ShippedSceneConfig())) << ShippedSceneConfig().string();
-            _manager = New<SceneManager>();
-            _manager->Deserialize(deserializer);
-            ASSERT_FALSE(deserializer.HasErrors());
+            _manager = LoadShippedSceneManager();
+            ASSERT_TRUE(_manager);
             _manager->Initialize();
             EngineEnvironment::UseSceneManager(_manager);
 

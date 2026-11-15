@@ -13,6 +13,7 @@
 #include <gtest/gtest.h>
 #include <memory>
 #include <tests/HudWords.h>
+#include <tests/ShippedScene.h>
 
 namespace BECore::Tests {
 
@@ -114,14 +115,12 @@ namespace BECore::Tests {
                                                "EngineGroup", "EngineStockfish", "EngineOwn",  "LevelRow",      "LevelCaption",    "LevelGroup",   "LevelEasy",
                                                "LevelMedium", "LevelHard",       "LevelMax",   "OpponentError", "OpponentButtons", "OpponentBack", "OpponentClose"};
 
-        std::filesystem::path ShippedSceneConfig() {
-            return std::filesystem::path(__FILE__).parent_path().parent_path() / "config" / "SceneConfig.xml";
-        }
+        using Chess::Tests::ShippedSceneConfig;
 
         /// The `<elements>` of the canvas on the Hud node of the shipped scene, as the content of a screen
         String ShippedHudXml() {
             pugi::xml_document document;
-            if (!document.load_file(ShippedSceneConfig().string().c_str())) {
+            if (!Chess::Tests::LoadShippedSceneDocument(document)) {
                 return {};
             }
             pugi::xml_node hud = document.select_node("//node[@name='Hud']").node();
@@ -142,7 +141,7 @@ namespace BECore::Tests {
         /// takes it all the same. The engine's UIWebTest does the same in its kPanelXml.
         String ShippedPlateXml(const char* nodeName, const char* plateName) {
             pugi::xml_document document;
-            if (!document.load_file(ShippedSceneConfig().string().c_str())) {
+            if (!Chess::Tests::LoadShippedSceneDocument(document)) {
                 return {};
             }
             pugi::xml_node panel = document.select_node(Format("//node[@name='{}']", nodeName).c_str()).node();

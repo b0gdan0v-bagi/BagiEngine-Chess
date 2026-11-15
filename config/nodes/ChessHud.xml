@@ -1,0 +1,49 @@
+<?xml version="1.0"?>
+<!-- The HUD is in the margins of the view (space="SceneView"): it scales and moves with the board and never covers it, whatever the shape of the window.
+     The board is 640 x 640 at (100, 80); the margin is 80 units above and below, so one row of 56-unit controls fits in each (12 units from the edge of the
+     safe area), and a 56-unit button is still a 32 px touch target at the smallest fit scale of the size matrix (0.57, the 840 units of the width in a 480 px window).
+     The top row is Turn (left), Menu and Reset (right); the bottom margin holds only Status (bottom right). Every element is anchored to a corner, so the row is
+     as wide as the safe area, which is about 689 units in the narrowest window of the matrix (480 px with side insets): Turn (320), Menu (110) and Reset (110) with
+     their gaps add up to less than that, and ChessUiTest lays every word the game can show into them. Menu is the one button that opens the menu (the list panel
+     node MenuPanel, ChessMenuPanel.xml): it emits ChessOpenMenu, is always shown, and its text is the fixed word "Menu", not a state; the side, the engine and the level
+     are chosen in the opponent panel, which the list opens and which also shows what is picked now, and not on buttons of the HUD: the margins are full.
+     The numbers are those of the default view. The Portrait view (720 x 960, the board at (40, 144) to (680, 784)) has the same rows: the top row at y 12 to 68 above the upper row of the
+     material (y 92) and the board, Status at y 892 to 948 under the board and the lower row (y 832); the anchors keep them there. Only Status is wider there (60 % of the safe area): the
+     safe area of the narrowest window with side insets is 590 units and 48 % of it, 283, cuts the longest sentence, which the 330 of the default view's narrowest window holds. -->
+<node name="Hud" layer="10" contentVersion="5">
+  <components>
+    <component type="UICanvasComponent" space="SceneView" useSafeArea="true">
+      <elements>
+        <element type="UIElement" name="Turn" x="12" y="12" width="320" height="56" fontSize="28">
+          <components>
+            <component type="UITextComponent" text="{turn}" verticalAlign="Center"/>
+          </components>
+        </element>
+        <element type="UIElement" name="Menu" anchor="TopRight" x="-134" y="12" width="110" height="56" fontSize="24" color="45,75,120,255">
+          <components>
+            <component type="UITextComponent" text="Menu" align="Center" verticalAlign="Center" wrap="false"/>
+            <component type="UIInputClicker" action="ChessOpenMenu"/>
+          </components>
+        </element>
+        <element type="UIElement" name="Reset" anchor="TopRight" x="-12" y="12" width="110" height="56" fontSize="26" color="40,90,60,255">
+          <components>
+            <component type="UITextComponent" text="Reset" align="Center" verticalAlign="Center" wrap="false"/>
+            <component type="UIInputClicker" action="ChessReset"/>
+          </components>
+        </element>
+        <element type="UIElement" name="Status" anchor="BottomRight" x="-12" y="-12" width="48%" height="56" fontSize="28">
+          <components>
+            <component type="UITextComponent" text="{status}" align="Right" verticalAlign="Center"/>
+          </components>
+        </element>
+      </elements>
+      <variants>
+        <variant when="orientation:portrait">
+          <overrides>
+            <set element="Status" width="60%" />
+          </overrides>
+        </variant>
+      </variants>
+    </component>
+  </components>
+</node>

@@ -35,7 +35,7 @@ namespace BECore::Chess::Tests {
 #endif
     }
 
-    /// The script, found from this file like the shipped SceneConfig.xml is found from ChessUiTest.cpp (the source tree is not mounted in the test environment)
+    /// The script, found from this file like the shipped scene is found from tests/ShippedScene.h (the source tree is not mounted in the test environment)
     inline std::filesystem::path FakeEngineScript() {
         return std::filesystem::path(__FILE__).parent_path() / "fake_uci_engine.py";
     }
