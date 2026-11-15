@@ -76,6 +76,7 @@ namespace BECore::Chess {
     }
 
     void PositionAnalyst::Update(const ChessGameModel& model, OpponentEngine picked) {
+        BE_PROFILE_SCOPE("Chess analyst update");
         UpdateSearch(model, picked);
         _rater.Update(model);
     }
@@ -268,7 +269,7 @@ namespace BECore::Chess {
         // Fire and forget: the task keeps itself alive until it ends, and the answer comes through _search, not through the handle
         SearchRequest request = SearchRequest::FromModel(model, limits);
         request.lines = kAnalysisLines;
-        TaskManager::GetInstance().Run(RunSearch(_search, std::move(request)));
+        TaskManager::GetInstance().Run(RunSearch(_search, std::move(request)), TaskPriority::Normal, ThreadType::Background, BE_TASK_LABEL("Chess analysis"));
     }
 
     void PositionAnalyst::Fail(uint64_t version, OpponentEngine engine, EngineError error) {

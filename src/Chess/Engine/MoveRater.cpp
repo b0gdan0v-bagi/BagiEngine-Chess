@@ -24,6 +24,7 @@ namespace BECore::Chess {
     }
 
     void MoveRater::Update(const ChessGameModel& model) {
+        BE_PROFILE_SCOPE("Chess rater update");
         SyncHistory(model);
         if (_search && _search->done.load(std::memory_order_acquire)) {
             TakeAnswer();
@@ -159,7 +160,7 @@ namespace BECore::Chess {
         _searchPly = ply;
         _searchGeneration = _generation;
         // Fire and forget: the task keeps itself alive until it ends, and the answer comes through _search, not through the handle
-        TaskManager::GetInstance().Run(RunSearch(_search, std::move(request)));
+        TaskManager::GetInstance().Run(RunSearch(_search, std::move(request)), TaskPriority::Normal, ThreadType::Background, BE_TASK_LABEL("Chess rating"));
     }
 
     Optional<size_t> MoveRater::OldestUnrated() const {

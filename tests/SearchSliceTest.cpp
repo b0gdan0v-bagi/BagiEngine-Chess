@@ -1520,6 +1520,8 @@ namespace BECore::Chess::Tests {
         /// One way to run a search to the end: takes the position and the depth, answers the nodes it searched. Later forms of the search
         /// add a column by adding one of these
         struct BenchmarkColumn {
+            /// The key of the column's total in the JSON line the perf set reads (.claude/rules/perf-project.md)
+            const char* key;
             const char* title;
             uint64_t (*run)(StringView fen, int depth);
         };
@@ -1549,9 +1551,11 @@ namespace BECore::Chess::Tests {
         }
 
         /// Runs every column over every position and prints `name depth nodes ms Mnodes/s` per row and a total per column
-        /// (the sum of the nodes over the sum of the fastest times)
+        /// (the sum of the nodes over the sum of the fastest times), then one line of JSON with the total Mnodes/s of each column
         void RunBenchmark(const Vector<BenchmarkColumn>& columns) {
             const Vector<BenchmarkPosition> positions = BenchmarkPositions();
+            std::ostringstream json;
+            json << std::fixed << std::setprecision(3) << "{";
             for (const BenchmarkColumn& column : columns) {
                 std::cout << "\n" << column.title << "\n";
                 std::cout << std::left << std::setw(10) << "name" << std::right << std::setw(6) << "depth" << std::setw(12) << "nodes" << std::setw(12) << "ms" << std::setw(12) << "Mnodes/s" << "\n";
@@ -1567,8 +1571,10 @@ namespace BECore::Chess::Tests {
                 const Measured total{totalNodes, totalMilliseconds};
                 std::cout << std::left << std::setw(10) << "total" << std::right << std::setw(6) << "" << std::setw(12) << total.nodes << std::setw(12) << std::fixed << std::setprecision(2)
                           << total.milliseconds << std::setw(12) << std::setprecision(3) << NodesPerSecond(total) << "\n";
+                json << (&column == &columns.front() ? "" : ", ") << "\"" << column.key << "\": " << NodesPerSecond(total);
             }
-            std::cout << std::flush;
+            json << "}";
+            std::cout << "\n" << json.str() << std::endl;
         }
 
         /// The one-call Search() on the caller's position
@@ -1626,11 +1632,11 @@ namespace BECore::Chess::Tests {
     // Run by hand, in a Release build, on a quiet machine: ChessTests --gtest_also_run_disabled_tests --gtest_filter='SearchSliceBenchmark.*'
     // ctest does not run it. The first column uses the public Search() only, so the same file measures the code before and after a change
     TEST(SearchSliceBenchmark, DISABLED_NodesPerSecond) {
-        RunBenchmark({{"Search() one call", SearchToTheEnd},
-                      {"SearchJob in slices of kSearchSliceNodes", JobInSlices},
-                      {"SearchJob in slices with a ShouldYield() poll", JobInSlicesWithAPoll},
-                      {"OwnEngine search in one call (what FindMove() does)", OwnSearchToTheEnd},
-                      {"OwnEngine search in slices of kSearchSliceNodes", OwnSearchInSlices}});
+        RunBenchmark({{"searchOneCall", "Search() one call", SearchToTheEnd},
+                      {"searchSlices", "SearchJob in slices of kSearchSliceNodes", JobInSlices},
+                      {"searchSlicesPoll", "SearchJob in slices with a ShouldYield() poll", JobInSlicesWithAPoll},
+                      {"ownOneCall", "OwnEngine search in one call (what FindMove() does)", OwnSearchToTheEnd},
+                      {"ownSlices", "OwnEngine search in slices of kSearchSliceNodes", OwnSearchInSlices}});
     }
 
 }  // namespace BECore::Chess::Tests
