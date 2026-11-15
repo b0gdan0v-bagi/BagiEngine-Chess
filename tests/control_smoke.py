@@ -179,6 +179,17 @@ def without_squares(image, squares: list, turned: bool = False) -> list:
     return rows
 
 
+def without_panel(image, rows: list) -> list:
+    """The rows (of `without_squares`, say) of a screenshot with the box of the move panel blanked: the list shows the moves played, which a position set from a FEN does not have."""
+    scale, left, top = view_in_picture(image)
+    first_x, last_x = max(int(left + PANEL_LEFT * scale), 0), min(int(left + PANEL_RIGHT * scale) + 1, image.width)
+    first_y, last_y = max(int(top + PANEL_TOP * scale), 0), min(int(top + PANEL_BOTTOM * scale) + 1, image.height)
+    blanked = [bytearray(row) for row in rows]
+    for y in range(first_y, last_y):
+        blanked[y][first_x * image.channels : last_x * image.channels] = bytes((last_x - first_x) * image.channels)
+    return blanked
+
+
 def run_moves_before_the_first_frame(client: BagiControlClient, headless: bool) -> None:
     """A client that acts at once: the scene registers its pieces in the first frame, after these moves, and has to show them."""
     if not headless:
@@ -195,7 +206,7 @@ def run_moves_before_the_first_frame(client: BagiControlClient, headless: bool) 
     by_fen = take_screenshot(client)
     marked = [OPENING[-1][:2], OPENING[-1][2:4]]
     check(
-        without_squares(by_moves, marked) == without_squares(by_fen, marked),
+        without_panel(by_moves, without_squares(by_moves, marked)) == without_panel(by_fen, without_squares(by_fen, marked)),
         "the scene after moves played before the first frame is not the scene of the same position",
     )
     client.call("reset")
@@ -721,6 +732,7 @@ def run_analysis_scenario(client: BagiControlClient, headless: bool) -> None:
 VIEW_WIDTH, WIDE_VIEW_WIDTH, VIEW_HEIGHT = 840, 1120, 800
 BOARD_TOP, BOARD_BOTTOM = 80, 720
 BOARD_LEFT, SQUARE_SIZE = 100, 80  # the left edge of the board and the side of a square, in view units
+PANEL_LEFT, PANEL_TOP, PANEL_RIGHT, PANEL_BOTTOM = 760, 80, 1080, 720  # the box of the move panel in the Wide view (Game/MovePanel.h), in view units
 BOARD_BAND_INSET = 2  # rows kept away from the edge of the board, against rounding
 
 
@@ -788,7 +800,7 @@ def check_the_board_turns_with_the_program(client: BagiControlClient) -> None:
     turned_again = take_screenshot(client)
     first, last = board_rows(turned_again)
     check(
-        without_squares(turned_again, marked, turned=True)[first:last] == without_squares(rotated, marked, turned=True)[first:last],
+        without_panel(turned_again, without_squares(turned_again, marked, turned=True))[first:last] == without_panel(rotated, without_squares(rotated, marked, turned=True))[first:last],
         "the board turned again is not the picture it was the first time",
     )
     client.call("set_state", {"opponent": {"plays": None}})

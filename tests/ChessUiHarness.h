@@ -32,6 +32,7 @@
 #include <Chess/Game/MaterialLayout.h>
 #include <Chess/Game/MenuSections.h>
 #include <Chess/Game/MoveGenerator.h>
+#include <Chess/Game/MovePanel.h>
 #include <Chess/Game/PromotionChoices.h>
 #include <Common/EngineEnvironment.h>
 #include <Common/RecordingRenderer.h>
@@ -1506,6 +1507,16 @@ namespace BECore::Chess::Tests {
         /// The canvas of the captured pieces and the balance: the node `Material`
         IntrusivePtr<UICanvasComponent> Material() const {
             return CanvasOf("Material");
+        }
+
+        /// The canvas of the move list: the node `MovePanel`
+        IntrusivePtr<UICanvasComponent> MovePanel() const {
+            return CanvasOf("MovePanel");
+        }
+
+        /// An element of the `MovePanel` canvas by name (the test fails when it is not there)
+        UIElement& MovePanelElement(const char* name) const {
+            return ElementOf("MovePanel", name);
         }
 
         /// An element of the `Material` canvas by name (the test fails when it is not there)

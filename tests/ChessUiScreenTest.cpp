@@ -464,6 +464,7 @@ namespace BECore::Chess::Tests {
 
         const CanvasMatrixTest kCanvasMatrixTests[] = {{"BoardCoordinates", "TheBoardCoordinatesPassTheSizeMatrixWithEveryLetterAndDigit"},
                                                        {"Material", "TheMaterialCanvasPassesTheSizeMatrixWithEveryCountAndEverySign"},
+                                                       {"MovePanel", "TheMovePanelPassesTheSizeMatrixWithTheLongestMoves"},
                                                        {"Hud", "TheHudPassesTheSizeMatrixWithTheLongestWords"},
                                                        {"MenuPanel", "TheMenuPanelPassesTheSizeMatrix"},
                                                        {"OpponentPanel", "ThePanelPassesTheSizeMatrix"},

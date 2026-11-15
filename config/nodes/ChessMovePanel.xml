@@ -1,0 +1,269 @@
+<?xml version="1.0"?>
+<!-- The move list, right of the board in the Wide view (1120 x 800; SceneConfig.xml): the box (760, 80) to (1080, 720), 320 x 640, as high as the board and 40 units from the right edge of the
+     view; the numbers are those of Game/MovePanel.h, which says the panel is shown only while the whole box lies inside the safe area of this canvas. A canvas of the SceneView space with no
+     safe area, like Material, so ChessMovePanelComponent decides what a window with insets leaves of it: in the default and the Portrait view (narrower than the box) and in a Wide window whose
+     side insets cut the box (700 x 480) MovePanelBox stays hidden. Layer 5: over the pieces (0) and the result bar (1), under the HUD (10) and the panels (20); the component is listed before
+     the canvas so that it gives the variables their words before the canvas draws in the same frame. Nothing here takes a click (no blocksInput, nothing interactive, not modal), so the board
+     and the HUD get every press. The box is one stack on a dark plate (not a color of the board): a title band of 56 units ("Moves"), the list of 8 rows of 56 (448: the touch height the clickable
+     rows of a later stage need, 32 px at the smallest Wide scale 0.6), and two bands of 56 that stay empty (MovePanelBandButtons, MovePanelBandPlayer: reserved for the takeback buttons and the
+     other player's row), with 8 units between them: 56 + 8 + 448 + 8 + 56 + 8 + 56 = 640. A row is a number cell of 56 units and two cells (White's and Black's, half of the rest each); the cell of the last
+     move shows its Mark, a fill in the gold of the board's last-move squares (245, 205, 50) under the text. The component writes movePanelNumber<i>, movePanelWhite<i> and movePanelBlack<i> of the
+     8 rows and shows only the rows the game has (a hidden row takes no room, so the rows pack at the top); the list shows the last 8 rows of the game. The text of a move is at most 7 characters
+     ("Qh4xe1+", "exd8=Q#") in a cell of 122 units, the number "100." in 56: a font of 24 and 22 units fits both at the smallest Wide scale, ChessUiTest lays the longest words out on the size matrix.
+     Every name starts with MovePanel because elements are found by name in every canvas of the scene. -->
+<node name="MovePanel" layer="5" contentVersion="5">
+  <components>
+    <component type="ChessMovePanelComponent" />
+    <component type="UICanvasComponent" space="SceneView" useSafeArea="false">
+      <elements>
+        <element type="UIStack" name="MovePanelBox" x="760" y="80" width="320" height="640" direction="Vertical" spacing="8" padding="8,0,8,0" crossAlign="Stretch" color="32,44,50,255" visible="false">
+          <children>
+            <element type="UIElement" name="MovePanelTitle" height="56" fontSize="28">
+              <components>
+                <component type="UITextComponent" text="Moves" textColor="236,238,244,255" align="Center" verticalAlign="Center" wrap="false"/>
+              </components>
+            </element>
+            <element type="UIStack" name="MovePanelList" height="448" direction="Vertical" crossAlign="Stretch">
+              <children>
+            <element type="UIStack" name="MovePanelRow0" height="56" direction="Horizontal" spacing="4" crossAlign="Stretch" visible="false">
+              <children>
+                <element type="UIElement" name="MovePanelNumber0" width="56" fontSize="22">
+                  <components>
+                    <component type="UITextComponent" text="{movePanelNumber0}" textColor="165,172,190,255" align="Right" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                  </components>
+                </element>
+                <element type="UIElement" name="MovePanelWhite0" flex="1">
+                  <children>
+                    <element type="UIElement" name="MovePanelWhiteMark0" anchor="Stretch" color="245,205,50,150" visible="false"/>
+                    <element type="UIElement" name="MovePanelWhiteText0" anchor="Stretch" fontSize="24">
+                      <components>
+                        <component type="UITextComponent" text="{movePanelWhite0}" textColor="236,238,244,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                      </components>
+                    </element>
+                  </children>
+                </element>
+                <element type="UIElement" name="MovePanelBlack0" flex="1">
+                  <children>
+                    <element type="UIElement" name="MovePanelBlackMark0" anchor="Stretch" color="245,205,50,150" visible="false"/>
+                    <element type="UIElement" name="MovePanelBlackText0" anchor="Stretch" fontSize="24">
+                      <components>
+                        <component type="UITextComponent" text="{movePanelBlack0}" textColor="236,238,244,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                      </components>
+                    </element>
+                  </children>
+                </element>
+              </children>
+            </element>
+            <element type="UIStack" name="MovePanelRow1" height="56" direction="Horizontal" spacing="4" crossAlign="Stretch" visible="false">
+              <children>
+                <element type="UIElement" name="MovePanelNumber1" width="56" fontSize="22">
+                  <components>
+                    <component type="UITextComponent" text="{movePanelNumber1}" textColor="165,172,190,255" align="Right" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                  </components>
+                </element>
+                <element type="UIElement" name="MovePanelWhite1" flex="1">
+                  <children>
+                    <element type="UIElement" name="MovePanelWhiteMark1" anchor="Stretch" color="245,205,50,150" visible="false"/>
+                    <element type="UIElement" name="MovePanelWhiteText1" anchor="Stretch" fontSize="24">
+                      <components>
+                        <component type="UITextComponent" text="{movePanelWhite1}" textColor="236,238,244,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                      </components>
+                    </element>
+                  </children>
+                </element>
+                <element type="UIElement" name="MovePanelBlack1" flex="1">
+                  <children>
+                    <element type="UIElement" name="MovePanelBlackMark1" anchor="Stretch" color="245,205,50,150" visible="false"/>
+                    <element type="UIElement" name="MovePanelBlackText1" anchor="Stretch" fontSize="24">
+                      <components>
+                        <component type="UITextComponent" text="{movePanelBlack1}" textColor="236,238,244,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                      </components>
+                    </element>
+                  </children>
+                </element>
+              </children>
+            </element>
+            <element type="UIStack" name="MovePanelRow2" height="56" direction="Horizontal" spacing="4" crossAlign="Stretch" visible="false">
+              <children>
+                <element type="UIElement" name="MovePanelNumber2" width="56" fontSize="22">
+                  <components>
+                    <component type="UITextComponent" text="{movePanelNumber2}" textColor="165,172,190,255" align="Right" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                  </components>
+                </element>
+                <element type="UIElement" name="MovePanelWhite2" flex="1">
+                  <children>
+                    <element type="UIElement" name="MovePanelWhiteMark2" anchor="Stretch" color="245,205,50,150" visible="false"/>
+                    <element type="UIElement" name="MovePanelWhiteText2" anchor="Stretch" fontSize="24">
+                      <components>
+                        <component type="UITextComponent" text="{movePanelWhite2}" textColor="236,238,244,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                      </components>
+                    </element>
+                  </children>
+                </element>
+                <element type="UIElement" name="MovePanelBlack2" flex="1">
+                  <children>
+                    <element type="UIElement" name="MovePanelBlackMark2" anchor="Stretch" color="245,205,50,150" visible="false"/>
+                    <element type="UIElement" name="MovePanelBlackText2" anchor="Stretch" fontSize="24">
+                      <components>
+                        <component type="UITextComponent" text="{movePanelBlack2}" textColor="236,238,244,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                      </components>
+                    </element>
+                  </children>
+                </element>
+              </children>
+            </element>
+            <element type="UIStack" name="MovePanelRow3" height="56" direction="Horizontal" spacing="4" crossAlign="Stretch" visible="false">
+              <children>
+                <element type="UIElement" name="MovePanelNumber3" width="56" fontSize="22">
+                  <components>
+                    <component type="UITextComponent" text="{movePanelNumber3}" textColor="165,172,190,255" align="Right" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                  </components>
+                </element>
+                <element type="UIElement" name="MovePanelWhite3" flex="1">
+                  <children>
+                    <element type="UIElement" name="MovePanelWhiteMark3" anchor="Stretch" color="245,205,50,150" visible="false"/>
+                    <element type="UIElement" name="MovePanelWhiteText3" anchor="Stretch" fontSize="24">
+                      <components>
+                        <component type="UITextComponent" text="{movePanelWhite3}" textColor="236,238,244,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                      </components>
+                    </element>
+                  </children>
+                </element>
+                <element type="UIElement" name="MovePanelBlack3" flex="1">
+                  <children>
+                    <element type="UIElement" name="MovePanelBlackMark3" anchor="Stretch" color="245,205,50,150" visible="false"/>
+                    <element type="UIElement" name="MovePanelBlackText3" anchor="Stretch" fontSize="24">
+                      <components>
+                        <component type="UITextComponent" text="{movePanelBlack3}" textColor="236,238,244,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                      </components>
+                    </element>
+                  </children>
+                </element>
+              </children>
+            </element>
+            <element type="UIStack" name="MovePanelRow4" height="56" direction="Horizontal" spacing="4" crossAlign="Stretch" visible="false">
+              <children>
+                <element type="UIElement" name="MovePanelNumber4" width="56" fontSize="22">
+                  <components>
+                    <component type="UITextComponent" text="{movePanelNumber4}" textColor="165,172,190,255" align="Right" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                  </components>
+                </element>
+                <element type="UIElement" name="MovePanelWhite4" flex="1">
+                  <children>
+                    <element type="UIElement" name="MovePanelWhiteMark4" anchor="Stretch" color="245,205,50,150" visible="false"/>
+                    <element type="UIElement" name="MovePanelWhiteText4" anchor="Stretch" fontSize="24">
+                      <components>
+                        <component type="UITextComponent" text="{movePanelWhite4}" textColor="236,238,244,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                      </components>
+                    </element>
+                  </children>
+                </element>
+                <element type="UIElement" name="MovePanelBlack4" flex="1">
+                  <children>
+                    <element type="UIElement" name="MovePanelBlackMark4" anchor="Stretch" color="245,205,50,150" visible="false"/>
+                    <element type="UIElement" name="MovePanelBlackText4" anchor="Stretch" fontSize="24">
+                      <components>
+                        <component type="UITextComponent" text="{movePanelBlack4}" textColor="236,238,244,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                      </components>
+                    </element>
+                  </children>
+                </element>
+              </children>
+            </element>
+            <element type="UIStack" name="MovePanelRow5" height="56" direction="Horizontal" spacing="4" crossAlign="Stretch" visible="false">
+              <children>
+                <element type="UIElement" name="MovePanelNumber5" width="56" fontSize="22">
+                  <components>
+                    <component type="UITextComponent" text="{movePanelNumber5}" textColor="165,172,190,255" align="Right" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                  </components>
+                </element>
+                <element type="UIElement" name="MovePanelWhite5" flex="1">
+                  <children>
+                    <element type="UIElement" name="MovePanelWhiteMark5" anchor="Stretch" color="245,205,50,150" visible="false"/>
+                    <element type="UIElement" name="MovePanelWhiteText5" anchor="Stretch" fontSize="24">
+                      <components>
+                        <component type="UITextComponent" text="{movePanelWhite5}" textColor="236,238,244,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                      </components>
+                    </element>
+                  </children>
+                </element>
+                <element type="UIElement" name="MovePanelBlack5" flex="1">
+                  <children>
+                    <element type="UIElement" name="MovePanelBlackMark5" anchor="Stretch" color="245,205,50,150" visible="false"/>
+                    <element type="UIElement" name="MovePanelBlackText5" anchor="Stretch" fontSize="24">
+                      <components>
+                        <component type="UITextComponent" text="{movePanelBlack5}" textColor="236,238,244,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                      </components>
+                    </element>
+                  </children>
+                </element>
+              </children>
+            </element>
+            <element type="UIStack" name="MovePanelRow6" height="56" direction="Horizontal" spacing="4" crossAlign="Stretch" visible="false">
+              <children>
+                <element type="UIElement" name="MovePanelNumber6" width="56" fontSize="22">
+                  <components>
+                    <component type="UITextComponent" text="{movePanelNumber6}" textColor="165,172,190,255" align="Right" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                  </components>
+                </element>
+                <element type="UIElement" name="MovePanelWhite6" flex="1">
+                  <children>
+                    <element type="UIElement" name="MovePanelWhiteMark6" anchor="Stretch" color="245,205,50,150" visible="false"/>
+                    <element type="UIElement" name="MovePanelWhiteText6" anchor="Stretch" fontSize="24">
+                      <components>
+                        <component type="UITextComponent" text="{movePanelWhite6}" textColor="236,238,244,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                      </components>
+                    </element>
+                  </children>
+                </element>
+                <element type="UIElement" name="MovePanelBlack6" flex="1">
+                  <children>
+                    <element type="UIElement" name="MovePanelBlackMark6" anchor="Stretch" color="245,205,50,150" visible="false"/>
+                    <element type="UIElement" name="MovePanelBlackText6" anchor="Stretch" fontSize="24">
+                      <components>
+                        <component type="UITextComponent" text="{movePanelBlack6}" textColor="236,238,244,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                      </components>
+                    </element>
+                  </children>
+                </element>
+              </children>
+            </element>
+            <element type="UIStack" name="MovePanelRow7" height="56" direction="Horizontal" spacing="4" crossAlign="Stretch" visible="false">
+              <children>
+                <element type="UIElement" name="MovePanelNumber7" width="56" fontSize="22">
+                  <components>
+                    <component type="UITextComponent" text="{movePanelNumber7}" textColor="165,172,190,255" align="Right" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                  </components>
+                </element>
+                <element type="UIElement" name="MovePanelWhite7" flex="1">
+                  <children>
+                    <element type="UIElement" name="MovePanelWhiteMark7" anchor="Stretch" color="245,205,50,150" visible="false"/>
+                    <element type="UIElement" name="MovePanelWhiteText7" anchor="Stretch" fontSize="24">
+                      <components>
+                        <component type="UITextComponent" text="{movePanelWhite7}" textColor="236,238,244,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                      </components>
+                    </element>
+                  </children>
+                </element>
+                <element type="UIElement" name="MovePanelBlack7" flex="1">
+                  <children>
+                    <element type="UIElement" name="MovePanelBlackMark7" anchor="Stretch" color="245,205,50,150" visible="false"/>
+                    <element type="UIElement" name="MovePanelBlackText7" anchor="Stretch" fontSize="24">
+                      <components>
+                        <component type="UITextComponent" text="{movePanelBlack7}" textColor="236,238,244,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                      </components>
+                    </element>
+                  </children>
+                </element>
+              </children>
+            </element>
+              </children>
+            </element>
+            <element type="UIElement" name="MovePanelBandButtons" height="56"/>
+            <element type="UIElement" name="MovePanelBandPlayer" height="56"/>
+          </children>
+        </element>
+      </elements>
+    </component>
+  </components>
+</node>

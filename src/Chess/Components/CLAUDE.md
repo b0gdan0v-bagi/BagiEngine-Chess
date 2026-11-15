@@ -11,6 +11,7 @@ ChessMenuComponent      on MenuPanel: ChessOpenMenu, ChessOpenSection, ChessClos
 ChessOpponentPanelComponent  on OpponentPanel, before its canvas: ChessSet*, the Stockfish segment
 ChessPromotionPanelComponent on PromotionPanel, before its canvas: shown while a promotion is pending, ChessPromote, ChessCancelPromotion
 ChessMaterialComponent  on the node Material, before its canvas: icons, the material... variables, rows shown or hidden
+ChessMovePanelComponent on the node MovePanel, before its canvas: the variables of the move list rows, rows and marks shown or hidden, the box shown where it fits
 ChessPieceComponent     one piece node: follows its piece in the model, slides a played move, switches its sprite after a promotion
 ChessResultComponent    its own node (layer 1): dims the board and draws the result bar once the game is over
 ```
@@ -54,6 +55,13 @@ Node `Material` (`ChessMaterial.xml`, layer 5, after `BoardCoordinates`): `Chess
 - A row shows when its count is above 0 and `MaterialListFits` (the box of the active view, `Game/MaterialLayout.h`, inside the canvas's `safeBounds`, in view units); nothing shows before the first layout. With side insets (the narrowest window of either view) the lists hide and the balance stays (the owner's decision).
 - **Known limits:** a "+39" beside a rank "8" may read as one number; with a top notch `Turn` (layer 10) covers the upper group's first rows and its balance (in Portrait only where the view fills the window, a 3:4 one), which a test asserts; moving the group breaks the mirror, so the fix is the owner's call.
 
+## The move panel
+
+Node `MovePanel` (`ChessMovePanel.xml`, layer 5, after `Material` in the references): `ChessMovePanelComponent`, then a `SceneView` canvas (no safe area, not modal) with one root `MovePanelBox`, the plate right of the board in the **Wide view** (box (760, 80) to (1080, 720), the numbers of `Game/MovePanel.h`): a title band, 8 rows of 56 units (`MovePanelRow<i>`: a number and a White and a Black cell, the cell of the last move shows its gold `...Mark<i>` under the text) and two bands under the list that stay empty (reserved for the buttons and the other player's row of later stages). Nothing in it takes a click; every name starts with `MovePanel`.
+
+- The component rebuilds `BuildMoveList` and `BuildMovePanelRows` only when the model or its version changed, writes `movePanelNumber<i>`, `movePanelWhite<i>` and `movePanelBlack<i>` of the 8 rows and shows the rows and marks the entries say; the list is the **last 8 rows** of the game and has no scroll (the engine's UI has none; the window of rows is the component's choice).
+- **Where it is hidden:** `MovePanelBox` is shown only while `MovePanelFits` holds for the canvas's `safeBounds`, asked on every draw and never before the first layout. That is the Wide view with no insets and with side insets that leave the box (a 3:2 or 16:10 window of 480 px short side keeps it); the default and Portrait views are narrower than the box, and a Wide window of 700 x 480 or 672 x 480 with side insets cuts it. The panel for those windows is a later stage.
+
 ## The HUD
 
 `SceneView` canvas on `Hud` (`ChessHud.xml`, layer 10), controls 56 units high in the margins: `Turn` (`{turn}`), `Menu` (fixed word, `ChessOpenMenu`; the owner wants no button named after a state, and no element is called `Opponent`), `Reset` (`ChessReset`), `Status` (`{status}`; wider in Portrait, where the narrowest safe area is 590 units). The anchors keep the top row above the board and `Status` under it in every view (in Wide, `Menu`, `Reset` and `Status` are at the right end, over and under the move panel's box). The widest sentences only just fit the narrowest window (480 px with insets): a longer one needs a reword or a wider box; a sentence says what went wrong, never what to do. `ChessUiTest` holds the layout on the size matrix, with the views, with every word of `tests/HudWords.h`, `ChessHudWebTest` the HTML twin of the default view's HUD (no Portrait twin).
@@ -76,4 +84,4 @@ Node `OpponentPanel` (`ChessOpponentPanel.xml`, layer 20, modal, `visible="false
 
 ## Draw order
 
-By layer, not by place among the references of `SceneConfig.xml` (`engine/src/Modules/BECore/Scene/CLAUDE.md`, "Draw order"); the same layer draws in scene order. `Board` and then `BoardCoordinates` -1, pieces 0, `Result` 1, `Material` 5, a dragged piece 6, `Hud` 10, the panels and the menu 20. A test reads the draw calls of one frame.
+By layer, not by place among the references of `SceneConfig.xml` (`engine/src/Modules/BECore/Scene/CLAUDE.md`, "Draw order"); the same layer draws in scene order. `Board` and then `BoardCoordinates` -1, pieces 0, `Result` 1, `Material` and `MovePanel` 5, a dragged piece 6, `Hud` 10, the panels and the menu 20. A test reads the draw calls of one frame.

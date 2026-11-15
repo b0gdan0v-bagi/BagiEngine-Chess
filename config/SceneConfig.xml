@@ -24,6 +24,7 @@
         <node ref="nodes/ChessBoard" />
         <node ref="nodes/ChessBoardCoordinates" />
         <node ref="nodes/ChessMaterial" />
+        <node ref="nodes/ChessMovePanel" />
         <node ref="nodes/ChessHud" />
         <node ref="nodes/ChessMenuPanel" />
         <node ref="nodes/ChessOpponentPanel" />

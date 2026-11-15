@@ -42,6 +42,7 @@ set(expected
     config/nodes/ChessHud.xml
     config/nodes/ChessMaterial.xml
     config/nodes/ChessMenuPanel.xml
+    config/nodes/ChessMovePanel.xml
     config/nodes/ChessOpponentPanel.xml
     config/nodes/ChessPiece.xml
     config/nodes/ChessPromotionPanel.xml
