@@ -1,6 +1,6 @@
-# Chess scene and UI (src/Chess/Components, config/SceneConfig.xml)
+# Chess scene and UI (src/Chess/Components, config/SceneConfig.xml, config/nodes/)
 
-Read this before changing `config/SceneConfig.xml`. Siblings: the opponent `src/Chess/Engine/CLAUDE.md`, the rules `src/Chess/Game/CLAUDE.md`, the tests `tests/CLAUDE.md`. Components keep no game state: everything is read from the model (`ChessGame::GetActiveModel()`) on every update or draw.
+Read this before changing `config/SceneConfig.xml` or a file of `config/nodes/` (which file holds which node: `config/CLAUDE.md`). Siblings: the opponent `src/Chess/Engine/CLAUDE.md`, the rules `src/Chess/Game/CLAUDE.md`, the tests `tests/CLAUDE.md`. Components keep no game state: everything is read from the model (`ChessGame::GetActiveModel()`) on every update or draw.
 
 ## Files
 
@@ -25,7 +25,7 @@ Order inside the board's `OnDraw()`: squares, the last move (`kLastMoveSquare`, 
 
 ## The pieces
 
-- A piece node is `ChessPieceComponent` + `SpriteRendererComponent` + `TransformComponent`, the node the whole square and the sprite `fit="Contain"` (a new piece node needs it; the atlas `assets/chess_test.png` must keep its alpha). A piece registering late is dealt to the position as it stands.
+- A piece node is a reference of the prefab `config/nodes/ChessPiece.xml` (`name`, `spriteId`, `file`, `rank` overridden); a new piece node is another such reference. The prefab is `ChessPieceComponent` + `SpriteRendererComponent` + `TransformComponent`, the node the whole square and the sprite `fit="Contain"` (the atlas `assets/chess_test.png` must keep its alpha). A piece registering late is dealt to the position as it stands.
 - **A played move slides** (`ScopedTween`, `_slideDuration`, reflected, not set in the scene); the model and the control API know nothing of it. Only a change of exactly one move and one version with time in the frame slides; everything else snaps (first sighting, reset, `set_state`, several moves at once), and a frame with `deltaTime` 0 snaps, so UI tests need no waiting. A captured piece leaves when the slide ends.
 
 ## The premove
@@ -38,11 +38,11 @@ While the program thinks and the person has the other color, `OnMouseDown` hands
 
 ## The promotion picker
 
-A click on a promotion target leaves it pending in the model; the node `PromotionPanel` (modal `SceneView` canvas, layer 20, `visible="false"`) is shown exactly while `HasPendingPromotion()`, checked after a click and every update, so a reset, `set_state` or someone's move closes a stale one. Buttons `PromoteQueen` .. `PromoteKnight` (`ChessPromote`, the id from `Game/PromotionChoices.*` as `value`) and `PromotionCancel` (`ChessCancelPromotion`: the pawn stays selected). Element names start with `Promotion` or `Promote`.
+A click on a promotion target leaves it pending in the model; the node `PromotionPanel` (`ChessPromotionPanel.xml`, modal `SceneView` canvas, layer 20, `visible="false"`) is shown exactly while `HasPendingPromotion()`, checked after a click and every update, so a reset, `set_state` or someone's move closes a stale one. Buttons `PromoteQueen` .. `PromoteKnight` (`ChessPromote`, the id from `Game/PromotionChoices.*` as `value`) and `PromotionCancel` (`ChessCancelPromotion`: the pawn stays selected). Element names start with `Promotion` or `Promote`.
 
 ## The captured material
 
-Node `Material` (layer 5, after `BoardCoordinates`): `ChessMaterialComponent`, then a `SceneView` canvas (no safe area, not modal). Two groups mirrored about the board's middle (in Portrait two horizontal rows, the upper above the board and the lower below it, a balance beside each), `MaterialTop*` and `MaterialBottom*`, each a balance label and five rows (icon + count `{material<Top|Bottom><Type>}`); every name starts with `Material`. The variables are written only when the model, its version or the bottom color changed.
+Node `Material` (`ChessMaterial.xml`, layer 5, after `BoardCoordinates`): `ChessMaterialComponent`, then a `SceneView` canvas (no safe area, not modal). Two groups mirrored about the board's middle (in Portrait two horizontal rows, the upper above the board and the lower below it, a balance beside each), `MaterialTop*` and `MaterialBottom*`, each a balance label and five rows (icon + count `{material<Top|Bottom><Type>}`); every name starts with `Material`. The variables are written only when the model, its version or the bottom color changed.
 
 - The lower group is what the color at the bottom has taken (its icons are the other color's); the groups swap when the board turns. The balance (`BalanceText`, "+N" for the side ahead) is the difference on the board (`Game/CapturedMaterial.h`).
 - A row shows when its count is above 0 and `MaterialListFits` (the box of the active view, `Game/MaterialLayout.h`, inside the canvas's `safeBounds`, in view units); nothing shows before the first layout. With side insets (the narrowest window of either view) the lists hide and the balance stays (the owner's decision).
@@ -50,17 +50,17 @@ Node `Material` (layer 5, after `BoardCoordinates`): `ChessMaterialComponent`, t
 
 ## The HUD
 
-`SceneView` canvas on `Hud` (layer 10), controls 56 units high in the margins: `Turn` (`{turn}`), `Menu` (fixed word, `ChessOpenMenu`; the owner wants no button named after a state, and no element is called `Opponent`), `Reset` (`ChessReset`), `Status` (`{status}`; wider in Portrait, where the narrowest safe area is 590 units). The anchors keep the top row above the board and `Status` under it in both views. The widest sentences only just fit the narrowest window (480 px with insets): a longer one needs a reword or a wider box; a sentence says what went wrong, never what to do. `ChessUiTest` holds the layout on the size matrix, with the views, with every word of `tests/HudWords.h`, `ChessHudWebTest` the HTML twin of the default view's HUD (no Portrait twin).
+`SceneView` canvas on `Hud` (`ChessHud.xml`, layer 10), controls 56 units high in the margins: `Turn` (`{turn}`), `Menu` (fixed word, `ChessOpenMenu`; the owner wants no button named after a state, and no element is called `Opponent`), `Reset` (`ChessReset`), `Status` (`{status}`; wider in Portrait, where the narrowest safe area is 590 units). The anchors keep the top row above the board and `Status` under it in both views. The widest sentences only just fit the narrowest window (480 px with insets): a longer one needs a reword or a wider box; a sentence says what went wrong, never what to do. `ChessUiTest` holds the layout on the size matrix, with the views, with every word of `tests/HudWords.h`, `ChessHudWebTest` the HTML twin of the default view's HUD (no Portrait twin).
 
 The variables are republished when the model's version, the controller's revision, `IsThinking()` or the person's color changed: `turn` (`StatusText::Turn`, "Computer is thinking"), `status` (the opponent's error while one stands, it wins over "Check"; else the game status), `opponentError`, and the panel bindings `opponentMode`, `opponentColor` (**the person's** color), `opponentEngine`, `opponentLevel`.
 
 ## The menu
 
-Node `MenuPanel` (layer 20, modal, `visible="false"`): `MenuDim`, `MenuPlate`, `MenuTitle`, one 56-unit button `MenuSection<Name>` per section (`ChessOpenSection`, the section id as `value`) and `MenuClose`; names start with `Menu`. `ChessOpenMenu` shows the list and hides every section, `ChessOpenSection` swaps the list for the section's canvas (an unknown id logs one warning), `ChessCloseMenu` hides all. The sections are the table `Game/MenuSections.*`. The menu is no state. **A new section** is a table row, a button, its own panel with `Back` and `Close`, and 68 units more in `MenuPlate`; a test fails a button without a row and the reverse.
+Node `MenuPanel` (`ChessMenuPanel.xml`, layer 20, modal, `visible="false"`): `MenuDim`, `MenuPlate`, `MenuTitle`, one 56-unit button `MenuSection<Name>` per section (`ChessOpenSection`, the section id as `value`) and `MenuClose`; names start with `Menu`. `ChessOpenMenu` shows the list and hides every section, `ChessOpenSection` swaps the list for the section's canvas (an unknown id logs one warning), `ChessCloseMenu` hides all. The sections are the table `Game/MenuSections.*`. The menu is no state. **A new section** is a table row, a button, its own panel with `Back` and `Close`, and 68 units more in `MenuPlate`; a test fails a button without a row and the reverse.
 
 ## The opponent panel
 
-Node `OpponentPanel` (layer 20, modal, `visible="false"`), after the engine's choice-panel template (`engine/src/Modules/BECore/UI/CLAUDE.md`, "Choice panels"): `Dim`, `Plate`, four `UISegmented` rows with the control API ids as segment values, `ModeGroup` (`opponentMode`, `ChessSetMode`), `ColorGroup` (`opponentColor`, `ChessSetColor`), `EngineGroup` (`ChessSetEngine`), `LevelGroup` (`ChessSetLevel`), the `OpponentError` line and `OpponentBack` / `OpponentClose`. A segment needs an explicit `height`. The three modal panels are centered plates (94% of the safe area up to 640) and fit both views; only this one has a Portrait variant (the plate takes the whole safe area and the captions get narrower), for the 590 safe units of the narrowest Portrait window. A test lists the canvases of the scene and fails for one with no matrix test over the views.
+Node `OpponentPanel` (`ChessOpponentPanel.xml`, layer 20, modal, `visible="false"`), after the engine's choice-panel template (`engine/src/Modules/BECore/UI/CLAUDE.md`, "Choice panels"): `Dim`, `Plate`, four `UISegmented` rows with the control API ids as segment values, `ModeGroup` (`opponentMode`, `ChessSetMode`), `ColorGroup` (`opponentColor`, `ChessSetColor`), `EngineGroup` (`ChessSetEngine`), `LevelGroup` (`ChessSetLevel`), the `OpponentError` line and `OpponentBack` / `OpponentClose`. A segment needs an explicit `height`. The three modal panels are centered plates (94% of the safe area up to 640) and fit both views; only this one has a Portrait variant (the plate takes the whole safe area and the captions get narrower), for the 590 safe units of the narrowest Portrait window. A test lists the canvases of the scene and fails for one with no matrix test over the views.
 
 - The group owns no choice: a press emits the action, the board picks through `ChessGame::GetActiveChoice()` and publishes the variable, so the panel shows what the game has. An id in no table logs one warning.
 - **The color is the person's**; `opponent.plays` of the control API is the program's.
@@ -70,4 +70,4 @@ Node `OpponentPanel` (layer 20, modal, `visible="false"`), after the engine's ch
 
 ## Draw order
 
-By layer, not by place in `SceneConfig.xml` (`engine/src/Modules/BECore/Scene/CLAUDE.md`, "Draw order"); the same layer draws in scene order. `Board` and then `BoardCoordinates` -1, pieces 0, `Result` 1, `Material` 5, a dragged piece 6, `Hud` 10, the panels and the menu 20. A test reads the draw calls of one frame.
+By layer, not by place among the references of `SceneConfig.xml` (`engine/src/Modules/BECore/Scene/CLAUDE.md`, "Draw order"); the same layer draws in scene order. `Board` and then `BoardCoordinates` -1, pieces 0, `Result` 1, `Material` 5, a dragged piece 6, `Hud` 10, the panels and the menu 20. A test reads the draw calls of one frame.

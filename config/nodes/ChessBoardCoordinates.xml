@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<!-- The letters and numbers at the edges of the board. A canvas of UILabels (the renderer has no text primitive) on the same layer as the Board, written right after it:
+<!-- The letters and numbers at the edges of the board. A canvas of UILabels (the renderer has no text primitive) on the same layer as the Board, written right after Board in the scene:
      same layer, scene order, so it is drawn after the squares and the highlights of ChessBoardComponent and before the pieces (layer 0), the result bar (1), the HUD (10) and
      the panels (20). The canvas has no safe area: the board stands at fixed scene units (view 840 x 800, the board 640 x 640 at (100, 80); in the Portrait view 720 x 960 at (40, 144)) and an inset must not move a label.
      The labels take no click (no blocksInput, not interactive), so the board gets every press. Rank numbers sit in the left column of cells (RankLabel<row>, row from the
