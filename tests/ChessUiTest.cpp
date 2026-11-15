@@ -2092,7 +2092,6 @@ namespace BECore::Chess::Tests {
         EXPECT_TRUE(MenuList()->_visible);
         EXPECT_FALSE(Panel()->_visible) << "the list does not open a section by itself";
 
-        // Opponent hides the list and shows the panel; Close of the panel hides both
         ASSERT_TRUE(ClickMenuList("MenuSectionOpponent").Both());
         EXPECT_FALSE(MenuList()->_visible);
         EXPECT_TRUE(Panel()->_visible);
@@ -2100,7 +2099,6 @@ namespace BECore::Chess::Tests {
         EXPECT_FALSE(MenuList()->_visible);
         EXPECT_FALSE(Panel()->_visible);
 
-        // Back shows the list and hides the panel; Close of the list hides it
         ASSERT_TRUE(OpenThePanel());
         ASSERT_TRUE(ClickPanel("OpponentBack").Both());
         EXPECT_TRUE(MenuList()->_visible);
@@ -2341,10 +2339,10 @@ namespace BECore::Chess::Tests {
     namespace {
 
         const Color kBoardDimColor{0, 0, 0, 140};      // the dim of the result (ChessResultComponent.cpp)
-        const Color kResultBarColor{25, 25, 25, 245};  // the bar of the winner (ChessResultComponent.cpp)
+        const Color kResultBarColor{25, 25, 25, 245};  // the bar of a win of Black (ChessResultComponent.cpp)
 
         constexpr const char* kBlackToMoveAfterE4 = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1";
-        constexpr const char* kFourRooks = "r3k2r/8/8/8/8/8/4K3/r6r b - - 0 1";  // Black to move, a rook in each corner of the board
+        constexpr const char* kFourRooks = "r3k2r/8/8/8/8/8/4K3/r6r b - - 0 1";  // a rook in each corner of the board
         constexpr const char* kBlackInCheck = "4k3/8/8/8/8/8/8/4RK2 b - - 0 1";
         constexpr const char* kBlackPromotesOnE1 = "7k/8/8/8/8/8/4p3/K7 b - - 0 1";
         constexpr const char* kBlackMatesOnA1 = "r5k1/8/8/8/8/8/5PPP/6K1 b - - 0 1";  // Ra1 is mate
@@ -2761,9 +2759,8 @@ namespace BECore::Chess::Tests {
     }
 
     // ---- the board coordinates: the labels in the scene ---------------------------------------------------------------------------
-    // The node BoardCoordinates of the shipped scene is a canvas of 16 UILabels at the edges of the board (SceneConfig.xml has the reasons for its numbers). They are checked the way the HUD
-    // is: the validator and CheckContent() on the size matrix, then the geometry against the board and the pieces, the colors against the squares that are drawn, the order of a frame, and that
-    // a click goes through them to the board
+    // The node BoardCoordinates of the shipped scene is a canvas of 16 UILabels at the edges of the board (SceneConfig.xml has the reasons for its numbers). The layout is checked the way the
+    // HUD's is: the validator and CheckContent() on the size matrix
 
     namespace {
 
@@ -3163,7 +3160,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheHudStillStaysOutsideTheBoardWithTheCoordinatesOnIt) {
-        // The labels are over the board and the HUD is in its margins; neither is moved by the other (the HUD tests above are unchanged)
+        // The labels are over the board and the HUD is in its margins; neither is moved by the other
         ExpectTheHudSurvivesTheMatrix();
         Draw();
         const auto hud = Hud();
@@ -3655,7 +3652,7 @@ namespace BECore::Chess::Tests {
         Click("d2");
         EXPECT_FALSE(Model().HasSelection());
 
-        ASSERT_TRUE(Opponent().CycleSide().has_value());  // nobody
+        ASSERT_TRUE(Opponent().CycleSide().has_value());
 
         EXPECT_FALSE(Opponent().GetError().has_value());
         EXPECT_FALSE(Opponent().GetPlays().has_value());
@@ -3736,7 +3733,6 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheBoardDoesNotPublishASideVariable) {
-        // The board publishes no variable named `side`, at the start or after a pick
         Draw();
         EXPECT_TRUE(CoreManager::GetUIVars().Has(PoolString::Intern("opponentMode"))) << "the board publishes its variables: the check below is not about a missing frame";
         EXPECT_FALSE(CoreManager::GetUIVars().Has(PoolString::Intern("side")));
@@ -3746,7 +3742,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, ModeAndColorThroughThePanelPickTheSideTheProgramPlays) {
-        // Was TheSideActionWalksThreeWordsAndBackAndTheProgramPlaysTheSideTheWordSays (the cycle is gone with the Side button): the mode and the color are two choices now
+        // The mode and the color are two choices, so the case goes by their segments
         const auto engine = MakeShared<InstantEngine>();
         CountingFactory factory({engine});
         Opponent().SetEngineFactory(factory.AsFactory());
@@ -3791,7 +3787,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheLevelActionPicksEveryLevelAndTheFactoryIsAskedOnlyWhenTheProgramPlays) {
-        // Was TheLevelActionWalksTheLevelsAndWraps (the cycle is gone with the Level button): every level segment of the panel emits ChessSetLevel with its id
+        // Every level segment of the panel emits ChessSetLevel with its id
         const auto levels = GetOpponentLevels();
         CountingFactory factory({MakeShared<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
@@ -3814,7 +3810,6 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheEngineSegmentsPickBothEnginesAndTheDefaultIsStockfish) {
-        // Was TheEngineWordStartsAsStockfishAndTheActionWalksTheEnginesAndWraps (the cycle and the `engine` word are gone with the Engine button)
         SKIP_WITHOUT_STOCKFISH_SEGMENT();
         CountingFactory factory({MakeShared<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
@@ -3926,7 +3921,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheEngineGroupTakesClicksWhetherOrNotTheProgramPlays) {
-        // Was TheEngineButtonIsShownWhetherOrNotTheProgramPlays: the Engine button was never hidden; no group of the panel is greyed, and the EngineGroup works in every state
+        // No group of the panel is greyed, and the EngineGroup works in every state
         CountingFactory working({MakeShared<InstantEngine>()});
         Opponent().SetEngineFactory(working.AsFactory());
         _manager->UpdateAll();
@@ -3963,7 +3958,6 @@ namespace BECore::Chess::Tests {
     // The fill of each button has a color of its own in SceneConfig.xml, which is how a test finds where the screen shows it (the way ClickingTheResetButtonOnTheScreen... does)
 
     TEST_F(ChessUiTest, ClickingTheModeAndColorSegmentsOnTheScreenPicksTheSideAndAPressAloneDoesNothing) {
-        // Was ClickingTheSideButtonOnTheScreenCyclesTheSide
         CountingFactory factory({MakeShared<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -3986,7 +3980,6 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, ClickingAnEngineSegmentOnTheScreenPicksTheEngineAndAPressAloneDoesNothing) {
-        // Was ClickingTheEngineButtonOnTheScreenCyclesTheEngineAndAPressAloneDoesNothing
         SKIP_WITHOUT_STOCKFISH_SEGMENT();
         CountingFactory factory({MakeShared<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
@@ -4018,7 +4011,6 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, APressOnASegmentDoesNotChangeTheBoardSelection) {
-        // Was APressOnTheEngineButtonDoesNotChangeTheSelection
         CountingFactory factory({MakeShared<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -4037,8 +4029,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheOwnEngineOfTheDefaultFactoryPlaysThroughThePanel) {
-        // Was TheOwnEngineOfTheDefaultFactoryPlaysThroughTheButtons. No factory is set: the controller makes the real OwnEngine (no process, no settings) at the easy level, so the
-        // test needs no Stockfish and no fake program
+        // No factory is set: the controller makes the real OwnEngine (no process, no settings) at the easy level, so the test needs no Stockfish and no fake program
         const Optional<size_t> easy = FindOpponentLevel("easy");
         ASSERT_TRUE(easy.has_value());
         ASSERT_TRUE(OpenThePanel());
@@ -4124,7 +4115,7 @@ namespace BECore::Chess::Tests {
 
     // ---- the choice of the opponent panel: the actions with a value and the ids --------------------------------------------
     // The segments of the panel emit ChessSetMode / ChessSetColor / ChessSetEngine / ChessSetLevel with the id as `value`; the board answers through OpponentChoice and
-    // publishes the ids. These tests press the actions the segments will emit (the panel itself is in the scene from WP 3) and read the variables
+    // publishes the ids. These tests press the actions the segments emit and read the variables
 
     TEST_F(ChessUiTest, TheIdsOfThePanelStartAsTwoWhiteTheDefaultEngineMediumAndNoError) {
         EXPECT_EQ(Var("opponentMode"), "two");
@@ -4469,7 +4460,7 @@ namespace BECore::Chess::Tests {
         // A build without Stockfish hides its segment: nine are on the screen to click
         const auto IsShown = [](const PanelSegment& segment) { return kStockfishAvailable || segment.name != "EngineStockfish"; };
 
-        // Two people play first: only the mode and the engine groups take clicks. Computer is picked in the middle, which wakes the other two; then back to two
+        // Every group in turn, with Computer picked before the color and the level; then back to two
         const auto clickGroup = [&](const char* group) {
             for (const PanelSegment& segment : segments) {
                 if (StringView(segment.group) != group || !IsShown(segment)) {
@@ -4531,8 +4522,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, NoGroupOfThePanelIsGreyedAndALevelAndAColorPickedForTwoPeopleApplyAtComputer) {
-        // Replaces TheColorAndLevelGroupsAreDisabledWhileTwoPeoplePlayAndTheEngineGroupNever (and Was TheLevelButtonIsShownOnlyWhileTheProgramPlays): a greyed group read as a dead
-        // button, so every group takes clicks in every mode and the pick is remembered until Computer is picked
+        // A greyed group read as a dead button, so every group takes clicks in every mode and the pick is remembered until Computer is picked
         CountingFactory working({MakeShared<InstantEngine>()});
         Opponent().SetEngineFactory(working.AsFactory());
         _manager->UpdateAll();
@@ -4599,7 +4589,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, NoGroupOfThePanelIsGreyedWhateverTheControlApiSets) {
-        // Replaces TheDisabledFlagFollowsAnOpponentSetFromOutside: the control API picks the program's side without the panel and the groups stay whole while the choice follows it
+        // The control API picks the program's side without the panel and the groups stay whole while the choice follows it
         CountingFactory factory({MakeShared<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -4633,7 +4623,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, ARefusedStockfishPickOnThePanelKeepsComputerTheOwnEngineAndTheLevelAndTheProgramStillAnswers) {
-        // The owner's report: choosing Stockfish switched the mode to Two players. An engine that cannot be had cannot be saved: nothing changes and the error is said
+        // A pick of an engine that cannot be had changes nothing, and the error is said
         SKIP_WITHOUT_STOCKFISH_SEGMENT();  // the pick of the name is the action's in that build: WithoutStockfishThePickOfTheNameOnTheActionIsRefused...
         Vector<String> asked;
         Opponent().SetEngineFactory([&asked](OpponentEngine engine, const OpponentLevel&) -> MadeEngine {
@@ -4737,7 +4727,7 @@ namespace BECore::Chess::Tests {
 
 #if CHESS_NO_STOCKFISH
     TEST_F(ChessUiTest, WithoutStockfishThePickOfTheNameOnTheActionIsRefusedAndTheOwnEngineStaysTheWayOnIsComputer) {
-        // The default factory (no SetEngineFactory): the panel has no segment for the name, but the action can still carry it (a hand-made press, the web build's scene editor)
+        // The default factory (no SetEngineFactory): the panel has no segment for the name, but the action can still carry it (a hand-made press)
         _manager->UpdateAll();
         EXPECT_EQ(Var("opponentEngine"), "own") << "a game starts with the own engine";
 
@@ -4811,7 +4801,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, WhenNoStockfishIsFoundThePanelLeadsToTheOwnEngineAndTheProgramPlays) {
-        // Was WhenNoStockfishIsFoundTheEngineButtonLeadsToTheOwnEngine... (the action-level twin is WhenNoStockfishIsFoundTheEngineRowLeadsToTheOwnEngineAndComputerPlays). The
+        // The action-level twin is WhenNoStockfishIsFoundTheEngineRowLeadsToTheOwnEngineAndComputerPlays. The
         // factory stands in for "no Stockfish found" and nothing else: it never makes the own engine for a Stockfish pick, so the program cannot have fallen back by itself
         Vector<String> asked;
         Opponent().SetEngineFactory([&asked](OpponentEngine engine, const OpponentLevel&) -> MadeEngine {
@@ -4886,7 +4876,6 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheSentencesOfTheErrorLineAreTheOnesOfTheOpponentText) {
-        // The line shows OpponentText::Error of the error that stands, and nothing else
         const auto engine = MakeShared<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
         CountingFactory factory({engine});
         ASSERT_NO_FATAL_FAILURE(ProvokeAnEngineError(factory));
