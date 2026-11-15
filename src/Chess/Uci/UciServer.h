@@ -1,5 +1,6 @@
 #pragma once
 
+#include <BECore/Utils/MoveOnlyFunction.h>
 #include <Chess/Engine/SearchRequest.h>
 #include <Chess/Uci/UciCommand.h>
 #include <TaskSystem/CancellationToken.h>
@@ -40,11 +41,10 @@ namespace BECore::Chess::Uci {
      */
     class UciServer {
     public:
-        //-NoStd: no callable alias yet (callables-move-only)
-        using Sink = eastl::function<void(StringView)>;
+        using Sink = MoveOnlyFunction<void(StringView)>;
 
         /// @p engine answers the searches (not null) and must honour the CancellationToken: `stop` and `quit` wait for it. @p sink gets every line of the server
-        UciServer(SharedPtr<IChessEngine> engine, Sink sink);
+        UciServer(ChessEnginePtr engine, Sink sink);
 
         /// Cancels a running search and waits for the worker (its `bestmove` still goes to the sink)
         ~UciServer();
@@ -67,7 +67,7 @@ namespace BECore::Chess::Uci {
         /// What a worker needs for one `go`: copies of everything, so the reader may go on
         struct SearchJob {
             SearchRequest request;
-            SharedPtr<IChessEngine> engine;
+            ChessEnginePtr engine;
             CancellationToken token;
             bool deepen = false;
         };
@@ -85,7 +85,7 @@ namespace BECore::Chess::Uci {
         void SayInfo(StringView text);
         void SayBestMove(const Move* move);
 
-        SharedPtr<IChessEngine> _engine;
+        ChessEnginePtr _engine;
         Sink _sink;
         Mutex _sinkMutex{BE_LOCK_SITE("UciServer sink")};
 

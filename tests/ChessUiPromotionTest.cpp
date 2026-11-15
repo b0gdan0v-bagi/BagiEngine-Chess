@@ -353,7 +353,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, WhileTheProgramPlaysTheOtherColorThePersonsPromotionWorksAndTheProgramAnswersIt) {
-        CountingFactory factory({MakeShared<InstantEngine>()});
+        CountingFactory factory({New<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         ASSERT_TRUE(Opponent().SetSide(PieceColor::Black).has_value());
@@ -373,7 +373,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, TheProgramTakingTheTurnClosesThePanel) {
         // The person selected the pawn and asked for the promotion; the program (switched on in the meantime) takes the turn and drops the half-made move
-        CountingFactory factory({MakeShared<InstantEngine>()});
+        CountingFactory factory({New<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         StartFrom(kPromotionFen);

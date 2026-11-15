@@ -4,6 +4,7 @@
 #include <Chess/Game/ChessGameModel.h>
 #include <Chess/Game/MoveGenerator.h>
 #include <Common/EngineEnvironment.h>
+#include <Common/SharedPtr.h>
 #include <TaskSystem/Awaitables.h>
 #include <TaskSystem/TaskManager.h>
 #include <iomanip>
@@ -200,8 +201,7 @@ namespace BECore::Chess::Tests {
         }
 
         /// The nodes to give the call number @p call of a job (0, 1, ...)
-        //-NoStd: no callable alias yet (callables-move-only)
-        using SlicePolicy = std::function<uint64_t(size_t call)>;
+        using SlicePolicy = MoveOnlyFunction<uint64_t(size_t call)>;
 
         SlicePolicy Fixed(uint64_t nodes) {
             return [nodes](size_t) { return nodes; };
@@ -811,8 +811,8 @@ namespace BECore::Chess::Tests {
             uint64_t slices = 0;
         };
 
-        Task<void> DriveOnThePool(OwnEngine engine, SearchRequest request, CancellationToken token, SharedPtr<CoroutineAnswer> out) {
-            auto search = engine.BeginFindMove(request, token);
+        Task<void> DriveOnThePool(IntrusivePtrAtomic<OwnEngine> engine, SearchRequest request, CancellationToken token, SharedPtr<CoroutineAnswer> out) {
+            auto search = engine->BeginFindMove(request, token);
             if (!search) {
                 out->answer = std::unexpected(std::move(search.error()));
                 out->done.store(true, std::memory_order_release);
@@ -1100,9 +1100,9 @@ namespace BECore::Chess::Tests {
         // A single-thread build resumes a yielded task only in TaskManager::Update, which only CoreManager calls; this test polls and never pumps (OpponentOverFramesTest does, with PumpTaskFrame)
         GTEST_SKIP() << "needs worker threads (BE_SINGLE_THREAD)";
 #else
-        OwnEngine engine;
+        const IntrusivePtrAtomic<OwnEngine> engine = New<OwnEngine>();
         const SearchRequest request = RequestFor(kKiwipeteFen, kGoldenDepth);
-        const auto expected = engine.FindMove(request, CancellationToken::Create());
+        const auto expected = engine->FindMove(request, CancellationToken::Create());
         ASSERT_TRUE(expected.has_value());
 
         auto out = MakeShared<CoroutineAnswer>();
@@ -1119,7 +1119,7 @@ namespace BECore::Chess::Tests {
 #if BE_SINGLE_THREAD
         GTEST_SKIP() << "needs worker threads (BE_SINGLE_THREAD)";
 #else
-        OwnEngine engine;
+        const IntrusivePtrAtomic<OwnEngine> engine = New<OwnEngine>();
         CancellationToken token = CancellationToken::Create();
         auto out = MakeShared<CoroutineAnswer>();
         TaskManager::GetInstance().Run(DriveOnThePool(engine, RequestFor(kKiwipeteFen, kGoldenForeverDepth), token, out));
@@ -1426,7 +1426,7 @@ namespace BECore::Chess::Tests {
         const auto expected = OwnEngine().FindMove(SearchRequest::FromModel(model, limits), CancellationToken::Create());
         ASSERT_TRUE(expected.has_value());
 
-        EngineOpponent opponent(MakeShared<OwnEngine>(), PieceColor::White, limits);
+        EngineOpponent opponent(New<OwnEngine>(), PieceColor::White, limits);
         [[maybe_unused]] const size_t frames = PlayFrames(opponent, model);
 
         ASSERT_EQ(model.GetMoves().size(), 1u) << "the opponent did not play within the time limit";
@@ -1440,7 +1440,7 @@ namespace BECore::Chess::Tests {
     /// ChessTests --gtest_also_run_disabled_tests --gtest_filter=OpponentOverFramesTest.DISABLED_FrameLengthYardstick
     TEST_F(OpponentOverFramesTest, DISABLED_FrameLengthYardstick) {
         ChessGameModel model;
-        EngineOpponent opponent(MakeShared<OwnEngine>(), PieceColor::White, SearchLimits{0, kFramesDepth});
+        EngineOpponent opponent(New<OwnEngine>(), PieceColor::White, SearchLimits{0, kFramesDepth});
         std::chrono::milliseconds longestFrame{0};
         [[maybe_unused]] const size_t frames = PlayFrames(opponent, model, &longestFrame);
 
@@ -1450,7 +1450,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OpponentOverFramesTest, ACancelInTheMiddleOfAMultiFrameSearchPlaysNothing) {
         ChessGameModel model;
-        EngineOpponent opponent(MakeShared<OwnEngine>(), PieceColor::White, SearchLimits{0, kGoldenForeverDepth});
+        EngineOpponent opponent(New<OwnEngine>(), PieceColor::White, SearchLimits{0, kGoldenForeverDepth});
 
         for (int frame = 0; frame < kFramesBeforeCancel; ++frame) {
             PumpTaskFrame();
@@ -1474,7 +1474,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OpponentOverFramesTest, AMovedVersionInTheMiddleOfAMultiFrameSearchDropsTheAnswer) {
         ChessGameModel model;
-        EngineOpponent opponent(MakeShared<OwnEngine>(), PieceColor::White, SearchLimits{0, kGoldenForeverDepth});
+        EngineOpponent opponent(New<OwnEngine>(), PieceColor::White, SearchLimits{0, kGoldenForeverDepth});
         for (int frame = 0; frame < kFramesBeforeCancel; ++frame) {
             PumpTaskFrame();
             opponent.Update(model);
@@ -1521,8 +1521,7 @@ namespace BECore::Chess::Tests {
         /// add a column by adding one of these
         struct BenchmarkColumn {
             const char* title;
-            //-NoStd: no callable alias yet (callables-move-only)
-            std::function<uint64_t(StringView fen, int depth)> run;
+            uint64_t (*run)(StringView fen, int depth);
         };
 
         struct Measured {

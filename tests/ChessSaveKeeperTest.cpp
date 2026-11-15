@@ -196,7 +196,7 @@ namespace BECore::Chess::Tests {
         CountingFactory factory;
         ChessSaveKeeper keeper;
 
-        KeptGame() : controller(model), choice(controller), factory({MakeShared<InstantEngine>()}) {
+        KeptGame() : controller(model), choice(controller), factory({New<InstantEngine>()}) {
             controller.SetEngineFactory(factory.AsFactory());
         }
 

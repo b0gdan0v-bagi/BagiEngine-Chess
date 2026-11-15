@@ -67,7 +67,7 @@ namespace BECore::Chess::Tests {
         OpponentChoice choice;
         CountingFactory factory;
 
-        SavedGame() : controller(model), choice(controller), factory({MakeShared<InstantEngine>()}) {
+        SavedGame() : controller(model), choice(controller), factory({New<InstantEngine>()}) {
             controller.SetEngineFactory(factory.AsFactory());
         }
 
@@ -167,8 +167,7 @@ namespace BECore::Chess::Tests {
             return game.Captured();
         }
 
-        //-NoStd: no callable alias yet (callables-move-only)
-        void SaveAltered(const eastl::function<void(ChessSaveState&)>& alter) {
+        void SaveAltered(FunctionRef<void(ChessSaveState&)> alter) {
             ChessSaveState state = GoodState();
             alter(state);
             ASSERT_TRUE(_service.Save(kChessSaveSlot, kChessSaveSchema, state).has_value());

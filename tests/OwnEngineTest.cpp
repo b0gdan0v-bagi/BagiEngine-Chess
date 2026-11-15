@@ -167,7 +167,7 @@ namespace BECore::Chess::Tests {
         /// An engine that asks another with limits of its own and counts the searches that have ended: the levels of the game give a move time, and these tests want a depth
         class LimitedEngine final : public IChessEngine {
         public:
-            LimitedEngine(SharedPtr<IChessEngine> inner, SearchLimits limits) : _inner(std::move(inner)), _limits(limits) {}
+            LimitedEngine(ChessEnginePtr inner, SearchLimits limits) : _inner(std::move(inner)), _limits(limits) {}
 
             std::expected<Move, EngineError> FindMove(const SearchRequest& request, const CancellationToken& token) override {
                 SearchRequest limited = request;
@@ -187,7 +187,7 @@ namespace BECore::Chess::Tests {
             }
 
         private:
-            SharedPtr<IChessEngine> _inner;
+            ChessEnginePtr _inner;
             SearchLimits _limits;
             std::atomic<int> _calls{0};
             std::atomic<int> _answered{0};
@@ -373,7 +373,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OwnEngineTest, AControllerWithItPlaysALegalAnswer) {
         ChessGameModel model;
-        const auto engine = MakeShared<LimitedEngine>(MakeShared<OwnEngine>(), Depth(kFloorDepth));
+        const auto engine = New<LimitedEngine>(New<OwnEngine>(), Depth(kFloorDepth));
         OpponentController controller(model);
         controller.SetEngineFactory([engine](OpponentEngine, const OpponentLevel&) -> MadeEngine { return engine; });
         ASSERT_TRUE(controller.SetSide(PieceColor::Black).has_value());
@@ -395,7 +395,7 @@ namespace BECore::Chess::Tests {
         SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
         ASSERT_TRUE(Play(model, "e2e4"));
-        const auto engine = MakeShared<LimitedEngine>(MakeShared<OwnEngine>(), Depth(kDepthThatNeverEnds));
+        const auto engine = New<LimitedEngine>(New<OwnEngine>(), Depth(kDepthThatNeverEnds));
         OpponentController controller(model);
         controller.SetEngineFactory([engine](OpponentEngine, const OpponentLevel&) -> MadeEngine { return engine; });
         ASSERT_TRUE(controller.SetSide(PieceColor::Black).has_value());
@@ -986,7 +986,7 @@ namespace BECore::Chess::Tests {
         SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
         ASSERT_TRUE(Play(model, "e2e4"));
-        const auto engine = MakeShared<LimitedEngine>(MakeShared<OwnEngine>(), Depth(kDepthThatNeverEnds));
+        const auto engine = New<LimitedEngine>(New<OwnEngine>(), Depth(kDepthThatNeverEnds));
         OpponentController controller(model);
         controller.SetEngineFactory([engine](OpponentEngine, const OpponentLevel&) -> MadeEngine { return engine; });
         ASSERT_TRUE(controller.SetSide(PieceColor::Black).has_value());

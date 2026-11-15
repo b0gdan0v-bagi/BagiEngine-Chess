@@ -30,7 +30,7 @@ namespace BECore::Chess {
     inline constexpr int kOwnMoveTimeCapMs = 10000;
 
     /// The engine as the game plays this level: the same pointer when the level has no blunderPercent, else a BlunderEngine around it (a blunder starts no search)
-    [[nodiscard]] SharedPtr<IChessEngine> WithHandicap(SharedPtr<IChessEngine> engine, const OpponentLevel& level);
+    [[nodiscard]] ChessEnginePtr WithHandicap(ChessEnginePtr engine, const OpponentLevel& level);
 
     /// What the engine gets for a move at this level (the handicap is not a limit: see WithHandicap). Stockfish: the move time of the level and no depth. The own engine: the depth
     /// of the level and kOwnMoveTimeCapMs as the time

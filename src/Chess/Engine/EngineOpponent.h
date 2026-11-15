@@ -31,7 +31,7 @@ namespace BECore::Chess {
      */
     class EngineOpponent {
     public:
-        EngineOpponent(SharedPtr<IChessEngine> engine, PieceColor side, SearchLimits limits);
+        EngineOpponent(ChessEnginePtr engine, PieceColor side, SearchLimits limits);
 
         /// Cancels the search in flight and returns at once
         ~EngineOpponent();
@@ -75,10 +75,10 @@ namespace BECore::Chess {
 
     private:
         /// What the worker and the opponent share. The worker writes the answer and then raises `done`; the opponent reads the answer after it sees `done`
-        struct Search {
-            explicit Search(SharedPtr<IChessEngine> engineToAsk) : engine(std::move(engineToAsk)) {}
+        struct Search : RefCountedAtomic {
+            explicit Search(ChessEnginePtr engineToAsk) : engine(std::move(engineToAsk)) {}
 
-            SharedPtr<IChessEngine> engine;
+            ChessEnginePtr engine;
             CancellationToken token = CancellationToken::Create();
             Mutex mutex{BE_LOCK_SITE("EngineOpponent")};  ///< guards `answer`
             std::expected<Move, EngineError> answer = std::unexpected(EngineError{EngineErrorKind::NoMove, "the search has not finished"});
@@ -86,18 +86,18 @@ namespace BECore::Chess {
         };
 
         /// Runs on the pool: asks the engine and leaves the answer in @p search. Takes its arguments by value, so the frame owns everything it uses
-        static Task<void> RunSearch(SharedPtr<Search> search, SearchRequest request);
+        static Task<void> RunSearch(IntrusivePtrAtomic<Search> search, SearchRequest request);
 
         void StartSearch(const ChessGameModel& model);
         void CancelWhenStale(const ChessGameModel& model);
         void TakeAnswer(ChessGameModel& model);
         void Fail(EngineError error);
 
-        SharedPtr<IChessEngine> _engine;
+        ChessEnginePtr _engine;
         PieceColor _side;
         SearchLimits _limits;
-        SharedPtr<Search> _search;    ///< the search under way, null when none; main thread only
-        uint64_t _searchVersion = 0;  ///< the version of the model when _search was asked
+        IntrusivePtrAtomic<Search> _search;  ///< the search under way, null when none; main thread only
+        uint64_t _searchVersion = 0;         ///< the version of the model when _search was asked
         Optional<EngineError> _lastError;
     };
 

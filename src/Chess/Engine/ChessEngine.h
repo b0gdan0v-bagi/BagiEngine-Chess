@@ -1,5 +1,6 @@
 #pragma once
 
+#include <BECore/RefCounted/New.h>
 #include <Chess/Engine/Analysis.h>
 #include <Chess/Game/Move.h>
 #include <TaskSystem/CancellationToken.h>
@@ -45,10 +46,11 @@ namespace BECore::Chess {
      * (OwnEngine) gives the thread back between slices of its search, the others block for the whole call (the default). The game's tasks await the async form.
      * It takes a SearchRequest (the start FEN and the moves played), not a Position, because UCI engines see repetitions only through the moves;
      * the type is in Chess/Engine/SearchRequest.h, which includes this file.
+     * Held by ChessEnginePtr and counted atomically: a search task on the pool holds the engine too, so the last holder can be any thread.
      */
-    class IChessEngine {
+    class IChessEngine : public RefCountedAtomic {
     public:
-        virtual ~IChessEngine() = default;
+        ~IChessEngine() override = default;
 
         /**
          * @brief The move the engine plays in the position @p request leads to, within its limits.
@@ -83,5 +85,8 @@ namespace BECore::Chess {
         /// Analyse() as a coroutine, with the rules of FindMoveAsync(). The default body calls Analyse(), so an engine that does not analyse answers Unsupported
         [[nodiscard]] virtual Task<std::expected<Analysis, EngineError>> AnalyseAsync(SearchRequest request, CancellationToken token);
     };
+
+    /// The shared owner of an engine; New<OwnEngine>() makes one
+    using ChessEnginePtr = IntrusivePtrAtomic<IChessEngine>;
 
 }  // namespace BECore::Chess

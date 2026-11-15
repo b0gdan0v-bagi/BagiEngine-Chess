@@ -178,7 +178,7 @@ namespace BECore::Chess::Tests {
     TEST(OpponentStockfishFileTest, AFactoryOfTheTestOffersStockfishAndIsAskedWithoutAnyLookup) {
         const TempDirectory directory;
         ChessGameModel model;
-        CountingFactory factory({MakeShared<InstantEngine>()});
+        CountingFactory factory({New<InstantEngine>()});
         OpponentController controller(model, SettingsAt(directory.File(kFileName)));
         controller.SetEngineFactory(factory.AsFactory());  // the test world: its doubles are called Stockfish and Own, and no file is behind them
 

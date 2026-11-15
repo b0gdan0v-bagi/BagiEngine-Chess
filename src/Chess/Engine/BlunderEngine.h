@@ -26,7 +26,7 @@ namespace BECore::Chess {
     class BlunderEngine final : public IChessEngine {
     public:
         /// @p percent is the share of moves replaced by a random legal move, 0..100 (brought into that range)
-        BlunderEngine(SharedPtr<IChessEngine> inner, int percent);
+        BlunderEngine(ChessEnginePtr inner, int percent);
 
         [[nodiscard]] std::expected<Move, EngineError> FindMove(const SearchRequest& request, const CancellationToken& token) override;
 
@@ -52,7 +52,7 @@ namespace BECore::Chess {
         /// nothing when the wrapped engine is to answer (always at 0 percent, with no check of the request)
         [[nodiscard]] std::expected<Optional<Move>, EngineError> BlunderMove(const SearchRequest& request, const CancellationToken& token) const;
 
-        SharedPtr<IChessEngine> _inner;
+        ChessEnginePtr _inner;
         int _percent;
     };
 

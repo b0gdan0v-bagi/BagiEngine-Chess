@@ -90,7 +90,7 @@ namespace BECore::Chess::Tests {
         ChessGameModel model;
         ASSERT_TRUE(Play(model, "e2e4"));
         ASSERT_TRUE(Play(model, "e7e5"));
-        CountingFactory factory({MakeShared<InstantEngine>()});
+        CountingFactory factory({New<InstantEngine>()});
         OpponentController controller(model);
         controller.SetEngineFactory(factory.AsFactory());
 
@@ -112,7 +112,7 @@ namespace BECore::Chess::Tests {
     TEST_F(OpponentControllerTest, PickingBlackMakesTheProgramAnswerAPersonsMove) {
         SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
-        const auto engine = MakeShared<GatedEngine>(true);
+        const auto engine = New<GatedEngine>(true);
         CountingFactory factory({engine});
         OpponentController controller(model);
         controller.SetEngineFactory(factory.AsFactory());
@@ -155,7 +155,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OpponentControllerTest, PickingWhiteMakesTheProgramOpen) {
         ChessGameModel model;
-        const auto engine = MakeShared<InstantEngine>();
+        const auto engine = New<InstantEngine>();
         CountingFactory factory({engine});
         OpponentController controller(model);
         controller.SetEngineFactory(factory.AsFactory());
@@ -175,7 +175,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OpponentControllerTest, ASideCycleWalksNobodyBlackWhiteNobody) {
         ChessGameModel model;
-        CountingFactory factory({MakeShared<InstantEngine>()});
+        CountingFactory factory({New<InstantEngine>()});
         OpponentController controller(model);
         controller.SetEngineFactory(factory.AsFactory());
         const Optional<PieceColor> expected[] = {PieceColor::Black, PieceColor::White, std::nullopt, PieceColor::Black};
@@ -209,7 +209,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OpponentControllerTest, ALevelThatDoesNotExistChangesNothing) {
         ChessGameModel model;
-        CountingFactory factory({MakeShared<InstantEngine>()});
+        CountingFactory factory({New<InstantEngine>()});
         OpponentController controller(model);
         controller.SetEngineFactory(factory.AsFactory());
         ASSERT_TRUE(controller.SetSide(PieceColor::Black).has_value());
@@ -229,7 +229,7 @@ namespace BECore::Chess::Tests {
     TEST_F(OpponentControllerTest, ThePickOfTheSameSideAndLevelKeepsTheSearch) {
         SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
-        const auto engine = MakeShared<GatedEngine>(true);
+        const auto engine = New<GatedEngine>(true);
         CountingFactory factory({engine});
         OpponentController controller(model);
         controller.SetEngineFactory(factory.AsFactory());
@@ -293,7 +293,7 @@ namespace BECore::Chess::Tests {
     TEST_F(OpponentControllerTest, AFactoryThatMakesNoEngineIsLaunchFailedToo) {
         ChessGameModel model;
         OpponentController controller(model);
-        controller.SetEngineFactory([](OpponentEngine, const OpponentLevel&) -> MadeEngine { return MadeEngine(SharedPtr<IChessEngine>{}); });
+        controller.SetEngineFactory([](OpponentEngine, const OpponentLevel&) -> MadeEngine { return MadeEngine(ChessEnginePtr{}); });
 
         const auto picked = controller.SetSide(PieceColor::Black);
 
@@ -310,7 +310,7 @@ namespace BECore::Chess::Tests {
     TEST_F(OpponentControllerTest, ANewPickClearsTheErrorAndCanSucceedAfterTheFailure) {
         ChessGameModel model;
         CountingFactory failing(LaunchFailed());
-        CountingFactory working({MakeShared<InstantEngine>()});
+        CountingFactory working({New<InstantEngine>()});
         OpponentController controller(model);
         controller.SetEngineFactory(failing.AsFactory());
         ASSERT_FALSE(controller.SetSide(PieceColor::Black).has_value());
@@ -338,7 +338,7 @@ namespace BECore::Chess::Tests {
         SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
         // The own engine is there (gated, honors its token); Stockfish is not
-        const auto own = MakeShared<GatedEngine>(true, Mv("e7e5"));
+        const auto own = New<GatedEngine>(true, Mv("e7e5"));
         Vector<OpponentEngine> asked;
         OpponentController controller(model);
         controller.SetEngineFactory([&](OpponentEngine engine, const OpponentLevel&) -> MadeEngine {
@@ -391,7 +391,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OpponentControllerTest, ARefusedChooseChangesNothingAtAll) {
         ChessGameModel model;
-        const auto own = MakeShared<InstantEngine>();
+        const auto own = New<InstantEngine>();
         Vector<OpponentEngine> asked;
         OpponentController controller(model);
         controller.SetEngineFactory([&](OpponentEngine engine, const OpponentLevel&) -> MadeEngine {
@@ -421,7 +421,7 @@ namespace BECore::Chess::Tests {
     TEST_F(OpponentControllerTest, AfterARefusedPickThePickOfWhatPlaysClearsTheErrorWithoutRemakingTheOpponent) {
         SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
-        const auto own = MakeShared<GatedEngine>(true, Mv("e7e5"));
+        const auto own = New<GatedEngine>(true, Mv("e7e5"));
         CountingFactory factory({own});
         OpponentController controller(model);
         controller.SetEngineFactory([&](OpponentEngine engine, const OpponentLevel& level) -> MadeEngine {
@@ -451,7 +451,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OpponentControllerTest, ALevelPickedWhileNobodyPlaysIsKeptEvenWithoutStockfishAndAppliesAtTheNextSide) {
         ChessGameModel model;
-        CountingFactory factory({MakeShared<InstantEngine>()});
+        CountingFactory factory({New<InstantEngine>()});
         OpponentController controller(model);
         controller.SetEngineFactory(factory.AsFactory());
         const size_t max = LevelIndex("max");
@@ -469,8 +469,8 @@ namespace BECore::Chess::Tests {
         SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
         // The first engine ignores its token and holds the answer h7h5 until the end of the test; the second answers at once
-        const auto slow = MakeShared<GatedEngine>(false, Mv("h7h5"));
-        const auto quick = MakeShared<InstantEngine>();
+        const auto slow = New<GatedEngine>(false, Mv("h7h5"));
+        const auto quick = New<InstantEngine>();
         CountingFactory factory({slow, quick});
         OpponentController controller(model);
         controller.SetEngineFactory(factory.AsFactory());
@@ -511,8 +511,8 @@ namespace BECore::Chess::Tests {
     TEST_F(OpponentControllerTest, ChangingFromWhiteToBlackRemakesTheOpponentAndCancelsTheOldSearch) {
         SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
-        const auto asWhite = MakeShared<GatedEngine>(true);
-        const auto asBlack = MakeShared<InstantEngine>();
+        const auto asWhite = New<GatedEngine>(true);
+        const auto asBlack = New<InstantEngine>();
         CountingFactory factory({asWhite, asBlack});
         OpponentController controller(model);
         controller.SetEngineFactory(factory.AsFactory());
@@ -539,7 +539,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OpponentControllerTest, AnEngineThatFailsIsReportedOnceAndAskedAgainOnlyWhenTheGameMovesOn) {
         ChessGameModel model;
-        const auto engine = MakeShared<FailingEngine>(EngineError{EngineErrorKind::Timeout, "no answer in the test"});
+        const auto engine = New<FailingEngine>(EngineError{EngineErrorKind::Timeout, "no answer in the test"});
         CountingFactory factory({engine});
         OpponentController controller(model);
         controller.SetEngineFactory(factory.AsFactory());
@@ -575,7 +575,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OpponentControllerTest, AMoveOfSomeoneElseIsAlsoTheGameMovingOn) {
         ChessGameModel model;
-        const auto engine = MakeShared<FailingEngine>(EngineError{EngineErrorKind::ProcessDied, "gone in the test"});
+        const auto engine = New<FailingEngine>(EngineError{EngineErrorKind::ProcessDied, "gone in the test"});
         CountingFactory factory({engine});
         OpponentController controller(model);
         controller.SetEngineFactory(factory.AsFactory());
@@ -592,7 +592,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OpponentControllerTest, PickingTheSideToMoveDropsAHalfMadeMoveOfThePerson) {
         ChessGameModel model;
-        CountingFactory factory({MakeShared<GatedEngine>()});
+        CountingFactory factory({New<GatedEngine>()});
         OpponentController controller(model);
         controller.SetEngineFactory(factory.AsFactory());
         model.OnSquareClicked(Sq("g1"));
@@ -623,7 +623,7 @@ namespace BECore::Chess::Tests {
     TEST_F(OpponentControllerTest, ShutdownCancelsTheSearchAndLaterUpdatesDoNothing) {
         SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
-        const auto engine = MakeShared<GatedEngine>(true);
+        const auto engine = New<GatedEngine>(true);
         CountingFactory factory({engine});
         OpponentController controller(model);
         controller.SetEngineFactory(factory.AsFactory());
@@ -651,7 +651,7 @@ namespace BECore::Chess::Tests {
     TEST_F(OpponentControllerTest, DestroyingTheControllerCancelsTheSearch) {
         SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
-        const auto engine = MakeShared<GatedEngine>(true);
+        const auto engine = New<GatedEngine>(true);
         CountingFactory factory({engine});
         {
             OpponentController controller(model);
@@ -724,7 +724,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OpponentControllerTest, WithoutStockfishAFactoryOfTheTestIsStillAskedForStockfish) {
         ChessGameModel model;
-        CountingFactory factory({MakeShared<InstantEngine>()});
+        CountingFactory factory({New<InstantEngine>()});
         OpponentController controller(model);
         controller.SetEngineFactory(factory.AsFactory());  // the test world: its doubles are called Stockfish and Own
 
@@ -883,7 +883,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OpponentControllerTest, ANewControllerHasTheDefaultEngineAndPickingTheOtherWithNobodyPlayingStartsNothing) {
         ChessGameModel model;
-        CountingFactory factory({MakeShared<InstantEngine>()});
+        CountingFactory factory({New<InstantEngine>()});
         OpponentController controller(model);
         controller.SetEngineFactory(factory.AsFactory());
         EXPECT_EQ(controller.GetEngine(), kDefaultOpponentEngine);
@@ -904,7 +904,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OpponentControllerTest, AnEngineCycleWalksStockfishOwnStockfishWhereStockfishIsAvailableElseStaysOnOwn) {
         ChessGameModel model;
-        CountingFactory factory({MakeShared<InstantEngine>()});
+        CountingFactory factory({New<InstantEngine>()});
         OpponentController controller(model);
         controller.SetEngineFactory(factory.AsFactory());  // a factory of the test offers Stockfish whatever the machine has (OpponentStockfishFileTest holds the file rule)
 
@@ -927,8 +927,8 @@ namespace BECore::Chess::Tests {
         SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
         // The first (Stockfish) engine ignores its token and holds h7h5 until the end of the test; the second (Own) answers at once
-        const auto slow = MakeShared<GatedEngine>(false, Mv("h7h5"));
-        const auto quick = MakeShared<InstantEngine>();
+        const auto slow = New<GatedEngine>(false, Mv("h7h5"));
+        const auto quick = New<InstantEngine>();
         CountingFactory factory({slow, quick});
         OpponentController controller(model);
         controller.SetEngineFactory(factory.AsFactory());
@@ -969,7 +969,7 @@ namespace BECore::Chess::Tests {
     TEST_F(OpponentControllerTest, ChooseWithAnEngineMakesOneEngineAndTheSamePickAgainKeepsTheSearch) {
         SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
-        const auto engine = MakeShared<GatedEngine>(true);
+        const auto engine = New<GatedEngine>(true);
         CountingFactory factory({engine});
         OpponentController controller(model);
         controller.SetEngineFactory(factory.AsFactory());
@@ -1012,7 +1012,7 @@ namespace BECore::Chess::Tests {
         ChessGameModel model;
         // Stockfish is not there, the own engine always is. The log says which kinds were asked for
         Vector<OpponentEngine> asked;
-        const auto instant = MakeShared<InstantEngine>();
+        const auto instant = New<InstantEngine>();
         OpponentController controller(model);
         controller.SetEngineFactory([&](OpponentEngine engine, const OpponentLevel&) -> MadeEngine {
             asked.push_back(engine);
@@ -1114,7 +1114,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OpponentControllerTest, TheOwnEngineSearchesToTheDepthOfTheLevelWithTheCapOfTheWindow) {
         ChessGameModel model;
-        const auto recorder = MakeShared<RecordingOwnEngine>();
+        const auto recorder = New<RecordingOwnEngine>();
         CountingFactory factory({recorder});
         OpponentController controller(model);
         controller.SetEngineFactory(factory.AsFactory());
@@ -1150,7 +1150,7 @@ namespace BECore::Chess::Tests {
 
         /// The person (White) has played e2e4 against a program that plays Black through the double and the program's search is held at the gate
         struct PremoveGame {
-            explicit PremoveGame(SharedPtr<GatedEngine> gate) : engine(std::move(gate)), factory({engine}), controller(model) {
+            explicit PremoveGame(IntrusivePtrAtomic<GatedEngine> gate) : engine(std::move(gate)), factory({engine}), controller(model) {
                 controller.SetEngineFactory(factory.AsFactory());
                 EXPECT_TRUE(controller.SetSide(PieceColor::Black).has_value());
                 EXPECT_TRUE(Play(model, "e2e4"));
@@ -1165,7 +1165,7 @@ namespace BECore::Chess::Tests {
             }
 
             ChessGameModel model;
-            SharedPtr<GatedEngine> engine;
+            IntrusivePtrAtomic<GatedEngine> engine;
             CountingFactory factory;
             OpponentController controller;
         };
@@ -1174,7 +1174,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OpponentControllerTest, APremoveQueuedWhileTheProgramThinksPlaysInTheFrameOfTheAnswerAndTheNextAfterTheNextAnswer) {
         SKIP_WITHOUT_WORKER_THREADS();
-        PremoveGame game(MakeShared<GatedEngine>(true));
+        PremoveGame game(New<GatedEngine>(true));
         game.Queue("d2", "d4");
         game.Queue("b1", "c3");
         const uint64_t revision = game.controller.GetRevision();
@@ -1203,7 +1203,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(Play(scratch, "e2e4"));
         const auto answer = MoveGenerator::ParseUci(scratch.GetPosition(), "e7e5");
         ASSERT_TRUE(answer.has_value());
-        PremoveGame game(MakeShared<GatedEngine>(true, *answer));
+        PremoveGame game(New<GatedEngine>(true, *answer));
         game.Queue("e4", "e5");
         game.Queue("d2", "d4");
 
@@ -1222,7 +1222,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OpponentControllerTest, APickThatChangesTheSeatsDropsTheQueue) {
         SKIP_WITHOUT_WORKER_THREADS();
-        PremoveGame game(MakeShared<GatedEngine>(true));
+        PremoveGame game(New<GatedEngine>(true));
         game.Queue("d2", "d4");
         const size_t other = (kDefaultOpponentLevel + 1) % GetOpponentLevels().size();
 
@@ -1234,7 +1234,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OpponentControllerTest, APickThatChangesNothingKeepsTheQueue) {
         SKIP_WITHOUT_WORKER_THREADS();
-        PremoveGame game(MakeShared<GatedEngine>(true));
+        PremoveGame game(New<GatedEngine>(true));
         game.Queue("d2", "d4");
 
         ASSERT_TRUE(game.controller.SetSide(PieceColor::Black).has_value());
@@ -1247,10 +1247,10 @@ namespace BECore::Chess::Tests {
     TEST_F(OpponentControllerTest, ARefusedPickKeepsTheQueue) {
         SKIP_WITHOUT_WORKER_THREADS();
         ChessGameModel model;
-        const auto engine = MakeShared<GatedEngine>(true);
+        const auto engine = New<GatedEngine>(true);
         bool refuse = false;
         OpponentController controller(model);
-        controller.SetEngineFactory([&](OpponentEngine, const OpponentLevel&) -> std::expected<SharedPtr<IChessEngine>, EngineError> {
+        controller.SetEngineFactory([&](OpponentEngine, const OpponentLevel&) -> std::expected<ChessEnginePtr, EngineError> {
             if (refuse) {
                 return std::unexpected(LaunchFailed());
             }
@@ -1273,7 +1273,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OpponentControllerTest, APickOfTwoPlayersDropsTheQueueAndAHalfMadePremove) {
         SKIP_WITHOUT_WORKER_THREADS();
-        PremoveGame game(MakeShared<GatedEngine>(true));
+        PremoveGame game(New<GatedEngine>(true));
         game.Queue("d2", "d4");
         game.model.OnPremoveClicked(PieceColor::White, Sq("g1"));
         ASSERT_TRUE(game.model.HasSelection());
@@ -1286,7 +1286,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OpponentControllerTest, ShutdownDropsTheQueue) {
         SKIP_WITHOUT_WORKER_THREADS();
-        PremoveGame game(MakeShared<GatedEngine>(true));
+        PremoveGame game(New<GatedEngine>(true));
         game.Queue("d2", "d4");
 
         game.controller.Shutdown();
@@ -1296,7 +1296,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OpponentControllerTest, AQueueWaitsWhileTheProgramHasTheMove) {
         SKIP_WITHOUT_WORKER_THREADS();
-        PremoveGame game(MakeShared<GatedEngine>(true));
+        PremoveGame game(New<GatedEngine>(true));
         game.Queue("d2", "d4");
 
         for (int frame = 0; frame < kManyUpdates; ++frame) {

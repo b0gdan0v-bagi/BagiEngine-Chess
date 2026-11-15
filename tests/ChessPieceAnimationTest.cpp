@@ -324,7 +324,7 @@ namespace BECore::Chess::Tests {
 
         IntrusivePtr<RecordingRenderer> _renderer;
         IntrusivePtrAtomic<SceneManager> _manager;
-        CountingFactory _factory{MakeShared<GatedEngine>(true)};
+        CountingFactory _factory{New<GatedEngine>(true)};
     };
 
     TEST_F(ChessPieceAnimationTest, TheShippedSlideTimeIsTheDefaultOfTheCode) {

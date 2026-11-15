@@ -22,7 +22,7 @@ namespace BECore::Chess {
 
     namespace {
 
-        std::expected<SharedPtr<IChessEngine>, EngineError> MakeStockfishEngine(const OpponentSettings& settings, const OpponentLevel& level) {
+        std::expected<ChessEnginePtr, EngineError> MakeStockfishEngine(const OpponentSettings& settings, const OpponentLevel& level) {
             if (!IsOpponentEngineAvailable(OpponentEngine::Stockfish)) {
                 return std::unexpected(UnavailableEngineError(OpponentEngine::Stockfish));
             }
@@ -34,7 +34,7 @@ namespace BECore::Chess {
             engine.launch.path = *program;
             engine.options = EngineOptionsOf(level);
             engine.quitGraceMs = OpponentController::kQuitGraceMs;
-            return WithHandicap(MakeShared<UciEngine>(std::move(engine)), level);
+            return WithHandicap(New<UciEngine>(std::move(engine)), level);
         }
 
     }  // namespace
@@ -189,7 +189,7 @@ namespace BECore::Chess {
 
         // The engines first, so that a refused pick changes nothing, running searches included
         Array<bool, kSeatCount> remake = {};
-        Array<SharedPtr<IChessEngine>, kSeatCount> made;
+        Array<ChessEnginePtr, kSeatCount> made;
         for (const PieceColor color : EnumUtils<PieceColor>::Values()) {
             const size_t index = SeatIndex(color);
             const Seat& seat = _seats[index];
@@ -198,7 +198,7 @@ namespace BECore::Chess {
                 continue;
             }
             const OpponentLevel& chosen = levels[picked[index].level];
-            std::expected<SharedPtr<IChessEngine>, EngineError> engine = MakeEngine(picked[index].engine, chosen);
+            std::expected<ChessEnginePtr, EngineError> engine = MakeEngine(picked[index].engine, chosen);
             if (engine && !*engine) {
                 engine = std::unexpected(EngineError{EngineErrorKind::LaunchFailed, "the engine factory made no engine"});
             }
@@ -240,7 +240,7 @@ namespace BECore::Chess {
         return {};
     }
 
-    std::expected<SharedPtr<IChessEngine>, EngineError> OpponentController::MakeEngine(OpponentEngine engine, const OpponentLevel& level) const {
+    std::expected<ChessEnginePtr, EngineError> OpponentController::MakeEngine(OpponentEngine engine, const OpponentLevel& level) const {
         if (_factory) {
             return _factory(engine, level);
         }
@@ -248,7 +248,7 @@ namespace BECore::Chess {
             case OpponentEngine::Stockfish:
                 return MakeStockfishEngine(_settings, level);
             case OpponentEngine::Own:
-                return WithHandicap(MakeShared<OwnEngine>(level.varietyMargin), level);
+                return WithHandicap(New<OwnEngine>(level.varietyMargin), level);
         }
         return std::unexpected(EngineError{EngineErrorKind::BadRequest, "unknown engine"});
     }

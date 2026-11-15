@@ -18,7 +18,7 @@ namespace BECore::Chess {
 
     }  // namespace
 
-    BlunderEngine::BlunderEngine(SharedPtr<IChessEngine> inner, int percent) : _inner(std::move(inner)), _percent(eastl::clamp(percent, 0, kMaxPercent)) {
+    BlunderEngine::BlunderEngine(ChessEnginePtr inner, int percent) : _inner(std::move(inner)), _percent(eastl::clamp(percent, 0, kMaxPercent)) {
         ASSERT(_inner, "BlunderEngine: no engine to wrap");
     }
 

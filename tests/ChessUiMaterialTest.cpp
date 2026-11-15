@@ -199,7 +199,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, WithTheProgramAsWhiteTheGroupsSwapWithTheBoard) {
-        CountingFactory factory({MakeShared<GatedEngine>(true)});
+        CountingFactory factory({New<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         StartFrom(kWhiteTookAPawn);
@@ -227,7 +227,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, WithTheProgramAsBlackAndWithTwoPeopleWhiteStaysAtTheBottomOfTheDisplayToo) {
-        CountingFactory factory({MakeShared<GatedEngine>(true)});
+        CountingFactory factory({New<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         StartFrom(kBlackTookTheQueen);
@@ -241,7 +241,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, ThePanelTurnsTheDisplayWithTheBoard) {
         SKIP_WITHOUT_WORKER_THREADS();
-        CountingFactory factory({MakeShared<GatedEngine>(true)});
+        CountingFactory factory({New<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         StartFrom(kBlackTookTheQueen);
@@ -309,7 +309,7 @@ namespace BECore::Chess::Tests {
         ASSERT_EQ(ShownMaterialRows(), "");
         const auto take = MoveGenerator::ParseUci(Model().GetPosition(), "d5e4");
         ASSERT_TRUE(take.has_value());
-        const auto engine = MakeShared<GatedEngine>(true, *take);
+        const auto engine = New<GatedEngine>(true, *take);
         CountingFactory factory({engine});
         Opponent().SetEngineFactory(factory.AsFactory());
         ASSERT_TRUE(Opponent().SetSide(PieceColor::Black).has_value());
@@ -536,7 +536,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, InThePortraitViewTheGroupsSwapWithTheBoardAndTheBalanceGoesWithItsGroup) {
-        CountingFactory factory({MakeShared<GatedEngine>(true)});
+        CountingFactory factory({New<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         StartFrom(kWhiteTookAPawn);
