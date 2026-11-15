@@ -964,7 +964,7 @@ def run_opponent_panel_scenario(client: BagiControlClient, headless: bool) -> No
         check_selected(tree, ["ModeTwo", "ColorWhite", "EngineStockfish", "LevelMedium"], ["ModeComputer", "ColorBlack", "EngineOwn", "LevelEasy", "LevelHard", "LevelMax"])
     else:
         check_selected(tree, ["ModeTwo", "ColorWhite", "EngineOwn", "LevelMedium"], ["ModeComputer", "ColorBlack", "LevelEasy", "LevelHard", "LevelMax"])
-        check(panel_element(tree, "EngineStockfish")["visible"] is False, f"the Stockfish segment is shown where no Stockfish is offered:{panel_element(tree, 'EngineStockfish')}")
+        check(panel_element(tree, "EngineStockfish")["visible"] is False, f"the Stockfish segment is shown where no Stockfish is offered: {panel_element(tree, 'EngineStockfish')}")
         check(panel_element(tree, "EngineOwn")["visible"] is True, f"the Own engine segment is not shown: {panel_element(tree, 'EngineOwn')}")
     check_no_group_disabled(tree)
     check(panel_element(tree, "OpponentError")["text"] == "", f"the error line is not empty: {panel_element(tree, 'OpponentError')}")
