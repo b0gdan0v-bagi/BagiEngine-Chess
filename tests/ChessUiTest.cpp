@@ -109,6 +109,9 @@ namespace BECore::Chess::Tests {
 
         constexpr int kManyFrames = 200;  // frames that must pass with nothing happening
 
+        constexpr float kDimInset = 8.0f;     // view units: a point of a dim just inside the corner of the view, far from every plate
+        const Color kDimColor{0, 0, 0, 150};  // the dim of a modal panel (the node files)
+
         SDL_MouseButtonEvent Button(float x, float y, bool down) {
             SDL_MouseButtonEvent event{};
             event.type = down ? SDL_EVENT_MOUSE_BUTTON_DOWN : SDL_EVENT_MOUSE_BUTTON_UP;
@@ -788,6 +791,19 @@ namespace BECore::Chess::Tests {
         Pair<float, float> ScreenCenter(const UIElement& element) const {
             const Rect cell = ActiveFit().ToOutput(element.rect.x, element.rect.y, element.rect.w, element.rect.h);
             return {cell.x + cell.w * 0.5f, cell.y + cell.h * 0.5f};
+        }
+
+        /// Whether a point of the screen (output pixels) lies in an element as it was laid out in the last draw
+        bool Covers(const UIElement& element, const Pair<float, float>& point) const {
+            const Rect cell = ActiveFit().ToOutput(element.rect.x, element.rect.y, element.rect.w, element.rect.h);
+            return point.first >= cell.x && point.first <= cell.x + cell.w && point.second >= cell.y && point.second <= cell.y + cell.h;
+        }
+
+        /// A point of the dim of a modal canvas that no plate covers: just inside the corner of the view (the dim is the whole canvas, so its middle is under the plate)
+        Pair<float, float> DimCorner(const char* nodeName, const char* dimName) {
+            Draw();
+            const UIElement& dim = ElementOf(nodeName, dimName);
+            return PixelOf(dim.rect.x + kDimInset, dim.rect.y + kDimInset);
         }
 
         struct Taken {
@@ -2229,7 +2245,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(log.LastAction(), PoolString::Intern("ChessCloseMenu"));
     }
 
-    TEST_F(ChessUiTest, WhileTheListIsShownEveryPressIsItsAndTheBoardTheResetAndTheMenuButtonUnderItSeeNone) {
+    TEST_F(ChessUiTest, WhileTheListIsShownThePlateTakesAPressAndTheDimClosesItAndNothingUnderTheDimSeesOne) {
         ASSERT_TRUE(ClickButton(kMenuColor));
         ASSERT_TRUE(MenuList()->_visible);
         Draw();
@@ -2238,16 +2254,68 @@ namespace BECore::Chess::Tests {
         Draw();
         ActionLog log;
 
-        // On the plate (its title), on the dim over the board (a1, h8), over the Reset button and over the Menu button of the HUD: all of them are the list's
-        const Pair<float, float> points[] = {ScreenCenter(ElementOf("MenuPanel", "MenuTitle")), SquareCenter("a1"), SquareCenter("h8"), ScreenCenter(*HudElement("Reset")),
-                                             ScreenCenter(*HudElement("Menu"))};
-        for (const auto& [x, y] : points) {
-            EXPECT_TRUE(ClickAtPixel(x, y).Both()) << x << "," << y;
-        }
-        EXPECT_EQ(log.Total(), 0u) << "none of them is a button";
-        EXPECT_FALSE(Model().HasSelection()) << "no click reached the board";
-        EXPECT_EQ(Model().GetVersion(), afterMove) << "Reset under the dim was not pressed";
+        const auto title = ScreenCenter(ElementOf("MenuPanel", "MenuTitle"));
+        EXPECT_TRUE(ClickAtPixel(title.first, title.second).Both());
+        EXPECT_EQ(log.Total(), 0u) << "the title is no button, and the press did not reach the dim";
         EXPECT_TRUE(MenuList()->_visible);
+
+        // The dim over the board (a1, h8), over the Reset button and over the Menu button of the HUD: each press closes the list and nothing else gets it
+        const UIElement& plate = ElementOf("MenuPanel", "MenuPlate");
+        const Pair<float, float> points[] = {SquareCenter("a1"), SquareCenter("h8"), ScreenCenter(*HudElement("Reset")), ScreenCenter(*HudElement("Menu"))};
+        for (const auto& point : points) {
+            SCOPED_TRACE(Format("{},{}", point.first, point.second).c_str());
+            ASSERT_FALSE(Covers(plate, point)) << "a point of the dim, not of the plate";
+            const size_t before = log.Total();
+            EXPECT_TRUE(ClickAtPixel(point.first, point.second).Both());
+            EXPECT_EQ(log.Total(), before + 1) << "one action: the dim's";
+            EXPECT_EQ(log.LastAction(), PoolString::Intern("ChessCloseMenu"));
+            EXPECT_FALSE(MenuList()->_visible);
+            EXPECT_FALSE(Panel()->_visible);
+            EXPECT_FALSE(Model().HasSelection()) << "no click reached the board";
+            EXPECT_EQ(Model().GetVersion(), afterMove) << "Reset under the dim was not pressed";
+
+            ASSERT_TRUE(ClickButton(kMenuColor)) << "the Menu button works again once the list is closed";
+            ASSERT_TRUE(MenuList()->_visible);
+            Draw();
+        }
+    }
+
+    TEST_F(ChessUiTest, AClickOnTheDimOfTheListOrOfTheOpponentPanelClosesBothAndNeverAClickOnThePlate) {
+        ActionLog log;
+        ASSERT_TRUE(ClickButton(kMenuColor));
+        ASSERT_TRUE(MenuList()->_visible);
+        const auto menuTitle = ScreenCenter(ElementOf("MenuPanel", "MenuTitle"));
+        EXPECT_TRUE(ClickAtPixel(menuTitle.first, menuTitle.second).Both());
+        EXPECT_TRUE(MenuList()->_visible) << "a click on the plate closes nothing";
+
+        const size_t before = log.Total();
+        const auto menuDim = DimCorner("MenuPanel", "MenuDim");
+        ASSERT_FALSE(Covers(ElementOf("MenuPanel", "MenuPlate"), menuDim));
+        EXPECT_TRUE(ClickAtPixel(menuDim.first, menuDim.second).Both());
+        EXPECT_EQ(log.Total(), before + 1);
+        EXPECT_EQ(log.LastAction(), PoolString::Intern("ChessCloseMenu"));
+        EXPECT_FALSE(MenuList()->_visible);
+        EXPECT_FALSE(Panel()->_visible);
+
+        const auto e2 = SquareCenter("e2");
+        EXPECT_FALSE(CoreManager::GetUIInput().DispatchMouseButtonDown(Button(e2.first, e2.second, true))) << "the board takes clicks again";
+        EXPECT_TRUE(Model().HasSelection());
+        Release(e2.first, e2.second);
+
+        ASSERT_TRUE(OpenThePanel());
+        const auto title = ScreenCenter(PanelElement("Title"));
+        const size_t opened = log.Total();
+        EXPECT_TRUE(ClickAtPixel(title.first, title.second).Both());
+        EXPECT_EQ(log.Total(), opened);
+        EXPECT_TRUE(Panel()->_visible) << "a click on the plate closes nothing";
+
+        const auto panelDim = DimCorner("OpponentPanel", "Dim");
+        ASSERT_FALSE(Covers(PanelElement("Plate"), panelDim));
+        EXPECT_TRUE(ClickAtPixel(panelDim.first, panelDim.second).Both());
+        EXPECT_EQ(log.Total(), opened + 1);
+        EXPECT_EQ(log.LastAction(), PoolString::Intern("ChessCloseMenu"));
+        EXPECT_FALSE(Panel()->_visible);
+        EXPECT_FALSE(MenuList()->_visible) << "the list is not shown behind it";
     }
 
     TEST_F(ChessUiTest, AnUnknownSectionChangesNothingAndAKnownOneIsTheTablesWord) {
@@ -4777,12 +4845,16 @@ namespace BECore::Chess::Tests {
         Draw();
         EXPECT_FALSE(RectCalls(kPlateColor).empty()) << "shown: the plate is drawn";
 
-        // The Menu button is under the dim now: the list takes the press first, and nothing is emitted
+        // The Menu button is under the dim now: the dim takes the press first, and it is the dim's (it closes the list), not the Menu button's
         const size_t actions = log.Total();
         const auto button = ScreenCenter(*HudElement("Menu"));
         const Taken second = ClickAtPixel(button.first, button.second);
         EXPECT_TRUE(second.Both()) << "the modal canvas takes it";
-        EXPECT_EQ(log.Total(), actions) << "and it is not the Menu button's";
+        EXPECT_EQ(log.Total(), actions + 1);
+        EXPECT_EQ(log.LastAction(), PoolString::Intern("ChessCloseMenu"));
+        EXPECT_FALSE(MenuList()->_visible);
+        ASSERT_TRUE(ClickButton(kMenuColor));
+        ASSERT_TRUE(MenuList()->_visible);
 
         // The section replaces the list, Back brings the list back, Close hides both
         ASSERT_TRUE(ClickMenuList("MenuSectionOpponent").Both());
@@ -4812,7 +4884,7 @@ namespace BECore::Chess::Tests {
         EXPECT_FALSE(Panel()->_visible);
     }
 
-    TEST_F(ChessUiTest, WhileThePanelIsShownEveryPressIsItsAndTheBoardAndTheResetButtonUnderItSeeNone) {
+    TEST_F(ChessUiTest, WhileThePanelIsShownThePlateTakesAPressAndTheDimClosesItAndNothingUnderTheDimSeesOne) {
         ASSERT_TRUE(OpenThePanel());
         Draw();
         ActionLog log;
@@ -4822,18 +4894,35 @@ namespace BECore::Chess::Tests {
         ASSERT_GT(afterMove, version);
         Draw();
 
-        // On a segment, on the plate (its title), on the dim over the board (a1, below the plate) and over the Reset button: all of them are the panel's
-        const Pair<float, float> points[] = {ScreenCenter(PanelButton("EngineOwn")), ScreenCenter(PanelElement("Title")), SquareCenter("a1"), SquareCenter("h8"),
-                                             ScreenCenter(*HudElement("Reset")),     ScreenCenter(*HudElement("Turn"))};
-        for (const auto& [x, y] : points) {
-            const Taken taken = ClickAtPixel(x, y);
-            EXPECT_TRUE(taken.Both()) << x << "," << y;
-        }
-        EXPECT_FALSE(Model().HasSelection()) << "no click reached the board";
-        EXPECT_EQ(Model().GetVersion(), afterMove) << "Reset under the dim was not pressed, the board did not move";
-        EXPECT_EQ(Model().GetMoves().size(), 1u);
-        EXPECT_EQ(log.Total(), 1u) << "only the click on EngineOwn is an action; the others hit the plate or the dim";
+        // On a segment (an action) and on the plate (its title): the panel stays
+        const auto segment = ScreenCenter(PanelButton("EngineOwn"));
+        const auto title = ScreenCenter(PanelElement("Title"));
+        EXPECT_TRUE(ClickAtPixel(segment.first, segment.second).Both());
+        EXPECT_EQ(log.Total(), 1u);
         EXPECT_EQ(log.LastAction(), PoolString::Intern(kSetEngineAction));
+        EXPECT_TRUE(ClickAtPixel(title.first, title.second).Both());
+        EXPECT_EQ(log.Total(), 1u) << "the title is no button";
+        EXPECT_TRUE(Panel()->_visible);
+
+        // On the dim over the board (a1, h8, below the plate), over the Reset button and over the Turn label: each press closes the panel and the list, nothing else gets it
+        const UIElement& plate = PanelElement("Plate");
+        const Pair<float, float> points[] = {SquareCenter("a1"), SquareCenter("h8"), ScreenCenter(*HudElement("Reset")), ScreenCenter(*HudElement("Turn"))};
+        for (const auto& point : points) {
+            SCOPED_TRACE(Format("{},{}", point.first, point.second).c_str());
+            ASSERT_FALSE(Covers(plate, point)) << "a point of the dim, not of the plate";
+            const size_t before = log.Total();
+            EXPECT_TRUE(ClickAtPixel(point.first, point.second).Both());
+            EXPECT_EQ(log.Total(), before + 1) << "one action: the dim's";
+            EXPECT_EQ(log.LastAction(), PoolString::Intern("ChessCloseMenu"));
+            EXPECT_FALSE(Panel()->_visible);
+            EXPECT_FALSE(MenuList()->_visible);
+            EXPECT_FALSE(Model().HasSelection()) << "no click reached the board";
+            EXPECT_EQ(Model().GetVersion(), afterMove) << "Reset under the dim was not pressed, the board did not move";
+            EXPECT_EQ(Model().GetMoves().size(), 1u);
+
+            ASSERT_TRUE(OpenThePanel());
+            Draw();
+        }
     }
 
     TEST_F(ChessUiTest, EverySegmentEmitsItsActionAndValueAndTheSelectionFollowsTheController) {
@@ -5468,27 +5557,152 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(Model().GetPieceAt(Sq("a8")).type, PieceType::Knight);
     }
 
-    TEST_F(ChessUiTest, WhileThePromotionPanelIsShownEveryPressIsItsAndNothingUnderItSeesOne) {
+    TEST_F(ChessUiTest, WhileThePromotionPanelIsShownThePlateTakesAPressAndTheDimCancelsAndNothingUnderTheDimSeesOne) {
         StartFrom(kPromotionFen);
+        const uint64_t version = Model().GetVersion();
+        const String fen = Model().GetPosition().ToFen();
         ClickMove("a7", "a8");
         ASSERT_TRUE(PromotionShown());
         Draw();
         ActionLog log;
-        const uint64_t version = Model().GetVersion();
 
-        const Pair<float, float> points[] = {
-            SquareCenter("a1"), SquareCenter("h8"), SquareCenter("a8"), ScreenCenter(*HudElement("Reset")), ScreenCenter(*HudElement("Menu")), ScreenCenter(PromotionElement("PromotionTitle"))};
-        for (const auto& [x, y] : points) {
-            EXPECT_TRUE(ClickAtPixel(x, y).Both()) << x << "," << y;
+        const auto title = ScreenCenter(PromotionElement("PromotionTitle"));
+        EXPECT_TRUE(ClickAtPixel(title.first, title.second).Both());
+        EXPECT_EQ(log.Total(), 0u) << "the title is no button, and the press did not reach the dim";
+        EXPECT_TRUE(PromotionShown());
+
+        // The dim over the board (a1, h8, a8) and over the Reset and Menu buttons of the HUD: each press cancels the promotion and nothing else gets it
+        const UIElement& plate = PromotionElement(kPromotionPlate);
+        const Pair<float, float> points[] = {SquareCenter("a1"), SquareCenter("h8"), SquareCenter("a8"), ScreenCenter(*HudElement("Reset")), ScreenCenter(*HudElement("Menu"))};
+        for (const auto& point : points) {
+            SCOPED_TRACE(Format("{},{}", point.first, point.second).c_str());
+            ASSERT_FALSE(Covers(plate, point)) << "a point of the dim, not of the plate";
+            const size_t before = log.Total();
+            EXPECT_TRUE(ClickAtPixel(point.first, point.second).Both());
+            EXPECT_EQ(log.Total(), before + 1) << "one action: the dim's";
+            EXPECT_EQ(log.LastAction(), PoolString::Intern("ChessCancelPromotion"));
+            EXPECT_FALSE(PromotionShown());
+            EXPECT_FALSE(Model().HasPendingPromotion());
+            EXPECT_EQ(Model().GetVersion(), version) << "Reset under the dim was not pressed";
+            EXPECT_EQ(Model().GetPosition().ToFen(), fen);
+            EXPECT_EQ(Model().GetSelected(), Sq("a7")) << "the pawn stays selected";
+            EXPECT_FALSE(Panel()->_visible) << "the opponent panel stays closed (the Menu button was not pressed)";
+            EXPECT_FALSE(MenuList()->_visible);
+
+            Click("a8");
+            ASSERT_TRUE(PromotionShown()) << "the same target asks again";
+            Draw();
         }
+    }
 
-        EXPECT_EQ(log.Total(), 0u) << "no action was emitted: Reset and Opponent got no press";
+    TEST_F(ChessUiTest, AClickOnThePromotionDimCancelsLikeCancelAndNothingElseOfThePanelDoes) {
+        StartFrom(kPromotionFen);
+        const uint64_t version = Model().GetVersion();
+        Click("a7");
+        Click("a8");
+        ASSERT_TRUE(PromotionShown());
+        ActionLog log;
+
+        // The click that opened the panel pressed on the board, and its release now meets a modal canvas that saw no press: no click on the dim
+        ReleaseOn("a8");
+        EXPECT_TRUE(PromotionShown());
+        EXPECT_EQ(log.Total(), 0u);
+
+        // On the plate, beside the buttons (its padding), and on its title: nothing changes
+        Draw();
+        const UIElement& plate = PromotionElement(kPromotionPlate);
+        const auto padding = PixelOf(plate.rect.x + kDimInset / 2, plate.rect.y + kDimInset / 2);
+        const auto title = ScreenCenter(PromotionElement("PromotionTitle"));
+        ASSERT_TRUE(Covers(plate, padding));
+        for (const auto& point : {padding, title}) {
+            EXPECT_TRUE(ClickAtPixel(point.first, point.second).Both());
+        }
+        EXPECT_EQ(log.Total(), 0u);
+        EXPECT_TRUE(PromotionShown());
+        EXPECT_TRUE(Model().HasPendingPromotion());
+
+        // Outside the plate: the same as Cancel
+        const auto dim = DimCorner("PromotionPanel", "PromotionDim");
+        ASSERT_FALSE(Covers(plate, dim));
+        EXPECT_TRUE(ClickAtPixel(dim.first, dim.second).Both());
+        EXPECT_EQ(log.Total(), 1u);
+        EXPECT_EQ(log.LastAction(), PoolString::Intern("ChessCancelPromotion"));
+        EXPECT_FALSE(PromotionShown());
+        EXPECT_FALSE(Model().HasPendingPromotion());
         EXPECT_EQ(Model().GetVersion(), version);
         EXPECT_TRUE(Model().HasSelection());
         EXPECT_EQ(Model().GetSelected(), Sq("a7"));
-        EXPECT_TRUE(Model().HasPendingPromotion());
-        EXPECT_TRUE(PromotionShown());
-        EXPECT_FALSE(Panel()->_visible) << "the opponent panel stays closed";
+        EXPECT_EQ(Model().GetPieceAt(Sq("a7")).type, PieceType::Pawn);
+        Draw();
+        EXPECT_TRUE(RectCalls(kPromotionPlateColor).empty());
+
+        Click("a8");
+        EXPECT_TRUE(PromotionShown()) << "the pawn is still selected, so the same target asks again";
+        ASSERT_TRUE(ClickPromotion("PromoteQueen").Both());
+        EXPECT_EQ(Model().GetPieceAt(Sq("a8")).type, PieceType::Queen);
+    }
+
+    TEST_F(ChessUiTest, EveryModalCanvasHasADimThatIsItsOwnCloseAndDrawsTheSameUnderThePointer) {
+        struct ModalRow {
+            const char* node;
+            const char* dim;
+            const char* action;
+        };
+        // The dim of a modal canvas is its first element, and a click on it does what the panel's Close or Cancel does
+        const ModalRow rows[] = {{"MenuPanel", "MenuDim", "ChessCloseMenu"}, {"OpponentPanel", "Dim", "ChessCloseMenu"}, {"PromotionPanel", "PromotionDim", "ChessCancelPromotion"}};
+        size_t modals = 0;
+        for (const auto& node : GetScene().GetRootNode().GetChildren()) {
+            const auto canvas = node->GetComponent<UICanvasComponent>();
+            if (!canvas || !canvas->_modal) {
+                continue;
+            }
+            ++modals;
+            SCOPED_TRACE(node->GetName().CStr());
+            const ModalRow* row = nullptr;
+            for (const ModalRow& candidate : rows) {
+                if (node->GetName() == PoolString::Intern(candidate.node)) {
+                    row = &candidate;
+                }
+            }
+            ASSERT_NE(row, nullptr) << "a modal canvas needs a dim that closes it, and a row here";
+            ASSERT_FALSE(canvas->GetRoot().children.empty());
+            const UIElement& dim = *canvas->GetRoot().children.front();
+            EXPECT_EQ(dim.name, PoolString::Intern(row->dim)) << "the dim is the first element, so everything else is hit before it";
+            const UIInputClicker* clicker = ClickerOf(dim);
+            ASSERT_NE(clicker, nullptr);
+            EXPECT_EQ(clicker->action, PoolString::Intern(row->action));
+            EXPECT_FALSE(clicker->stateLook) << "the dim stays the plain rect under the pointer";
+            EXPECT_TRUE(dim.blocksInput);
+        }
+        EXPECT_EQ(modals, std::size(rows));
+
+        // Shown, with the pointer over its dim, a dim is drawn as before: the same one rect of the dim color
+        const auto show = [&](const char* node) {
+            if (StringView(node) == "MenuPanel") {
+                return ClickButton(kMenuColor);
+            }
+            if (StringView(node) == "OpponentPanel") {
+                return OpenThePanel();
+            }
+            StartFrom(kPromotionFen);
+            ClickMove("a7", "a8");
+            return PromotionShown();
+        };
+        for (const ModalRow& row : rows) {
+            SCOPED_TRACE(row.node);
+            ASSERT_TRUE(show(row.node));
+            Draw();
+            ASSERT_EQ(RectCalls(kDimColor).size(), 1u);
+            const auto corner = DimCorner(row.node, row.dim);
+            MouseMove(corner.first, corner.second, false);
+            Draw();
+            EXPECT_EQ(RectCalls(kDimColor).size(), 1u) << "hovered, the dim is still the plain rect";
+            Press("ChessCloseMenu");
+            Press("ChessCancelPromotion");
+            _manager->UpdateAll();
+            Draw();
+            ASSERT_TRUE(RectCalls(kDimColor).empty()) << "closed again";
+        }
     }
 
     TEST_F(ChessUiTest, AResetASetPositionOrAMoveOfSomeoneElseClosesThePanelAtTheNextFrame) {
@@ -7919,9 +8133,9 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(PromotionShown());
         const uint64_t version = Model().GetVersion();
         Drag("a7", "a8");
-        Drag("a7", "a6");
-        EXPECT_TRUE(PromotionShown());
-        EXPECT_TRUE(Model().HasPendingPromotion());
+        // A press and a release on the dim are a click on it: the drag cancels the promotion, and the board armed nothing
+        EXPECT_FALSE(PromotionShown());
+        EXPECT_FALSE(Model().HasPendingPromotion());
         EXPECT_EQ(Model().GetSelected(), Sq("a7"));
         EXPECT_TRUE(Model().GetMoves().empty());
         EXPECT_EQ(Model().GetVersion(), version);

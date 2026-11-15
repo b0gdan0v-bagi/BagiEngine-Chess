@@ -38,7 +38,7 @@ While the program thinks and the person has the other color, `OnMouseDown` hands
 
 ## The promotion picker
 
-A click on a promotion target leaves it pending in the model; the node `PromotionPanel` (`ChessPromotionPanel.xml`, modal `SceneView` canvas, layer 20, `visible="false"`) is shown exactly while `HasPendingPromotion()`, checked after a click and every update, so a reset, `set_state` or someone's move closes a stale one. Buttons `PromoteQueen` .. `PromoteKnight` (`ChessPromote`, the id from `Game/PromotionChoices.*` as `value`) and `PromotionCancel` (`ChessCancelPromotion`: the pawn stays selected). Element names start with `Promotion` or `Promote`.
+A click on a promotion target leaves it pending in the model; the node `PromotionPanel` (`ChessPromotionPanel.xml`, modal `SceneView` canvas, layer 20, `visible="false"`) is shown exactly while `HasPendingPromotion()`, checked after a click and every update, so a reset, `set_state` or someone's move closes a stale one. Buttons `PromoteQueen` .. `PromoteKnight` (`ChessPromote`, the id from `Game/PromotionChoices.*` as `value`) and `PromotionCancel` (`ChessCancelPromotion`: the pawn stays selected); `PromotionDim` cancels too. Element names start with `Promotion` or `Promote`.
 
 ## The captured material
 
@@ -56,7 +56,7 @@ The variables are republished when the model's version, the controller's revisio
 
 ## The menu
 
-Node `MenuPanel` (`ChessMenuPanel.xml`, layer 20, modal, `visible="false"`): `MenuDim`, `MenuPlate`, `MenuTitle`, one 56-unit button `MenuSection<Name>` per section (`ChessOpenSection`, the section id as `value`) and `MenuClose`; names start with `Menu`. `ChessOpenMenu` shows the list and hides every section, `ChessOpenSection` swaps the list for the section's canvas (an unknown id logs one warning), `ChessCloseMenu` hides all. The sections are the table `Game/MenuSections.*`. The menu is no state. **A new section** is a table row, a button, its own panel with `Back` and `Close`, and 68 units more in `MenuPlate`; a test fails a button without a row and the reverse.
+Node `MenuPanel` (`ChessMenuPanel.xml`, layer 20, modal, `visible="false"`): `MenuDim`, `MenuPlate`, `MenuTitle`, one 56-unit button `MenuSection<Name>` per section (`ChessOpenSection`, the section id as `value`) and `MenuClose`; names start with `Menu`. `ChessOpenMenu` shows the list and hides every section, `ChessOpenSection` swaps the list for the section's canvas (an unknown id logs one warning), `ChessCloseMenu` hides all. `MenuDim` is a button of its own with the action of `MenuClose`, so a click beside the plate closes the list; the same holds for `Dim` of the opponent panel and `PromotionDim` of the promotion picker, each with `stateLook="false"` (no hover look: the dim stays the plain `0,0,0,150`) and always the first child of its canvas, so a click on a plate is hit first and never reaches it. Escape is not wired (a separate entry waits for the engine's input mapping). The sections are the table `Game/MenuSections.*`. The menu is no state. **A new section** is a table row, a button, its own panel with `Back` and `Close`, and 68 units more in `MenuPlate`; a test fails a button without a row and the reverse.
 
 ## The opponent panel
 

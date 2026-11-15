@@ -2,7 +2,8 @@
 <!-- The menu: a list of sections, a modal canvas over everything (layer 20, above the HUD and the end-of-game bar), started hidden. The Menu button of the HUD shows it
      (ChessOpenMenu); a section button hides it and shows the canvas of the section (ChessOpenSection, the id of the section as the value: the table of MenuSections, which
      ChessBoardComponent hides and shows the canvases through); Close hides it (ChessCloseMenu). The list and a section panel replace one another; while one is shown its dim
-     takes every click, so the board and the HUD under it get none, and there is no Escape and no click outside. Only the sections the game has are here: a feature that
+     takes every click, so the board and the HUD under it get none. The dim is a button of its own that does what Close does (ChessCloseMenu), so a click beside the plate
+     closes the list; its clicker has stateLook="false", or the dim would lighten under the pointer. Escape is not wired. Only the sections the game has are here: a feature that
      does not exist yet has no button. Every name starts with Menu because elements are found by name in every canvas of the scene (the HUD button is the only one called
      exactly Menu). The sections are one 56-unit button MenuSection<Name> each, in the order of MenuSections(). To add a section: a row in Game/MenuSections.cpp, a
      MenuSection<Name> button here (and 68 units more in the height of MenuPlate: 56 for the button and 12 for the gap) and the panel node of the row. The plate is 94% of
@@ -13,7 +14,11 @@
   <components>
     <component type="UICanvasComponent" space="SceneView" useSafeArea="true" modal="true" visible="false">
       <elements>
-        <element type="UIElement" name="MenuDim" anchor="Stretch" ignoreSafeArea="true" color="0,0,0,150" blocksInput="true" />
+        <element type="UIElement" name="MenuDim" anchor="Stretch" ignoreSafeArea="true" color="0,0,0,150" blocksInput="true">
+          <components>
+            <component type="UIInputClicker" action="ChessCloseMenu" stateLook="false"/>
+          </components>
+        </element>
         <element type="UIStack" name="MenuPlate" anchor="Center" width="94%" maxWidth="640" height="224" direction="Vertical" spacing="12" padding="16" crossAlign="Stretch" color="36,40,52,255" blocksInput="true">
           <children>
             <element type="UIElement" name="MenuTitle" height="44" fontSize="30">
