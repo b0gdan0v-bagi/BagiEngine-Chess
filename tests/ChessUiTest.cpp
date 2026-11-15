@@ -7,6 +7,7 @@
 #include <BECore/Scene/Scene.h>
 #include <BECore/Scene/SceneManager.h>
 #include <BECore/Scene/SceneNode.h>
+#include <BECore/Scene/SceneView.h>
 #include <BECore/Text/FontAtlasLibrary.h>
 #include <BECore/UI/UICanvasComponent.h>
 #include <BECore/UI/UIElement.h>
@@ -62,7 +63,15 @@ namespace BECore::Chess::Tests {
         constexpr float kMinGap = 8.0f;                     // two controls of the HUD keep this much between them, in view units
         constexpr float kButtonAir = 8.0f;                  // the text of a button keeps this much from each edge of its fill
         constexpr float kNarrowestWidth = 480.0f;           // the narrowest window of the size matrix, in pixels
-        constexpr float kNarrowestHeight = 853.0f;          // 9:16 at that width
+        constexpr float kNarrowestHeight = 480.0f;          // the narrowest window with the default (landscape) view: 480 x 480 is a square, which keeps it, at the scale 0.571
+        constexpr float kNarrowestPortraitHeight = 853.0f;  // 9:16 at that width: the Portrait view, at the scale 0.667
+
+        // The second view of the scene (SceneConfig.xml, `viewVariants`): 720 x 960, the board at (40, 144), a square 80 units as in the default view
+        constexpr float kPortraitViewWidth = 720.0f;
+        constexpr float kPortraitViewHeight = 960.0f;
+        constexpr float kPortraitBoardLeft = 40.0f;
+        constexpr float kPortraitBoardTop = 144.0f;
+        constexpr const char* kPortraitViewName = "Portrait";
 
         // The colors the board fills a full square with (ChessBoardComponent.cpp)
         const Color kSelectedColor{120, 200, 120, 200};
@@ -741,8 +750,7 @@ namespace BECore::Chess::Tests {
 
         /// The middle of an element as it was laid out in the last draw, in output pixels (the view is fitted into the output)
         Pair<float, float> ScreenCenter(const UIElement& element) const {
-            const ViewTransform fit = ViewTransform::Fit(kViewWidth, kViewHeight, _renderer->width, _renderer->height);
-            const Rect cell = fit.ToOutput(element.rect.x, element.rect.y, element.rect.w, element.rect.h);
+            const Rect cell = ActiveFit().ToOutput(element.rect.x, element.rect.y, element.rect.w, element.rect.h);
             return {cell.x + cell.w * 0.5f, cell.y + cell.h * 0.5f};
         }
 
@@ -1046,7 +1054,7 @@ namespace BECore::Chess::Tests {
 
         /// The output pixel of a point of the view in scene units, for the fit of the view into the current output
         Pair<float, float> PixelOf(float sceneX, float sceneY) const {
-            const Rect at = ViewTransform::Fit(kViewWidth, kViewHeight, _renderer->width, _renderer->height).ToOutput(sceneX, sceneY, 0.0f, 0.0f);
+            const Rect at = ActiveFit().ToOutput(sceneX, sceneY, 0.0f, 0.0f);
             return {at.x, at.y};
         }
 
@@ -1135,9 +1143,35 @@ namespace BECore::Chess::Tests {
             ASSERT_EQ(Opponent().GetError()->kind, EngineErrorKind::LaunchFailed);
         }
 
+        /// A frame of the game as it is a few frames after a window has changed its shape: when the draw picked another view of the scene, the next update announces it to the board
+        /// (SceneViewChangedEvent), and the frame is drawn again with the geometry of that view
         void Draw() {
+            const uint32_t viewBefore = GetScene().GetViewVersion();
             _renderer->ClearCalls();
             _manager->DrawAll();
+            if (GetScene().GetViewVersion() != viewBefore) {
+                _manager->UpdateAll();
+                _renderer->ClearCalls();
+                _manager->DrawAll();
+            }
+        }
+
+        /// Whether the scene draws its Portrait view now (the last draw picked it)
+        bool PortraitIsActive() const {
+            return GetScene().GetActiveView().name == PoolString::Intern(kPortraitViewName);
+        }
+
+        /// The size of the view the scene draws now, in scene units
+        float ViewWidth() const {
+            return GetScene().GetViewWidth();
+        }
+        float ViewHeight() const {
+            return GetScene().GetViewHeight();
+        }
+
+        /// The fit of the active view into the current output, as the scene draws it
+        ViewTransform ActiveFit() const {
+            return ViewTransform::Fit(GetScene().GetViewWidth(), GetScene().GetViewHeight(), _renderer->width, _renderer->height);
         }
 
         /// The middle, in output pixels, of the fill that a button was drawn with in the last frame; none when no fill of that color was drawn (a hidden button draws nothing)
@@ -1388,7 +1422,7 @@ namespace BECore::Chess::Tests {
 
         /// A rect of the view in output pixels, for the fit of the view into the current output
         Rect OutputRect(const Rect& view) const {
-            return ViewTransform::Fit(kViewWidth, kViewHeight, _renderer->width, _renderer->height).ToOutput(view.x, view.y, view.w, view.h);
+            return ActiveFit().ToOutput(view.x, view.y, view.w, view.h);
         }
 
         /// Sets the 16 variables of the labels to round @p round of the 8: every letter and every digit stands at every label once over the rounds, so the widest one is laid out in each box
@@ -1456,8 +1490,10 @@ namespace BECore::Chess::Tests {
         }
 
         /// The top left corner of a cell of the board in view units: @p column from the left, @p rowFromTop from the top
-        static Pair<float, float> CellOrigin(int column, int rowFromTop) {
-            return {100.0f + static_cast<float>(column) * 80.0f, kBoardTop + static_cast<float>(rowFromTop) * 80.0f};
+        Pair<float, float> CellOrigin(int column, int rowFromTop) const {
+            const float left = PortraitIsActive() ? kPortraitBoardLeft : kBoardLeft;
+            const float top = PortraitIsActive() ? kPortraitBoardTop : kBoardTop;
+            return {left + static_cast<float>(column) * 80.0f, top + static_cast<float>(rowFromTop) * 80.0f};
         }
 
         /// The cell a square is drawn in, written out here and not taken from BoardOrientation.h: White at the bottom has a1 at the bottom left, Black at the bottom has the grid turned by 180 degrees
@@ -1467,9 +1503,8 @@ namespace BECore::Chess::Tests {
 
         /// A cell of the board in output pixels, for the fit of the view into the current output
         Rect CellRect(int column, int rowFromTop) const {
-            const ViewTransform fit = ViewTransform::Fit(kViewWidth, kViewHeight, _renderer->width, _renderer->height);
             const auto [x, y] = CellOrigin(column, rowFromTop);
-            return fit.ToOutput(x, y, 80.0f, 80.0f);
+            return ActiveFit().ToOutput(x, y, 80.0f, 80.0f);
         }
 
         /// A square of the board in output pixels, for the fit of the view into the current output and the orientation the opponent gives
@@ -1615,9 +1650,9 @@ namespace BECore::Chess::Tests {
             ASSERT_FALSE(plate.rect.IsEmpty()) << "the plate is shown at " << size.first << "x" << size.second;
             EXPECT_GE(plate.rect.x, -kPixelTolerance) << size.first << "x" << size.second;
             EXPECT_GE(plate.rect.y, -kPixelTolerance) << size.first << "x" << size.second;
-            EXPECT_LE(plate.rect.x + plate.rect.w, kViewWidth + kPixelTolerance) << size.first << "x" << size.second;
-            EXPECT_LE(plate.rect.y + plate.rect.h, kViewHeight + kPixelTolerance) << size.first << "x" << size.second;
-            EXPECT_NEAR(plate.rect.x + plate.rect.w * 0.5f, kViewWidth * 0.5f, 0.5f) << "the plate is centered in the view, at " << size.first << "x" << size.second;
+            EXPECT_LE(plate.rect.x + plate.rect.w, ViewWidth() + kPixelTolerance) << size.first << "x" << size.second;
+            EXPECT_LE(plate.rect.y + plate.rect.h, ViewHeight() + kPixelTolerance) << size.first << "x" << size.second;
+            EXPECT_NEAR(plate.rect.x + plate.rect.w * 0.5f, ViewWidth() * 0.5f, 0.5f) << "the plate is centered in the view, at " << size.first << "x" << size.second;
         }
     }
 
@@ -1996,9 +2031,9 @@ namespace BECore::Chess::Tests {
             ASSERT_FALSE(plate.rect.IsEmpty()) << "the plate is shown";
             EXPECT_GE(plate.rect.x, -kPixelTolerance);
             EXPECT_GE(plate.rect.y, -kPixelTolerance);
-            EXPECT_LE(plate.rect.x + plate.rect.w, kViewWidth + kPixelTolerance);
-            EXPECT_LE(plate.rect.y + plate.rect.h, kViewHeight + kPixelTolerance);
-            EXPECT_NEAR(plate.rect.x + plate.rect.w * 0.5f, kViewWidth * 0.5f, 0.5f) << "the plate is centered in the view";
+            EXPECT_LE(plate.rect.x + plate.rect.w, ViewWidth() + kPixelTolerance);
+            EXPECT_LE(plate.rect.y + plate.rect.h, ViewHeight() + kPixelTolerance);
+            EXPECT_NEAR(plate.rect.x + plate.rect.w * 0.5f, ViewWidth() * 0.5f, 0.5f) << "the plate is centered in the view";
             EXPECT_LE(plate.rect.w, 640.0f + kPixelTolerance);
             EXPECT_NEAR(plate.rect.h, MenuPlateHeight(), kPixelTolerance) << "16 + 44 + 56 per section + 56 + 12 per gap + 16: 224 with one section";
 
@@ -2286,7 +2321,7 @@ namespace BECore::Chess::Tests {
         Model().OnSquareClicked(Sq("e2"));
         ASSERT_TRUE(Model().HasSelection());
 
-        // The view is 840 x 800: 1280 x 720 and 720 x 1280 are not its shape, so the view transform is a scale and a move
+        // 1280 x 720 and 2560 x 1080 draw the default view (840 x 800) with bars at the sides, 720 x 1280 the Portrait one (720 x 960) with bars above and below
         for (const auto& size : {Pair<float, float>{1280.0f, 720.0f}, Pair<float, float>{720.0f, 1280.0f}, Pair<float, float>{2560.0f, 1080.0f}}) {
             SCOPED_TRACE(Format("output {}x{}", size.first, size.second).c_str());
             DrawAt(size.first, size.second);
@@ -2329,6 +2364,126 @@ namespace BECore::Chess::Tests {
             EXPECT_TRUE(SameRect(check[0]->rect, SquareRect("e8")));
             EXPECT_TRUE(IsCenteredIn(king->rect, check[0]->rect));
             EXPECT_NEAR(king->rect.w / king->rect.h, kCellWidth / kCellHeight, 1e-4f) << "not stretched to the highlight";
+        }
+    }
+
+    // ---- the two views of the scene --------------------------------------------------------------------------------------------
+    // The default view is 840 x 800 and Portrait 720 x 960; the board is 640 x 640 in both, so the view that the scene picks for an output is the one in which the board is bigger on
+    // the screen. The board follows the active view: a square is 80 units in both, its origin is that of the view
+
+    namespace {
+
+        constexpr float kBoardUnits = 640.0f;
+        constexpr float kBoardPixelTolerance = 0.01f;
+
+        /// The outputs that decide which view is right: phones held upright and sideways, tablets, desktop windows, squares and the degenerate ones
+        const Pair<float, float> kViewOutputs[] = {{480.0f, 853.0f},  {390.0f, 844.0f},  {720.0f, 1280.0f},  {768.0f, 1024.0f}, {800.0f, 800.0f},
+                                                   {1024.0f, 768.0f}, {1280.0f, 720.0f}, {1920.0f, 1080.0f}, {480.0f, 480.0f},  {1.0f, 1.0f},
+                                                   {0.0f, 0.0f},      {874.0f, 1000.0f}, {875.0f, 1000.0f},  {876.0f, 1000.0f}, {2560.0f, 1080.0f}};
+
+        /// The board's side on the screen when a view of @p viewWidth x @p viewHeight is fitted into an output
+        float BoardPixels(float viewWidth, float viewHeight, float outputWidth, float outputHeight) {
+            return kBoardUnits * std::min(outputWidth / viewWidth, outputHeight / viewHeight);
+        }
+
+    }  // namespace
+
+    TEST_F(ChessUiTest, TheSceneHasTheDefaultViewAndThePortraitView) {
+        EXPECT_FLOAT_EQ(GetScene().GetViewWidth(), kViewWidth);
+        EXPECT_FLOAT_EQ(GetScene().GetViewHeight(), kViewHeight);
+        const auto variants = GetScene().GetViewVariants();
+        ASSERT_EQ(variants.size(), 1u);
+        EXPECT_EQ(variants[0].name, PoolString::Intern(kPortraitViewName));
+        EXPECT_FLOAT_EQ(variants[0].width, kPortraitViewWidth);
+        EXPECT_FLOAT_EQ(variants[0].height, kPortraitViewHeight);
+    }
+
+    TEST_F(ChessUiTest, TheSceneShowsTheViewWithTheBiggerBoardOnTheScreen) {
+        const auto variants = GetScene().GetViewVariants();
+        for (const auto& output : kViewOutputs) {
+            SCOPED_TRACE(Format("output {}x{}", output.first, output.second).c_str());
+            const ActiveSceneView picked = SceneViewSelector::Pick(kViewWidth, kViewHeight, variants, output.first, output.second);
+            const float pickedPixels = BoardPixels(picked.width, picked.height, output.first, output.second);
+            EXPECT_GE(pickedPixels, BoardPixels(kViewWidth, kViewHeight, output.first, output.second) - kBoardPixelTolerance);
+            EXPECT_GE(pickedPixels, BoardPixels(kPortraitViewWidth, kPortraitViewHeight, output.first, output.second) - kBoardPixelTolerance);
+
+            if (output.first > 0.0f) {
+                DrawAt(output.first, output.second);
+                EXPECT_EQ(GetScene().GetActiveView(), picked) << "the scene draws the view that the rule picks";
+            }
+        }
+        // The cases that name the rule: a phone held upright is Portrait, a window wider than 0.875 of its height (a square too) the default view
+        const auto nameOf = [&](float width, float height) { return SceneViewSelector::Pick(kViewWidth, kViewHeight, variants, width, height).name; };
+        EXPECT_EQ(nameOf(480.0f, 853.0f), PoolString::Intern(kPortraitViewName));
+        EXPECT_EQ(nameOf(768.0f, 1024.0f), PoolString::Intern(kPortraitViewName));
+        EXPECT_EQ(nameOf(874.0f, 1000.0f), PoolString::Intern(kPortraitViewName));
+        EXPECT_EQ(nameOf(876.0f, 1000.0f), PoolString());
+        EXPECT_EQ(nameOf(800.0f, 800.0f), PoolString());
+        EXPECT_EQ(nameOf(1920.0f, 1080.0f), PoolString());
+    }
+
+    TEST_F(ChessUiTest, TheNarrowestWindowOfEachViewHasItsOwnScale) {
+        DrawAt(kNarrowestWidth, kNarrowestHeight);
+        EXPECT_FALSE(PortraitIsActive()) << "a square window keeps the default view";
+        EXPECT_NEAR(ActiveFit().scale, kNarrowestWidth / kViewWidth, 1e-4f);
+
+        DrawAt(kNarrowestWidth, kNarrowestPortraitHeight);
+        EXPECT_TRUE(PortraitIsActive());
+        EXPECT_NEAR(ActiveFit().scale, kNarrowestWidth / kPortraitViewWidth, 1e-4f) << "the width is the limit: 9:16 is taller than the view";
+    }
+
+    TEST_F(ChessUiTest, TheBoardAndThePiecesFollowTheViewThatIsDrawn) {
+        const ChessBoardComponent* board = ChessBoardComponent::GetActive();
+        ASSERT_NE(board, nullptr);
+        _manager->UpdateAll();
+
+        struct Shape {
+            Pair<float, float> output;
+            bool portrait;
+        };
+        // Landscape, portrait, landscape again: the geometry goes there and back
+        for (const Shape& shape : {Shape{{1280.0f, 720.0f}, false}, Shape{{480.0f, 853.0f}, true}, Shape{{768.0f, 1024.0f}, true}, Shape{{1024.0f, 768.0f}, false}}) {
+            SCOPED_TRACE(Format("output {}x{}", shape.output.first, shape.output.second).c_str());
+            DrawAt(shape.output.first, shape.output.second);
+            ASSERT_EQ(PortraitIsActive(), shape.portrait);
+
+            const float left = shape.portrait ? kPortraitBoardLeft : kBoardLeft;
+            const float top = shape.portrait ? kPortraitBoardTop : kBoardTop;
+            EXPECT_FLOAT_EQ(board->GetOriginX(), left);
+            EXPECT_FLOAT_EQ(board->GetOriginY(), top);
+            EXPECT_FLOAT_EQ(board->GetSquareSize(), kCellSize);
+
+            // A square is where the fixture says, for both orientations of the board
+            for (const PieceColor bottom : {PieceColor::White, PieceColor::Black}) {
+                for (const char* name : {"a1", "h1", "a8", "h8", "e4"}) {
+                    const Square square = Sq(name);
+                    const auto [column, row] = CellOfSquare(square, bottom == PieceColor::Black);
+                    float x = 0.0f;
+                    float y = 0.0f;
+                    board->SquareToPixel(square.file, square.rank, bottom, x, y);
+                    EXPECT_FLOAT_EQ(x, left + static_cast<float>(column) * kCellSize) << name;
+                    EXPECT_FLOAT_EQ(y, top + static_cast<float>(row) * kCellSize) << name;
+                }
+            }
+
+            // The pieces stand on their squares and the 64 squares drawn make the board of the view, to the pixel
+            ExpectPiecesAtTheCellsOf(false);
+            float minX = 1e9f;
+            float minY = 1e9f;
+            float maxX = -1e9f;
+            float maxY = -1e9f;
+            size_t cells = 0;
+            for (const Color& color : {kLightSquareColor, kDarkSquareColor}) {
+                for (const DrawCall* call : RectCalls(color)) {
+                    minX = std::min(minX, call->rect.x);
+                    minY = std::min(minY, call->rect.y);
+                    maxX = std::max(maxX, call->rect.x + call->rect.w);
+                    maxY = std::max(maxY, call->rect.y + call->rect.h);
+                    ++cells;
+                }
+            }
+            EXPECT_EQ(cells, 64u);
+            EXPECT_TRUE(SameRect(Rect{minX, minY, maxX - minX, maxY - minY}, OutputRect(Rect{left, top, kBoardUnits, kBoardUnits})));
         }
     }
 
@@ -5321,9 +5476,9 @@ namespace BECore::Chess::Tests {
             ASSERT_FALSE(plate.rect.IsEmpty()) << "the plate is shown";
             EXPECT_GE(plate.rect.x, -kPixelTolerance);
             EXPECT_GE(plate.rect.y, -kPixelTolerance);
-            EXPECT_LE(plate.rect.x + plate.rect.w, kViewWidth + kPixelTolerance);
-            EXPECT_LE(plate.rect.y + plate.rect.h, kViewHeight + kPixelTolerance);
-            EXPECT_NEAR(plate.rect.x + plate.rect.w * 0.5f, kViewWidth * 0.5f, 0.5f) << "the plate is centered in the view";
+            EXPECT_LE(plate.rect.x + plate.rect.w, ViewWidth() + kPixelTolerance);
+            EXPECT_LE(plate.rect.y + plate.rect.h, ViewHeight() + kPixelTolerance);
+            EXPECT_NEAR(plate.rect.x + plate.rect.w * 0.5f, ViewWidth() * 0.5f, 0.5f) << "the plate is centered in the view";
             EXPECT_LE(plate.rect.w, 640.0f + kPixelTolerance);
             EXPECT_NEAR(plate.rect.h, kPromotionPlateHeight, kPixelTolerance);
 

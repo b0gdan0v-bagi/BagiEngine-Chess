@@ -6,11 +6,20 @@
       name="ChessScene"
       viewWidth="840"
       viewHeight="800">
+      <!-- Two views. The default one is 840 x 800 (the board 640 x 640 at (100, 80), the HUD in the margins), the view named Portrait 720 x 960 (the board at (40, 144), the material above and below it).
+           The board is 640 x 640 and a square 80 units in both, so a piece, a drag and a label keep their numbers. `when` is tested on the OUTPUT in pixels: with the board 640 units in both views
+           it is 640 * min(W / viewW, H / viewH) pixels, which is bigger in Portrait exactly while W / H is under 840 / 960 = 0.875 (a width-bound landscape view against a height-bound portrait one),
+           so the view with the bigger board on the screen is picked; a square window keeps the default view. maxAspect holds up to and including its number, so the tie (0.875) is Portrait.
+           ChessBoardComponent follows the active view (its portraitOrigin* and portraitSquareSize are the board of Portrait); a canvas lays out per view with a variant `orientation:portrait`
+           (a canvas variant is conditioned on the bounds of its own canvas, here the view in units: 720 x 960 is portrait, 840 x 800 is not). -->
+      <viewVariants>
+        <view name="Portrait" when="maxAspect:0.875" width="720" height="960" />
+      </viewVariants>
       <nodes>
         <!-- Background layer: nodes with a lower layer are drawn first, the pieces (layer 0) on top. -->
         <node name="Board" layer="-1">
           <components>
-            <component type="ChessBoardComponent" originX="100" originY="80" squareSize="80" />
+            <component type="ChessBoardComponent" originX="100" originY="80" squareSize="80" portraitOriginX="40" portraitOriginY="144" portraitSquareSize="80" />
           </components>
         </node>
 

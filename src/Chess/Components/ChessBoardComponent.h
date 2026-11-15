@@ -18,7 +18,8 @@ namespace BECore {
 
     namespace SceneEvents {
         struct SceneUpdateEvent;
-    }
+        struct SceneViewChangedEvent;
+    }  // namespace SceneEvents
 
 }  // namespace BECore
 
@@ -31,6 +32,11 @@ namespace BECore::Chess {
      *
      * Owns no game state: the model is shared with ChessPieceComponent through GameManager::GetActive(). The geometry (origin and cell size) is reflected, in scene units: the engine scales
      * the scene to the window. The pieces, the HUD, the menu and the panels are other nodes of the scene (`Components/CLAUDE.md` tells them).
+     *
+     * The scene has two views, so the geometry has two sets: the default fields and the `portrait*` ones, for the view named kPortraitView. Which set holds is changed only on
+     * SceneViewChangedEvent (sent from Scene::Update(), before every update of the frame) and every accessor reads that one choice: the squares drawn, the pieces placed from the same
+     * update and the result bar then always agree, which they would not if each asked the scene for its active view at its own moment (a draw may run after the view was picked and before
+     * the pieces have moved). Before the first event the default set holds.
      *
      * It publishes the UIVars that the HUD, the panels and the coordinate labels show, only when something they say changed, and answers their actions: the HUD and the menu (`ChessReset`,
      * `ChessOpenMenu`, `ChessOpenSection`, `ChessCloseMenu`), the four of the opponent panel's groups (`ChessSetMode`, `ChessSetColor`, `ChessSetEngine`, `ChessSetLevel`) and the promotion pair
@@ -51,6 +57,9 @@ namespace BECore::Chess {
         BE_REFLECT_FIELD float _originX = 100.0f;
         BE_REFLECT_FIELD float _originY = 100.0f;
         BE_REFLECT_FIELD float _squareSize = 80.0f;
+        BE_REFLECT_FIELD float _portraitOriginX = 40.0f;
+        BE_REFLECT_FIELD float _portraitOriginY = 144.0f;
+        BE_REFLECT_FIELD float _portraitSquareSize = 80.0f;
 
         void OnAttached() override;
         void OnDraw() override;
@@ -64,14 +73,15 @@ namespace BECore::Chess {
         /// The same for an orientation the caller has read once (OnDraw places many squares per frame)
         void SquareToPixel(int file, int rank, PieceColor bottom, float& outX, float& outY) const;
 
+        /// The geometry of the view in effect (see the class comment), in scene units of that view
         float GetSquareSize() const noexcept {
-            return _squareSize;
+            return _portraitActive ? _portraitSquareSize : _squareSize;
         }
         float GetOriginX() const noexcept {
-            return _originX;
+            return _portraitActive ? _portraitOriginX : _originX;
         }
         float GetOriginY() const noexcept {
-            return _originY;
+            return _portraitActive ? _portraitOriginY : _originY;
         }
 
         /// The currently-attached board, if any. Chess assumes a single board is alive at any time; piece components read the layout through it
@@ -129,6 +139,9 @@ namespace BECore::Chess {
         void SyncPromotionPanel(const ChessGameModel& model);
         void OnUpdate(const SceneEvents::SceneUpdateEvent&);
 
+        /// Takes the geometry of the new view; a drag in the hand ends, since its scene units were those of the old one
+        void OnViewChanged(const SceneEvents::SceneViewChangedEvent&);
+
         /// Without Stockfish in this build (CHESS_NO_STOCKFISH) hides its segment of the opponent panel, so Own engine fills the group; once, at the first update or draw, when every node of the
         /// scene is attached. The scene file is the same in every build
         void HideUnavailableEngines();
@@ -154,6 +167,7 @@ namespace BECore::Chess {
         uint64_t _loggedVersion = 0;
         const void* _loggedModel = nullptr;
 
+        bool _portraitActive = false;       // the geometry in effect: the `portrait*` fields, else the default ones
         bool _promotionPanelShown = false;  // the canvas starts hidden
         bool _enginesChecked = false;
 
