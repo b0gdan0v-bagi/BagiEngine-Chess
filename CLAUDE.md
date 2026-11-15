@@ -4,6 +4,8 @@
 
 `ChessGame` is an `IGame` (name `Chess`, scene `ChessScene`, namespace `BECore::Chess`), executable `BagiChess`; how a game is registered: `engine/src/Modules/Games/CLAUDE.md`. Content: `config/` (`ApplicationConfig.xml`, `SceneConfig.xml` with its node files in `config/nodes/`, `TextureLibrary.xml`, `ChessSettings.xml`) and `assets/`. It starts in Game mode; `mode="Editor"` opens the scene editor (a local edit only: `ChessWebConfigTest` fails with it). Style is the engine's (`engine/CLAUDE.md`); `BECore::Format`, not `fmt::` (`BagiChessFmtLayerCheck`). Comments: `.claude/rules/code-comments.md`.
 
+- **Licence:** the game and its own art are Beerware (`LICENSE`); what the repository carries of other authors and the Stockfish paragraph (never shipped or linked, a separate process over UCI) are in `THIRD_PARTY_NOTICES.md`, held to the tree by ctest `BagiChessThirdPartyNotices`: a new asset or library adds its row in the same commit. The engine's notices are `engine/THIRD_PARTY_NOTICES.md`.
+
 ## Layout
 
 ```

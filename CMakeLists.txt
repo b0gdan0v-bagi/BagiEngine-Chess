@@ -133,6 +133,10 @@ if(ENGINE_BUILD_TESTS)
             TIMEOUT 60
         )
 
+        # LICENSE and THIRD_PARTY_NOTICES.md hold to the tree (tests/check_notices.py): a row for every asset, the Stockfish section, no Stockfish file in the repository
+        add_test(NAME BagiChessThirdPartyNotices COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_notices.py)
+        set_tests_properties(BagiChessThirdPartyNotices PROPERTIES TIMEOUT 60)
+
         # A quoted include is allowed only for a source file's own header; every other include is <...> from an include root (the engine's
         # check_includes.py over the whole game: src, tests, uci)
         add_test(NAME BagiChessIncludeStyle COMMAND ${Python3_EXECUTABLE} ${BAGI_ENGINE_DIR}/CI/scripts/check_includes.py --root ${CMAKE_CURRENT_SOURCE_DIR})
