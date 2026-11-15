@@ -1513,4 +1513,67 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(model.GetPremoves().size(), 1U);
     }
 
+    // ---- The seed ----
+
+    TEST(ChessGameModelTest, ABareModelHasSeedZeroAndKeepsItOverReset) {
+        ChessGameModel model;
+        EXPECT_EQ(model.GetSeed(), 0U);
+        model.Reset();
+        EXPECT_EQ(model.GetSeed(), 0U);
+    }
+
+    TEST(ChessGameModelTest, ResetWithASeedSourceDrawsTheSeedInOneVersionStep) {
+        ChessGameModel model;
+        uint32_t next = 7;
+        model.SetSeedSource([&next]() { return next++; });
+        EXPECT_EQ(model.GetSeed(), 0U) << "installing a source draws nothing";
+
+        const uint64_t before = model.GetVersion();
+        model.Reset();
+        EXPECT_EQ(model.GetSeed(), 7U);
+        EXPECT_EQ(model.GetVersion(), before + 1) << "the new game and its seed are one step";
+
+        model.Reset();
+        EXPECT_EQ(model.GetSeed(), 8U);
+    }
+
+    TEST(ChessGameModelTest, ASourceThatReturnsZeroGivesSeedOne) {
+        ChessGameModel model;
+        model.SetSeedSource([]() { return 0U; });
+        model.Reset();
+        EXPECT_EQ(model.GetSeed(), 1U);
+    }
+
+    TEST(ChessGameModelTest, SetSeedMovesTheVersionOnlyWhenTheValueChanges) {
+        ChessGameModel model;
+        const uint64_t before = model.GetVersion();
+
+        model.SetSeed(0);
+        EXPECT_EQ(model.GetVersion(), before);
+
+        model.SetSeed(99);
+        EXPECT_EQ(model.GetSeed(), 99U);
+        EXPECT_EQ(model.GetVersion(), before + 1);
+
+        model.SetSeed(99);
+        EXPECT_EQ(model.GetVersion(), before + 1);
+    }
+
+    TEST(ChessGameModelTest, SetPositionKeepsTheSeed) {
+        ChessGameModel model;
+        model.SetSeed(123);
+        model.SetPosition(PositionFromFen(kPromotionFen));
+        EXPECT_EQ(model.GetSeed(), 123U);
+    }
+
+    TEST(ChessGameModelTest, ASeedSourceDoesNotTouchSetPositionOrMoves) {
+        ChessGameModel model;
+        model.SetSeedSource([]() { return 5U; });
+        model.Reset();
+        ASSERT_TRUE(Play(model, "e2e4"));
+        EXPECT_EQ(model.GetSeed(), 5U);
+        model.SetPosition(PositionFromFen(kPromotionFen));
+        EXPECT_EQ(model.GetSeed(), 5U);
+    }
+
 }  // namespace BECore::Chess::Tests

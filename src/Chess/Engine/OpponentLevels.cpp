@@ -20,6 +20,11 @@ namespace BECore::Chess {
         constexpr int kMaxSkillLevel = 20;
         constexpr int kMaxMoveTimeMs = 2000;
         constexpr int kMaxBlunderPercent = 0;
+        // Centipawns within which the own engine may vary its move; the weaker the level, the more it varies
+        constexpr int kEasyVarietyMargin = 100;
+        constexpr int kMediumVarietyMargin = 50;
+        constexpr int kHardVarietyMargin = 25;
+        constexpr int kMaxVarietyMargin = 0;
         // The depth of the own engine at each level; the deepest stops at 5 so that a slower machine still answers in a short time
         constexpr int kEasyOwnDepth = 1;
         constexpr int kMediumOwnDepth = 2;
@@ -27,10 +32,10 @@ namespace BECore::Chess {
         constexpr int kMaxOwnDepth = 5;
 
         constexpr Array<OpponentLevel, 4> kLevels{
-            OpponentLevel{"easy", "Easy", kEasySkillLevel, kEasyMoveTimeMs, kEasyOwnDepth, kEasyBlunderPercent},
-            OpponentLevel{"medium", "Medium", kMediumSkillLevel, kMediumMoveTimeMs, kMediumOwnDepth, kMediumBlunderPercent},
-            OpponentLevel{"hard", "Hard", kHardSkillLevel, kHardMoveTimeMs, kHardOwnDepth, kHardBlunderPercent},
-            OpponentLevel{"max", "Max", kMaxSkillLevel, kMaxMoveTimeMs, kMaxOwnDepth, kMaxBlunderPercent},
+            OpponentLevel{"easy", "Easy", kEasySkillLevel, kEasyMoveTimeMs, kEasyOwnDepth, kEasyBlunderPercent, kEasyVarietyMargin},
+            OpponentLevel{"medium", "Medium", kMediumSkillLevel, kMediumMoveTimeMs, kMediumOwnDepth, kMediumBlunderPercent, kMediumVarietyMargin},
+            OpponentLevel{"hard", "Hard", kHardSkillLevel, kHardMoveTimeMs, kHardOwnDepth, kHardBlunderPercent, kHardVarietyMargin},
+            OpponentLevel{"max", "Max", kMaxSkillLevel, kMaxMoveTimeMs, kMaxOwnDepth, kMaxBlunderPercent, kMaxVarietyMargin},
         };
         static_assert(!kLevels.empty());
         static_assert(kDefaultOpponentLevel < kLevels.size());

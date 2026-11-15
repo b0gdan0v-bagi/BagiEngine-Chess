@@ -2,6 +2,7 @@
 
 #include <Games/GameManager.h>
 #include <Generated/ChessGame.gen.hpp>
+#include <random>
 
 namespace BECore::Chess {
 
@@ -31,6 +32,12 @@ namespace BECore::Chess {
     }
 
     ChessGame::ChessGame() : _opponent(_model), _choice(_opponent), _control(_model, _opponent, _analyst) {
+        // A new game draws a new seed; a device per draw because the source has to be copyable and a Reset is rare
+        _model.SetSeedSource([]() -> uint32_t {
+            //-NoStd: the operating system's randomness is the real boundary of the seed
+            std::random_device device;
+            return device();
+        });
         // The settings are read at the time of the search, so the ones Start() loads are the ones used
         _analyst.SetEngineFactory([this](OpponentEngine engine) { return MakeAnalysisEngine(engine, _opponent.GetSettings()); });
     }

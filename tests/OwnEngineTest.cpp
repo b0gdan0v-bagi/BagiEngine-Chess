@@ -86,6 +86,69 @@ namespace BECore::Chess::Tests {
             return eastl::find(moves.begin(), moves.end(), move) != moves.end();
         }
 
+        SearchRequest WithSeed(SearchRequest request, uint32_t seed) {
+            request.seed = seed;
+            return request;
+        }
+
+        constexpr int kVarietyMargin = 50;
+        constexpr uint32_t kSeedCount = 40;
+        constexpr uint32_t kFewSeeds = 8;
+
+        /// The moves a variety search may answer, worked out from the lines of Analyse(): line 1, then every line up to the first one that is a mate or more than
+        /// @p margin centipawns below line 1 (a mate as line 1 stands alone)
+        Vector<Move> VarietyCandidates(const SearchRequest& request, int margin) {
+            OwnEngine plain;
+            const auto analysis = plain.Analyse(WithLines(request, kVarietyMaxLines), CancellationToken::Create());
+            Vector<Move> candidates;
+            if (!analysis) {
+                return candidates;
+            }
+            const AnalysisScore first = analysis->Best().score;
+            candidates.push_back(analysis->Best().move);
+            for (size_t i = 1; i < analysis->lines.size() && first.kind == AnalysisScoreKind::Centipawns; ++i) {
+                const AnalysisLine& line = analysis->lines[i];
+                if (line.score.kind != AnalysisScoreKind::Centipawns || line.score.value < first.value - margin) {
+                    break;
+                }
+                candidates.push_back(line.move);
+            }
+            return candidates;
+        }
+
+        /// The answers of @p engine for the seeds 1..kSeedCount
+        Vector<Move> AnswersOverSeeds(IChessEngine& engine, const SearchRequest& request, uint32_t count = kSeedCount) {
+            Vector<Move> answers;
+            for (uint32_t seed = 1; seed <= count; ++seed) {
+                const auto answer = Ask(engine, WithSeed(request, seed));
+                EXPECT_TRUE(answer.has_value()) << seed;
+                if (answer) {
+                    answers.push_back(*answer);
+                }
+            }
+            return answers;
+        }
+
+        bool Contains(const Vector<Move>& moves, Move move) {
+            return eastl::find(moves.begin(), moves.end(), move) != moves.end();
+        }
+
+        /// The move of a driven search that gets @p slice nodes per call
+        std::expected<Move, EngineError> FindInSlices(const OwnEngine& engine, const SearchRequest& request, uint64_t slice) {
+            auto search = engine.BeginFindMove(request, CancellationToken::Create());
+            if (!search) {
+                return std::unexpected(std::move(search.error()));
+            }
+            while (!search->IsDone()) {
+                (void)search->Advance(slice);
+            }
+            auto answer = search->Result();
+            if (!answer) {
+                return std::unexpected(std::move(answer.error()));
+            }
+            return answer->Best().move;
+        }
+
         /// How long @p search takes when its token is cancelled kCancelAfter after it began (for the yardsticks)
         template <class SearchCall>
         std::chrono::steady_clock::duration TimeCancelledSearch(SearchCall&& search) {
@@ -703,6 +766,192 @@ namespace BECore::Chess::Tests {
         many.lines = 5;
 
         EXPECT_EQ(Found(Ask(_engine, many)), Found(Ask(_engine, request)));
+    }
+
+    // -- Variety: the choice among near-equal moves -----------------------------------------------------------------------------------
+
+    TEST_F(OwnEngineTest, WithoutAMarginOrWithoutASeedTheAnswerIsThePlainSearch) {
+        OwnEngine margin(kVarietyMargin);
+        OwnEngine noMargin(0);
+        for (const StringView fen : {Position::kStartFen, kKiwipeteFen, StringView(kHangingQueen)}) {
+            const SearchRequest request = SearchRequest::FromPosition(PositionFromFen(fen), Depth(kFloorDepth));
+            auto plain = _engine.BeginFindMove(request, CancellationToken::Create());
+            ASSERT_TRUE(plain.has_value());
+            (void)plain->Advance(UINT64_MAX);
+            const auto plainMove = plain->Result()->Best();
+
+            for (const uint32_t seed : {1u, 777u}) {
+                auto plainByMargin = margin.BeginFindMove(request, CancellationToken::Create());
+                ASSERT_TRUE(plainByMargin.has_value());
+                (void)plainByMargin->Advance(UINT64_MAX);
+                EXPECT_EQ(plainByMargin->Result()->Best().move, plainMove.move) << fen.data() << " seed " << seed << " margin: unseeded request";
+
+                auto noVariety = noMargin.BeginFindMove(WithSeed(request, seed), CancellationToken::Create());
+                ASSERT_TRUE(noVariety.has_value());
+                (void)noVariety->Advance(UINT64_MAX);
+                const AnalysisLine line = noVariety->Result()->Best();
+                EXPECT_EQ(line.move, plainMove.move) << fen.data() << " seed " << seed;
+                EXPECT_EQ(line.score, plainMove.score) << fen.data() << " seed " << seed;
+                EXPECT_EQ(line.depth, plainMove.depth) << fen.data() << " seed " << seed;
+                EXPECT_EQ(noVariety->GetNodes(), plain->GetNodes()) << fen.data() << " seed " << seed << ": the same search, not one node more";
+            }
+        }
+    }
+
+    TEST_F(OwnEngineTest, ASeedPicksAmongTheNearEqualMovesOfTheStartPosition) {
+        OwnEngine engine(kVarietyMargin);
+        const SearchRequest request = SearchRequest::FromPosition(Position::Start(), Depth(kShallow));
+        const Vector<Move> allowed = VarietyCandidates(request, kVarietyMargin);
+        ASSERT_GE(allowed.size(), 2u) << "the start position has near-equal moves at this depth";
+
+        const Vector<Move> answers = AnswersOverSeeds(engine, request);
+
+        size_t distinct = 0;
+        for (const Move move : allowed) {
+            distinct += Contains(answers, move) ? 1 : 0;
+        }
+        EXPECT_GE(distinct, 2u) << "different seeds give different moves of the near-equal ones";
+        for (const Move move : answers) {
+            EXPECT_TRUE(Contains(allowed, move)) << move.ToUci() << " is outside the margin";
+        }
+    }
+
+    TEST_F(OwnEngineTest, TheAnswerIsNeverOutsideTheMarginWhateverTheMarginAndTheSeed) {
+        for (const StringView fen : {Position::kStartFen, kKiwipeteFen, StringView(kHangingQueen)}) {
+            for (const int margin : {1, 25, 100, 100000}) {
+                OwnEngine engine(margin);
+                const SearchRequest request = SearchRequest::FromPosition(PositionFromFen(fen), Depth(1));
+                const Vector<Move> allowed = VarietyCandidates(request, margin);
+                ASSERT_FALSE(allowed.empty());
+                EXPECT_LE(allowed.size(), static_cast<size_t>(kVarietyMaxLines));
+
+                for (const Move move : AnswersOverSeeds(engine, request, kFewSeeds)) {
+                    EXPECT_TRUE(Contains(allowed, move)) << fen.data() << " margin " << margin << ": " << move.ToUci();
+                }
+            }
+        }
+    }
+
+    TEST_F(OwnEngineTest, AWinningCaptureIsNotVariedAtAnEasyMargin) {
+        OwnEngine engine(kVarietyMargin);
+        const SearchRequest request = SearchRequest::FromPosition(PositionFromFen(kHangingQueen), Depth(kShallow));
+        const Vector<Move> answers = AnswersOverSeeds(engine, request);
+
+        for (const Move move : answers) {
+            EXPECT_EQ(move, Mv("d1d4")) << "the second best move is a rook and a queen worse";
+        }
+    }
+
+    TEST_F(OwnEngineTest, AForcedMateIsNeverVariedHoweverWideTheMargin) {
+        OwnEngine engine(100000);
+
+        for (const uint32_t seed : {1u, 2u, 3u, 100u}) {
+            EXPECT_EQ(Found(Ask(engine, WithSeed(SearchRequest::FromPosition(PositionFromFen(kMateInOneForWhite), Depth(kShallow)), seed))), Mv("a1a8")) << seed;
+        }
+        const SearchRequest mateInTwo = SearchRequest::FromPosition(PositionFromFen(kMateInTwo), Depth(kMateInTwoDepth));
+        const auto plain = Ask(_engine, mateInTwo);
+        ASSERT_TRUE(plain.has_value());
+        for (const Move move : AnswersOverSeeds(engine, mateInTwo)) {
+            EXPECT_EQ(move, *plain);
+        }
+    }
+
+    TEST_F(OwnEngineTest, ALostPositionIsNotVariedEither) {
+        // Every Black move is mated at once: line 1 is a mate score (a loss), so the answer is the plain one
+        OwnEngine engine(100000);
+        const SearchRequest request = SearchRequest::FromPosition(PositionFromFen(kMatedInOne), Depth(kShallow));
+        const auto plain = Ask(_engine, request);
+        ASSERT_TRUE(plain.has_value());
+
+        for (const Move move : AnswersOverSeeds(engine, request)) {
+            EXPECT_EQ(move, *plain);
+        }
+    }
+
+    TEST_F(OwnEngineTest, OneOrTwoLegalMovesNeedNoMoreLinesThanThereAreMoves) {
+        OwnEngine engine(100000);
+
+        EXPECT_EQ(Found(Ask(engine, WithSeed(SearchRequest::FromPosition(PositionFromFen(kOneLegalMove), Depth(kShallow)), 5))), Mv("a8a7"));
+        const SearchRequest two = SearchRequest::FromPosition(PositionFromFen(kTwoLegalMoves), Depth(kShallow));
+        const Vector<Move> allowed = VarietyCandidates(two, 100000);
+        ASSERT_EQ(allowed.size(), 2u);
+        for (const Move move : AnswersOverSeeds(engine, two)) {
+            EXPECT_TRUE(Contains(allowed, move));
+        }
+    }
+
+    TEST_F(OwnEngineTest, TheSameSeedGivesTheSameMoveFromAnotherObjectAndInSlices) {
+        OwnEngine first(kVarietyMargin);
+        OwnEngine second(kVarietyMargin);
+        const SearchRequest request = SearchRequest::FromPosition(Position::Start(), Depth(kFloorDepth));
+
+        for (uint32_t seed = 1; seed <= 12; ++seed) {
+            const SearchRequest seeded = WithSeed(request, seed);
+            const auto whole = Ask(first, seeded);
+            ASSERT_TRUE(whole.has_value()) << seed;
+
+            EXPECT_EQ(Found(Ask(first, seeded)), Found(whole)) << seed << ": again";
+            EXPECT_EQ(Found(Ask(second, seeded)), Found(whole)) << seed << ": another object";
+            EXPECT_EQ(Found(FindInSlices(first, seeded, kSearchSliceNodes)), Found(whole)) << seed << ": slices of kSearchSliceNodes";
+            EXPECT_EQ(Found(FindInSlices(first, seeded, 1)), Found(whole)) << seed << ": one node a slice";
+        }
+    }
+
+    TEST_F(OwnEngineTest, ARequestOfAGameRollsAnotherChoiceThanTheSamePositionFromItsStartFen) {
+        // The roll takes the number of moves of the request in, as the handicap does: the same position reached by a different request may be answered differently, and each way is repeatable
+        OwnEngine engine(100000);
+        ChessGameModel model;
+        ASSERT_TRUE(Play(model, "g1f3"));
+        ASSERT_TRUE(Play(model, "g8f6"));
+        ASSERT_TRUE(Play(model, "f3g1"));
+        ASSERT_TRUE(Play(model, "f6g8"));
+        SearchRequest game = SearchRequest::FromModel(model, Depth(kShallow));
+        const SearchRequest fresh = SearchRequest::FromPosition(Position::Start(), Depth(kShallow));
+
+        size_t different = 0;
+        for (uint32_t seed = 1; seed <= kSeedCount; ++seed) {
+            game.seed = seed;
+            const auto a = Ask(engine, game);
+            const auto b = Ask(engine, game);
+            ASSERT_TRUE(a.has_value());
+            EXPECT_EQ(Found(a), Found(b)) << seed;
+            different += Found(a) != Found(Ask(engine, WithSeed(fresh, seed))) ? 1 : 0;
+        }
+        EXPECT_GT(different, 0u);
+    }
+
+    TEST_F(OwnEngineTest, AnalyseIsNeverVariedByTheMarginOrTheSeed) {
+        OwnEngine engine(100000);
+        const SearchRequest request = WithLines(SearchRequest::FromPosition(PositionFromFen(kKiwipeteFen), Depth(kShallow)), 3);
+        const auto plain = Analyse(_engine, request);
+        ASSERT_TRUE(plain.has_value());
+
+        for (const uint32_t seed : {1u, 9u}) {
+            const auto varied = Analyse(engine, WithSeed(request, seed));
+
+            ASSERT_TRUE(varied.has_value());
+            ASSERT_EQ(varied->LineCount(), plain->LineCount());
+            for (size_t i = 0; i < plain->LineCount(); ++i) {
+                EXPECT_EQ(varied->lines[i].move, plain->lines[i].move) << seed << " line " << i;
+                EXPECT_EQ(varied->lines[i].score, plain->lines[i].score) << seed << " line " << i;
+                EXPECT_EQ(varied->lines[i].depth, plain->lines[i].depth) << seed << " line " << i;
+            }
+        }
+    }
+
+    TEST_F(OwnEngineTest, AVarietySearchWithAMoveTimeAloneAnswersALegalMoveAndAnArrivedCancelIsCancelled) {
+        OwnEngine engine(kVarietyMargin);
+        const SearchRequest request = WithSeed(SearchRequest::FromPosition(PositionFromFen(kKiwipeteFen), SearchLimits{kMoveTimeMs, 0}), 3);
+        const auto answer = Ask(engine, request);
+
+        ASSERT_TRUE(answer.has_value());
+        EXPECT_TRUE(IsLegalIn(*request.FinalPosition(), *answer));
+
+        CancellationToken cancelled = CancellationToken::Create();
+        cancelled.Cancel();
+        const auto refused = Ask(engine, request, cancelled);
+        ASSERT_FALSE(refused.has_value());
+        EXPECT_EQ(refused.error().kind, EngineErrorKind::Cancelled);
     }
 
     // -- By-hand yardsticks: the speed claims no normal test makes, because they depend on the load of the machine --------------------

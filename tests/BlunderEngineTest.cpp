@@ -1,5 +1,6 @@
 #include <Chess/Engine/BlunderEngine.h>
 #include <Chess/Engine/OwnEngine.h>
+#include <Chess/Engine/VarietyRoll.h>
 #include <Chess/Game/ChessGameModel.h>
 #include <tests/GamePlay.h>
 #include <thread>
@@ -17,6 +18,9 @@ namespace BECore::Chess::Tests {
         constexpr size_t kRatePositions = 400;
         constexpr uint64_t kGameSeed = 0x2545F4914F6CDD1DULL;
         constexpr size_t kSelfPlayPlies = 40;
+        constexpr uint32_t kSeedA = 12345;
+        constexpr uint32_t kSeedB = 987654321;
+        constexpr uint64_t kOldPlyStep = 0x9E3779B97F4A7C15ULL;
 
         std::expected<Move, EngineError> Ask(IChessEngine& engine, const SearchRequest& request, const CancellationToken& token = CancellationToken::Create()) {
             return engine.FindMove(request, token);
@@ -49,6 +53,11 @@ namespace BECore::Chess::Tests {
                 }
             }
             return requests;
+        }
+
+        SearchRequest WithSeed(SearchRequest request, uint32_t seed) {
+            request.seed = seed;
+            return request;
         }
 
         /// What one request did to a BlunderEngine over an InstantEngine: whether the wrapped engine was asked, and the answer
@@ -195,6 +204,92 @@ namespace BECore::Chess::Tests {
         const double at15 = rate(15);
         const double at40 = rate(40);
 
+        EXPECT_GE(at15, 8.0);
+        EXPECT_LE(at15, 24.0);
+        EXPECT_GE(at40, 30.0);
+        EXPECT_LE(at40, 50.0);
+    }
+
+    TEST(BlunderEngineTest, ARollKeyWithSeedZeroIsTheOldExpressionAndMixIsTheSplitmixFinalizer) {
+        // The golden values of the handicap above hold only while seed 0 rolls exactly what it always rolled
+        const Position kiwipete = PositionFromFen(kKiwipeteFen);
+        const Position start = Position::Start();
+
+        EXPECT_EQ(RollKey(start, 0, 0), start.Key());
+        EXPECT_EQ(RollKey(kiwipete, 7, 0), kiwipete.Key() ^ (uint64_t{7} * kOldPlyStep));
+        EXPECT_EQ(Mix(0), 0u);
+        EXPECT_EQ(Mix(1), 0x5692161D100B05E5ULL);
+        EXPECT_NE(RollKey(kiwipete, 7, kSeedA), RollKey(kiwipete, 7, 0));
+        EXPECT_NE(RollKey(kiwipete, 7, kSeedA), RollKey(kiwipete, 7, kSeedB));
+        EXPECT_EQ(RollKey(kiwipete, 7, kSeedA), RollKey(kiwipete, 7, kSeedA));
+    }
+
+    TEST(BlunderEngineTest, ANonZeroSeedChangesWhichPositionsBlunderAndWhichMoveIsPlayed) {
+        const auto inner = MakeShared<InstantEngine>();
+        BlunderEngine engine(inner, 40);
+        const Vector<SearchRequest> requests = SeededRequests(kRatePositions);
+        size_t differentDecision = 0;
+        size_t differentMove = 0;
+        size_t bothBlunder = 0;
+
+        for (const SearchRequest& request : requests) {
+            const Decision plain = Decide(engine, *inner, request);
+            const Decision seeded = Decide(engine, *inner, WithSeed(request, kSeedA));
+
+            differentDecision += plain.blundered != seeded.blundered ? 1 : 0;
+            if (plain.blundered && seeded.blundered) {
+                ++bothBlunder;
+                differentMove += plain.move != seeded.move ? 1 : 0;
+            }
+        }
+
+        EXPECT_GT(differentDecision, requests.size() / 10) << "another seed rolls another set of blunders";
+        EXPECT_LT(differentDecision, requests.size()) << "but not the opposite of every decision";
+        EXPECT_GT(bothBlunder, 0u);
+        EXPECT_GT(differentMove, 0u) << "the random move is another one too";
+    }
+
+    TEST(BlunderEngineTest, TheSameSeedGivesTheSameAnswerFromAnyObject) {
+        const Vector<SearchRequest> requests = SeededRequests(kGamePlies);
+        const auto innerA = MakeShared<InstantEngine>();
+        const auto innerB = MakeShared<InstantEngine>();
+        BlunderEngine first(innerA, 50);
+        BlunderEngine second(innerB, 50);
+
+        for (size_t i = 0; i < requests.size(); ++i) {
+            const SearchRequest request = WithSeed(requests[i], kSeedB);
+            const Decision a = Decide(first, *innerA, request);
+            const Decision b = Decide(first, *innerA, request);
+            const Decision c = Decide(second, *innerB, request);
+
+            EXPECT_EQ(Describe(a), Describe(b)) << i;
+            EXPECT_EQ(Describe(a), Describe(c)) << i << ": another object, the same answer";
+        }
+    }
+
+    TEST(BlunderEngineTest, WithASeedAPositionThatBlundersAt15PercentBlundersAt40AndTheRateStaysNearThePercent) {
+        const auto inner = MakeShared<InstantEngine>();
+        BlunderEngine low(inner, 15);
+        BlunderEngine high(inner, 40);
+        const Vector<SearchRequest> requests = SeededRequests(kRatePositions);
+        size_t lowBlunders = 0;
+        size_t highBlunders = 0;
+
+        for (size_t i = 0; i < requests.size(); ++i) {
+            const SearchRequest request = WithSeed(requests[i], kSeedA);
+            const Decision atLow = Decide(low, *inner, request);
+            const Decision atHigh = Decide(high, *inner, request);
+
+            lowBlunders += atLow.blundered ? 1 : 0;
+            highBlunders += atHigh.blundered ? 1 : 0;
+            if (atLow.blundered) {
+                EXPECT_TRUE(atHigh.blundered) << i;
+                EXPECT_EQ(atLow.move, atHigh.move) << i;
+            }
+        }
+
+        const double at15 = static_cast<double>(lowBlunders) * 100.0 / static_cast<double>(requests.size());
+        const double at40 = static_cast<double>(highBlunders) * 100.0 / static_cast<double>(requests.size());
         EXPECT_GE(at15, 8.0);
         EXPECT_LE(at15, 24.0);
         EXPECT_GE(at40, 30.0);

@@ -48,11 +48,15 @@ namespace BECore::Chess {
 
         explicit OwnSearch(UniquePtr<Impl> impl) noexcept;
 
-        /// Validates, finds the position and its moves, and starts the first line; @p lines is the number wanted (the legal moves may limit it)
-        [[nodiscard]] static std::expected<OwnSearch, EngineError> Begin(const SearchRequest& request, const CancellationToken& token, int lines);
+        /// Validates, finds the position and its moves, and starts the first line; @p lines is the number wanted (the legal moves may limit it). A @p varietyMargin
+        /// above 0 with a seed in the request makes it the search of OwnEngine::FindMove() that chooses among near-equal moves (@p lines is then 1)
+        [[nodiscard]] static std::expected<OwnSearch, EngineError> Begin(const SearchRequest& request, const CancellationToken& token, int lines, int varietyMargin);
 
         UniquePtr<Impl> _impl;
     };
+
+    /// The most lines a FindMove() with a variety margin looks at (the first and the alternatives within the margin): the cost of a varied move is up to this many searches
+    inline constexpr int kVarietyMaxLines = 4;
 
     /**
      * @brief The own engine: IChessEngine over Search(), in the process of the game, on every platform.
@@ -65,8 +69,14 @@ namespace BECore::Chess {
      * the search had a move by then: the answer is dropped, as UciEngine drops it. IllegalMove would mean a bug in Search() (the move is checked against
      * MoveGenerator before it leaves), not a state of the world.
      *
-     * **Deterministic for a depth**: a request with a depth and no time gives the same move on every run and platform. A request with a time is not: where the
-     * clock stops the search decides the depth reached, hence the move.
+     * **Deterministic for a depth**: a request with a depth and no time gives the same move on every run and platform, for the same SearchRequest::seed. A request
+     * with a time is not: where the clock stops the search decides the depth reached, hence the move.
+     *
+     * **Variety.** With a margin (the constructor) above 0 and a request with a seed other than 0, FindMove() does not always play the first line: it looks at up to
+     * kVarietyMaxLines lines the way Analyse() does, takes line 1 and every later line whose centipawn score is at most the margin below line 1's (it stops at the
+     * first line outside, and at once at a mate, so a forced win or loss is never varied), and plays the candidate that RollKey() picks. The same seed, position and
+     * depth give the same move. Margin 0 or seed 0 is the plain search, move, score and node count unchanged; Analyse() is never varied. A move time is a deadline of the
+     * whole call for every line: a later line the clock stops is no candidate, line 1 is never shortened by the others.
      *
      * **One implementation, three ways to ask.** FindMove() and Analyse() block until the answer; BeginFindMove() / BeginAnalyse() hand back an OwnSearch to drive
      * with Advance(); FindMoveAsync() and AnalyseAsync() are coroutines that drive it between frames. The blocking calls are "begin, run to the end", so they give
@@ -78,6 +88,9 @@ namespace BECore::Chess {
      */
     class OwnEngine final : public IChessEngine {
     public:
+        /// @p varietyMargin is the centipawns below the best move that FindMove() still counts as equal (0 = none, never varied; below 0 is brought to 0)
+        explicit OwnEngine(int varietyMargin = 0);
+
         [[nodiscard]] std::expected<Move, EngineError> FindMove(const SearchRequest& request, const CancellationToken& token) override;
 
         /// SearchRequest::lines lines (at most as many as the position has legal moves), best first. Line 1 is the best move of the last iteration that finished, with
@@ -101,6 +114,12 @@ namespace BECore::Chess {
 
         /// Analyse() as a coroutine, the same loop
         [[nodiscard]] Task<std::expected<Analysis, EngineError>> AnalyseAsync(SearchRequest request, CancellationToken token) override;
+
+    private:
+        /// The coroutine of FindMoveAsync(): the margin comes by value, so the frame reads no member of an engine that may be gone
+        [[nodiscard]] static Task<std::expected<Move, EngineError>> FindMoveTask(SearchRequest request, CancellationToken token, int varietyMargin);
+
+        int _varietyMargin;
     };
 
 }  // namespace BECore::Chess

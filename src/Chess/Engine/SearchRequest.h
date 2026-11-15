@@ -18,8 +18,10 @@ namespace BECore::Chess {
         SearchLimits limits;
         /// How many lines IChessEngine::Analyse() returns (1..kMaxAnalysisLines, best first); FindMove() always gives one move, but still validates it. The factories give 1
         int lines = 1;
+        /// ChessGameModel::GetSeed() of the game: 0 = no variety. It varies the handicap's blunders and the own engine's choice among near-equal moves, nothing else
+        uint32_t seed = 0;
 
-        /// The game of @p model: its start FEN and its moves, repetitions included.
+        /// The game of @p model: its start FEN, its moves (repetitions included) and its seed.
         [[nodiscard]] static SearchRequest FromModel(const ChessGameModel& model, SearchLimits limits);
 
         /// The position as it stands, with no moves. The repetition history of a Position is lost (the FEN does not carry it), a model keeps it: use FromModel() for a game.

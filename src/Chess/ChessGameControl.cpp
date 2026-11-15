@@ -126,6 +126,7 @@ namespace BECore::Chess {
             ProgramSides plays;
             SeatChoice white;
             SeatChoice black;
+            Optional<uint32_t> seed;  ///< Empty: the game's seed stays
         };
 
         constexpr StringView kBothId = "both";
@@ -217,7 +218,7 @@ namespace BECore::Chess {
             return ReadChoice(seat, StringView(where), choice);
         }
 
-        /// Reads {"plays", "level", "engine", "white", "black"}; a member that is missing keeps what @p current says, per seat. "level" and "engine" are for both seats, then the seat objects
+        /// Reads {"plays", "level", "engine", "white", "black", "seed"}; a member that is missing keeps what @p current says, per seat. "level" and "engine" are for both seats, then the seat objects
         /// override one seat, then "plays" says who plays. Nothing is changed: the pick is applied by the caller once everything is valid
         std::expected<OpponentPick, ControlError> ParseOpponent(const Json& opponent, OpponentPick current) {
             if (!opponent.is_object()) {
@@ -253,6 +254,13 @@ namespace BECore::Chess {
                         return std::unexpected(BadOpponent("opponent 'plays' has to be \"white\", \"black\", \"both\" or null (two people): the colors the program plays"));
                     }
                 }
+            }
+            if (FindJsonMember(opponent, "seed")) {
+                const Optional<int64_t> seed = GetJsonInt(opponent, "seed");
+                if (!seed || *seed < 0 || *seed > static_cast<int64_t>(std::numeric_limits<uint32_t>::max())) {
+                    return std::unexpected(BadOpponent(Format("opponent 'seed' has to be an integer from 0 to {} (0 is no variety)", std::numeric_limits<uint32_t>::max())));
+                }
+                current.seed = static_cast<uint32_t>(*seed);
             }
             return current;
         }
@@ -318,6 +326,7 @@ namespace BECore::Chess {
         opponent["level"] = MakeJsonString(GetOpponentLevels()[_opponent.GetLevel()].id);
         opponent["engine"] = MakeJsonString(OpponentEngineId(_opponent.GetEngine()));
         opponent["seats"] = std::move(seats);
+        opponent["seed"] = _model.GetSeed();
         opponent["thinking"] = _opponent.IsThinking();
         opponent["error"] = ErrorJson(error);
         return opponent;
@@ -435,9 +444,8 @@ namespace BECore::Chess {
         const Json* opponentMember = FindJsonMember(state, "opponent");
         const Json* analysisMember = FindJsonMember(state, "analysis");
         if (!fenMember && !opponentMember && !analysisMember) {
-            return std::unexpected(MakeControlError(
-                ControlErrors::kInvalidParams,
-                "'fen' (a FEN string), 'opponent' ({\"plays\", \"level\", \"engine\", \"white\", \"black\"}), both, or 'analysis' ({\"evaluation\", \"hint\", \"ratings\"}) alone are needed"));
+            return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, "'fen' (a FEN string), 'opponent' ({\"plays\", \"level\", \"engine\", \"white\", \"black\", \"seed\"}), both, or "
+                                                                                   "'analysis' ({\"evaluation\", \"hint\", \"ratings\"}) alone are needed"));
         }
         if (analysisMember && (fenMember || opponentMember)) {
             return std::unexpected(MakeControlError(ControlErrors::kInvalidParams,
@@ -476,6 +484,9 @@ namespace BECore::Chess {
             if (!chosen) {
                 return std::unexpected(
                     MakeControlError(ChessControlErrors::kEngineUnavailable, Format("no engine for the opponent ({}): {}", ErrorKindName(chosen.error().kind), chosen.error().detail)));
+            }
+            if (pick->seed) {
+                _model.SetSeed(*pick->seed);  // after the pick that can fail, before the position
             }
             _analyst.SetPicked(_opponent.GetEngine());  // at once, so a get_state before the next frame does not show the old engine's answer
         }

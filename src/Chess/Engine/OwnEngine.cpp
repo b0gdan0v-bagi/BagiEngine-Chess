@@ -1,12 +1,15 @@
 #include "OwnEngine.h"
 
 #include <Chess/Engine/Analysis.h>
+#include <Chess/Engine/VarietyRoll.h>
 #include <Chess/Game/MoveGenerator.h>
 #include <TaskSystem/Awaitables.h>
 
 namespace BECore::Chess {
 
     namespace {
+
+        constexpr uint64_t kPickSalt = 0xC2B2AE3D27D4EB4FULL;
 
         std::unexpected<EngineError> Fail(EngineErrorKind kind, String detail) {
             return std::unexpected(EngineError{kind, std::move(detail)});
@@ -31,6 +34,12 @@ namespace BECore::Chess {
     /// The state of one FindMove() / Analyse(): the position and limits, the line being searched (a job) and the lines found. The one place for the line loop,
     /// the deadlines, the retry and the checks of the answer
     struct OwnSearch::Impl {
+        /// A FindMove() that chooses among near-equal moves: the lines are searched as in Analyse() and the answer is picked from those within the margin
+        struct Variety {
+            int margin;
+            uint64_t roll;
+        };
+
         /// The position the request leads to, with the history of the game; every line's job searches a copy of it
         Position position;
         MoveList legal;
@@ -46,6 +55,8 @@ namespace BECore::Chess {
         Optional<SearchJob> job;
         /// Whether the job is the retry at depth 1 of a line whose first search was stopped before its first node
         bool retrying = false;
+        /// Set for a FindMove() with a margin and a seed (OwnEngine::OwnEngine()); then `lineCount` is the most lines to look at and `analysis` holds the candidates
+        Optional<Variety> variety;
         /// The nodes of the jobs that are over
         uint64_t finishedNodes = 0;
         Optional<std::expected<Analysis, EngineError>> result;
@@ -62,7 +73,9 @@ namespace BECore::Chess {
             SearchControl control;
             if (!retry) {
                 control.token = token;
-                control.deadline = DeadlineOfLine(start, limits, excluded.size() + 1, lineCount);
+                // The extra lines of a variety search must not shorten line 1: each may use the whole move time and is simply no candidate when it does not finish
+                const size_t line = variety ? lineCount : excluded.size() + 1;
+                control.deadline = DeadlineOfLine(start, limits, line, lineCount);
             }
             job.emplace(position, std::move(settings), std::move(control));
         }
@@ -75,6 +88,20 @@ namespace BECore::Chess {
             result = std::unexpected(EngineError{kind, std::move(detail)});
         }
 
+        /// Whether a line found after the first is a near-equal alternative: a score in centipawns at most `margin` below line 1's (a mate is never one)
+        [[nodiscard]] bool IsCandidate(const AnalysisLine& line) const {
+            const AnalysisScore& first = analysis.lines.front().score;
+            return line.score.kind == AnalysisScoreKind::Centipawns && line.score.value >= first.value - variety->margin;
+        }
+
+        /// The answer of a variety search: one of the lines found (all of them candidates), chosen by the roll
+        void FinishVariety() {
+            const AnalysisLine picked = analysis.lines[Mix(variety->roll ^ kPickSalt) % analysis.lines.size()];
+            analysis.lines.clear();
+            analysis.lines.push_back(picked);
+            result = std::move(analysis);
+        }
+
         /// The end of a line's job: Cancelled when the token is cancelled, the retry when no iteration finished, the check of the move against the generator, then
         /// the line is kept and the next job starts, or the analysis is the answer
         void OnJobDone() {
@@ -85,6 +112,11 @@ namespace BECore::Chess {
             if (!retrying) {
                 if (token.IsCancelled()) {
                     Finish(EngineErrorKind::Cancelled, "the search was cancelled and its answer was dropped");
+                    return;
+                }
+                if (variety && !excluded.empty() && (!found.complete || found.stopped)) {
+                    // An optional line that the time did not allow: its score is not comparable, so the candidates are the lines before it
+                    FinishVariety();
                     return;
                 }
                 if (!found.complete) {
@@ -102,6 +134,20 @@ namespace BECore::Chess {
             }
             analysis.lines.push_back(AnalysisLine{found.best, ScoreFromSearch(found.score), found.depth});
             excluded.push_back(found.best);
+            if (variety) {
+                // A forced win or loss is never varied: a mate as line 1 ends the collecting, and so does the first line outside the margin (not a candidate)
+                const bool isFirst = analysis.lines.size() == 1;
+                const bool collecting = isFirst ? analysis.lines.front().score.kind == AnalysisScoreKind::Centipawns : IsCandidate(analysis.lines.back());
+                if (!collecting && !isFirst) {
+                    analysis.lines.pop_back();
+                }
+                if (!collecting || excluded.size() >= lineCount) {
+                    FinishVariety();
+                    return;
+                }
+                StartJob(false);
+                return;
+            }
             if (excluded.size() >= lineCount) {
                 result = std::move(analysis);
                 return;
@@ -115,7 +161,7 @@ namespace BECore::Chess {
     OwnSearch::OwnSearch(OwnSearch&&) noexcept = default;
     OwnSearch& OwnSearch::operator=(OwnSearch&&) noexcept = default;
 
-    std::expected<OwnSearch, EngineError> OwnSearch::Begin(const SearchRequest& request, const CancellationToken& token, int lines) {
+    std::expected<OwnSearch, EngineError> OwnSearch::Begin(const SearchRequest& request, const CancellationToken& token, int lines, int varietyMargin) {
         const std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
 
         if (auto valid = request.Validate(); !valid) {
@@ -133,8 +179,14 @@ namespace BECore::Chess {
             return Fail(EngineErrorKind::Cancelled, "cancelled before the search started");
         }
         // Fewer legal moves than lines asked for: as many lines as moves
-        const size_t lineCount = eastl::min(static_cast<size_t>(lines), static_cast<size_t>(legal.size()));
+        size_t lineCount = eastl::min(static_cast<size_t>(lines), static_cast<size_t>(legal.size()));
+        Optional<Impl::Variety> variety;
+        if (varietyMargin > 0 && request.seed != 0 && legal.size() > 1) {
+            variety = Impl::Variety{varietyMargin, RollKey(*found, request.moves.size(), request.seed)};
+            lineCount = eastl::min(static_cast<size_t>(kVarietyMaxLines), legal.size());
+        }
         auto impl = MakeUnique<Impl>(std::move(*found), std::move(legal), request.limits, start, token, lineCount);
+        impl->variety = variety;
         impl->StartJob(false);
         return OwnSearch(std::move(impl));
     }
@@ -185,13 +237,15 @@ namespace BECore::Chess {
         return _impl->finishedNodes + (_impl->job ? _impl->job->GetResult().nodes : 0);
     }
 
+    OwnEngine::OwnEngine(int varietyMargin) : _varietyMargin(eastl::max(varietyMargin, 0)) {}
+
     std::expected<OwnSearch, EngineError> OwnEngine::BeginFindMove(const SearchRequest& request, const CancellationToken& token) const {
         // One move whatever request.lines says (the request is validated with it all the same)
-        return OwnSearch::Begin(request, token, 1);
+        return OwnSearch::Begin(request, token, 1, _varietyMargin);
     }
 
     std::expected<OwnSearch, EngineError> OwnEngine::BeginAnalyse(const SearchRequest& request, const CancellationToken& token) const {
-        return OwnSearch::Begin(request, token, request.lines);
+        return OwnSearch::Begin(request, token, request.lines, 0);
     }
 
     namespace {
@@ -228,7 +282,11 @@ namespace BECore::Chess {
     // The coroutines call OwnSearch::Begin() and not the members, so nothing reads `this` once the task runs: the engine may be gone by then.
     // The yield goes before the work, so a task started between two drains of the frame budget gives the frame back at once.
     Task<std::expected<Move, EngineError>> OwnEngine::FindMoveAsync(SearchRequest request, CancellationToken token) {
-        auto search = OwnSearch::Begin(request, token, 1);
+        return FindMoveTask(std::move(request), std::move(token), _varietyMargin);
+    }
+
+    Task<std::expected<Move, EngineError>> OwnEngine::FindMoveTask(SearchRequest request, CancellationToken token, int varietyMargin) {
+        auto search = OwnSearch::Begin(request, token, 1, varietyMargin);
         if (!search) {
             co_return std::unexpected(std::move(search.error()));
         }
@@ -240,7 +298,7 @@ namespace BECore::Chess {
     }
 
     Task<std::expected<Analysis, EngineError>> OwnEngine::AnalyseAsync(SearchRequest request, CancellationToken token) {
-        auto search = OwnSearch::Begin(request, token, request.lines);
+        auto search = OwnSearch::Begin(request, token, request.lines, 0);
         if (!search) {
             co_return std::unexpected(std::move(search.error()));
         }

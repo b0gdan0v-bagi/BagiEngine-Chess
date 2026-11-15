@@ -18,7 +18,7 @@ namespace BECore::Chess {
      * until Reset() or SetPosition().
      *
      * GetVersion() grows with every change a controller has to see (a new game, a position set from outside, a played
-     * move, a takeback) and never goes back. A selection, a pending promotion (a click on the last rank leaves it pending
+     * move, a takeback, a changed seed) and never goes back. A selection, a pending promotion (a click on the last rank leaves it pending
      * until ChoosePromotion() or CancelPromotion()) and the premove queue are no change of the game: they leave the
      * version alone, so a search in flight stays valid. The move PlayPremove() plays moves it, as any move.
      *
@@ -27,6 +27,11 @@ namespace BECore::Chess {
      * the game and a move of the premoving color that did not come from it, and, in PlayPremove(), whole when its front is
      * not legal in its turn. A premoved promotion plays as a queen. Who may premove is for the owner of the opponent to
      * decide; the model only keeps the queue.
+     *
+     * The seed varies what an engine picks among equal options (0 = no variety, the engines behave as they always did). A bare
+     * model has seed 0 and keeps it over Reset(); a model with a seed source (SetSeedSource()) draws a new non-zero seed in
+     * Reset(), inside the version step of the new game. SetPosition() keeps the seed: it is no new draw, so a position set from
+     * outside stays reproducible. SetSeed() moves the version only when the value changes, so a search in flight is dropped.
      *
      * Visual pieces are tracked through opaque handles, so the scene can render moves and captures without re-deriving
      * identity from piece type and color. A handle is bound at registration to its starting square and follows its piece
@@ -37,10 +42,24 @@ namespace BECore::Chess {
         /// Opaque caller-provided identity (e.g. a ChessPieceComponent*).
         using PieceHandle = const void*;
 
+        /// Where Reset() gets a new seed from; returns any value (a 0 becomes 1).
+        //-NoStd: no callable alias yet (callables-move-only)
+        using SeedSource = eastl::function<uint32_t()>;
+
         ChessGameModel();
 
-        /// Restart from the standard opening position.
+        /// Restart from the standard opening position; with a seed source, also with a new seed (one version step for both).
         void Reset();
+
+        /// Empty (the default) keeps the seed over Reset().
+        void SetSeedSource(SeedSource source) {
+            _seedSource = std::move(source);
+        }
+        [[nodiscard]] uint32_t GetSeed() const noexcept {
+            return _seed;
+        }
+        /// The version grows only when @p seed differs from the current one.
+        void SetSeed(uint32_t seed) noexcept;
 
         /**
          * @brief Start a game from @p position instead of the opening one (it becomes the start of the move list).
@@ -242,6 +261,8 @@ namespace BECore::Chess {
         String _startFen;
         Vector<Move> _moves;
         uint64_t _version = 0;
+        uint32_t _seed = 0;
+        SeedSource _seedSource;
         GameStatus _status = GameStatus::Ongoing;
         bool _hasSelected = false;
         Square _selected{};
