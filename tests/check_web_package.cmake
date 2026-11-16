@@ -39,6 +39,7 @@ set(expected
     config/TextureLibrary.xml
     config/nodes/ChessBoard.xml
     config/nodes/ChessBoardCoordinates.xml
+    config/nodes/ChessGameSection.xml
     config/nodes/ChessHud.xml
     config/nodes/ChessMaterial.xml
     config/nodes/ChessMenuPanel.xml

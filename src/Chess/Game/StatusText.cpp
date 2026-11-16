@@ -54,6 +54,14 @@ namespace BECore::Chess {
             return "Draw declined";
         }
 
+        String ResignQuestion() {
+            return "Resign?";
+        }
+
+        String DrawQuestion() {
+            return "Agree a draw?";
+        }
+
         String Viewing(const ChessGameModel& model) {
             if (!model.IsViewing()) {
                 return {};

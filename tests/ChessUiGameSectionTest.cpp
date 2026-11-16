@@ -1,7 +1,8 @@
+#include <Chess/Components/ChessGameSectionComponent.h>
 #include <tests/ChessUiHarness.h>
 
-/// Resigning and agreeing a draw as the person does it: ChessGame::OfferDraw() driven through real frames, and what the HUD says of the judge's answer. The menu section "Game" that
-/// holds the buttons comes later in this file. The scene, the helpers and the fixture ChessUiTest are tests/ChessUiHarness.h.
+/// Resigning and agreeing a draw as the person does it: ChessGame::OfferDraw() driven through real frames, and what the HUD says of the judge's answer; the menu section "Game"
+/// (config/nodes/ChessGameSection.xml) that holds the buttons. The scene, the helpers and the fixture ChessUiTest are tests/ChessUiHarness.h.
 namespace BECore::Chess::Tests {
 
     namespace {
@@ -13,7 +14,54 @@ namespace BECore::Chess::Tests {
             return AnalysisScore{AnalysisScoreKind::Centipawns, value};
         }
 
+        constexpr const char* kSectionNode = "GameSection";
+        constexpr const char* kSectionPlate = "GameSectionPlate";
+
+        /// Shows what the component shows in the state: Resign and Draw, or the question line and Yes / No (the layout holds a hidden row at no height; Yes and No follow their row here, or
+        /// PanelProblems() would take their empty rects for a missing height)
+        void ShowGameState(UICanvasComponent& canvas, GameQuestion question) {
+            const bool asking = question != GameQuestion::None;
+            CoreManager::GetUIVars().Set("gameQuestion"_intern, StringView(question == GameQuestion::Resign ? StatusText::ResignQuestion() : StatusText::DrawQuestion()));
+            EXPECT_TRUE(canvas.SetElementVisible("GameSectionQuestion"_intern, asking));
+            EXPECT_TRUE(canvas.SetElementVisible("GameSectionAnswers"_intern, asking));
+            EXPECT_TRUE(canvas.SetElementVisible("GameSectionYes"_intern, asking));
+            EXPECT_TRUE(canvas.SetElementVisible("GameSectionNo"_intern, asking));
+            EXPECT_TRUE(canvas.SetElementVisible("GameSectionResign"_intern, !asking));
+            EXPECT_TRUE(canvas.SetElementVisible("GameSectionDraw"_intern, !asking));
+        }
+
     }  // namespace
+
+    TEST_F(ChessUiTest, TheGameSectionPassesTheSizeMatrixWithEveryWord) {
+        Draw();
+        auto canvas = CanvasOf(kSectionNode);
+        ASSERT_TRUE(canvas);
+        canvas->UpdateLayout(1280.0f, 720.0f);  // the reflected fields of the component reach the layout on its first update
+
+        UICanvasLayout& layout = canvas->GetLayout();
+        UILayoutValidatorOptions options;
+        options.minTouchSize = CoreManager::GetUIEnvironment().GetSettings().minTouchSize;
+        String report;
+        size_t reported = 0;
+        for (const GameQuestion question : {GameQuestion::None, GameQuestion::Resign, GameQuestion::Draw}) {
+            ShowGameState(*canvas, question);
+            const auto failures = ValidateOnMatrix(layout, options, ViewContext(), SceneViews());
+            if (!failures.empty() && reported++ < kReportedCases) {
+                report += Format("{}: {}", EnumUtils<GameQuestion>::ToString(question), DescribeMatrixFailures(failures).c_str());
+            }
+            // The validator does not see a Clip label's cut, nor a plate too low for what it holds
+            OnEveryCaseOfTheMatrix(
+                layout,
+                [&](const String& label, const UICanvasLayout& laidOut) {
+                    const String problems = PanelProblems(laidOut, kSectionPlate);
+                    if (!problems.empty() && reported++ < kReportedCases) {
+                        report += Format("{}, {}:\n{}", EnumUtils<GameQuestion>::ToString(question), label.c_str(), problems.c_str());
+                    }
+                },
+                true);
+        }
+        EXPECT_TRUE(report.empty()) << report.c_str();
+    }
 
     TEST_F(ChessUiTest, TwoPeopleAgreeADrawAtOnce) {
         ASSERT_TRUE(PlayAll(Model(), {"e2e4", "e7e5"}));

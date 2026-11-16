@@ -7,8 +7,8 @@
      does not exist yet has no button. Every name starts with Menu because elements are found by name in every canvas of the scene (the HUD button is the only one called
      exactly Menu). The sections are one 56-unit button MenuSection<Name> each, in the order of MenuSections(). To add a section: a row in Game/MenuSections.cpp, a
      MenuSection<Name> button here (and 68 units more in the height of MenuPlate: 56 for the button and 12 for the gap) and the panel node of the row. The plate is 94% of
-     the safe area up to 640 units: 16 + 44 (title) + 56 (Opponent) + 56 (Moves) + 56 (Close) + 4 x 12 (spacing) + 16 = 292 units high.
-     The plate is centered in the safe area of every view and needs no variant: it is 292 units high, and the buttons fit the 555 units of the
+     the safe area up to 640 units: 16 + 44 (title) + 56 (Opponent) + 56 (Moves) + 56 (Resign / Draw) + 56 (Close) + 5 x 12 (spacing) + 16 = 360 units high.
+     The plate is centered in the safe area of every view and needs no variant: it is 360 units high, and the buttons fit the 555 units of the
      narrowest Portrait window (94% of its 590 safe units) as well as the 640 of the default view. -->
 <node name="MenuPanel" layer="20" contentVersion="5">
   <components>
@@ -20,7 +20,7 @@
             <component type="UIInputClicker" action="ChessCloseMenu" stateLook="false"/>
           </components>
         </element>
-        <element type="UIStack" name="MenuPlate" anchor="Center" width="94%" maxWidth="640" height="292" direction="Vertical" spacing="12" padding="16" crossAlign="Stretch" color="36,40,52,255" blocksInput="true">
+        <element type="UIStack" name="MenuPlate" anchor="Center" width="94%" maxWidth="640" height="360" direction="Vertical" spacing="12" padding="16" crossAlign="Stretch" color="36,40,52,255" blocksInput="true">
           <children>
             <element type="UIElement" name="MenuTitle" height="44" fontSize="30">
               <components>
@@ -37,6 +37,12 @@
               <components>
                 <component type="UITextComponent" text="Moves" align="Center" verticalAlign="Center" wrap="false"/>
                 <component type="UIInputClicker" action="ChessOpenSection" value="moves"/>
+              </components>
+            </element>
+            <element type="UIElement" name="MenuSectionGame" height="56" fontSize="26" color="70,70,100,255">
+              <components>
+                <component type="UITextComponent" text="Resign / Draw" align="Center" verticalAlign="Center" wrap="false"/>
+                <component type="UIInputClicker" action="ChessOpenSection" value="game"/>
               </components>
             </element>
             <element type="UIElement" name="MenuClose" height="56" fontSize="26" color="110,60,60,255">

@@ -108,6 +108,11 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(StatusText::DrawDeclined(), "Draw declined");
     }
 
+    TEST(StatusTextTest, TheMenuAsksBeforeItEndsTheGame) {
+        EXPECT_EQ(StatusText::ResignQuestion(), "Resign?");
+        EXPECT_EQ(StatusText::DrawQuestion(), "Agree a draw?");
+    }
+
     TEST(StatusTextTest, WhileTheComputerThinksTheTurnSaysSoInsteadOfWhoseMoveItIs) {
         ChessGameModel model;
         EXPECT_EQ(StatusText::Turn(model, true), "Computer is thinking");
