@@ -76,7 +76,7 @@ Node `MovePanel` (`ChessMovePanel.xml`, layer 4, under `Material`, which draws o
 
 `SceneView` canvas on `Hud` (`ChessHud.xml`, layer 10), controls 56 units high in the margins: `Turn` (`{turn}`), `Resign`, `Menu` (fixed word, `ChessOpenMenu`; no button is named after a state, none is called `Opponent`), `Reset` (`ChessReset`), `Status` (`{status}`; wider in Portrait). The anchors keep the top row above the board and `Status` under it in every view (in Wide at the right end, over and under the move panel's box). The widest sentences only just fit the narrowest window (480 px with insets): a longer one needs a reword or a wider box; an error says what went wrong, never what to do.
 
-**`Resign`** (in Wide left of the panel's box, clear of the chips under a notch) emits the section's `ChessResign`: the section opens on "Resign?" (one confirmation; one rule, `ChessGame::ResigningNow()`, also greys it). Hidden in Portrait and Tall (no room).
+**`Resign`** (in Wide left of the panel's box, clear of the chips under a notch) emits the section's `ChessResign` (one rule, `ChessGame::ResigningNow()`, also greys it); the section shows only its plate `GameSectionConfirm` (Yes / No; No returns to the game). Hidden in Portrait and Tall (no room).
 
 `ChessHudComponent` republishes the variables only on a change (class comment): `turn` (`StatusText::Turn`, "Computer is thinking", also while a draw offer is judged), `status` (while viewing `StatusText::Viewing`, over all; else a standing error of the opponent, over "Check"; else "Draw declined" until the version moves; else the game status), `opponentError`, and the panel bindings `opponentMode`, `opponentColor` (**the person's** color), `opponentEngine`, `opponentLevel`.
 

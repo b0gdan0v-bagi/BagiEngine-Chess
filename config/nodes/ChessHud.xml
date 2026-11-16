@@ -5,7 +5,7 @@
      The top row is Turn (left), Resign, Menu and Reset (right); the bottom margin holds only Status (bottom right). Every element is anchored to a corner, so the row is
      as wide as the safe area, which is about 689 units in the narrowest window of the matrix (480 px with side insets): Turn (300), Resign, Menu and Reset (110 each) with
      their gaps add up to less than that, and ChessUiTest lays every word the game can show into them. Resign emits ChessResign, the action of the menu section's Resign:
-     ChessGameSectionComponent shows that section with its question "Resign?" open, so Yes / No and the rule are the section's; ChessHudComponent greys it while nobody can
+     ChessGameSectionComponent shows only that section's question "Resign?" with Yes / No (No returns to the game), so the confirmation and the rule are the section's; ChessHudComponent greys it while nobody can
      resign (a finished game, two programs). Portrait and Tall have no room for it (their narrowest window leaves 34 units between Turn and Menu), so their variant hides it there and
      the menu section stays the way to resign. Menu is the one button that opens the menu (the list panel
      node MenuPanel, ChessMenuPanel.xml): it emits ChessOpenMenu, is always shown, and its text is the fixed word "Menu", not a state; the side, the engine and the level

@@ -18,7 +18,8 @@ namespace BECore::Chess {
      * @brief The menu section "Game" (Resign / Draw), on the node `GameSection` before its canvas: answers `ChessResign`, `ChessDraw`, `ChessGameYes` and `ChessGameNo`.
      *
      * Resign asks "Resign?" and Draw between two people "Agree a draw?" first (Yes / No in the same panel); Draw against the program is offered at once, and the answer shows on the HUD.
-     * The HUD's Resign button emits the same `ChessResign`: the section shows itself with the question open, so both buttons share one confirmation and one rule (ChessGame::ResigningNow()).
+     * The HUD's Resign button emits the same `ChessResign`: with the section closed it shows itself with only the plate `GameSectionConfirm` (the question and Yes / No), and No or a
+     * change that drops the question hides it again, back to the game; both buttons share one confirmation and one rule (ChessGame::ResigningNow()).
      * Yes asks the rule again, because the grey look of the buttons is from the last draw, ends the game and closes the menu (`ChessCloseMenu`). The open question is the one UI-only
      * state of the scene: it is dropped by the menu opening, closing or switching a section, by No, and by any change of the game's version or of the opponent, so a program's move
      * never leaves a question about a position that is gone. Resign and Draw are greyed while the game cannot take them; the words and the greyed look are written only when they change,
@@ -36,14 +37,19 @@ namespace BECore::Chess {
     private:
         void OnAction(const InputEvents::ActionEvent& event);
 
-        /// Opens the question for the game as it is now
-        void Ask(GameQuestion question, const ChessGame& game);
+        /// Opens the question for the game as it is now; @p fromHud: asked by the HUD's Resign, shown as the question alone
+        void Ask(GameQuestion question, const ChessGame& game, bool fromHud = false);
+
+        /// Shows or hides the canvas of this node
+        void ShowCanvas(bool shown);
 
         /// Yes: what the open question asked, if the rule still allows it, and the menu closes
         void Answer(ChessGame& game);
 
         GameQuestion _asking = GameQuestion::None;
         GameQuestion _shownAsking = GameQuestion::None;  ///< what the canvas shows: the XML starts with Resign and Draw
+        bool _fromHud = false;                           ///< the open question was asked by the HUD's Resign
+        bool _shownFromHud = false;                      ///< what the canvas shows: the XML starts with the section's plate
         const void* _askedModel = nullptr;
         uint64_t _askedVersion = 0;
         uint64_t _askedRevision = 0;

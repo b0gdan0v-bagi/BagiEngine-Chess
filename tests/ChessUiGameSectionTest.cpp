@@ -17,17 +17,41 @@ namespace BECore::Chess::Tests {
         constexpr const char* kSectionNode = "GameSection";
         constexpr const char* kSectionPlate = "GameSectionPlate";
 
-        /// Shows what the component shows in the state: Resign and Draw, or the question line and Yes / No (the layout holds a hidden row at no height; Yes and No follow their row here, or
-        /// PanelProblems() would take their empty rects for a missing height)
-        void ShowGameState(UICanvasComponent& canvas, GameQuestion question) {
-            const bool asking = question != GameQuestion::None;
-            CoreManager::GetUIVars().Set("gameQuestion"_intern, StringView(question == GameQuestion::Resign ? StatusText::ResignQuestion() : StatusText::DrawQuestion()));
-            EXPECT_TRUE(canvas.SetElementVisible("GameSectionQuestion"_intern, asking));
-            EXPECT_TRUE(canvas.SetElementVisible("GameSectionAnswers"_intern, asking));
-            EXPECT_TRUE(canvas.SetElementVisible("GameSectionYes"_intern, asking));
-            EXPECT_TRUE(canvas.SetElementVisible("GameSectionNo"_intern, asking));
-            EXPECT_TRUE(canvas.SetElementVisible("GameSectionResign"_intern, !asking));
-            EXPECT_TRUE(canvas.SetElementVisible("GameSectionDraw"_intern, !asking));
+        /// One state of the canvas: the section's plate with no question or with one, or the HUD's question alone on the plate GameSectionConfirm
+        struct GameState {
+            GameQuestion question = GameQuestion::None;
+            bool fromHud = false;
+        };
+
+        constexpr GameState kGameStates[] = {{GameQuestion::None, false}, {GameQuestion::Resign, false}, {GameQuestion::Draw, false}, {GameQuestion::Resign, true}};
+
+        String Describe(const GameState& state) {
+            return Format("{}{}", EnumUtils<GameQuestion>::ToString(state.question), state.fromHud ? " from the HUD" : "");
+        }
+
+        /// Shows what the component shows in the state: Resign and Draw, the question line and Yes / No, or the HUD's plate (the layout holds a hidden element at no height; every
+        /// control follows its row or plate here, or PanelProblems() would take its empty rect for a missing height)
+        void ShowGameState(UICanvasComponent& canvas, const GameState& state) {
+            const bool confirmOnly = state.question != GameQuestion::None && state.fromHud;
+            const bool asking = state.question != GameQuestion::None && !confirmOnly;
+            CoreManager::GetUIVars().Set("gameQuestion"_intern, StringView(state.question == GameQuestion::Draw ? StatusText::DrawQuestion() : StatusText::ResignQuestion()));
+            for (const char* name : {"GameSectionPlate", "GameSectionTitle", "GameSectionButtons", "GameSectionBack", "GameSectionClose"}) {
+                EXPECT_TRUE(canvas.SetElementVisible(PoolString::Intern(name), !confirmOnly)) << name;
+            }
+            for (const char* name : {"GameSectionQuestion", "GameSectionAnswers", "GameSectionYes", "GameSectionNo"}) {
+                EXPECT_TRUE(canvas.SetElementVisible(PoolString::Intern(name), asking)) << name;
+            }
+            for (const char* name : {"GameSectionResign", "GameSectionDraw"}) {
+                EXPECT_TRUE(canvas.SetElementVisible(PoolString::Intern(name), !asking && !confirmOnly)) << name;
+            }
+            for (const char* name : {"GameSectionConfirm", "GameSectionConfirmQuestion", "GameSectionConfirmAnswers", "GameSectionConfirmYes", "GameSectionConfirmNo"}) {
+                EXPECT_TRUE(canvas.SetElementVisible(PoolString::Intern(name), confirmOnly)) << name;
+            }
+        }
+
+        /// The plate a state shows
+        const char* PlateOf(const GameState& state) {
+            return state.fromHud ? "GameSectionConfirm" : kSectionPlate;
         }
 
     }  // namespace
@@ -43,19 +67,19 @@ namespace BECore::Chess::Tests {
         options.minTouchSize = CoreManager::GetUIEnvironment().GetSettings().minTouchSize;
         String report;
         size_t reported = 0;
-        for (const GameQuestion question : {GameQuestion::None, GameQuestion::Resign, GameQuestion::Draw}) {
-            ShowGameState(*canvas, question);
+        for (const GameState& state : kGameStates) {
+            ShowGameState(*canvas, state);
             const auto failures = ValidateOnMatrix(layout, options, ViewContext(), SceneViews());
             if (!failures.empty() && reported++ < kReportedCases) {
-                report += Format("{}: {}", EnumUtils<GameQuestion>::ToString(question), DescribeMatrixFailures(failures).c_str());
+                report += Format("{}: {}", Describe(state).c_str(), DescribeMatrixFailures(failures).c_str());
             }
             // The validator does not see a Clip label's cut, nor a plate too low for what it holds
             OnEveryCaseOfTheMatrix(
                 layout,
                 [&](const String& label, const UICanvasLayout& laidOut) {
-                    const String problems = PanelProblems(laidOut, kSectionPlate);
+                    const String problems = PanelProblems(laidOut, PlateOf(state));
                     if (!problems.empty() && reported++ < kReportedCases) {
-                        report += Format("{}, {}:\n{}", EnumUtils<GameQuestion>::ToString(question), label.c_str(), problems.c_str());
+                        report += Format("{}, {}:\n{}", Describe(state).c_str(), label.c_str(), problems.c_str());
                     }
                 },
                 true);
@@ -213,19 +237,20 @@ namespace BECore::Chess::Tests {
         UICanvasLayout& layout = canvas->GetLayout();
         const float minTouch = CoreManager::GetUIEnvironment().GetSettings().minTouchSize;
 
-        for (const GameQuestion question : {GameQuestion::None, GameQuestion::Resign, GameQuestion::Draw}) {
-            ShowGameState(*canvas, question);
+        for (const GameState& state : kGameStates) {
+            ShowGameState(*canvas, state);
             for (const ViewShape& shape : kViewShapes) {
-                SCOPED_TRACE(Format("{}, {}", EnumUtils<GameQuestion>::ToString(question), shape.name).c_str());
+                SCOPED_TRACE(Format("{}, {}", Describe(state).c_str(), shape.name).c_str());
                 LayOutInTheNarrowestWindow(layout, shape);
                 const float scale = layout.GetResolved().scale;
                 EXPECT_NEAR(scale, shape.NarrowestScale(), 0.01f);
-                const String problems = PanelProblems(layout, kSectionPlate);
+                const String problems = PanelProblems(layout, PlateOf(state));
                 EXPECT_TRUE(problems.empty()) << problems.c_str();
 
-                // Four buttons are on the screen in every state: Resign and Draw or Yes and No, and Back and Close
+                // Four buttons are on the screen in every state of the section (Resign and Draw or Yes and No, and Back and Close), only Yes and No for the HUD's question
                 size_t onScreen = 0;
-                for (const char* name : {"GameSectionResign", "GameSectionDraw", "GameSectionYes", "GameSectionNo", "GameSectionBack", "GameSectionClose"}) {
+                for (const char* name :
+                     {"GameSectionResign", "GameSectionDraw", "GameSectionYes", "GameSectionNo", "GameSectionBack", "GameSectionClose", "GameSectionConfirmYes", "GameSectionConfirmNo"}) {
                     const UIElement& button = ElementOf(kSectionNode, name);
                     if (button.rect.IsEmpty()) {
                         continue;
@@ -236,7 +261,7 @@ namespace BECore::Chess::Tests {
                     const UIContentFit fit = button.CheckContent(button.rect.w - 2.0f * kButtonAir, button.rect.h, scale);
                     EXPECT_TRUE(fit.hasContent && fit.fits) << name << " '" << ShownText(button).c_str() << "' in " << button.rect.w << " units";
                 }
-                EXPECT_EQ(onScreen, 4u);
+                EXPECT_EQ(onScreen, state.fromHud ? 2u : 4u);
             }
         }
         layout.Invalidate();
@@ -467,9 +492,9 @@ namespace BECore::Chess::Tests {
         EXPECT_FALSE(greyed("GameSectionDraw"));
     }
 
-    // ---- the HUD's Resign: the section's question, one rule -----------------------------------------------------------------------
+    // ---- the HUD's Resign: the question alone, one rule -----------------------------------------------------------------------
 
-    TEST_F(ChessUiTest, TheResignButtonOfTheHudOpensTheSectionWithItsQuestionAndYesResigns) {
+    TEST_F(ChessUiTest, TheResignButtonOfTheHudShowsOnlyTheQuestionWithYesAndNoAndYesResigns) {
         ASSERT_TRUE(Play(Model(), "e2e4"));
         UIElement* resign = HudElement("Resign");
         ASSERT_NE(resign, nullptr);
@@ -482,12 +507,15 @@ namespace BECore::Chess::Tests {
         EXPECT_FALSE(Model().IsGameOver()) << "the HUD's Resign only asks";
         EXPECT_TRUE(GameSection()->_visible);
         EXPECT_FALSE(MenuList()->_visible);
-        EXPECT_EQ(ShownText(ElementOf(kSectionNode, "GameSectionQuestion")), "Resign?");
-        EXPECT_TRUE(ElementOf(kSectionNode, "GameSectionQuestion").active.visible);
-        EXPECT_TRUE(ElementOf(kSectionNode, "GameSectionAnswers").active.visible);
-        EXPECT_FALSE(ElementOf(kSectionNode, "GameSectionResign").active.visible);
+        EXPECT_EQ(ShownText(ElementOf(kSectionNode, "GameSectionConfirmQuestion")), "Resign?");
+        for (const char* name : {"GameSectionConfirmQuestion", "GameSectionConfirmYes", "GameSectionConfirmNo"}) {
+            EXPECT_FALSE(ElementOf(kSectionNode, name).rect.IsEmpty()) << name << " is on the screen";
+        }
+        for (const char* name : {"GameSectionTitle", "GameSectionResign", "GameSectionDraw", "GameSectionQuestion", "GameSectionYes", "GameSectionNo", "GameSectionBack", "GameSectionClose"}) {
+            EXPECT_TRUE(ElementOf(kSectionNode, name).rect.IsEmpty()) << name << ": only the question and Yes / No";
+        }
 
-        ASSERT_TRUE(ClickGameSection("GameSectionYes").Both());
+        ASSERT_TRUE(ClickGameSection("GameSectionConfirmYes").Both());
         EXPECT_EQ(Model().GetStatus(), GameStatus::Resigned);
         EXPECT_EQ(Model().GetResigned(), PieceColor::Black) << "two people: the side to move";
         EXPECT_FALSE(GameSection()->_visible);
@@ -495,16 +523,48 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(Var("status"), "Black resigned");
     }
 
-    TEST_F(ChessUiTest, NoAfterTheResignButtonOfTheHudKeepsTheGameInTheSection) {
+    TEST_F(ChessUiTest, NoAfterTheResignButtonOfTheHudReturnsToTheGameAndTheMenuStillOpensTheWholeSection) {
         ASSERT_TRUE(ClickControl(*HudElement("Resign")).Both());
-        ASSERT_TRUE(ClickGameSection("GameSectionNo").Both());
+        ASSERT_TRUE(ClickGameSection("GameSectionConfirmNo").Both());
         Draw();
         EXPECT_FALSE(Model().IsGameOver());
-        EXPECT_TRUE(GameSection()->_visible) << "No stays in the section, as it does when the section asked";
-        EXPECT_TRUE(ElementOf(kSectionNode, "GameSectionResign").active.visible);
-        EXPECT_FALSE(ElementOf(kSectionNode, "GameSectionQuestion").active.visible);
-        ASSERT_TRUE(ClickGameSection("GameSectionClose").Both());
-        EXPECT_FALSE(GameSection()->_visible);
+        EXPECT_FALSE(MenuList()->_visible) << "No returns to the game, not to the menu";
+        for (const MenuSection& section : MenuSections()) {
+            EXPECT_FALSE(CanvasOf(String(section.node).c_str())->_visible) << String(section.node).c_str() << ": no section either";
+        }
+        Click("e2");
+        EXPECT_TRUE(Model().HasSelection()) << "the board takes the next click";
+        EXPECT_EQ(Model().GetSelected(), Sq("e2"));
+
+        ASSERT_TRUE(OpenTheGameSection());
+        Draw();
+        EXPECT_FALSE(ElementOf(kSectionNode, "GameSectionPlate").rect.IsEmpty()) << "the menu's way shows the whole section";
+        EXPECT_TRUE(ElementOf(kSectionNode, "GameSectionConfirm").rect.IsEmpty());
+        ASSERT_TRUE(ClickGameSection("GameSectionResign").Both());
+        Draw();
+        EXPECT_TRUE(ElementOf(kSectionNode, "GameSectionQuestion").active.visible) << "the section's question stays in the section";
+        EXPECT_FALSE(ElementOf(kSectionNode, "GameSectionBack").rect.IsEmpty());
+        ASSERT_TRUE(ClickGameSection("GameSectionNo").Both());
+        EXPECT_TRUE(GameSection()->_visible) << "No of the section stays in the section";
+    }
+
+    TEST_F(ChessUiTest, AMoveOfTheProgramWhileTheQuestionOfTheHudIsOpenReturnsToTheGame) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        const auto engine = New<GatedEngine>(true);
+        CountingFactory factory({engine});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        ASSERT_TRUE(Opponent().SetSide(PieceColor::Black).has_value());
+        ASSERT_TRUE(Play(Model(), "e2e4"));
+        ASSERT_TRUE(FramesUntil([&] { return engine->Calls() == 1; }));
+        ASSERT_TRUE(ClickControl(*HudElement("Resign")).Both());
+        ASSERT_TRUE(GameSection()->_visible);
+
+        engine->Open();
+        ASSERT_TRUE(FramesUntil([&] { return Model().GetMoves().size() == 2; })) << "the program answered";
+        Draw();
+        EXPECT_FALSE(GameSection()->_visible) << "the position it asked about is gone, and the section was never opened";
+        EXPECT_FALSE(Model().IsGameOver());
     }
 
     TEST_F(ChessUiTest, TheResignButtonOfTheHudIsGreyedWhileNobodyCanResign) {

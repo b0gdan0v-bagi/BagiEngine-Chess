@@ -41,8 +41,9 @@ namespace BECore::Chess {
         SubscribeInScene<InputEvents::ActionEvent, &ChessGameSectionComponent::OnAction>(this);
     }
 
-    void ChessGameSectionComponent::Ask(GameQuestion question, const ChessGame& game) {
+    void ChessGameSectionComponent::Ask(GameQuestion question, const ChessGame& game, bool fromHud) {
         _asking = question;
+        _fromHud = fromHud;
         _askedModel = &game.GetModel();
         _askedVersion = game.GetModel().GetVersion();
         _askedRevision = game.GetOpponent().GetRevision();
@@ -51,6 +52,7 @@ namespace BECore::Chess {
     void ChessGameSectionComponent::Answer(ChessGame& game) {
         const GameQuestion question = _asking;
         _asking = GameQuestion::None;
+        _fromHud = false;
         if (question == GameQuestion::Resign) {
             if (const Optional<PieceColor> color = game.ResigningNow()) {
                 static_cast<void>(game.GetModel().Resign(*color));
@@ -65,8 +67,12 @@ namespace BECore::Chess {
 
     void ChessGameSectionComponent::OnAction(const InputEvents::ActionEvent& event) {
         const PoolString action = event.action;
+        if (action == "ChessGameNo"_intern && _asking != GameQuestion::None && _fromHud) {
+            ShowCanvas(false);
+        }
         if (action == "ChessOpenMenu"_intern || action == "ChessCloseMenu"_intern || action == "ChessOpenSection"_intern || action == "ChessGameNo"_intern) {
             _asking = GameQuestion::None;
+            _fromHud = false;
             return;
         }
         const bool resign = action == "ChessResign"_intern;
@@ -83,8 +89,10 @@ namespace BECore::Chess {
             if (game->ResigningNow()) {
                 // The HUD's Resign comes while no modal canvas is shown (they cover the HUD), so showing this one is all the menu would do; an action of the menu
                 // would click a second time
-                UICanvasComponent::SetVisibleByName(GetScene(), GetNode().GetName(), true);
-                Ask(GameQuestion::Resign, *game);
+                const auto canvas = GetNode().GetComponent<UICanvasComponent>();
+                const bool fromHud = canvas && !canvas->_visible;
+                ShowCanvas(true);
+                Ask(GameQuestion::Resign, *game, fromHud);
             }
         } else if (CanOfferDraw(*game)) {
             if (TwoPeoplePlay(*game)) {
@@ -94,6 +102,10 @@ namespace BECore::Chess {
                 CloseTheMenu();
             }
         }
+    }
+
+    void ChessGameSectionComponent::ShowCanvas(bool shown) {
+        UICanvasComponent::SetVisibleByName(GetScene(), GetNode().GetName(), shown);
     }
 
     void ChessGameSectionComponent::OnDraw() {
@@ -107,10 +119,19 @@ namespace BECore::Chess {
         const uint64_t revision = game ? game->GetOpponent().GetRevision() : 0;
 
         if (_asking != GameQuestion::None && (model != _askedModel || version != _askedVersion || revision != _askedRevision)) {
+            // The HUD's question came without the section: the game, not the section, is what is left when it goes
+            if (_fromHud) {
+                ShowCanvas(false);
+            }
             _asking = GameQuestion::None;
+            _fromHud = false;
         }
-        if (_asking != _shownAsking) {
+        if (_asking != _shownAsking || _fromHud != _shownFromHud) {
             const bool asking = _asking != GameQuestion::None;
+            const bool confirmOnly = asking && _fromHud;
+            canvas->SetElementVisible("GameSectionPlate"_intern, !confirmOnly);
+            canvas->SetElementVisible("GameSectionConfirm"_intern, confirmOnly);
+            _shownFromHud = _fromHud;
             if (asking) {
                 const String question = _asking == GameQuestion::Resign ? StatusText::ResignQuestion() : StatusText::DrawQuestion();
                 CoreManager::GetUIVars().Set("gameQuestion"_intern, StringView(question));
