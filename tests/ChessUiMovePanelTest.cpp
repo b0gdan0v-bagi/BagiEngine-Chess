@@ -1,3 +1,4 @@
+#include <BECore/UI/UIToggleComponent.h>
 #include <Chess/Components/ChessMovePanelComponent.h>
 #include <Chess/Game/MoveList.h>
 #include <tests/ChessUiHarness.h>
@@ -377,8 +378,11 @@ namespace BECore::Chess::Tests {
         const auto canvas = MovePanel();
         ASSERT_TRUE(canvas);
         ASSERT_TRUE(MovePanelElement("MovePanelBox").active.visible);
-        // The cells of the moves and the three step buttons of the band are buttons of ChessShowMove, Take back of ChessTakeBack; nothing else blocks or takes the pointer
+        // The cells of the moves and the three step buttons of the band are buttons of ChessShowMove, Take back of ChessTakeBack, Hint of ChessHint and the evaluation cell a toggle
+        // of ChessSetEvaluation; nothing else blocks or takes the pointer
         const PoolString takeBack = PoolString::Intern("MovePanelTakeBack");
+        const PoolString hintNames[] = {PoolString::Intern("MovePanelHint"), PoolString::Intern("MovePanelTallHint")};
+        const PoolString evalNames[] = {PoolString::Intern("MovePanelEval"), PoolString::Intern("MovePanelTallEval")};
         Vector<String> clickable;
         for (const UIElement* element : AllElements(canvas->GetRoot())) {
             EXPECT_FALSE(element->blocksInput) << element->name.CStr();
@@ -392,11 +396,22 @@ namespace BECore::Chess::Tests {
                 EXPECT_EQ(clicker->action, PoolString::Intern("ChessTakeBack"));
                 continue;
             }
+            if (eastl::find(eastl::begin(hintNames), eastl::end(hintNames), element->name) != eastl::end(hintNames)) {
+                EXPECT_EQ(clicker->action, PoolString::Intern("ChessHint"));
+                continue;
+            }
+            if (eastl::find(eastl::begin(evalNames), eastl::end(evalNames), element->name) != eastl::end(evalNames)) {
+                const UIToggleComponent* toggle = element->GetComponent<UIToggleComponent>();
+                ASSERT_NE(toggle, nullptr) << element->name.CStr();
+                EXPECT_EQ(toggle->action, PoolString::Intern("ChessSetEvaluation"));
+                EXPECT_EQ(toggle->bind, PoolString::Intern("analysisEvaluationOn"));
+                continue;
+            }
             EXPECT_EQ(clicker->action, PoolString::Intern("ChessShowMove")) << element->name.CStr();
             EXPECT_TRUE(ParseMoveListPress(clicker->value.ToStringView()).has_value()) << element->name.CStr();
         }
-        EXPECT_EQ(clickable.size(), 2 * kMovePanelRows + 4);
-        for (const char* name : {"MovePanelStepBack", "MovePanelStepForward", "MovePanelLatest", "MovePanelTakeBack", "MovePanelWhite6", "MovePanelBlack0"}) {
+        EXPECT_EQ(clickable.size(), 2 * kMovePanelRows + 4 + 2 * std::size(hintNames)) << "the cells, the four buttons, and Hint and the evaluation cell of the Wide band and of the Tall twins";
+        for (const char* name : {"MovePanelStepBack", "MovePanelStepForward", "MovePanelLatest", "MovePanelTakeBack", "MovePanelHint", "MovePanelEval", "MovePanelWhite6", "MovePanelBlack0"}) {
             EXPECT_NE(eastl::find(clickable.begin(), clickable.end(), String(name)), clickable.end()) << name;
         }
         for (const char* name : {"MovePanelBox", "MovePanelBandTopPlayer", "MovePanelBandBottomPlayer", "MovePanelNumber0"}) {

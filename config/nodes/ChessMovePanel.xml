@@ -4,12 +4,12 @@
      safe area, like Material, so ChessMovePanelComponent decides what a window with insets leaves of it: in the default and the Portrait view (narrower than the box) and in a Wide window whose
      side insets cut the box (700 x 480) MovePanelBox stays hidden. Layer 4: over the pieces (0) and the result bar (1), under Material (5, which draws the captured material over the bands of
      this box, so the plate must be drawn first), the HUD (10) and the panels (20); the component is listed before
-     the canvas so that it gives the variables their words before the canvas draws in the same frame. Only the cells of the moves and the four buttons of the lowest
+     the canvas so that it gives the variables their words before the canvas draws in the same frame. Only the cells of the moves, the four buttons of the band under the list and the two controls of the lowest
      band take a click: the cells, ‹, › and » with the action ChessShowMove (answered by ChessMovePanelComponent; the value is the press: a cell views the position after its move, ‹ and › step one move,
-     » returns to the game), Take back with ChessTakeBack (the same component; greyed while nothing can be taken back, Game/TakeBack.h); nothing blocks input and the canvas is not modal, so the board and the HUD get every other press. The box is one stack on a dark plate (not a color of the board): a band of 56 units, the list of 7 rows of 56 (392: a cell is a touch target, 32 px at the smallest
-     Wide scale 0.6) and two bands of 56, with 6 units between them: 56 + 6 + 392 + 6 + 56 + 6 + 56 = 578 of the 640, the rest under the buttons is empty. The bands are empty here: the captured material of
+     » returns to the game), Take back with ChessTakeBack (the same component; greyed while nothing can be taken back, Game/TakeBack.h); Hint (ChessHint, greyed while no hint can be asked) and the evaluation cell (a toggle on analysisEvaluationOn, ChessSetEvaluation) are answered by the same component, which also publishes analysisText and analysisBar; nothing blocks input and the canvas is not modal, so the board and the HUD get every other press. The box is one stack on a dark plate (not a color of the board): a band of 56 units, the list of 7 rows of 56 (392: a cell is a touch target, 32 px at the smallest
+     Wide scale 0.6) and three bands of 56, with 6 units between them: 56 + 6 + 392 + 6 + 56 + 6 + 56 + 6 + 56 = 640. The bands of the players are empty here: the captured material of
      the player at the top of the board is drawn by the canvas of Material over MovePanelBandTopPlayer, the other player's over MovePanelBandBottomPlayer (ChessMaterial.xml has to agree with
-     these places), and MovePanelBandButtons, the lowest, holds the step buttons (56 x 56 at its left) and Take back in the rest of it (112 units wide here, at a font of 22 that fits the word at the smallest scale). The box has no title, the top band being the material's. A notch pushes Menu and Reset onto the top
+     these places), MovePanelBandButtons holds the step buttons (56 x 56 at its left) and Take back after them (112 units, at a font of 22 that fits the word at the smallest scale), and MovePanelBandAnalysis, the lowest, holds Hint (96 wide) and the evaluation cell in the rest of it: the text of the evaluation over a thin bar that is the share of White (the text above the bar, so no word lies on its light fill). The box has no title, the top band being the material's. A notch pushes Menu and Reset onto the top
      band; Status stays under the box also when the side insets of a phone held sideways lift it (a Wide variant of ChessHud.xml). A row is a number cell of 56 units
      and two cells (White's and Black's, half of the rest each); the cell of the last move shows its Mark, a fill in the gold of the board's last-move squares (245, 205, 50) under the text. The
      component writes movePanelNumber<i>, movePanelWhite<i> and movePanelBlack<i> of the 7 rows and shows only the rows the game has (a hidden row takes no room, so the rows pack at the top); the list shows the page of the move the board shows (Game/MovePanel.h). The text of a move is at most 7 characters
@@ -18,7 +18,7 @@
      The Tall view (720 x 1204, SceneConfig.xml; the only view whose canvas bounds are under the aspect 0.6, hence the variant) has the box under the board and the lower row of the
      material: (40, 840) to (680, 1128), the numbers of the Tall box of Game/MovePanel.h, as wide as the board. The material keeps its rows above and below the board there, so the two
      bands of the players are hidden (a hidden element takes no room) and the list is horizontal: its two columns side by side, each 312 units (set there), a little wider than a Wide row (304), so the
-     fonts are the Wide ones; 224 + 6 + 56 (the band of the buttons) = 286 of the 288. Status is 8 units under the box with no insets; side insets (64.8 units at each side in that view) cut the box, which is
+     fonts are the Wide ones. The box has no room for a sixth band (it ends at 1128 of the 1204, and a bottom inset hides a box that ends lower), so the variant hides MovePanelBandAnalysis and shows the twins MovePanelTallHint and MovePanelTallEval that the file authors hidden at the end of MovePanelBandButtons, whose 624 units hold the four buttons, Hint and the rest for the evaluation; 224 + 6 + 56 (the band of the buttons) = 286 of the 288. Status is 8 units under the box with no insets; side insets (64.8 units at each side in that view) cut the box, which is
      then hidden like the Wide one.
      Every name starts with MovePanel because elements are found by name in every canvas of the scene. -->
 <node name="MovePanel" layer="4" contentVersion="5">
@@ -307,11 +307,55 @@
                     <component type="UIInputClicker" action="ChessShowMove" value="latest"/>
                   </components>
                 </element>
-                <element type="UIElement" name="MovePanelTakeBack" flex="1" fontSize="22" color="112,84,48,255">
+                <element type="UIElement" name="MovePanelTakeBack" width="112" fontSize="22" color="112,84,48,255">
                   <components>
                     <component type="UITextComponent" text="Take back" align="Center" verticalAlign="Center" wrap="false" fadeWhenDisabled="true"/>
                     <component type="UIInputClicker" action="ChessTakeBack" disabled="true"/>
                   </components>
+                </element>
+                <element type="UIElement" name="MovePanelTallHint" width="96" fontSize="22" color="50,115,85,255" visible="false">
+                  <components>
+                    <component type="UITextComponent" text="Hint" align="Center" verticalAlign="Center" wrap="false" fadeWhenDisabled="true"/>
+                    <component type="UIInputClicker" action="ChessHint" disabled="true"/>
+                  </components>
+                </element>
+                <element type="UIElement" name="MovePanelTallEval" flex="1" color="46,64,74,255" visible="false">
+                  <components>
+                    <component type="UIInputClicker"/>
+                    <component type="UIToggleComponent" bind="analysisEvaluationOn" action="ChessSetEvaluation"/>
+                  </components>
+                  <children>
+                    <element type="UIElement" name="MovePanelTallEvalText" anchor="Stretch" margin="0,0,0,16" fontSize="22">
+                      <components>
+                        <component type="UITextComponent" text="{analysisText}" textColor="236,238,244,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                      </components>
+                    </element>
+                    <element type="UIProgressBar" name="MovePanelTallEvalBar" bind="analysisBar" minValue="0" maxValue="1" anchorMin="0,1" anchorMax="1,1" pivot="0.5,1" y="-4" height="12" margin="8,0,8,0" trackColor="18,26,30,255" fillColor="226,230,238,255"/>
+                  </children>
+                </element>
+              </children>
+            </element>
+            <element type="UIStack" name="MovePanelBandAnalysis" height="56" direction="Horizontal" spacing="8" crossAlign="Stretch">
+              <children>
+                <element type="UIElement" name="MovePanelHint" width="96" fontSize="22" color="50,115,85,255">
+                  <components>
+                    <component type="UITextComponent" text="Hint" align="Center" verticalAlign="Center" wrap="false" fadeWhenDisabled="true"/>
+                    <component type="UIInputClicker" action="ChessHint" disabled="true"/>
+                  </components>
+                </element>
+                <element type="UIElement" name="MovePanelEval" flex="1" color="46,64,74,255">
+                  <components>
+                    <component type="UIInputClicker"/>
+                    <component type="UIToggleComponent" bind="analysisEvaluationOn" action="ChessSetEvaluation"/>
+                  </components>
+                  <children>
+                    <element type="UIElement" name="MovePanelEvalText" anchor="Stretch" margin="0,0,0,16" fontSize="22">
+                      <components>
+                        <component type="UITextComponent" text="{analysisText}" textColor="236,238,244,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                      </components>
+                    </element>
+                    <element type="UIProgressBar" name="MovePanelEvalBar" bind="analysisBar" minValue="0" maxValue="1" anchorMin="0,1" anchorMax="1,1" pivot="0.5,1" y="-4" height="12" margin="8,0,8,0" trackColor="18,26,30,255" fillColor="226,230,238,255"/>
+                  </children>
                 </element>
               </children>
             </element>
@@ -324,6 +368,9 @@
             <set element="MovePanelBox" x="40" y="840" width="640" height="288" />
             <set element="MovePanelBandTopPlayer" visible="false" />
             <set element="MovePanelBandBottomPlayer" visible="false" />
+            <set element="MovePanelBandAnalysis" visible="false" />
+            <set element="MovePanelTallHint" visible="true" />
+            <set element="MovePanelTallEval" visible="true" />
             <set element="MovePanelList" height="224" direction="Horizontal" />
             <set element="MovePanelColumn0" width="312" />
             <set element="MovePanelColumn1" width="312" />
