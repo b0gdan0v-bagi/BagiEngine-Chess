@@ -7,6 +7,8 @@ namespace BECore::Chess {
         constexpr StringView kWhitePress = "white";
         constexpr StringView kBlackPress = "black";
         constexpr size_t kDecimalBase = 10;
+        /// More than any row of a game, few enough that the number cannot wrap
+        constexpr size_t kMaxRowDigits = 4;
 
         bool HoldsPly(const MoveListRow& row, int ply) {
             return ply >= 0 && (row.white.ply == ply || row.black.ply == ply);
@@ -81,7 +83,7 @@ namespace BECore::Chess {
         } else {
             return std::nullopt;
         }
-        if (digits.empty()) {
+        if (digits.empty() || digits.size() > kMaxRowDigits) {
             return std::nullopt;
         }
         for (const char digit : digits) {

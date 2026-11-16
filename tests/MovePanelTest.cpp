@@ -245,7 +245,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(ParseMoveListPress("back")->kind, MoveListPressKind::Back);
         EXPECT_EQ(ParseMoveListPress("forward")->kind, MoveListPressKind::Forward);
         EXPECT_EQ(ParseMoveListPress("latest")->kind, MoveListPressKind::Latest);
-        for (const char* value : {"", "white", "black-1", "white1x", "White1", "red2", "Back"}) {
+        for (const char* value : {"", "white", "black-1", "white1x", "White1", "red2", "Back", "white18446744073709551617"}) {
             EXPECT_FALSE(ParseMoveListPress(value)) << value;
         }
     }
