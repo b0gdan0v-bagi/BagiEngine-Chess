@@ -128,7 +128,7 @@ namespace BECore::Chess::Tests {
             const UIInputClicker* clicker = ClickerOf(hint);
             ASSERT_NE(clicker, nullptr) << hint.name.CStr();
             EXPECT_EQ(clicker->action, PoolString::Intern("ChessHint")) << hint.name.CStr();
-            EXPECT_TRUE(clicker->disabled) << hint.name.CStr() << ": greyed until the component says a hint can be asked";
+            EXPECT_FALSE(clicker->disabled) << hint.name.CStr() << ": two people at the start, the person is to move";
             EXPECT_EQ(TextOf(hint)->GetDisplayText(hint), "Hint");
 
             const UIToggleComponent* toggle = eval.GetComponent<UIToggleComponent>();
@@ -231,6 +231,231 @@ namespace BECore::Chess::Tests {
         for (const char* name : {kTallNames.hint, kTallNames.eval}) {
             EXPECT_TRUE(MovePanelElement(name).active.visible) << name << " in the Tall view";
         }
+    }
+
+    namespace {
+
+        constexpr AnalysisScore kScore35{AnalysisScoreKind::Centipawns, 35};
+
+        /// An analysis engine that answers +0.35 for the side to move whatever the position, and the factory that hands it out
+        struct ScriptedAnalysis {
+            explicit ScriptedAnalysis(Optional<Move> move = std::nullopt) : engine(New<AnalysingEngine>(kScore35, move)), factory({engine}) {}
+
+            decltype(New<AnalysingEngine>(kScore35)) engine;
+            CountingAnalysisFactory factory;
+        };
+
+        /// Quiet frames in which a request that wrongly got through would have reached the engine
+        constexpr int kQuietFrames = 20;
+
+    }  // namespace
+
+    TEST_F(ChessUiTest, TheHintButtonIsGreyOnlyWhereAHintCannotBeAsked) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        Settle();
+        const UIElement& button = MovePanelElement("MovePanelHint");
+        const UIElement& tallButton = MovePanelElement("MovePanelTallHint");
+        EXPECT_FALSE(ClickerOf(button)->disabled) << "two people: the person is to move";
+        EXPECT_FALSE(ClickerOf(tallButton)->disabled);
+
+        CountingFactory factory({New<GatedEngine>(true)});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        ControlPlays("white");
+        Settle();
+        EXPECT_TRUE(ClickerOf(button)->disabled) << "the program's turn";
+        EXPECT_TRUE(ClickerOf(tallButton)->disabled);
+
+        ControlPlays("black");
+        Settle();
+        EXPECT_FALSE(ClickerOf(button)->disabled) << "the person's turn against the program";
+    }
+
+    TEST_F(ChessUiTest, TheHintButtonIsGreyInAFinishedGame) {
+        ASSERT_TRUE(PlayAll(Model(), {"f2f3", "e7e5", "g2g4", "d8h4"}));
+        ASSERT_TRUE(Model().IsGameOver());
+        Settle();
+        EXPECT_TRUE(ClickerOf(MovePanelElement("MovePanelHint"))->disabled);
+    }
+
+    TEST_F(ChessUiTest, AClickOnTheHintButtonAsksForTheHintAndTheBoardShowsIt) {
+        ScriptedAnalysis analysis(Mv("e2e4"));
+        Analyst().SetEngineFactory(analysis.factory.AsFactory());
+        Settle();
+        ASSERT_TRUE(ClickControl(MovePanelElement("MovePanelHint")).Both());
+        ASSERT_TRUE(FramesUntil([&] { return Analyst().GetHint(Model()).has_value(); }));
+        EXPECT_EQ(Analyst().GetHint(Model())->move, Mv("e2e4"));
+        EXPECT_FALSE(Analyst().IsEvaluationOn()) << "a hint does not switch the evaluation on";
+
+        Draw();
+        const auto [from, to] = HintFills();
+        ASSERT_EQ(from.size(), 1u);
+        ASSERT_EQ(to.size(), 1u);
+        EXPECT_TRUE(SameRect(from[0]->rect, SquareRect("e2")));
+        EXPECT_TRUE(SameRect(to[0]->rect, SquareRect("e4")));
+
+        ASSERT_TRUE(ClickControl(MovePanelElement("MovePanelHint")).Both());
+        _manager->UpdateAll();
+        EXPECT_EQ(analysis.factory.Calls(), 1) << "a second press while the hint stands asks for nothing";
+    }
+
+    TEST_F(ChessUiTest, AMoveDropsTheHintAndTheButtonAsksAgain) {
+        ScriptedAnalysis analysis;
+        Analyst().SetEngineFactory(analysis.factory.AsFactory());
+        ASSERT_TRUE(ShowTheHint());
+        ASSERT_TRUE(PlayAll(Model(), {"e2e4"}));
+        Draw();
+        EXPECT_TRUE(HintFills().first.empty());
+        EXPECT_FALSE(Analyst().GetHint(Model()).has_value());
+
+        ASSERT_TRUE(ClickControl(MovePanelElement("MovePanelHint")).Both());
+        ASSERT_TRUE(FramesUntil([&] { return Analyst().GetHint(Model()).has_value(); }));
+        EXPECT_TRUE(Analyst().IsHintRequested(Model()));
+    }
+
+    TEST_F(ChessUiTest, AForcedHintActionChangesNothingWhereTheButtonIsGrey) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        ScriptedAnalysis analysis;
+        Analyst().SetEngineFactory(analysis.factory.AsFactory());
+        CountingFactory opponentFactory({New<GatedEngine>(true)});
+        Opponent().SetEngineFactory(opponentFactory.AsFactory());
+        _manager->UpdateAll();
+        ControlPlays("white");
+        Settle();
+        ASSERT_TRUE(ClickerOf(MovePanelElement("MovePanelHint"))->disabled);
+
+        Press("ChessHint");
+        for (int frame = 0; frame < kQuietFrames; ++frame) {
+            _manager->UpdateAll();
+        }
+        EXPECT_FALSE(Analyst().IsHintRequested(Model())) << "the program's turn";
+        EXPECT_EQ(analysis.factory.Calls(), 0);
+    }
+
+    TEST_F(ChessUiTest, AForcedHintActionChangesNothingInAFinishedGame) {
+        ScriptedAnalysis analysis;
+        Analyst().SetEngineFactory(analysis.factory.AsFactory());
+        ASSERT_TRUE(PlayAll(Model(), {"f2f3", "e7e5", "g2g4", "d8h4"}));
+        Settle();
+        Press("ChessHint");
+        for (int frame = 0; frame < kQuietFrames; ++frame) {
+            _manager->UpdateAll();
+        }
+        EXPECT_FALSE(Analyst().IsHintRequested(Model()));
+        EXPECT_EQ(analysis.factory.Calls(), 0);
+    }
+
+    TEST_F(ChessUiTest, TheHintIsAskedInTheGamesPositionAndEndsAViewOfAnEarlierOne) {
+        ScriptedAnalysis analysis;
+        Analyst().SetEngineFactory(analysis.factory.AsFactory());
+        ASSERT_TRUE(PlayAll(Model(), {"e2e4", "e7e5", "g1f3"}));
+        ASSERT_TRUE(Model().ShowMoves(1));
+        Settle();
+        ASSERT_TRUE(Model().IsViewing());
+
+        ASSERT_TRUE(ClickControl(MovePanelElement("MovePanelHint")).Both());
+        EXPECT_FALSE(Model().IsViewing()) << "the hint is for the game's position";
+        EXPECT_EQ(Model().GetMoves().size(), 3u);
+        ASSERT_TRUE(FramesUntil([&] { return Analyst().GetHint(Model()).has_value(); }));
+        EXPECT_EQ(analysis.engine->LastRequest().moves.size(), 3u) << "the request is the whole game, not the viewed prefix";
+    }
+
+    TEST_F(ChessUiTest, TheEvaluationCellSwitchesTheEvaluationOnAndOffAndSaysTheLineInWhitesView) {
+        ScriptedAnalysis analysis;
+        Analyst().SetEngineFactory(analysis.factory.AsFactory());
+        Settle();
+        EXPECT_EQ(Var("analysisText"), "Eval off");
+        EXPECT_EQ(Var("analysisEvaluationOn"), "false");
+        EXPECT_EQ(ShownText(MovePanelElement("MovePanelEvalText")), "Eval off");
+
+        ASSERT_TRUE(ClickControl(MovePanelElement("MovePanelEval")).Both());
+        EXPECT_TRUE(Analyst().IsEvaluationOn());
+        ASSERT_TRUE(FramesUntil([&] { return Analyst().GetEvaluation(Model()).has_value(); }));
+        EXPECT_EQ(Var("analysisText"), "+0.35");
+        EXPECT_EQ(Var("analysisEvaluationOn"), "true");
+        EXPECT_EQ(ShownText(MovePanelElement("MovePanelEvalText")), "+0.35");
+        const float bar = MovePanelElement("MovePanelEvalBar").Cast<UIProgressBar>()->GetFraction();
+        EXPECT_GT(bar, 0.5f);
+        EXPECT_LT(bar, 1.0f);
+
+        ASSERT_TRUE(ClickControl(MovePanelElement("MovePanelEval")).Both());
+        EXPECT_FALSE(Analyst().IsEvaluationOn());
+        EXPECT_EQ(Var("analysisText"), "Eval off");
+        EXPECT_FLOAT_EQ(MovePanelElement("MovePanelEvalBar").Cast<UIProgressBar>()->GetFraction(), 0.0f);
+    }
+
+    TEST_F(ChessUiTest, TheEvaluationFollowsTheMovesAndTurnsToWhitesView) {
+        ScriptedAnalysis analysis;
+        Analyst().SetEngineFactory(analysis.factory.AsFactory());
+        Settle();
+        ASSERT_TRUE(ClickControl(MovePanelElement("MovePanelEval")).Both());
+        ASSERT_TRUE(FramesUntil([&] { return Analyst().GetEvaluation(Model()).has_value(); }));
+        ASSERT_EQ(Var("analysisText"), "+0.35");
+
+        ASSERT_TRUE(PlayAll(Model(), {"e2e4"}));
+        EXPECT_EQ(Var("analysisText"), "...") << "no answer for the new position yet";
+        EXPECT_FLOAT_EQ(MovePanelElement("MovePanelEvalBar").Cast<UIProgressBar>()->GetFraction(), 0.5f);
+        ASSERT_TRUE(FramesUntil([&] { return Analyst().GetEvaluation(Model()).has_value(); }));
+        EXPECT_EQ(Var("analysisText"), "-0.35") << "the double says +0.35 for Black, who is to move";
+        EXPECT_LT(MovePanelElement("MovePanelEvalBar").Cast<UIProgressBar>()->GetFraction(), 0.5f);
+    }
+
+    TEST_F(ChessUiTest, AFailedAnalysisSaysSoAndAFinishedGameSaysNothingToAnalyse) {
+        CountingAnalysisFactory factory(EngineError{EngineErrorKind::LaunchFailed, "no engine"});
+        Analyst().SetEngineFactory(factory.AsFactory());
+        Settle();
+        ASSERT_TRUE(ClickControl(MovePanelElement("MovePanelEval")).Both());
+        ASSERT_TRUE(FramesUntil([&] { return Analyst().GetError().has_value(); }));
+        EXPECT_EQ(Var("analysisText"), "No analysis");
+
+        ASSERT_TRUE(PlayAll(Model(), {"f2f3", "e7e5", "g2g4", "d8h4"}));
+        ASSERT_TRUE(Model().IsGameOver());
+        _manager->UpdateAll();
+        EXPECT_EQ(Var("analysisText"), "-");
+    }
+
+    TEST_F(ChessUiTest, AnythingButTrueOrFalseDoesNotSwitchTheEvaluation) {
+        ScriptedAnalysis analysis;
+        Analyst().SetEngineFactory(analysis.factory.AsFactory());
+        Settle();
+        PressWith("ChessSetEvaluation", "maybe");
+        PressWith("ChessSetEvaluation", "");
+        _manager->UpdateAll();
+        EXPECT_FALSE(Analyst().IsEvaluationOn());
+        PressWith("ChessSetEvaluation", "true");
+        EXPECT_TRUE(Analyst().IsEvaluationOn());
+        PressWith("ChessSetEvaluation", "false");
+        EXPECT_FALSE(Analyst().IsEvaluationOn());
+    }
+
+    TEST_F(ChessUiTest, TheTallTwinsAnswerTheSameActions) {
+        ScriptedAnalysis analysis;
+        Analyst().SetEngineFactory(analysis.factory.AsFactory());
+        ResizeWithoutInsets(kNarrowestWidth, kNarrowestTallHeight);
+        ASSERT_EQ(GetScene().GetActiveView().name, PoolString::Intern(kTallViewName));
+        ASSERT_TRUE(MovePanelElement("MovePanelBox").active.visible);
+
+        ASSERT_TRUE(ClickControl(MovePanelElement("MovePanelTallEval")).Both());
+        EXPECT_TRUE(Analyst().IsEvaluationOn());
+        ASSERT_TRUE(FramesUntil([&] { return Analyst().GetEvaluation(Model()).has_value(); }));
+        Draw();
+        EXPECT_EQ(ShownText(MovePanelElement("MovePanelTallEvalText")), "+0.35") << "the twin binds the same variables";
+        ASSERT_TRUE(ClickControl(MovePanelElement("MovePanelTallHint")).Both());
+        ASSERT_TRUE(FramesUntil([&] { return Analyst().GetHint(Model()).has_value(); }));
+        EXPECT_TRUE(Analyst().IsHintRequested(Model()));
+        ASSERT_TRUE(ClickControl(MovePanelElement("MovePanelTallEval")).Both());
+        EXPECT_FALSE(Analyst().IsEvaluationOn());
+    }
+
+    TEST_F(ChessUiTest, TheEvaluationAsksTheEngineThePersonPicked) {
+        ScriptedAnalysis analysis;
+        Analyst().SetEngineFactory(analysis.factory.AsFactory());
+        Settle();
+        ASSERT_TRUE(ClickControl(MovePanelElement("MovePanelEval")).Both());
+        ASSERT_TRUE(FramesUntil([&] { return Analyst().GetEvaluation(Model()).has_value(); }));
+        ASSERT_EQ(analysis.factory.Calls(), 1);
+        const StringView picked = OpponentEngineId(Opponent().GetEngine());
+        EXPECT_EQ(analysis.factory.Engines().front(), String(picked.data(), picked.size()));
     }
 
 }  // namespace BECore::Chess::Tests

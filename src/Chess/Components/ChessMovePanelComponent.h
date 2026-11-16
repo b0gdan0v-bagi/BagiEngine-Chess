@@ -1,6 +1,7 @@
 #pragma once
 
 #include <BECore/Scene/IComponent.h>
+#include <Chess/Components/AnalysisRows.h>
 #include <Chess/Components/MoveRows.h>
 
 namespace BECore::InputEvents {
@@ -25,6 +26,11 @@ namespace BECore::Chess {
      *
      * It answers `ChessTakeBack` of both canvases too: ChessGameModel::TakeBack() of TakeBackPliesNow() moves (nothing when that is 0), which ends a view, drops the selection and the
      * premoves and moves the version (the program's search in flight goes stale). Each canvas's own component greys its button (TakeBackOnCanvas).
+     *
+     * The analysis band (the Wide band and the Tall twins) is published from the game's analyst (PublishAnalysisWords) when AnalysisKey says it changed, and the Hint buttons are greyed
+     * while HintRefusalFor() refuses (HintOnCanvas). `ChessHint`: when the refusal does not hold, a view of an earlier position ends (the hint is for the game's position), the pick of the
+     * opponent is told to the analyst and the hint is asked, as the control API's `set_state analysis` does. `ChessSetEvaluation` (`value` "true" / "false", what the toggle says): the same pick,
+     * then the evaluation is switched; any other value logs one warning. The evaluation is of the game's position, not of the one a view shows.
      */
     class ChessMovePanelComponent : public IComponent {
         BE_CLASS(ChessMovePanelComponent)
@@ -38,6 +44,12 @@ namespace BECore::Chess {
     private:
         void OnAction(const InputEvents::ActionEvent& event);
 
+        /// ChessHint: ends a view, tells the analyst the pick and asks for the hint of the game's position, unless HintRefusalFor() refuses
+        void AskForHint();
+
+        /// ChessSetEvaluation: switches the evaluation to @p value ("true" or "false"); another value only logs
+        void SetEvaluation(StringView value);
+
         /// Writes the variables and the visibility of the rows and marks for the game of @p model (none: empty rows)
         void Publish(const ChessGameModel* model);
 
@@ -45,6 +57,9 @@ namespace BECore::Chess {
         void SyncBox();
 
         MoveRowsKey _published;
+        AnalysisKey _analysisPublished;
+        HintOnCanvas _hint{"MovePanelHint"};
+        HintOnCanvas _tallHint{"MovePanelTallHint"};
         MoveRowsOnCanvas _rows{"MovePanel"};
         TakeBackOnCanvas _takeBack{"MovePanel"};
         bool _boxShown = false;  ///< The scene starts with the box hidden
