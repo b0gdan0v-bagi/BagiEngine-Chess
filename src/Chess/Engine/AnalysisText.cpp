@@ -11,8 +11,6 @@ namespace BECore::Chess {
             /// The steepness of the bar: 1 / (1 + exp(-k * centipawns)). Chosen so that a pawn moves the bar visibly and a queen up nearly fills it
             constexpr double kShareSteepness = 0.0055;
 
-            constexpr double kEven = 0.5;
-
             String Words(StringView text) {
                 return String(text.data(), text.size());
             }
@@ -38,7 +36,7 @@ namespace BECore::Chess {
         double Share(const AnalysisScore& scoreForWhite) noexcept {
             if (scoreForWhite.kind == AnalysisScoreKind::Mate) {
                 if (scoreForWhite.value == 0) {
-                    return kEven;
+                    return kEvenShare;
                 }
                 return scoreForWhite.value > 0 ? 1.0 : 0.0;
             }

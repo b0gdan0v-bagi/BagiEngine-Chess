@@ -11,7 +11,6 @@ namespace BECore::Chess {
 
     namespace {
 
-        constexpr double kEvenBar = 0.5;
         constexpr double kEmptyBar = 0.0;
 
     }  // namespace
@@ -45,7 +44,7 @@ namespace BECore::Chess {
         }
         double bar = kEmptyBar;
         if (on) {
-            bar = lineForWhite && !failed && !gameOver ? AnalysisText::Share(lineForWhite->score) : kEvenBar;
+            bar = lineForWhite && !failed && !gameOver ? AnalysisText::Share(lineForWhite->score) : AnalysisText::kEvenShare;
         }
 
         UIVars& vars = CoreManager::GetUIVars();

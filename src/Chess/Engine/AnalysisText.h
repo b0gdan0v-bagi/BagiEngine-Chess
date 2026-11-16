@@ -16,6 +16,9 @@ namespace BECore::Chess {
         /// so the cell and its font are sized by it. A score beyond that (an engine's own) may be longer: the cell clips it
         inline constexpr size_t kMaxEvaluationLength = 11;
 
+        /// The share of an even position, and of a bar with no answer to show
+        inline constexpr double kEvenShare = 0.5;
+
         /**
          * @brief The word of the evaluation cell. The rules in order: off, failed, game over, the line, else pending.
          *
