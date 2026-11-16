@@ -31,3 +31,6 @@ engine.log
 .claude/plans/
 *.plan.md
 todo-export/
+
+# Art generation: the variants the Generate panel makes (an accepted one is copied into assets/artgen/)
+artgen/out/
