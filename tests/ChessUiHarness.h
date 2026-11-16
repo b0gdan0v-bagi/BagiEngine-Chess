@@ -143,6 +143,27 @@ namespace BECore::Chess::Tests {
             return move.has_value() && model.TryMove(*move).has_value();
         }
 
+        /// A game of @p plies plies that none of the end rules stops: the legal move with the index `ply * 5 + 1` modulo their count, at every ply
+        bool PlayAQuietGame(ChessGameModel& model, size_t plies) {
+            for (size_t ply = 0; ply < plies; ++ply) {
+                const MoveList legal = MoveGenerator::GenerateLegal(model.GetPosition());
+                if (legal.empty() || model.IsGameOver() || !model.TryMove(legal[(ply * 5 + 1) % legal.size()]).has_value()) {
+                    return false;
+                }
+            }
+            return !model.IsGameOver();
+        }
+
+        /// Plays the moves given in UCI one after the other; false at the first that is not legal
+        bool PlayAll(ChessGameModel& model, std::initializer_list<const char*> moves) {
+            for (const char* uci : moves) {
+                if (!Play(model, uci)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         bool SameColor(const Color& left, const Color& right) {
             return left.r == right.r && left.g == right.g && left.b == right.b && left.a == right.a;
         }

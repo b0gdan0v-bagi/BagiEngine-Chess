@@ -192,26 +192,6 @@ namespace BECore::Chess::Tests {
             return fits;
         }
 
-        /// A game of @p plies plies that none of the end rules stops: the legal move with the index `ply * 5 + 1` modulo their count, at every ply
-        bool PlayAQuietGame(ChessGameModel& model, size_t plies) {
-            for (size_t ply = 0; ply < plies; ++ply) {
-                const MoveList legal = MoveGenerator::GenerateLegal(model.GetPosition());
-                if (legal.empty() || model.IsGameOver() || !model.TryMove(legal[(ply * 5 + 1) % legal.size()]).has_value()) {
-                    return false;
-                }
-            }
-            return !model.IsGameOver();
-        }
-
-        bool PlayAll(ChessGameModel& model, std::initializer_list<const char*> moves) {
-            for (const char* uci : moves) {
-                if (!Play(model, uci)) {
-                    return false;
-                }
-            }
-            return true;
-        }
-
         /// The elements of the shipped canvas with the box and the rows shown, the text a copy of a test starts from; the variants keep what they hide
         String ShownMovePanelXml() {
             String xml = ShippedElementsXml("MovePanel");

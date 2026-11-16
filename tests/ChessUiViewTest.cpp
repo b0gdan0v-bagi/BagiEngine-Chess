@@ -8,15 +8,6 @@ namespace BECore::Chess::Tests {
 
         const Color kMateColor{150, 20, 20, 240};  // the king's square once mated (ChessBoardComponent.cpp)
 
-        bool PlayAll(ChessGameModel& model, std::initializer_list<const char*> moves) {
-            for (const char* uci : moves) {
-                if (!Play(model, uci)) {
-                    return false;
-                }
-            }
-            return true;
-        }
-
     }  // namespace
 
     TEST_F(ChessUiTest, WhileViewingTheBoardMarksTheViewedMoveAndNoneBeforeTheFirst) {
@@ -121,6 +112,36 @@ namespace BECore::Chess::Tests {
         Draw();
         EXPECT_EQ(RectCalls(kPremoveColor).size(), 2u);
         engine->Open();
+    }
+
+    TEST_F(ChessUiTest, TheRowsOfThePanelAndOfTheSectionMarkTheViewedMove) {
+        ASSERT_TRUE(PlayAll(Model(), {"e2e4", "e7e5", "g1f3"}));
+        ASSERT_EQ(ShownMovePanelRows(), "1. e4 e5 | 2. [Nf3]");
+        ASSERT_TRUE(ClickButton(kMenuColor));
+        ASSERT_TRUE(ClickMenuList("MenuSectionMoves").Both());
+        ASSERT_TRUE(Model().ShowMoves(2));
+        EXPECT_EQ(ShownMovePanelRows(), "1. e4 [e5] | 2. Nf3") << "in the frame after the view: no version moved";
+        EXPECT_EQ(ShownMoveRows("MovesSection"), "1. e4 [e5] | 2. Nf3");
+        ASSERT_TRUE(Model().ShowMoves(0));
+        EXPECT_EQ(ShownMovePanelRows(), "1. e4 e5 | 2. Nf3") << "the start position marks no move";
+        ASSERT_TRUE(Model().EndViewing());
+        EXPECT_EQ(ShownMovePanelRows(), "1. e4 e5 | 2. [Nf3]");
+    }
+
+    TEST_F(ChessUiTest, ViewingAnEarlyMoveOfALongGameShowsItsPageOfRows) {
+        Settle();
+        ASSERT_TRUE(PlayAQuietGame(Model(), 40)) << "twenty rows: the pages 13..20, 5..12 and 1..4";
+        Draw();
+        EXPECT_EQ(ShownText(MovePanelElement("MovePanelNumber0")), "13.");
+        ASSERT_TRUE(Model().ShowMoves(15));  // the White move of row 8
+        Draw();
+        EXPECT_EQ(ShownText(MovePanelElement("MovePanelNumber0")), "5.");
+        EXPECT_TRUE(MovePanelElement("MovePanelWhiteMark3").active.visible);
+        ASSERT_TRUE(Model().ShowMoves(3));  // the White move of row 2
+        Draw();
+        EXPECT_EQ(ShownText(MovePanelElement("MovePanelNumber0")), "1.");
+        EXPECT_FALSE(MovePanelElement("MovePanelRow4").active.visible) << "the first page holds the four rows left";
+        EXPECT_TRUE(MovePanelElement("MovePanelWhiteMark1").active.visible);
     }
 
 }  // namespace BECore::Chess::Tests

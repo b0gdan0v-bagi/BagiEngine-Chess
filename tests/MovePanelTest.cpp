@@ -205,20 +205,76 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(panel[7].number, "8.");
     }
 
-    TEST(MovePanelTest, TheWindowEndsAtTheRowOfTheCurrentPly) {
-        // The viewed ply 9 is the Black move of row 5: rows 1 to 5 show, nothing after them
+    TEST(MovePanelTest, TheWindowIsThePageOfTheCurrentPlyCountedFromTheEnd) {
+        // Twelve rows are the pages 5..12 and 1..4. Ply 9 is the Black move of row 5, on the last page: the window does not move when a row of it is viewed
         const Vector<MovePanelRow> panel = BuildMovePanelRows(RowsOf(12), 9);
-        EXPECT_EQ(ShownRows(panel), 5u);
-        EXPECT_EQ(panel[4].number, "5.");
-        EXPECT_TRUE(panel[4].black.current);
-        ExpectEmpty(panel[5]);
+        EXPECT_EQ(ShownRows(panel), kMovePanelRows);
+        EXPECT_EQ(panel[0].number, "5.");
+        EXPECT_TRUE(panel[0].black.current);
+        EXPECT_EQ(panel[7].number, "12.");
 
-        // Ply 19 is row 10, so the window is rows 3 to 10
-        const Vector<MovePanelRow> later = BuildMovePanelRows(RowsOf(12), 19);
-        EXPECT_EQ(ShownRows(later), kMovePanelRows);
-        EXPECT_EQ(later[0].number, "3.");
-        EXPECT_EQ(later[7].number, "10.");
-        EXPECT_TRUE(later[7].black.current);
+        // Ply 7 is row 4, on the first page, which holds the four rows left
+        const Vector<MovePanelRow> earlier = BuildMovePanelRows(RowsOf(12), 7);
+        EXPECT_EQ(ShownRows(earlier), 4u);
+        EXPECT_EQ(earlier[0].number, "1.");
+        EXPECT_EQ(earlier[3].number, "4.");
+        EXPECT_TRUE(earlier[3].black.current);
+        ExpectEmpty(earlier[4]);
+
+        // Twenty rows: the middle page is 5..12
+        const Vector<MovePanelRow> middle = BuildMovePanelRows(RowsOf(20), 10);
+        EXPECT_EQ(middle[0].number, "5.");
+        EXPECT_EQ(middle[7].number, "12.");
+        EXPECT_TRUE(middle[1].white.current);
+    }
+
+    TEST(MovePanelTest, EachCellKnowsItsPly) {
+        const Vector<MovePanelRow> panel = BuildMovePanelRows(RowsOf(3), 5);
+        EXPECT_EQ(panel[0].white.ply, 0);
+        EXPECT_EQ(panel[2].black.ply, 5);
+        EXPECT_EQ(panel[3].white.ply, -1) << "an entry with no row";
+    }
+
+    // ---- A press in the list ----
+
+    TEST(MovePanelTest, ThePressValuesOfTheClickersAreParsed) {
+        ASSERT_TRUE(ParseMoveListPress("white0"));
+        EXPECT_EQ(ParseMoveListPress("white0")->kind, MoveListPressKind::White);
+        EXPECT_EQ(ParseMoveListPress("black7")->kind, MoveListPressKind::Black);
+        EXPECT_EQ(ParseMoveListPress("black7")->row, 7u);
+        EXPECT_EQ(ParseMoveListPress("back")->kind, MoveListPressKind::Back);
+        EXPECT_EQ(ParseMoveListPress("forward")->kind, MoveListPressKind::Forward);
+        EXPECT_EQ(ParseMoveListPress("latest")->kind, MoveListPressKind::Latest);
+        for (const char* value : {"", "white", "black-1", "white1x", "White1", "red2", "Back"}) {
+            EXPECT_FALSE(ParseMoveListPress(value)) << value;
+        }
+    }
+
+    TEST(MovePanelTest, ACellShowsThePositionAfterItsMoveAndAnEmptyCellNothing) {
+        Vector<MoveListRow> rows = RowsOf(2);
+        rows.push_back(MoveListRow{3, MoveListEntry{"w3", 4}, {}});
+        const Vector<MovePanelRow> panel = BuildMovePanelRows(rows, 4);
+        EXPECT_EQ(ShownMovesAfter({MoveListPressKind::White, 0}, panel, 5, 5), 1u);
+        EXPECT_EQ(ShownMovesAfter({MoveListPressKind::Black, 1}, panel, 5, 5), 4u);
+        EXPECT_EQ(ShownMovesAfter({MoveListPressKind::White, 2}, panel, 1, 5), 5u) << "the last move is the game itself";
+        EXPECT_FALSE(ShownMovesAfter({MoveListPressKind::Black, 2}, panel, 5, 5)) << "Black has not moved yet";
+        EXPECT_FALSE(ShownMovesAfter({MoveListPressKind::White, 3}, panel, 5, 5)) << "an entry with no row";
+        EXPECT_FALSE(ShownMovesAfter({MoveListPressKind::White, kMovePanelRows}, panel, 5, 5));
+
+        const char* fen = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 7";
+        const Vector<MovePanelRow> blackFirst = BuildMovePanelRows(BuildMoveList(fen, MovesOf(fen, {"g8f6"})), 0);
+        EXPECT_FALSE(ShownMovesAfter({MoveListPressKind::White, 0}, blackFirst, 1, 1)) << "the dots are no move";
+    }
+
+    TEST(MovePanelTest, BackAndForwardStepOneMoveWithinTheGameAndLatestIsTheGame) {
+        const Vector<MovePanelRow> panel = BuildMovePanelRows(RowsOf(3), 5);
+        EXPECT_EQ(ShownMovesAfter({MoveListPressKind::Back}, panel, 6, 6), 5u);
+        EXPECT_EQ(ShownMovesAfter({MoveListPressKind::Back}, panel, 1, 6), 0u) << "to the position before the first move";
+        EXPECT_EQ(ShownMovesAfter({MoveListPressKind::Back}, panel, 0, 6), 0u) << "and no further";
+        EXPECT_EQ(ShownMovesAfter({MoveListPressKind::Back}, panel, 0, 0), 0u);
+        EXPECT_EQ(ShownMovesAfter({MoveListPressKind::Forward}, panel, 2, 6), 3u);
+        EXPECT_EQ(ShownMovesAfter({MoveListPressKind::Forward}, panel, 6, 6), 6u) << "not past the game";
+        EXPECT_EQ(ShownMovesAfter({MoveListPressKind::Latest}, panel, 2, 6), 6u);
     }
 
     TEST(MovePanelTest, AFewerRowsOptionIsHonoured) {
@@ -285,11 +341,12 @@ namespace BECore::Chess::Tests {
         EXPECT_TRUE(panel[2].black.current);
     }
 
-    TEST(MovePanelTest, NoCurrentMoveMarksNothingAndShowsTheEndOfTheList) {
+    TEST(MovePanelTest, ThePositionBeforeTheFirstMoveMarksNothingAndShowsTheFirstPage) {
         const Vector<MovePanelRow> panel = BuildMovePanelRows(RowsOf(12), -1);
         EXPECT_EQ(CurrentCells(panel), 0);
-        EXPECT_EQ(panel[0].number, "5.");
-        EXPECT_EQ(panel[7].number, "12.");
+        EXPECT_EQ(ShownRows(panel), 4u);
+        EXPECT_EQ(panel[0].number, "1.");
+        EXPECT_EQ(panel[3].number, "4.");
     }
 
     TEST(MovePanelTest, APlyNoRowHasMarksNothing) {

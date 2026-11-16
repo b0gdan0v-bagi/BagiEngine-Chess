@@ -21,7 +21,7 @@ namespace BECore::Chess {
     /// The view of the scene whose box the rule asks for; the default and the Portrait view hold neither box, so either answer there is no panel
     CORE_ENUM(MovePanelView, uint8_t, Wide, Tall)
 
-    /// The rows of the list the panel has room for: it shows the last ones of the game
+    /// The rows of the list the panel has room for: one page of the game (BuildMovePanelRows())
     constexpr size_t kMovePanelRows = 8;
 
     /// What a row says in the place of the White move of a game that began with Black to move
@@ -49,10 +49,11 @@ namespace BECore::Chess {
     // In the Tall view the width is the limit, so side insets of 9 % of the short side are always 64.8 units of it, more than the 40 the box keeps from the edge
     static_assert(!MovePanelFits(64.8f, 0.0f, 655.2f, 1175.2f, MovePanelView::Tall), "a Tall window with side insets cuts the box");
 
-    /// One cell of a row of the panel: the text of the move and whether it is the move the board shows
+    /// One cell of a row of the panel: the text of the move, whether it is the move the board shows, and its ply in ChessGameModel::GetMoves() (-1: a place with no move)
     struct MovePanelCell {
         String text;
         bool current = false;
+        int ply = -1;
     };
 
     /// One row of the panel; an entry that is not `shown` is empty and the panel hides its row
@@ -66,10 +67,31 @@ namespace BECore::Chess {
     /**
      * @brief The text of the rows the panel shows: exactly @p visibleRows entries, so a component writes every variable the same way.
      *
-     * The window is the last @p visibleRows rows of @p rows up to the row that holds @p currentPly (the ply of ChessGameModel::GetMoves(); -1 or a ply no row has: no
-     * current move, and the window ends at the last row). The entries after the window are empty and not shown. An absent White move (a game that began with Black to move)
-     * reads kMovePanelAbsentMove and is never current; an absent Black move is empty.
+     * The list is cut into pages of @p visibleRows rows counted from its end (the last rows, the ones before them, ...; the first page holds what is left), and the window is the page
+     * of the row that holds @p currentPly, the ply of ChessGameModel::GetMoves() the board shows, so a click on a row of the window keeps the window. -1 is the position before the
+     * first move (the first page, nothing current); a ply no row has marks nothing and shows the last page. The entries after the window are empty and not shown. An absent White
+     * move (a game that began with Black to move) reads kMovePanelAbsentMove and is never current; an absent Black move is empty.
      */
     [[nodiscard]] Vector<MovePanelRow> BuildMovePanelRows(const Vector<MoveListRow>& rows, int currentPly, size_t visibleRows = kMovePanelRows);
+
+    /// What a press in the move list asks for: the cell of a move, one move back or forward, or the game's own position
+    CORE_ENUM(MoveListPressKind, uint8_t, White, Black, Back, Forward, Latest)
+
+    struct MoveListPress {
+        MoveListPressKind kind = MoveListPressKind::Latest;
+        size_t row = 0;  ///< The entry of BuildMovePanelRows() whose cell was pressed (White and Black only)
+    };
+
+    /// The `value` of a clicker of the move list (ChessMovePanel.xml, ChessMovesSection.xml): `white<i>` and `black<i>` for the cells of entry i, `back`, `forward`, `latest`; nothing
+    /// for any other text
+    [[nodiscard]] Optional<MoveListPress> ParseMoveListPress(StringView value);
+
+    /**
+     * @brief The number of moves of the position to show after @p press (ChessGameModel::ShowMoves()).
+     *
+     * A cell gives the position after its move (nothing for a cell with no move or an entry @p rows does not have), `back` and `forward` one move from @p shownMoves, kept within 0 and
+     * @p gameMoves, and `latest` @p gameMoves, the game itself.
+     */
+    [[nodiscard]] Optional<size_t> ShownMovesAfter(const MoveListPress& press, const Vector<MovePanelRow>& rows, size_t shownMoves, size_t gameMoves);
 
 }  // namespace BECore::Chess

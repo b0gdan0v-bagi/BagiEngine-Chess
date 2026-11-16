@@ -10,8 +10,22 @@ namespace BECore::Chess {
 
     class ChessGameModel;
 
-    /// The rows the move list shows for the game of @p model: the last kMovePanelRows rows up to the last move, that move current; no game: every entry empty and not shown
+    /// The rows the move list shows for the game of @p model: the page of the move the board shows (the last one, or the viewed one), that move current; no game: every entry empty
+    /// and not shown
     [[nodiscard]] Vector<MovePanelRow> CurrentMovePanelRows(const ChessGameModel* model);
+
+    /// What the rows of a canvas were last built from: the model, its version and the moves of the shown position (a view moves no version)
+    class MoveRowsKey {
+    public:
+        /// Whether the rows of @p model are other than the ones last built (always on the first call); remembers @p model as built
+        bool Changed(const ChessGameModel* model);
+
+    private:
+        bool _built = false;
+        const ChessGameModel* _model = nullptr;
+        uint64_t _version = 0;
+        size_t _shownMoves = 0;
+    };
 
     /// Writes the words of @p rows to the UIVars `movePanelNumber<i>`, `movePanelWhite<i>` and `movePanelBlack<i>`, which every canvas that shows the list binds
     void PublishMovePanelWords(const Vector<MovePanelRow>& rows);

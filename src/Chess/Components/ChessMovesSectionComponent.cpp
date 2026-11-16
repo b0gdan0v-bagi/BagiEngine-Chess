@@ -10,13 +10,9 @@ namespace BECore::Chess {
 
     void ChessMovesSectionComponent::OnDraw() {
         const ChessGameModel* model = ChessGame::GetActiveModel();
-        const uint64_t version = model ? model->GetVersion() : 0;
-        if (_published && model == _publishedModel && version == _publishedVersion) {
+        if (!_published.Changed(model)) {
             return;
         }
-        _published = true;
-        _publishedModel = model;
-        _publishedVersion = version;
         const Vector<MovePanelRow> rows = CurrentMovePanelRows(model);
         PublishMovePanelWords(rows);
         if (const auto canvas = GetNode().GetComponent<UICanvasComponent>()) {

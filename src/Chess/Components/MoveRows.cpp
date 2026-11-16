@@ -35,14 +35,27 @@ namespace BECore::Chess {
 
     Vector<MovePanelRow> CurrentMovePanelRows(const ChessGameModel* model) {
         Vector<MoveListRow> list;
-        int lastPly = kNoCurrentPly;
+        int shownPly = kNoCurrentPly;
         if (model) {
             list = BuildMoveList(model->GetStartFen(), model->GetMoves());
-            lastPly = static_cast<int>(model->GetMoves().size()) - 1;
+            shownPly = static_cast<int>(model->GetShownMoveCount()) - 1;
         }
-        Vector<MovePanelRow> rows = BuildMovePanelRows(list, lastPly);
+        Vector<MovePanelRow> rows = BuildMovePanelRows(list, shownPly);
         ASSERT(rows.size() == kMovePanelRows);
         return rows;
+    }
+
+    bool MoveRowsKey::Changed(const ChessGameModel* model) {
+        const uint64_t version = model ? model->GetVersion() : 0;
+        const size_t shownMoves = model ? model->GetShownMoveCount() : 0;
+        if (_built && model == _model && version == _version && shownMoves == _shownMoves) {
+            return false;
+        }
+        _built = true;
+        _model = model;
+        _version = version;
+        _shownMoves = shownMoves;
+        return true;
     }
 
     void PublishMovePanelWords(const Vector<MovePanelRow>& rows) {

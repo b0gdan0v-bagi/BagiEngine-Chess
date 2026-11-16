@@ -42,11 +42,7 @@ namespace BECore::Chess {
 
     void ChessMovePanelComponent::OnDraw() {
         const ChessGameModel* model = ChessGame::GetActiveModel();
-        const uint64_t version = model ? model->GetVersion() : 0;
-        if (!_published || model != _publishedModel || version != _publishedVersion) {
-            _published = true;
-            _publishedModel = model;
-            _publishedVersion = version;
+        if (_published.Changed(model)) {
             Publish(model);
         }
         SyncBox();
