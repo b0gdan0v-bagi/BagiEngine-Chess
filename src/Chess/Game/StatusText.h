@@ -11,8 +11,13 @@ namespace BECore::Chess {
         /// computer opponent is searching (@p opponentThinking) it says "Computer is thinking" instead; a finished game never does
         [[nodiscard]] String Turn(const ChessGameModel& model, bool opponentThinking = false);
 
-        /// The line under the board: "" while the game goes on (but "Check" for a king in check), the reason once it is over
+        /// The line under the board: while an earlier position is viewed (ChessGameModel::IsViewing()), which one and how to get back (Viewing()); else "" while the game goes
+        /// on (but "Check" for a king in check), the reason once it is over
         [[nodiscard]] String Status(const ChessGameModel& model);
+
+        /// "At move 12 - tap board" (the score-sheet number of the last shown move, the same for White's and Black's) or "At the start - tap board"; "" when nothing earlier is viewed.
+        /// Short on purpose: a longer line, "Viewing move 12" with the whole hint, does not fit the Status of the narrowest window
+        [[nodiscard]] String Viewing(const ChessGameModel& model);
 
     }  // namespace StatusText
 

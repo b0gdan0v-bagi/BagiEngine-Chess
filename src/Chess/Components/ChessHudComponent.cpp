@@ -38,8 +38,10 @@ namespace BECore::Chess {
         const PieceColor personColor = choice.Color();
         // A search starts and ends without a move of the game, and a side or a level changes without one; the person's color changes without any of them while two people play
         const bool thinking = opponent.IsThinking();
+        // A view starts, steps and ends without a version step of the game
+        const Optional<size_t> shown = model.IsViewing() ? Optional<size_t>(model.GetShownMoveCount()) : std::nullopt;
         const bool opponentChanged = &model != _publishedModel || opponent.GetRevision() != _publishedRevision;
-        if (!opponentChanged && model.GetVersion() == _publishedVersion && thinking == _publishedThinking && personColor == _publishedColor) {
+        if (!opponentChanged && model.GetVersion() == _publishedVersion && thinking == _publishedThinking && personColor == _publishedColor && shown == _publishedShown) {
             return;
         }
         _publishedModel = &model;
@@ -47,11 +49,13 @@ namespace BECore::Chess {
         _publishedRevision = opponent.GetRevision();
         _publishedThinking = thinking;
         _publishedColor = personColor;
+        _publishedShown = shown;
 
-        // While an error of the opponent stands the game is stalled by it, so its sentence wins over "Check"
+        // While an error of the opponent stands the game is stalled by it, so its sentence wins over "Check"; a view wins over both: the board shows another position and the
+        // line says how to get back to the game (the panel keeps the error, and the line has it again when the view ends)
         const Optional<EngineError>& error = opponent.GetError();
         const String turn = StatusText::Turn(model, thinking);
-        const String status = error ? OpponentText::Error(*error) : StatusText::Status(model);
+        const String status = error && !shown ? OpponentText::Error(*error) : StatusText::Status(model);
         const String opponentError = error ? OpponentText::Error(*error) : String();
         UIVars& vars = CoreManager::GetUIVars();
         vars.Set("turn"_intern, StringView(turn));

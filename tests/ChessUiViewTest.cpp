@@ -76,6 +76,42 @@ namespace BECore::Chess::Tests {
         EXPECT_TRUE(Model().GetMoves().empty());
     }
 
+    TEST_F(ChessUiTest, WhileViewingTheStatusSaysWhatIsViewedAndHowToGetBackAndTheGamesLineReturnsWithIt) {
+        ASSERT_TRUE(PlayAll(Model(), {"e2e4", "d7d5", "f1b5"}));
+        Draw();
+        ASSERT_EQ(ShownText(Label("Status")), "Check");
+        const String turn = ShownText(Label("Turn"));
+
+        ASSERT_TRUE(ClickControl(MovePanelElement("MovePanelBlack0")).Both());
+        Draw();
+        EXPECT_EQ(ShownText(Label("Status")), "At move 1 - tap board") << "a view moves no version of the game, the HUD sees it all the same";
+        EXPECT_EQ(ShownText(Label("Turn")), turn) << "the turn is the game's";
+        ASSERT_TRUE(Model().ShowMoves(0));
+        Draw();
+        EXPECT_EQ(ShownText(Label("Status")), "At the start - tap board");
+
+        Click("e2");
+        Draw();
+        ASSERT_FALSE(Model().IsViewing());
+        EXPECT_EQ(ShownText(Label("Status")), "Check");
+    }
+
+    TEST_F(ChessUiTest, AViewWinsOverTheLineOfAnEngineErrorWhichComesBackWithTheGame) {
+        const auto engine = New<FailingEngine>(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
+        CountingFactory factory({engine});
+        ASSERT_NO_FATAL_FAILURE(ProvokeAnEngineError(factory));
+        Draw();
+        const String error = ShownText(Label("Status"));
+        ASSERT_EQ(error, OpponentText::Error(*Opponent().GetError()));
+
+        ASSERT_TRUE(Model().ShowMoves(0));
+        Draw();
+        EXPECT_EQ(ShownText(Label("Status")), "At the start - tap board") << "the board shows another position: the line says how to get back";
+        ASSERT_TRUE(Model().EndViewing());
+        Draw();
+        EXPECT_EQ(ShownText(Label("Status")), error);
+    }
+
     TEST_F(ChessUiTest, WhileViewingNoHintIsDrawnAndItComesBackWithTheGame) {
         ASSERT_TRUE(PlayAll(Model(), {"e2e4"}));
         CountingAnalysisFactory factory({New<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e7e5"))});

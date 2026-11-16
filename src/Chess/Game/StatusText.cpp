@@ -26,6 +26,9 @@ namespace BECore::Chess {
         }
 
         String Status(const ChessGameModel& model) {
+            if (model.IsViewing()) {
+                return Viewing(model);
+            }
             switch (model.GetStatus()) {
                 case GameStatus::Ongoing:
                     return model.IsInCheck() ? "Check" : "";
@@ -41,6 +44,19 @@ namespace BECore::Chess {
                     return "Draw: fifty-move rule";
             }
             return "";
+        }
+
+        String Viewing(const ChessGameModel& model) {
+            if (!model.IsViewing()) {
+                return {};
+            }
+            if (model.GetShownMoveCount() == 0) {
+                return "At the start - tap board";
+            }
+            // The fullmove number grows after Black's move, so a shown position with White to move came after Black's move of the number before
+            const Position& shown = model.GetShownPosition();
+            const int number = shown.SideToMove() == PieceColor::White ? shown.FullmoveNumber() - 1 : shown.FullmoveNumber();
+            return Format("At move {} - tap board", number);
         }
 
     }  // namespace StatusText
