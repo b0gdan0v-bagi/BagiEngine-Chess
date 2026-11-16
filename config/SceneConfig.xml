@@ -34,6 +34,7 @@
         <node ref="nodes/ChessMenuPanel" />
         <node ref="nodes/ChessOpponentPanel" />
         <node ref="nodes/ChessMovesSection" />
+        <node ref="nodes/ChessSoundPanel" />
         <node ref="nodes/ChessPromotionPanel" />
         <node ref="nodes/ChessResult" />
         <node ref="nodes/ChessSound" />
