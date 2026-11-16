@@ -1,5 +1,6 @@
 #pragma once
 
+#include <BECore/Audio/AudioManager.h>
 #include <BECore/Control/Json.h>
 #include <BECore/GameManager/CoreManager.h>
 #include <BECore/Reflection/XmlDeserializer.h>
@@ -1440,6 +1441,24 @@ namespace BECore::Chess::Tests {
         [[nodiscard]] Pair<Rect, Rect> LastMoveRects() const {
             const Move last = Model().GetMoves().back();
             return {SquareRect(last.From()), SquareRect(last.To())};
+        }
+
+        /// How many sounds the game has asked the audio manager for so far, played or not (ChessTests has no backend); read it before a step to see what the step asked for
+        static uint64_t AudioRequests() {
+            return CoreManager::GetAudio().GetRequestCount();
+        }
+
+        /// The sounds asked for after the count @p before was read, oldest first
+        static Vector<AudioPlayRecord> AudioRequestsSince(uint64_t before) {
+            Vector<AudioPlayRecord> recent;
+            CoreManager::GetAudio().GetRecentPlays(recent);
+            Vector<AudioPlayRecord> found;
+            for (const AudioPlayRecord& record : recent) {
+                if (record.index > before) {
+                    found.push_back(record);
+                }
+            }
+            return found;
         }
 
         /// Frames in which nothing is meant to happen

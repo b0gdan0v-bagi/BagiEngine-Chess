@@ -34,8 +34,10 @@
         <node ref="nodes/ChessMenuPanel" />
         <node ref="nodes/ChessOpponentPanel" />
         <node ref="nodes/ChessMovesSection" />
+        <node ref="nodes/ChessSoundPanel" />
         <node ref="nodes/ChessPromotionPanel" />
         <node ref="nodes/ChessResult" />
+        <node ref="nodes/ChessSound" />
 
         <!-- White back rank (rank 0) -->
         <node ref="nodes/ChessPiece" name="WhiteRook_a1">

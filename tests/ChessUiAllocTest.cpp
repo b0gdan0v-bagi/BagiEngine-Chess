@@ -22,6 +22,7 @@ namespace BECore::Chess::Tests {
         constexpr FrameCost kAnalysisFrame{};
         constexpr FrameCost kFinishedFrame{};
         constexpr FrameCost kPanelFrame{};
+        constexpr FrameCost kSoundPanelFrame{};
         constexpr FrameCost kPromotionFrame{};
         constexpr FrameCost kHintFrame{};
         constexpr FrameCost kTurnedResizedFrame{};
@@ -132,6 +133,13 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(OpenThePanel());
         WarmUp();
         EXPECT_TRUE(CostIs(MeasureFrame(), kPanelFrame));
+    }
+
+    TEST_F(ChessUiAllocTest, AFrameWithTheSoundPanelOpenAllocatesNothingNew) {
+        ASSERT_TRUE(ClickButton(kMenuColor));
+        ASSERT_TRUE(ClickMenuList("MenuSectionSound").Both());
+        WarmUp();
+        EXPECT_TRUE(CostIs(MeasureFrame(), kSoundPanelFrame));
     }
 
     TEST_F(ChessUiAllocTest, AFrameWithAPromotionPendingAllocatesNothingNew) {

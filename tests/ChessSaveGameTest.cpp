@@ -273,6 +273,7 @@ namespace BECore::Chess::Tests {
             EXPECT_GT(checked, 0u);
         }
 
+        ScopedAudioLevels _levels;
         Vector<String> _savedArguments;
         std::filesystem::path _directory;
         std::filesystem::path _saves;
@@ -360,6 +361,39 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(Member(opponent, "engine"), "own");
         EXPECT_EQ(Game().GetChoice().ColorId(), "white");
         EXPECT_EQ(Game().GetModel().GetMoves().size(), 4u);
+    }
+
+    TEST_F(ChessSaveGameTest, ALevelChangedInTheLastFrameSurvivesAStopAndAStartNextToTheGame) {
+        SetCommandLine({"--control", "--headless"}, true);
+        StartManager();
+        UseDoubles();
+        ASSERT_TRUE(Play(Game().GetModel(), "e2e4 e7e5"));
+        Frames(2);
+        CoreManager::GetAudio().SetMasterVolume(0.3f);
+        CoreManager::GetAudio().SetMasterMuted(true);
+
+        Game().Stop();
+        CoreManager::GetAudio().SetMasterVolume(1.0f);
+        CoreManager::GetAudio().SetMasterMuted(false);
+        Game().Start();
+
+        EXPECT_FLOAT_EQ(CoreManager::GetAudio().GetSettings()._master._volume, 0.3f);
+        EXPECT_TRUE(CoreManager::GetAudio().GetSettings()._master._muted);
+        EXPECT_EQ(Game().GetModel().GetMoves().size(), 2u);
+    }
+
+    TEST_F(ChessSaveGameTest, AControlRunWithNoSaveDirNeitherReadsNorWritesTheLevels) {
+        SetCommandLine({"--control", "--headless", "--manual-clock"}, false);
+        CoreManager::GetAudio().SetMasterVolume(0.3f);
+        StartManager();
+
+        EXPECT_FALSE(Game().GetKeeper().IsOn());
+        CoreManager::GetAudio().SetMasterVolume(0.6f);
+        Frames(4);
+        Game().Stop();
+
+        EXPECT_FLOAT_EQ(CoreManager::GetAudio().GetSettings()._master._volume, 0.6f);
+        EXPECT_TRUE(std::filesystem::is_empty(_directory));
     }
 
     TEST_F(ChessSaveGameTest, AFrameWritesAChangeWithoutAStop) {

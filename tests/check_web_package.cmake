@@ -33,6 +33,13 @@ endforeach()
 # --- the package is exactly the files of the game; a new config or asset file is a conscious change of this list
 set(expected
     assets/chess_test.png
+    assets/sounds/capture.wav
+    assets/sounds/castle.wav
+    assets/sounds/check.wav
+    assets/sounds/click.wav
+    assets/sounds/game_end.wav
+    assets/sounds/move.wav
+    assets/sounds/promotion.wav
     config/ApplicationConfig.xml
     config/ChessSettings.xml
     config/SceneConfig.xml
@@ -47,7 +54,9 @@ set(expected
     config/nodes/ChessOpponentPanel.xml
     config/nodes/ChessPiece.xml
     config/nodes/ChessPromotionPanel.xml
-    config/nodes/ChessResult.xml)
+    config/nodes/ChessResult.xml
+    config/nodes/ChessSound.xml
+    config/nodes/ChessSoundPanel.xml)
 chess_web_package_files(OUT files GAME_ROOT "${GAME_ROOT}")
 check_equal("the files of the preload package (a new file in config/ or assets/ must be added here, or excluded in cmake/ChessWeb.cmake)" "${files}" "${expected}")
 

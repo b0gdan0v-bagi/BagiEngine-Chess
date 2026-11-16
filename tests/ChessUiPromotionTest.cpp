@@ -211,6 +211,7 @@ namespace BECore::Chess::Tests {
         const ModalRow rows[] = {{"MenuPanel", "MenuDim", "ChessCloseMenu"},
                                  {"OpponentPanel", "Dim", "ChessCloseMenu"},
                                  {"MovesSection", "MovesSectionDim", "ChessCloseMenu"},
+                                 {"SoundPanel", "SoundPanelDim", "ChessCloseMenu"},
                                  {"PromotionPanel", "PromotionDim", "ChessCancelPromotion"}};
         size_t modals = 0;
         for (const auto& node : GetScene().GetRootNode().GetChildren()) {
@@ -248,6 +249,9 @@ namespace BECore::Chess::Tests {
             }
             if (StringView(node) == "MovesSection") {
                 return ClickButton(kMenuColor) && ClickMenuList("MenuSectionMoves").Both();
+            }
+            if (StringView(node) == "SoundPanel") {
+                return ClickButton(kMenuColor) && ClickMenuList("MenuSectionSound").Both();
             }
             StartFrom(kPromotionFen);
             ClickMove("a7", "a8");
