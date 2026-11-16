@@ -3,6 +3,8 @@
 #include <BECore/Control/Json.h>
 #include <Chess/Engine/OpponentChoice.h>
 #include <Chess/Game/CapturedMaterial.h>
+#include <Chess/Game/MoveList.h>
+#include <Chess/Game/TakeBack.h>
 
 namespace BECore::Chess {
 
@@ -179,6 +181,21 @@ namespace BECore::Chess {
             return pick;
         }
 
+        constexpr const char* kTakeBackUsage = "'takeBack' has to be an object like {} (the button's rule) or {\"plies\": 2} (the member is an optional integer from 1 to the moves played)";
+
+        /// The SAN of every move of the game, in the order of GetMoves()
+        Json SanMovesJson(const ChessGameModel& model) {
+            Json san = Json::array();
+            for (const MoveListRow& row : BuildMoveList(model.GetStartFen(), model.GetMoves())) {
+                for (const MoveListEntry* entry : {&row.white, &row.black}) {
+                    if (entry->ply >= 0) {
+                        san.push_back(TextJson(entry->san));
+                    }
+                }
+            }
+            return san;
+        }
+
         ControlError BadOpponent(String message) {
             return MakeControlError(ControlErrors::kInvalidParams, message);
         }
@@ -297,6 +314,8 @@ namespace BECore::Chess {
         state["legalMoveCount"] = LegalMoves().size();
         state["startFen"] = TextJson(_model.GetStartFen());
         state["moves"] = std::move(moves);
+        state["sanMoves"] = SanMovesJson(_model);
+        state["takeBackPlies"] = TakeBackPlies(_model.GetMoves().size(), _model.GetTurn(), _opponent.GetPlays());
         state["opponent"] = OpponentJson();
         state["material"] = MaterialJson(_model.GetPosition());
         state["analysis"] = AnalysisJson();
@@ -443,9 +462,16 @@ namespace BECore::Chess {
         const Json* fenMember = FindJsonMember(state, "fen");
         const Json* opponentMember = FindJsonMember(state, "opponent");
         const Json* analysisMember = FindJsonMember(state, "analysis");
-        if (!fenMember && !opponentMember && !analysisMember) {
+        const Json* takeBackMember = FindJsonMember(state, "takeBack");
+        if (!fenMember && !opponentMember && !analysisMember && !takeBackMember) {
             return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, "'fen' (a FEN string), 'opponent' ({\"plays\", \"level\", \"engine\", \"white\", \"black\", \"seed\"}), both, or "
-                                                                                   "'analysis' ({\"evaluation\", \"hint\", \"ratings\"}) alone are needed"));
+                                                                                   "'analysis' ({\"evaluation\", \"hint\", \"ratings\"}) or 'takeBack' ({\"plies\"}) alone are needed"));
+        }
+        if (takeBackMember) {
+            if (fenMember || opponentMember || analysisMember) {
+                return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, "'takeBack' cannot be combined with another member: what it takes back depends on the game they change"));
+            }
+            return SetTakeBack(*takeBackMember);
         }
         if (analysisMember && (fenMember || opponentMember)) {
             return std::unexpected(MakeControlError(ControlErrors::kInvalidParams,
@@ -527,6 +553,30 @@ namespace BECore::Chess {
                 _analyst.CancelHint();
             }
         }
+        return {};
+    }
+
+    std::expected<void, ControlError> ChessGameControl::SetTakeBack(const Json& takeBack) {
+        if (!takeBack.is_object()) {
+            return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, kTakeBackUsage));
+        }
+        for (const auto& member : takeBack.items()) {
+            if (member.key() != "plies") {
+                return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, kTakeBackUsage));
+            }
+        }
+        const size_t played = _model.GetMoves().size();
+        size_t plies = TakeBackPlies(played, _model.GetTurn(), _opponent.GetPlays());
+        if (FindJsonMember(takeBack, "plies")) {
+            const Optional<int64_t> asked = GetJsonInt(takeBack, "plies");
+            if (!asked || *asked < 1 || static_cast<uint64_t>(*asked) > played) {
+                return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, Format("'plies' has to be an integer from 1 to the {} moves played", played)));
+            }
+            plies = static_cast<size_t>(*asked);
+        } else if (plies == 0) {
+            return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, played == 0 ? "there is no move to take back" : "the only move is the program's: the person has none to take back"));
+        }
+        _model.TakeBack(plies);
         return {};
     }
 
