@@ -1,0 +1,368 @@
+<?xml version="1.0"?>
+<!-- The move list, right of the board in the Wide view (1120 x 800; SceneConfig.xml): the box (760, 80) to (1080, 720), 320 x 640, as high as the board and 40 units from the right edge of the
+     view; the numbers are those of Game/MovePanel.h, which says the panel is shown only while the whole box lies inside the safe area of this canvas. A canvas of the SceneView space with no
+     safe area, like Material, so ChessMovePanelComponent decides what a window with insets leaves of it: in the default and the Portrait view (narrower than the box) and in a Wide window whose
+     side insets cut the box (700 x 480) MovePanelBox stays hidden. Layer 4: over the pieces (0) and the result bar (1), under Material (5, which draws the captured material over the bands of
+     this box, so the plate must be drawn first), the HUD (10) and the panels (20); the component is listed before
+     the canvas so that it gives the variables their words before the canvas draws in the same frame. Only the cells of the moves and the four buttons of the lowest
+     band take a click: the cells, ‹, › and » with the action ChessShowMove (answered by ChessMovePanelComponent; the value is the press: a cell views the position after its move, ‹ and › step one move,
+     » returns to the game), Take back with ChessTakeBack (the same component; greyed while nothing can be taken back, Game/TakeBack.h); nothing blocks input and the canvas is not modal, so the board and the HUD get every other press. The box is one stack on a dark plate (not a color of the board): a band of 56 units, the list of 8 rows of 56 (448: a cell is a touch target, 32 px at the smallest
+     Wide scale 0.6) and two bands of 56, with 8 units between them: 56 + 8 + 448 + 8 + 56 + 8 + 56 = 640. The bands are empty here: the captured material of
+     the player at the top of the board is drawn by the canvas of Material over MovePanelBandTopPlayer, the other player's over MovePanelBandBottomPlayer (ChessMaterial.xml has to agree with
+     these places), and MovePanelBandButtons, the lowest, holds the step buttons (56 x 56 at its left) and Take back in the rest of it (112 units wide here, at a font of 22 that fits the word at the smallest scale). The box has no title, the top band being the material's. A notch pushes Menu and Reset onto the top
+     band; Status stays under the box also when the side insets of a phone held sideways lift it (a Wide variant of ChessHud.xml). A row is a number cell of 56 units
+     and two cells (White's and Black's, half of the rest each); the cell of the last move shows its Mark, a fill in the gold of the board's last-move squares (245, 205, 50) under the text. The
+     component writes movePanelNumber<i>, movePanelWhite<i> and movePanelBlack<i> of the 8 rows and shows only the rows the game has (a hidden row takes no room, so the rows pack at the top); the list shows the page of the move the board shows (Game/MovePanel.h). The text of a move is at most 7 characters
+     ("Qh4xe1+", "exd8=Q#") in a cell of 120 units, the number "100." in 56: a font of 24 and 22 units fits both at the smallest Wide scale, ChessUiTest lays the longest words out on the size matrix.
+     The rows are two columns of four (MovePanelColumn0 and 1, half of the list each): in the Wide view the list is vertical and they are one column of eight.
+     The Tall view (720 x 1204, SceneConfig.xml; the only view whose canvas bounds are under the aspect 0.6, hence the variant) has the box under the board and the lower row of the
+     material: (40, 840) to (680, 1128), the numbers of the Tall box of Game/MovePanel.h, as wide as the board. The material keeps its rows above and below the board there, so the two
+     bands of the players are hidden (a hidden element takes no room) and the list is horizontal: its two columns side by side, each 312 units, a little wider than a Wide row (304), so the
+     fonts are the Wide ones; 224 + 8 + 56 (the band of the buttons) = 288. Status is 8 units under the box with no insets; side insets (64.8 units at each side in that view) cut the box, which is
+     then hidden like the Wide one.
+     Every name starts with MovePanel because elements are found by name in every canvas of the scene. -->
+<node name="MovePanel" layer="4" contentVersion="5">
+  <components>
+    <component type="ChessMovePanelComponent" />
+    <component type="UICanvasComponent" space="SceneView" useSafeArea="false">
+      <elements>
+        <element type="UIStack" name="MovePanelBox" x="760" y="80" width="320" height="640" direction="Vertical" spacing="8" padding="8,0,8,0" crossAlign="Stretch" color="32,44,50,255" visible="false">
+          <children>
+            <element type="UIElement" name="MovePanelBandTopPlayer" height="56"/>
+            <element type="UIStack" name="MovePanelList" height="448" direction="Vertical" crossAlign="Stretch">
+              <children>
+                <element type="UIStack" name="MovePanelColumn0" flex="1" direction="Vertical" crossAlign="Stretch">
+                  <children>
+                    <element type="UIStack" name="MovePanelRow0" height="56" direction="Horizontal" spacing="4" crossAlign="Stretch" visible="false">
+                      <children>
+                        <element type="UIElement" name="MovePanelNumber0" width="56" fontSize="22">
+                          <components>
+                            <component type="UITextComponent" text="{movePanelNumber0}" textColor="165,172,190,255" align="Right" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                          </components>
+                        </element>
+                        <element type="UIElement" name="MovePanelWhite0" flex="1">
+                          <components>
+                            <component type="UIInputClicker" action="ChessShowMove" value="white0"/>
+                          </components>
+                          <children>
+                            <element type="UIElement" name="MovePanelWhiteMark0" anchor="Stretch" color="245,205,50,150" visible="false"/>
+                            <element type="UIElement" name="MovePanelWhiteText0" anchor="Stretch" fontSize="24">
+                              <components>
+                                <component type="UITextComponent" text="{movePanelWhite0}" textColor="236,238,244,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                              </components>
+                            </element>
+                          </children>
+                        </element>
+                        <element type="UIElement" name="MovePanelBlack0" flex="1">
+                          <components>
+                            <component type="UIInputClicker" action="ChessShowMove" value="black0"/>
+                          </components>
+                          <children>
+                            <element type="UIElement" name="MovePanelBlackMark0" anchor="Stretch" color="245,205,50,150" visible="false"/>
+                            <element type="UIElement" name="MovePanelBlackText0" anchor="Stretch" fontSize="24">
+                              <components>
+                                <component type="UITextComponent" text="{movePanelBlack0}" textColor="236,238,244,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                              </components>
+                            </element>
+                          </children>
+                        </element>
+                      </children>
+                    </element>
+                    <element type="UIStack" name="MovePanelRow1" height="56" direction="Horizontal" spacing="4" crossAlign="Stretch" visible="false">
+                      <children>
+                        <element type="UIElement" name="MovePanelNumber1" width="56" fontSize="22">
+                          <components>
+                            <component type="UITextComponent" text="{movePanelNumber1}" textColor="165,172,190,255" align="Right" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                          </components>
+                        </element>
+                        <element type="UIElement" name="MovePanelWhite1" flex="1">
+                          <components>
+                            <component type="UIInputClicker" action="ChessShowMove" value="white1"/>
+                          </components>
+                          <children>
+                            <element type="UIElement" name="MovePanelWhiteMark1" anchor="Stretch" color="245,205,50,150" visible="false"/>
+                            <element type="UIElement" name="MovePanelWhiteText1" anchor="Stretch" fontSize="24">
+                              <components>
+                                <component type="UITextComponent" text="{movePanelWhite1}" textColor="236,238,244,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                              </components>
+                            </element>
+                          </children>
+                        </element>
+                        <element type="UIElement" name="MovePanelBlack1" flex="1">
+                          <components>
+                            <component type="UIInputClicker" action="ChessShowMove" value="black1"/>
+                          </components>
+                          <children>
+                            <element type="UIElement" name="MovePanelBlackMark1" anchor="Stretch" color="245,205,50,150" visible="false"/>
+                            <element type="UIElement" name="MovePanelBlackText1" anchor="Stretch" fontSize="24">
+                              <components>
+                                <component type="UITextComponent" text="{movePanelBlack1}" textColor="236,238,244,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                              </components>
+                            </element>
+                          </children>
+                        </element>
+                      </children>
+                    </element>
+                    <element type="UIStack" name="MovePanelRow2" height="56" direction="Horizontal" spacing="4" crossAlign="Stretch" visible="false">
+                      <children>
+                        <element type="UIElement" name="MovePanelNumber2" width="56" fontSize="22">
+                          <components>
+                            <component type="UITextComponent" text="{movePanelNumber2}" textColor="165,172,190,255" align="Right" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                          </components>
+                        </element>
+                        <element type="UIElement" name="MovePanelWhite2" flex="1">
+                          <components>
+                            <component type="UIInputClicker" action="ChessShowMove" value="white2"/>
+                          </components>
+                          <children>
+                            <element type="UIElement" name="MovePanelWhiteMark2" anchor="Stretch" color="245,205,50,150" visible="false"/>
+                            <element type="UIElement" name="MovePanelWhiteText2" anchor="Stretch" fontSize="24">
+                              <components>
+                                <component type="UITextComponent" text="{movePanelWhite2}" textColor="236,238,244,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                              </components>
+                            </element>
+                          </children>
+                        </element>
+                        <element type="UIElement" name="MovePanelBlack2" flex="1">
+                          <components>
+                            <component type="UIInputClicker" action="ChessShowMove" value="black2"/>
+                          </components>
+                          <children>
+                            <element type="UIElement" name="MovePanelBlackMark2" anchor="Stretch" color="245,205,50,150" visible="false"/>
+                            <element type="UIElement" name="MovePanelBlackText2" anchor="Stretch" fontSize="24">
+                              <components>
+                                <component type="UITextComponent" text="{movePanelBlack2}" textColor="236,238,244,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                              </components>
+                            </element>
+                          </children>
+                        </element>
+                      </children>
+                    </element>
+                    <element type="UIStack" name="MovePanelRow3" height="56" direction="Horizontal" spacing="4" crossAlign="Stretch" visible="false">
+                      <children>
+                        <element type="UIElement" name="MovePanelNumber3" width="56" fontSize="22">
+                          <components>
+                            <component type="UITextComponent" text="{movePanelNumber3}" textColor="165,172,190,255" align="Right" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                          </components>
+                        </element>
+                        <element type="UIElement" name="MovePanelWhite3" flex="1">
+                          <components>
+                            <component type="UIInputClicker" action="ChessShowMove" value="white3"/>
+                          </components>
+                          <children>
+                            <element type="UIElement" name="MovePanelWhiteMark3" anchor="Stretch" color="245,205,50,150" visible="false"/>
+                            <element type="UIElement" name="MovePanelWhiteText3" anchor="Stretch" fontSize="24">
+                              <components>
+                                <component type="UITextComponent" text="{movePanelWhite3}" textColor="236,238,244,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                              </components>
+                            </element>
+                          </children>
+                        </element>
+                        <element type="UIElement" name="MovePanelBlack3" flex="1">
+                          <components>
+                            <component type="UIInputClicker" action="ChessShowMove" value="black3"/>
+                          </components>
+                          <children>
+                            <element type="UIElement" name="MovePanelBlackMark3" anchor="Stretch" color="245,205,50,150" visible="false"/>
+                            <element type="UIElement" name="MovePanelBlackText3" anchor="Stretch" fontSize="24">
+                              <components>
+                                <component type="UITextComponent" text="{movePanelBlack3}" textColor="236,238,244,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                              </components>
+                            </element>
+                          </children>
+                        </element>
+                      </children>
+                    </element>
+                  </children>
+                </element>
+                <element type="UIStack" name="MovePanelColumn1" flex="1" direction="Vertical" crossAlign="Stretch">
+                  <children>
+                    <element type="UIStack" name="MovePanelRow4" height="56" direction="Horizontal" spacing="4" crossAlign="Stretch" visible="false">
+                      <children>
+                        <element type="UIElement" name="MovePanelNumber4" width="56" fontSize="22">
+                          <components>
+                            <component type="UITextComponent" text="{movePanelNumber4}" textColor="165,172,190,255" align="Right" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                          </components>
+                        </element>
+                        <element type="UIElement" name="MovePanelWhite4" flex="1">
+                          <components>
+                            <component type="UIInputClicker" action="ChessShowMove" value="white4"/>
+                          </components>
+                          <children>
+                            <element type="UIElement" name="MovePanelWhiteMark4" anchor="Stretch" color="245,205,50,150" visible="false"/>
+                            <element type="UIElement" name="MovePanelWhiteText4" anchor="Stretch" fontSize="24">
+                              <components>
+                                <component type="UITextComponent" text="{movePanelWhite4}" textColor="236,238,244,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                              </components>
+                            </element>
+                          </children>
+                        </element>
+                        <element type="UIElement" name="MovePanelBlack4" flex="1">
+                          <components>
+                            <component type="UIInputClicker" action="ChessShowMove" value="black4"/>
+                          </components>
+                          <children>
+                            <element type="UIElement" name="MovePanelBlackMark4" anchor="Stretch" color="245,205,50,150" visible="false"/>
+                            <element type="UIElement" name="MovePanelBlackText4" anchor="Stretch" fontSize="24">
+                              <components>
+                                <component type="UITextComponent" text="{movePanelBlack4}" textColor="236,238,244,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                              </components>
+                            </element>
+                          </children>
+                        </element>
+                      </children>
+                    </element>
+                    <element type="UIStack" name="MovePanelRow5" height="56" direction="Horizontal" spacing="4" crossAlign="Stretch" visible="false">
+                      <children>
+                        <element type="UIElement" name="MovePanelNumber5" width="56" fontSize="22">
+                          <components>
+                            <component type="UITextComponent" text="{movePanelNumber5}" textColor="165,172,190,255" align="Right" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                          </components>
+                        </element>
+                        <element type="UIElement" name="MovePanelWhite5" flex="1">
+                          <components>
+                            <component type="UIInputClicker" action="ChessShowMove" value="white5"/>
+                          </components>
+                          <children>
+                            <element type="UIElement" name="MovePanelWhiteMark5" anchor="Stretch" color="245,205,50,150" visible="false"/>
+                            <element type="UIElement" name="MovePanelWhiteText5" anchor="Stretch" fontSize="24">
+                              <components>
+                                <component type="UITextComponent" text="{movePanelWhite5}" textColor="236,238,244,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                              </components>
+                            </element>
+                          </children>
+                        </element>
+                        <element type="UIElement" name="MovePanelBlack5" flex="1">
+                          <components>
+                            <component type="UIInputClicker" action="ChessShowMove" value="black5"/>
+                          </components>
+                          <children>
+                            <element type="UIElement" name="MovePanelBlackMark5" anchor="Stretch" color="245,205,50,150" visible="false"/>
+                            <element type="UIElement" name="MovePanelBlackText5" anchor="Stretch" fontSize="24">
+                              <components>
+                                <component type="UITextComponent" text="{movePanelBlack5}" textColor="236,238,244,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                              </components>
+                            </element>
+                          </children>
+                        </element>
+                      </children>
+                    </element>
+                    <element type="UIStack" name="MovePanelRow6" height="56" direction="Horizontal" spacing="4" crossAlign="Stretch" visible="false">
+                      <children>
+                        <element type="UIElement" name="MovePanelNumber6" width="56" fontSize="22">
+                          <components>
+                            <component type="UITextComponent" text="{movePanelNumber6}" textColor="165,172,190,255" align="Right" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                          </components>
+                        </element>
+                        <element type="UIElement" name="MovePanelWhite6" flex="1">
+                          <components>
+                            <component type="UIInputClicker" action="ChessShowMove" value="white6"/>
+                          </components>
+                          <children>
+                            <element type="UIElement" name="MovePanelWhiteMark6" anchor="Stretch" color="245,205,50,150" visible="false"/>
+                            <element type="UIElement" name="MovePanelWhiteText6" anchor="Stretch" fontSize="24">
+                              <components>
+                                <component type="UITextComponent" text="{movePanelWhite6}" textColor="236,238,244,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                              </components>
+                            </element>
+                          </children>
+                        </element>
+                        <element type="UIElement" name="MovePanelBlack6" flex="1">
+                          <components>
+                            <component type="UIInputClicker" action="ChessShowMove" value="black6"/>
+                          </components>
+                          <children>
+                            <element type="UIElement" name="MovePanelBlackMark6" anchor="Stretch" color="245,205,50,150" visible="false"/>
+                            <element type="UIElement" name="MovePanelBlackText6" anchor="Stretch" fontSize="24">
+                              <components>
+                                <component type="UITextComponent" text="{movePanelBlack6}" textColor="236,238,244,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                              </components>
+                            </element>
+                          </children>
+                        </element>
+                      </children>
+                    </element>
+                    <element type="UIStack" name="MovePanelRow7" height="56" direction="Horizontal" spacing="4" crossAlign="Stretch" visible="false">
+                      <children>
+                        <element type="UIElement" name="MovePanelNumber7" width="56" fontSize="22">
+                          <components>
+                            <component type="UITextComponent" text="{movePanelNumber7}" textColor="165,172,190,255" align="Right" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                          </components>
+                        </element>
+                        <element type="UIElement" name="MovePanelWhite7" flex="1">
+                          <components>
+                            <component type="UIInputClicker" action="ChessShowMove" value="white7"/>
+                          </components>
+                          <children>
+                            <element type="UIElement" name="MovePanelWhiteMark7" anchor="Stretch" color="245,205,50,150" visible="false"/>
+                            <element type="UIElement" name="MovePanelWhiteText7" anchor="Stretch" fontSize="24">
+                              <components>
+                                <component type="UITextComponent" text="{movePanelWhite7}" textColor="236,238,244,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                              </components>
+                            </element>
+                          </children>
+                        </element>
+                        <element type="UIElement" name="MovePanelBlack7" flex="1">
+                          <components>
+                            <component type="UIInputClicker" action="ChessShowMove" value="black7"/>
+                          </components>
+                          <children>
+                            <element type="UIElement" name="MovePanelBlackMark7" anchor="Stretch" color="245,205,50,150" visible="false"/>
+                            <element type="UIElement" name="MovePanelBlackText7" anchor="Stretch" fontSize="24">
+                              <components>
+                                <component type="UITextComponent" text="{movePanelBlack7}" textColor="236,238,244,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                              </components>
+                            </element>
+                          </children>
+                        </element>
+                      </children>
+                    </element>
+                  </children>
+                </element>
+              </children>
+            </element>
+            <element type="UIElement" name="MovePanelBandBottomPlayer" height="56"/>
+            <element type="UIStack" name="MovePanelBandButtons" height="56" direction="Horizontal" spacing="8" crossAlign="Stretch">
+              <children>
+                <element type="UIElement" name="MovePanelStepBack" width="56" fontSize="32" color="58,74,84,255">
+                  <components>
+                    <component type="UITextComponent" text="&#x2039;" align="Center" verticalAlign="Center" wrap="false"/>
+                    <component type="UIInputClicker" action="ChessShowMove" value="back"/>
+                  </components>
+                </element>
+                <element type="UIElement" name="MovePanelStepForward" width="56" fontSize="32" color="58,74,84,255">
+                  <components>
+                    <component type="UITextComponent" text="&#x203A;" align="Center" verticalAlign="Center" wrap="false"/>
+                    <component type="UIInputClicker" action="ChessShowMove" value="forward"/>
+                  </components>
+                </element>
+                <element type="UIElement" name="MovePanelLatest" width="56" fontSize="32" color="58,74,84,255">
+                  <components>
+                    <component type="UITextComponent" text="&#xBB;" align="Center" verticalAlign="Center" wrap="false"/>
+                    <component type="UIInputClicker" action="ChessShowMove" value="latest"/>
+                  </components>
+                </element>
+                <element type="UIElement" name="MovePanelTakeBack" flex="1" fontSize="22" color="112,84,48,255">
+                  <components>
+                    <component type="UITextComponent" text="Take back" align="Center" verticalAlign="Center" wrap="false" fadeWhenDisabled="true"/>
+                    <component type="UIInputClicker" action="ChessTakeBack" disabled="true"/>
+                  </components>
+                </element>
+              </children>
+            </element>
+          </children>
+        </element>
+      </elements>
+      <variants>
+        <variant when="maxAspect:0.6">
+          <overrides>
+            <set element="MovePanelBox" x="40" y="840" width="640" height="288" />
+            <set element="MovePanelBandTopPlayer" visible="false" />
+            <set element="MovePanelBandBottomPlayer" visible="false" />
+            <set element="MovePanelList" height="224" direction="Horizontal" />
+          </overrides>
+        </variant>
+      </variants>
+    </component>
+  </components>
+</node>

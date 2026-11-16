@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Chess/Game/Move.h>
+#include <Chess/Game/MoveGenerator.h>
 #include <Chess/Game/Position.h>
 
 namespace BECore::Chess {
@@ -15,5 +16,8 @@ namespace BECore::Chess {
      * unspecified. @p before is not changed.
      */
     [[nodiscard]] String SanOf(const Position& before, Move move);
+
+    /// The same text for a caller that has the legal moves of @p before already (MoveGenerator::GenerateLegal(before)), so they are not generated again
+    [[nodiscard]] String SanOf(const Position& before, Move move, const MoveList& legal);
 
 }  // namespace BECore::Chess

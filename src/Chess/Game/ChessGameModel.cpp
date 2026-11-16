@@ -22,12 +22,16 @@ namespace BECore::Chess {
     }
 
     void ChessGameModel::Reset() {
+        DrawSeed();
+        BeginGame(Position::Start());
+        PlaceHandlesAtStart(_pieces);
+    }
+
+    void ChessGameModel::DrawSeed() {
         if (_seedSource) {
             const uint32_t drawn = _seedSource();
             _seed = drawn == 0 ? 1 : drawn;  // 0 is "no variety", never a drawn seed
         }
-        BeginGame(Position::Start());
-        PlaceHandlesAtStart();
     }
 
     void ChessGameModel::SetSeed(uint32_t seed) noexcept {
@@ -37,8 +41,8 @@ namespace BECore::Chess {
         }
     }
 
-    void ChessGameModel::PlaceHandlesAtStart() {
-        for (auto& [handle, track] : _pieces) {
+    void ChessGameModel::PlaceHandlesAtStart(PieceTracks& tracks) {
+        for (auto& [handle, track] : tracks) {
             track.current = track.start;
             track.piece = track.startPiece;
             track.active = true;
@@ -47,14 +51,14 @@ namespace BECore::Chess {
 
     void ChessGameModel::SetPosition(const Position& position) {
         BeginGame(position);
-        DealPieces(_position);
+        DealPieces(_pieces, _position);
     }
 
-    void ChessGameModel::DealPieces(const Position& position) {
+    void ChessGameModel::DealPieces(PieceTracks& pieces, const Position& position) {
         for (const PieceColor color : {PieceColor::White, PieceColor::Black}) {
             // The map has no order of its own; the order of the start squares makes the deal the same on every run.
             Vector<PieceTrack*> tracks;
-            for (auto& [handle, track] : _pieces) {
+            for (auto& [handle, track] : pieces) {
                 if (track.startPiece.color == color) {
                     tracks.push_back(&track);
                 }
@@ -80,6 +84,7 @@ namespace BECore::Chess {
     }
 
     void ChessGameModel::BeginGame(const Position& position) {
+        DropView();
         _position = position;
         _startFen = _position.ToFen();
         _moves.clear();
@@ -110,7 +115,7 @@ namespace BECore::Chess {
     }
 
     bool ChessGameModel::OnSquareClicked(Square s) {
-        if (!s.IsInside() || IsGameOver()) {
+        if (EndViewing() || !s.IsInside() || IsGameOver()) {
             return false;
         }
 
@@ -169,7 +174,8 @@ namespace BECore::Chess {
             return std::unexpected(MoveError::IllegalMove);
         }
 
-        RelocatePieces(move);
+        DropView();
+        RelocatePieces(_pieces, move);
         _position.DoMove(move);
         _moves.push_back(move);
         ClearSelection();
@@ -186,29 +192,85 @@ namespace BECore::Chess {
         if (count == 0) {
             return 0;
         }
+        DropView();
         for (size_t taken = 0; taken < count; ++taken) {
             _position.UndoMove();
             _moves.pop_back();
         }
-        ReplayPieces();
+        ReplayPieces(_pieces, _moves.size());
         ClearSelection();
         ClearPremoves();
         _status = EvaluateStatus(_position);
+        DrawSeed();  // the person asked for another try, so the program may answer otherwise among near-equal moves
         ++_version;
         return count;
     }
 
-    void ChessGameModel::ReplayPieces() {
+    void ChessGameModel::ReplayPieces(PieceTracks& tracks, size_t moveCount) const {
         if (_startFen == Position::kStartFen) {
-            PlaceHandlesAtStart();
+            PlaceHandlesAtStart(tracks);
         } else if (const auto start = Position::FromFen(_startFen)) {
-            DealPieces(*start);
+            DealPieces(tracks, *start);
         } else {
             return;  // the model only stores FENs of its own positions, so this is not reached
         }
-        for (const Move move : _moves) {
-            RelocatePieces(move);
+        for (size_t index = 0; index < moveCount && index < _moves.size(); ++index) {
+            RelocatePieces(tracks, _moves[index]);
         }
+    }
+
+    bool ChessGameModel::ShowMoves(size_t count) {
+        if (count >= _moves.size()) {
+            if (!_viewing) {
+                return false;
+            }
+            DropView();
+            return true;
+        }
+        if (_viewing && count == _viewMoveCount) {
+            return false;
+        }
+        if (!_viewing) {
+            ClearSelection();
+        }
+        _viewing = true;
+        _viewMoveCount = count;
+        BuildView();
+        return true;
+    }
+
+    bool ChessGameModel::EndViewing() {
+        return ShowMoves(_moves.size());
+    }
+
+    void ChessGameModel::BuildView() {
+        _viewPosition = _position;
+        for (size_t undone = _viewMoveCount; undone < _moves.size(); ++undone) {
+            _viewPosition.UndoMove();
+        }
+        _viewPieces = _pieces;
+        ReplayPieces(_viewPieces, _viewMoveCount);
+    }
+
+    void ChessGameModel::DropView() {
+        _viewing = false;
+        _viewMoveCount = 0;
+        _viewPieces.clear();
+    }
+
+    Square ChessGameModel::GetShownSquareOf(PieceHandle handle) const {
+        const PieceTrack* track = FindActive(_viewing ? _viewPieces : _pieces, handle);
+        return track ? track->current : kOffBoard;
+    }
+
+    Piece ChessGameModel::GetShownPieceOf(PieceHandle handle) const {
+        const PieceTrack* track = FindActive(_viewing ? _viewPieces : _pieces, handle);
+        return track ? track->piece : Piece{};
+    }
+
+    const ChessGameModel::PieceTrack* ChessGameModel::FindActive(const PieceTracks& tracks, PieceHandle handle) {
+        const auto it = tracks.find(handle);
+        return it != tracks.end() && it->second.active ? &it->second : nullptr;
     }
 
     void ChessGameModel::RegisterPiece(PieceHandle handle, Square startSquare) {
@@ -222,33 +284,30 @@ namespace BECore::Chess {
         // The scene registers its pieces in its first frame, which a client that acts at once (the control API on the manual
         // clock) can precede: a game that has moved on, or began from another position, is dealt again with this piece in it.
         if (!_moves.empty() || _startFen != Position::kStartFen) {
-            DealPieces(_position);
+            DealPieces(_pieces, _position);
+        }
+        if (_viewing) {
+            BuildView();
         }
     }
 
     void ChessGameModel::UnregisterPiece(PieceHandle handle) {
         _pieces.erase(handle);
+        _viewPieces.erase(handle);
     }
 
     Square ChessGameModel::GetSquareOf(PieceHandle handle) const {
-        const auto it = _pieces.find(handle);
-        if (it == _pieces.end() || !it->second.active) {
-            return kOffBoard;
-        }
-        return it->second.current;
+        const PieceTrack* track = FindActive(_pieces, handle);
+        return track ? track->current : kOffBoard;
     }
 
     Piece ChessGameModel::GetPieceOf(PieceHandle handle) const {
-        const auto it = _pieces.find(handle);
-        if (it == _pieces.end() || !it->second.active) {
-            return Piece{};
-        }
-        return it->second.piece;
+        const PieceTrack* track = FindActive(_pieces, handle);
+        return track ? track->piece : Piece{};
     }
 
     bool ChessGameModel::IsActive(PieceHandle handle) const {
-        const auto it = _pieces.find(handle);
-        return it != _pieces.end() && it->second.active;
+        return FindActive(_pieces, handle) != nullptr;
     }
 
     std::expected<void, MoveError> ChessGameModel::ChoosePromotion(PieceType piece) {
@@ -288,7 +347,7 @@ namespace BECore::Chess {
     }
 
     bool ChessGameModel::OnPremoveClicked(PieceColor premover, Square s) {
-        if (!s.IsInside() || IsGameOver() || premover == _position.SideToMove()) {
+        if (EndViewing() || !s.IsInside() || IsGameOver() || premover == _position.SideToMove()) {
             return false;
         }
         if (_premoveColor.has_value() && *_premoveColor != premover) {
@@ -364,31 +423,31 @@ namespace BECore::Chess {
         }
     }
 
-    void ChessGameModel::RelocatePieces(Move move) {
+    void ChessGameModel::RelocatePieces(PieceTracks& tracks, Move move) {
         const Square from = move.From();
         const Square to = move.To();
 
         // Whatever is taken goes first, so the moving handle never finds its target square occupied. An en passant
         // capture takes the pawn that stands beside the capturing one, not the one on the target square.
         if (move.Kind() == MoveKind::EnPassant) {
-            Capture(Square{to.file, from.rank});
+            Capture(tracks, Square{to.file, from.rank});
         } else {
-            Capture(to);
+            Capture(tracks, to);
         }
 
-        PieceTrack* moved = MoveHandle(from, to);
+        PieceTrack* moved = MoveHandle(tracks, from, to);
 
         if (move.Kind() == MoveKind::Castling) {
             const bool kingSide = to.file > from.file;
-            MoveHandle(Square{static_cast<int8_t>(kingSide ? kKingSideRookFile : kQueenSideRookFile), from.rank},
+            MoveHandle(tracks, Square{static_cast<int8_t>(kingSide ? kKingSideRookFile : kQueenSideRookFile), from.rank},
                        Square{static_cast<int8_t>(kingSide ? kKingSideRookTargetFile : kQueenSideRookTargetFile), from.rank});
         } else if (move.IsPromotion() && moved) {
             moved->piece.type = move.PromotionType();
         }
     }
 
-    void ChessGameModel::Capture(Square at) {
-        for (auto& [handle, track] : _pieces) {
+    void ChessGameModel::Capture(PieceTracks& tracks, Square at) {
+        for (auto& [handle, track] : tracks) {
             if (track.active && track.current == at) {
                 track.active = false;
                 track.current = kOffBoard;
@@ -396,8 +455,8 @@ namespace BECore::Chess {
         }
     }
 
-    ChessGameModel::PieceTrack* ChessGameModel::MoveHandle(Square from, Square to) {
-        for (auto& [handle, track] : _pieces) {
+    ChessGameModel::PieceTrack* ChessGameModel::MoveHandle(PieceTracks& tracks, Square from, Square to) {
+        for (auto& [handle, track] : tracks) {
             if (track.active && track.current == from) {
                 track.current = to;
                 return &track;

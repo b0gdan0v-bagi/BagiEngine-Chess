@@ -249,8 +249,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(Model().GetWinner(), Optional<PieceColor>(PieceColor::Black));
         const auto dim = dimOf();
         ASSERT_TRUE(dim.has_value());
-        const ViewTransform fit = ViewTransform::Fit(kViewWidth, kViewHeight, _renderer->width, _renderer->height);
-        EXPECT_TRUE(SameRect(*dim, fit.ToOutput(100.0f, kBoardTop, 640.0f, 640.0f))) << "the whole board, as with White at the bottom";
+        EXPECT_TRUE(SameRect(*dim, ActiveFit().ToOutput(100.0f, kBoardTop, 640.0f, 640.0f))) << "the whole board, as with White at the bottom";
         EXPECT_FALSE(RectCalls(kResultBarColor).empty()) << "the bar of the winner";
     }
 
@@ -497,7 +496,7 @@ namespace BECore::Chess::Tests {
         for (const ViewShape& shape : kViewShapes) {
             SCOPED_TRACE(shape.name);
             LayOutInTheNarrowestWindow(layout, shape);
-            EXPECT_NEAR(layout.GetResolved().scale, kNarrowestWidth / shape.viewWidth, 0.01f) << "about 10 px for a font of 18 units in the default view, 12 in Portrait";
+            EXPECT_NEAR(layout.GetResolved().scale, shape.NarrowestScale(), 0.01f) << "about 10 px for a font of 18 units in the default view, 12 in Portrait";
 
             for (size_t round = 0; round < kBoardEdgeCells; ++round) {
                 PublishCoordinateRound(round);
@@ -928,7 +927,7 @@ namespace BECore::Chess::Tests {
             EXPECT_GE(status.rect.y, boardBottom - kPixelTolerance) << "Status is under the board";
             if (portrait) {
                 EXPECT_GE(status.rect.y, kMaterialPortraitListBottom + kMinGap) << "and under the lower row of the material";
-                EXPECT_FLOAT_EQ(status.rect.y, kPortraitStatusTop);
+                EXPECT_FLOAT_EQ(status.rect.y, ViewHeight() - (kPortraitViewHeight - kPortraitStatusTop)) << "as far above the bottom of its view as in Portrait, also in Tall";
             }
             EXPECT_EQ(MaterialClearance(Material()->GetLayout(), Hud()->GetLayout(), kMinGap), "") << "the rows of the material and the HUD keep apart";
         }
@@ -2711,18 +2710,24 @@ namespace BECore::Chess::Tests {
 
     // ---- the board in the Portrait view ------------------------------------------------------------------------------------------
     // What the entry asks of the board holds in the Portrait view as in the default one: a click and a drag go by the cells that are drawn, in both orientations, and the dim and the bar
-    // cover the board. The expected cells are written out here from the numbers of the view (the fit of 720 x 960, the board at (40, 144)), not taken from the board component
+    // cover the board. The expected cells are written out here from the numbers of the view (the fit of 720 x 960, or 720 x 1204 for the Tall view, the board at (40, 144) in both), not
+    // taken from the board component
 
     namespace {
 
-        // 480 x 853 has bars above and below the view, 1000 x 1200 at the sides, 768 x 1024 (3:4) none
+        // 480 x 853 is the Tall view with thin bars above and below it, 1000 x 1200 Portrait with bars at the sides, 768 x 1024 (3:4) Portrait with none
         const Pair<float, float> kPortraitOutputs[] = {{480.0f, 853.0f}, {768.0f, 1024.0f}, {1000.0f, 1200.0f}};
         constexpr int kPawnRow = 6;    // the row of the pawns of the person at the bottom, from the top
         constexpr int kTargetRow = 4;  // where a pawn goes with its double step
 
-        /// The cell (column from the left, row from the top) of the board in the Portrait view, in the pixels of an output
+        /// The height of the view an upright output shows: Tall up to its aspect, else Portrait (ChessUiScreenTest holds the rule)
+        float UprightViewHeight(const Pair<float, float>& output) {
+            return output.first / output.second <= kTallMaxAspect ? kTallViewHeight : kPortraitViewHeight;
+        }
+
+        /// The cell (column from the left, row from the top) of the board in the Portrait or the Tall view, in the pixels of an output
         Rect PortraitCell(const Pair<float, float>& output, int column, int row) {
-            const ViewTransform fit = ViewTransform::Fit(kPortraitViewWidth, kPortraitViewHeight, output.first, output.second);
+            const ViewTransform fit = ViewTransform::Fit(kPortraitViewWidth, UprightViewHeight(output), output.first, output.second);
             return fit.ToOutput(kPortraitBoardLeft + static_cast<float>(column) * kCellSize, kPortraitBoardTop + static_cast<float>(row) * kCellSize, kCellSize, kCellSize);
         }
 
@@ -2802,12 +2807,12 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, AClickInABarOutsideThePortraitViewSelectsNothingAndAClickInsideItDoes) {
-        // 480 x 853: the view is 480 x 640 pixels, bars of 106.5 above and below; 1000 x 1200: the view is 900 wide, bars of 50 at the sides
+        // 480 x 720: the view is 480 x 640 pixels, bars of 40 above and below; 1000 x 1200: the view is 900 wide, bars of 50 at the sides
         StartFrom(kFourRooks);
         const struct {
             Pair<float, float> output;
             Pair<float, float> inBar;
-        } shapes[] = {{{480.0f, 853.0f}, {240.0f, 50.0f}}, {{480.0f, 853.0f}, {240.0f, 800.0f}}, {{1000.0f, 1200.0f}, {25.0f, 600.0f}}, {{1000.0f, 1200.0f}, {975.0f, 600.0f}}};
+        } shapes[] = {{{480.0f, 720.0f}, {240.0f, 20.0f}}, {{480.0f, 720.0f}, {240.0f, 700.0f}}, {{1000.0f, 1200.0f}, {25.0f, 600.0f}}, {{1000.0f, 1200.0f}, {975.0f, 600.0f}}};
         for (const auto& shape : shapes) {
             SCOPED_TRACE(Format("output {}x{}, click ({}, {})", shape.output.first, shape.output.second, shape.inBar.first, shape.inBar.second).c_str());
             ASSERT_TRUE(ShowPortrait(shape.output));
@@ -2838,7 +2843,7 @@ namespace BECore::Chess::Tests {
                 ASSERT_TRUE(Model().IsGameOver());
                 Draw();
 
-                const ViewTransform fit = ViewTransform::Fit(kPortraitViewWidth, kPortraitViewHeight, output.first, output.second);
+                const ViewTransform fit = ViewTransform::Fit(kPortraitViewWidth, UprightViewHeight(output), output.first, output.second);
                 const auto dim = RectCalls(kBoardDimColor);
                 ASSERT_EQ(dim.size(), 1u);
                 EXPECT_TRUE(SameRect(dim[0]->rect, fit.ToOutput(kPortraitBoardLeft, kPortraitBoardTop, kBoardUnits, kBoardUnits))) << "the whole board";

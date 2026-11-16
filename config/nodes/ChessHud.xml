@@ -9,7 +9,12 @@
      are chosen in the opponent panel, which the list opens and which also shows what is picked now, and not on buttons of the HUD: the margins are full.
      The numbers are those of the default view. The Portrait view (720 x 960, the board at (40, 144) to (680, 784)) has the same rows: the top row at y 12 to 68 above the upper row of the
      material (y 92) and the board, Status at y 892 to 948 under the board and the lower row (y 832); the anchors keep them there. Only Status is wider there (60 % of the safe area): the
-     safe area of the narrowest window with side insets is 590 units and 48 % of it, 283, cuts the longest sentence, which the 330 of the default view's narrowest window holds. -->
+     safe area of the narrowest window with side insets is 590 units and 48 % of it, 283, cuts the longest sentence, which the 330 of the default view's narrowest window holds.
+     The Wide view (1120 x 800, picked from the aspect 1.4 up, SceneConfig.xml) has the same rows: Turn stays at the left, Menu and Reset are at the right end of the safe area (above the
+     move panel, x 760 to 1080) and Status, 48 % of the safe area, is at the bottom right under it, 38 units high and on the edge of the safe area (the variant minAspect:1.3, which
+     only the Wide bounds meet): the home bar of side insets (32 units there) lifts it to y 730, 10 units under the box (y 720; the HUD keeps 8 from it), where a 56-unit Status 12 units from the edge
+     would lie over the band of the buttons; 38 is about the least that holds a line of the font 28. The Tall view (720 x 1204, up to the aspect 0.59) is Portrait with more room at the
+     bottom: the same top row, and Status at the bottom of its safe area (y 1136 to 1192 with no insets), under the move panel. -->
 <node name="Hud" layer="10" contentVersion="5">
   <components>
     <component type="ChessHudComponent" />
@@ -42,6 +47,11 @@
         <variant when="orientation:portrait">
           <overrides>
             <set element="Status" width="60%" />
+          </overrides>
+        </variant>
+        <variant when="minAspect:1.3">
+          <overrides>
+            <set element="Status" y="0" height="38" />
           </overrides>
         </variant>
       </variants>

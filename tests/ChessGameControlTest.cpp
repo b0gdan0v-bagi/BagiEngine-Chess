@@ -2572,6 +2572,156 @@ namespace BECore::Chess::Tests {
         Frames();
         EXPECT_EQ(control.GetStateVersion(), rated) << "nothing left to rate, the version stays";
     }
+
+    // ---- The takeback (set_state {"takeBack"}, sanMoves, takeBackPlies) ----
+
+    namespace {
+
+        /// {"takeBack": {}}, or {"takeBack": {"plies": ..}} when @p plies is not null
+        Json TakeBackRequest(const Json& plies = Json()) {
+            Json takeBack = Json::object();
+            if (!plies.is_null()) {
+                takeBack["plies"] = plies;
+            }
+            Json request = Json::object();
+            request["takeBack"] = std::move(takeBack);
+            return request;
+        }
+
+        /// The strings of a JSON array joined by spaces
+        String Joined(const Json& array) {
+            String joined;
+            for (const Json& entry : array) {
+                const std::string& text = entry.get_ref<const std::string&>();  //-NoStd: nlohmann string, no engine accessor for it
+                joined += joined.empty() ? "" : " ";
+                joined.append(text.c_str(), text.size());
+            }
+            return joined;
+        }
+
+    }  // namespace
+
+    TEST_F(ChessGameControlTest, TheStateHasTheSanOfTheMovesAndWhatATakebackWouldTake) {
+        EXPECT_EQ(Joined(State()["sanMoves"]), "");
+        EXPECT_EQ(GetJsonInt(State(), "takeBackPlies"), 0);
+        for (const char* uci : {"e2e4", "e7e5", "g1f3", "b8c6", "f1c4", "g8f6", "e1g1"}) {
+            Perform(uci);
+        }
+        EXPECT_EQ(Joined(State()["sanMoves"]), "e4 e5 Nf3 Nc6 Bc4 Nf6 O-O");
+        EXPECT_EQ(GetJsonInt(State(), "takeBackPlies"), 1) << "two people: one move";
+    }
+
+    TEST_F(ChessGameControlTest, ATakebackOfTwoPeopleTakesBackOneMoveAndMovesTheVersionOnce) {
+        Perform("e2e4");
+        Perform("e7e5");
+        const uint64_t version = control.GetStateVersion();
+        ASSERT_TRUE(control.SetState(TakeBackRequest()).has_value());
+        EXPECT_EQ(MoveCount(), 1u);
+        EXPECT_EQ(StringMember(State(), "turn"), "black");
+        EXPECT_EQ(control.GetStateVersion(), version + 1);
+        EXPECT_EQ(Joined(State()["sanMoves"]), "e4");
+    }
+
+    TEST_F(ChessGameControlTest, AgainstTheProgramATakebackTakesItsAnswerWithTheMoveOfThePersonOrOnlyThatMoveWhileItIsToMove) {
+        CountingFactory factory({New<InstantEngine>()});
+        opponent.SetEngineFactory(factory.AsFactory());
+        ASSERT_TRUE(opponent.SetSide(PieceColor::Black).has_value());
+        Perform("e2e4");
+        EXPECT_EQ(GetJsonInt(State(), "takeBackPlies"), 1) << "the program is to move: the person's move only";
+        Perform("e7e5");  // for the program, as a client may
+        EXPECT_EQ(GetJsonInt(State(), "takeBackPlies"), 2);
+        ASSERT_TRUE(control.SetState(TakeBackRequest()).has_value());
+        EXPECT_EQ(MoveCount(), 0u);
+        EXPECT_EQ(StringMember(State(), "turn"), "white");
+    }
+
+    TEST_F(ChessGameControlTest, ATakebackOfPliesTakesThatManyAndNoMoreThanWerePlayed) {
+        for (const char* uci : {"e2e4", "e7e5", "g1f3"}) {
+            Perform(uci);
+        }
+        const uint64_t version = control.GetStateVersion();
+        for (const Json& plies : {Json(0), Json(4), Json(-1), Json("2"), Json(true)}) {
+            EXPECT_EQ(SetStateError(TakeBackRequest(plies)), "invalid_params") << DumpJson(plies).c_str();
+        }
+        EXPECT_EQ(MoveCount(), 3u);
+        EXPECT_EQ(control.GetStateVersion(), version) << "a refused takeback changes nothing";
+        ASSERT_TRUE(control.SetState(TakeBackRequest(Json(3))).has_value());
+        EXPECT_EQ(MoveCount(), 0u);
+        EXPECT_EQ(StringMember(State(), "fen"), String(Position::kStartFen.data(), Position::kStartFen.size()));
+    }
+
+    TEST_F(ChessGameControlTest, NothingToTakeBackIsInvalidParams) {
+        EXPECT_EQ(SetStateError(TakeBackRequest()), "invalid_params") << "no move";
+
+        CountingFactory factory({New<InstantEngine>()});
+        opponent.SetEngineFactory(factory.AsFactory());
+        ASSERT_TRUE(opponent.SetSide(PieceColor::White).has_value());
+        Perform("e2e4");  // the program's opening move
+        const uint64_t version = control.GetStateVersion();
+        EXPECT_EQ(GetJsonInt(State(), "takeBackPlies"), 0);
+        EXPECT_EQ(SetStateError(TakeBackRequest()), "invalid_params") << "the only move is the program's";
+        EXPECT_EQ(MoveCount(), 1u);
+        EXPECT_EQ(control.GetStateVersion(), version);
+        ASSERT_TRUE(control.SetState(TakeBackRequest(Json(1))).has_value()) << "a client may still name the plies";
+        EXPECT_EQ(MoveCount(), 0u);
+    }
+
+    TEST_F(ChessGameControlTest, ATakebackDrawsANewSeedAndASeedAfterItPinsTheGame) {
+        uint32_t next = 4242;
+        model.SetSeedSource([&next] { return next++; });
+        ASSERT_TRUE(control.Reset(Json::object()).has_value());
+        ASSERT_EQ(OpponentMember("seed").get<int64_t>(), 4242);
+        Perform("e2e4");
+        ASSERT_TRUE(control.SetState(TakeBackRequest()).has_value());
+        EXPECT_EQ(OpponentMember("seed").get<int64_t>(), 4243) << "as after a reset";
+
+        SetOpponent(OpponentSeedRequest(Json(1)));
+        EXPECT_EQ(OpponentMember("seed").get<int64_t>(), 1);
+    }
+
+    TEST_F(ChessGameControlTest, ATakebackIsAloneInItsCallAndAnObjectOfPliesOnly) {
+        Perform("e2e4");
+        const uint64_t version = control.GetStateVersion();
+        Json withFen = TakeBackRequest();
+        withFen["fen"] = MakeJsonString(kMateInOneFen);
+        EXPECT_EQ(SetStateError(withFen), "invalid_params");
+        Json withAnalysis = TakeBackRequest();
+        withAnalysis["analysis"] = Json::object();
+        EXPECT_EQ(SetStateError(withAnalysis), "invalid_params");
+        Json other = TakeBackRequest();
+        other["takeBack"]["moves"] = 1;
+        EXPECT_EQ(SetStateError(other), "invalid_params");
+        Json notAnObject = Json::object();
+        notAnObject["takeBack"] = 1;
+        EXPECT_EQ(SetStateError(notAnObject), "invalid_params");
+        EXPECT_EQ(MoveCount(), 1u);
+        EXPECT_EQ(control.GetStateVersion(), version);
+    }
+
+    TEST_F(ChessGameControlTest, ATakebackReopensAFinishedGameAndItsActionsAreMovesAgain) {
+        for (const char* uci : {"f2f3", "e7e5", "g2g4", "d8h4"}) {
+            Perform(uci);
+        }
+        ASSERT_EQ(StringMember(State(), "status"), "checkmate");
+        ASSERT_TRUE(Actions().empty());
+        ASSERT_TRUE(control.SetState(TakeBackRequest()).has_value());
+        EXPECT_EQ(StringMember(State(), "status"), "ongoing");
+        const Json actions = Actions();
+        ASSERT_FALSE(actions.empty());
+        for (size_t index = 0; index < actions.size(); ++index) {
+            EXPECT_EQ(StringMember(actions[index], "type"), "move") << "list_actions stays only moves";
+        }
+    }
+
+    TEST_F(ChessGameControlTest, ATakebackEndsAViewOfTheScreen) {
+        Perform("e2e4");
+        Perform("e7e5");
+        ASSERT_TRUE(model.ShowMoves(0));
+        ASSERT_TRUE(control.SetState(TakeBackRequest()).has_value());
+        EXPECT_FALSE(model.IsViewing());
+        EXPECT_EQ(MoveCount(), 1u);
+    }
+
 #if CHESS_NO_STOCKFISH
 
     // ---- Without Stockfish (CHESS_NO_STOCKFISH): the default factory of a real controller ----

@@ -2,6 +2,7 @@
 #include <Chess/Engine/OwnEngine.h>
 #include <Chess/Engine/UciEngine.h>
 #include <Chess/Game/ChessGameModel.h>
+#include <Chess/Game/TakeBack.h>
 #include <Common/EngineEnvironment.h>
 #include <chrono>
 #include <tests/ChessTestUtil.h>
@@ -588,6 +589,53 @@ namespace BECore::Chess::Tests {
 
         EXPECT_FALSE(controller.GetError().has_value());
         EXPECT_EQ(engine->Calls(), 1) << "it is white's turn: nothing to ask";
+    }
+
+    TEST_F(OpponentControllerTest, ATakebackWhileTheProgramThinksDropsTheSearchAndItsLateAnswer) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        ChessGameModel model;
+        // The engine ignores its token, so its answer e7e5 still comes after the takeback, into a game that has gone back
+        const auto engine = New<GatedEngine>(false, Mv("e7e5"));
+        CountingFactory factory({engine});
+        OpponentController controller(model);
+        controller.SetEngineFactory(factory.AsFactory());
+        ASSERT_TRUE(controller.SetSide(PieceColor::Black).has_value());
+        ASSERT_TRUE(Play(model, "e2e4"));
+        controller.Update();
+        ASSERT_TRUE(WaitUntil([&] { return engine->Calls() == 1; }));
+        ASSERT_TRUE(controller.IsThinking());
+
+        ASSERT_EQ(model.TakeBack(TakeBackPlies(model.GetMoves().size(), model.GetTurn(), controller.GetPlays())), 1u);
+        controller.Update();
+
+        EXPECT_FALSE(controller.IsThinking()) << "the version moved: the search is stale";
+        engine->Open();
+        ASSERT_TRUE(WaitUntil([&] { return engine->Answered() == 1; }));
+        for (int frame = 0; frame < kManyUpdates; ++frame) {
+            controller.Update();
+        }
+        EXPECT_TRUE(model.GetMoves().empty()) << "the late answer is not played, and White, the person, is to move";
+        EXPECT_EQ(engine->Calls(), 1);
+        EXPECT_FALSE(controller.GetError().has_value());
+    }
+
+    TEST_F(OpponentControllerTest, ATakebackClearsAStandingErrorOfTheEngine) {
+        ChessGameModel model;
+        const auto engine = New<FailingEngine>(EngineError{EngineErrorKind::ProcessDied, "gone in the test"});
+        CountingFactory factory({engine});
+        OpponentController controller(model);
+        controller.SetEngineFactory(factory.AsFactory());
+        ASSERT_TRUE(controller.SetSide(PieceColor::Black).has_value());
+        ASSERT_TRUE(Play(model, "e2e4"));
+        ASSERT_TRUE(UpdateUntil(controller, [&] { return controller.GetError().has_value(); }));
+        const uint64_t revision = controller.GetRevision();
+
+        ASSERT_EQ(model.TakeBack(TakeBackPlies(model.GetMoves().size(), model.GetTurn(), controller.GetPlays())), 1u);
+        controller.Update();
+
+        EXPECT_FALSE(controller.GetError().has_value()) << "the person has acted, as with a reset";
+        EXPECT_GT(controller.GetRevision(), revision);
+        EXPECT_EQ(engine->Calls(), 1) << "White is to move: nothing to ask";
     }
 
     TEST_F(OpponentControllerTest, PickingTheSideToMoveDropsAHalfMadeMoveOfThePerson) {

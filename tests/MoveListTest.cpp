@@ -75,6 +75,17 @@ namespace BECore::Chess::Tests {
             }
         }
 
+        void ExpectSameRows(const Vector<MoveListRow>& actual, const Vector<MoveListRow>& expected) {
+            ASSERT_EQ(actual.size(), expected.size());
+            for (size_t i = 0; i < actual.size(); ++i) {
+                EXPECT_EQ(actual[i].number, expected[i].number);
+                EXPECT_EQ(actual[i].white.san, expected[i].white.san);
+                EXPECT_EQ(actual[i].white.ply, expected[i].white.ply);
+                EXPECT_EQ(actual[i].black.san, expected[i].black.san);
+                EXPECT_EQ(actual[i].black.ply, expected[i].black.ply);
+            }
+        }
+
         bool Play(ChessGameModel& model, StringView uci) {
             const auto move = MoveGenerator::ParseUci(model.GetPosition(), uci);
             return move.has_value() && model.TryMove(*move).has_value();
@@ -216,6 +227,44 @@ namespace BECore::Chess::Tests {
         const Vector<MoveListRow> rows = BuildMoveList(model.GetStartFen(), model.GetMoves());
         EXPECT_EQ(TextOf(rows), kItalianGameText.data());
         ExpectEveryPlyOnceInOrder(rows, model.GetMoves().size());
+    }
+
+    // ---- After a takeback ----
+
+    TEST(MoveListTest, TheListAfterATakeBackIsTheListOfTheKeptMoves) {
+        ChessGameModel played;
+        for (const StringView uci : {"e2e4", "e7e5", "g1f3", "b8c6", "f1c4"}) {
+            ASSERT_TRUE(Play(played, uci));
+        }
+
+        ASSERT_EQ(played.TakeBack(1), 1u);
+        ChessGameModel kept;
+        for (const StringView uci : {"e2e4", "e7e5", "g1f3", "b8c6"}) {
+            ASSERT_TRUE(Play(kept, uci));
+        }
+        ExpectSameRows(BuildMoveList(played.GetStartFen(), played.GetMoves()), BuildMoveList(kept.GetStartFen(), kept.GetMoves()));
+
+        ASSERT_EQ(played.TakeBack(2), 2u);
+        const Vector<MoveListRow> rows = BuildMoveList(played.GetStartFen(), played.GetMoves());
+        EXPECT_EQ(TextOf(rows), "1.e4 e5");
+        ExpectEveryPlyOnceInOrder(rows, played.GetMoves().size());
+    }
+
+    TEST(MoveListTest, TheListAfterATakeBackOfAGameFromAPositionIsTheListOfTheRest) {
+        ChessGameModel model;
+        model.SetPosition(PositionFromFen(kBlackToMoveFen));
+        ASSERT_TRUE(Play(model, "g8f6"));
+        ASSERT_TRUE(Play(model, "b1c3"));
+        ASSERT_TRUE(Play(model, "e7e6"));
+
+        ASSERT_EQ(model.TakeBack(1), 1u);
+        EXPECT_EQ(TextOf(BuildMoveList(model.GetStartFen(), model.GetMoves())), "7...Nf6 8.Nc3");
+
+        ASSERT_EQ(model.TakeBack(1), 1u);
+        EXPECT_EQ(TextOf(BuildMoveList(model.GetStartFen(), model.GetMoves())), "7...Nf6");
+
+        ASSERT_EQ(model.TakeBack(5), 1u) << "the game goes back at most to the position it began from";
+        EXPECT_TRUE(BuildMoveList(model.GetStartFen(), model.GetMoves()).empty());
     }
 
     // ---- Input that is wrong ----

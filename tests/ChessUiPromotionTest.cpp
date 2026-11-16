@@ -208,7 +208,10 @@ namespace BECore::Chess::Tests {
             const char* action;
         };
         // The dim of a modal canvas is its first element, and a click on it does what the panel's Close or Cancel does
-        const ModalRow rows[] = {{"MenuPanel", "MenuDim", "ChessCloseMenu"}, {"OpponentPanel", "Dim", "ChessCloseMenu"}, {"PromotionPanel", "PromotionDim", "ChessCancelPromotion"}};
+        const ModalRow rows[] = {{"MenuPanel", "MenuDim", "ChessCloseMenu"},
+                                 {"OpponentPanel", "Dim", "ChessCloseMenu"},
+                                 {"MovesSection", "MovesSectionDim", "ChessCloseMenu"},
+                                 {"PromotionPanel", "PromotionDim", "ChessCancelPromotion"}};
         size_t modals = 0;
         for (const auto& node : GetScene().GetRootNode().GetChildren()) {
             const auto canvas = node->GetComponent<UICanvasComponent>();
@@ -242,6 +245,9 @@ namespace BECore::Chess::Tests {
             }
             if (StringView(node) == "OpponentPanel") {
                 return OpenThePanel();
+            }
+            if (StringView(node) == "MovesSection") {
+                return ClickButton(kMenuColor) && ClickMenuList("MenuSectionMoves").Both();
             }
             StartFrom(kPromotionFen);
             ClickMove("a7", "a8");
@@ -451,9 +457,9 @@ namespace BECore::Chess::Tests {
             SCOPED_TRACE(shape.name);
             LayOutInTheNarrowestWindow(layout, shape);
 
-            const float scale = kNarrowestWidth / shape.viewWidth;
+            const float scale = shape.NarrowestScale();
             EXPECT_NEAR(layout.GetResolved().scale, scale, 0.01f);
-            EXPECT_NEAR(layout.root->rect.w, kNarrowestWidth * (1.0f - 2.0f * UIPreview::kSideInsetShare) / scale, 0.5f) << "the safe area, in view units: about 689 and 590";
+            EXPECT_NEAR(layout.root->rect.w, shape.NarrowestSafeWidth(), 0.5f) << "the safe area, in view units: about 689 and 590";
             const String problems = PanelProblems(layout, kPromotionPlate);
             EXPECT_TRUE(problems.empty()) << problems.c_str();
 

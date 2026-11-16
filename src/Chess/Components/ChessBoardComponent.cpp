@@ -84,7 +84,7 @@ namespace BECore::Chess {
     }
 
     void ChessBoardComponent::OnViewChanged(const SceneEvents::SceneViewChangedEvent& event) {
-        _portraitActive = event.view.name == PoolString::Intern(kPortraitView);
+        _portraitActive = HasPortraitPlaces(event.view.name);
         _drag.reset();
     }
 
@@ -160,9 +160,13 @@ namespace BECore::Chess {
             return;
         }
 
+        // Everything below is of the shown position: an earlier one while it is viewed, which has no hint, premove or selection of its own
+        const Position& shown = model->GetShownPosition();
+        const bool viewing = model->IsViewing();
+
         // The last move, under the check, the hint and the selection; no move yet (a new game, a reset, a position set from a FEN) marks nothing
-        if (!model->GetMoves().empty()) {
-            const Move last = model->GetMoves().back();
+        if (const size_t shownMoves = model->GetShownMoveCount(); shownMoves > 0) {
+            const Move last = model->GetMoves()[shownMoves - 1];
             float mx = 0.0f;
             float my = 0.0f;
             SquareToPixel(last.From().file, last.From().rank, bottom, mx, my);
@@ -171,17 +175,17 @@ namespace BECore::Chess {
             renderer.DrawFilledRect(mx, my, squareSize, squareSize, kLastMoveSquare);
         }
 
-        if (model->IsInCheck()) {
-            const Square king = model->GetKingSquare(model->GetTurn());
+        if (shown.IsInCheck()) {
+            const Square king = Square::FromIndex(shown.KingSquare(shown.SideToMove()));
             float kx = 0.0f;
             float ky = 0.0f;
             SquareToPixel(king.file, king.rank, bottom, kx, ky);
-            renderer.DrawFilledRect(kx, ky, squareSize, squareSize, model->IsGameOver() ? kMateSquare : kCheckSquare);
+            renderer.DrawFilledRect(kx, ky, squareSize, squareSize, !viewing && model->IsGameOver() ? kMateSquare : kCheckSquare);
         }
 
         // The hint, under the selection, once the engine has answered for this very position: the analyst gives nothing for another version, so any change of the position takes it off at the next
         // frame
-        if (const PositionAnalyst* analyst = ChessGame::GetActiveAnalyst(); analyst && !model->IsGameOver()) {
+        if (const PositionAnalyst* analyst = ChessGame::GetActiveAnalyst(); analyst && !viewing && !model->IsGameOver()) {
             if (const Optional<AnalysisLine> hint = analyst->GetHint(*model)) {
                 float hx = 0.0f;
                 float hy = 0.0f;
@@ -194,6 +198,9 @@ namespace BECore::Chess {
 
         // The queued premoves stand until the program has answered, so they are drawn under the selection of the next one
         for (const Premove& premove : model->GetPremoves()) {
+            if (viewing) {
+                break;  // the queue is made for the game's position
+            }
             float qx = 0.0f;
             float qy = 0.0f;
             SquareToPixel(premove.from.file, premove.from.rank, bottom, qx, qy);
@@ -240,6 +247,11 @@ namespace BECore::Chess {
             return;
         }
 
+        // A press on an earlier position only brings the game back: nothing is played, selected or started on a board the game is not at
+        if (model->EndViewing()) {
+            return;
+        }
+
         // After the game has ended a click on the board starts the next one
         if (model->IsGameOver()) {
             model->Reset();
@@ -273,7 +285,8 @@ namespace BECore::Chess {
     }
 
     bool ChessBoardComponent::IsDragValid(const Drag& drag, const ChessGameModel* model) {
-        if (model != drag.model || model->GetVersion() != drag.version || model->IsGameOver() || !model->HasSelection() || model->GetSelected() != drag.from || model->HasPendingPromotion()) {
+        if (model != drag.model || model->GetVersion() != drag.version || model->IsGameOver() || model->IsViewing() || !model->HasSelection() || model->GetSelected() != drag.from ||
+            model->HasPendingPromotion()) {
             return false;
         }
         const OpponentController* opponent = ChessGame::GetActiveOpponent();

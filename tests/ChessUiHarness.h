@@ -32,6 +32,7 @@
 #include <Chess/Game/MaterialLayout.h>
 #include <Chess/Game/MenuSections.h>
 #include <Chess/Game/MoveGenerator.h>
+#include <Chess/Game/MovePanel.h>
 #include <Chess/Game/PromotionChoices.h>
 #include <Common/EngineEnvironment.h>
 #include <Common/RecordingRenderer.h>
@@ -68,7 +69,8 @@ namespace BECore::Chess::Tests {
         constexpr float kButtonAir = 8.0f;                  // the text of a button keeps this much from each edge of its fill
         constexpr float kNarrowestWidth = 480.0f;           // the narrowest window of the size matrix, in pixels
         constexpr float kNarrowestHeight = 480.0f;          // the narrowest window with the default (landscape) view: 480 x 480 is a square, which keeps it, at the scale 0.571
-        constexpr float kNarrowestPortraitHeight = 853.0f;  // 9:16 at that width: the Portrait view, at the scale 0.667
+        constexpr float kNarrowestPortraitHeight = 640.0f;  // 3:4 at that width: the Portrait view, at the scale 0.667, filling the window
+        constexpr float kNarrowestTallHeight = 853.0f;      // 9:16 at that width: the Tall view, at the same scale
 
         // The second view of the scene (SceneConfig.xml, `viewVariants`): 720 x 960, the board at (40, 144), a square 80 units as in the default view
         constexpr float kPortraitViewWidth = 720.0f;
@@ -80,6 +82,17 @@ namespace BECore::Chess::Tests {
         constexpr float kPortraitStatusTop = 892.0f;  // Status: 56 units high, 12 above the bottom of the view
         constexpr float kPortraitNotchUnits = 50.4f;  // the top inset of a notch (7 % of the short side) when the view fills the window: 7 % of its 720 units
         constexpr const char* kPortraitViewName = "Portrait";
+
+        // The fourth view (SceneConfig.xml): 720 x 1204, Portrait made higher, every place of Portrait and the move panel under the board; picked up to the aspect 0.59
+        constexpr float kTallViewHeight = 1204.0f;
+        constexpr const char* kTallViewName = "Tall";
+        constexpr float kTallMaxAspect = 0.59f;
+
+        // The third view (SceneConfig.xml): 1120 x 800, the board and the margins of the default view and the room for the move panel at the right; picked from the aspect 1.4 up
+        constexpr float kWideViewWidth = 1120.0f;
+        constexpr const char* kWideViewName = "Wide";
+        constexpr float kWideMinAspect = kWideViewWidth / kViewHeight;
+        constexpr float kWideNarrowestWidth = 700.0f;  // 700 x 480 is the narrowest Wide window with side insets (672 x 480 is the aspect 1.4 itself, a knife edge), at the scale 0.6
 
         // The colors the board fills a full square with (ChessBoardComponent.cpp)
         const Color kSelectedColor{120, 200, 120, 200};
@@ -128,6 +141,27 @@ namespace BECore::Chess::Tests {
         bool Play(ChessGameModel& model, StringView uci) {
             const auto move = MoveGenerator::ParseUci(model.GetPosition(), uci);
             return move.has_value() && model.TryMove(*move).has_value();
+        }
+
+        /// A game of @p plies plies that none of the end rules stops: the legal move with the index `ply * 5 + 1` modulo their count, at every ply
+        bool PlayAQuietGame(ChessGameModel& model, size_t plies) {
+            for (size_t ply = 0; ply < plies; ++ply) {
+                const MoveList legal = MoveGenerator::GenerateLegal(model.GetPosition());
+                if (legal.empty() || model.IsGameOver() || !model.TryMove(legal[(ply * 5 + 1) % legal.size()]).has_value()) {
+                    return false;
+                }
+            }
+            return !model.IsGameOver();
+        }
+
+        /// Plays the moves given in UCI one after the other; false at the first that is not legal
+        bool PlayAll(ChessGameModel& model, std::initializer_list<const char*> moves) {
+            for (const char* uci : moves) {
+                if (!Play(model, uci)) {
+                    return false;
+                }
+            }
+            return true;
         }
 
         bool SameColor(const Color& left, const Color& right) {
@@ -408,23 +442,51 @@ namespace BECore::Chess::Tests {
             Pair<float, float> output;
             Pair<float, float> narrowest;
             float viewWidth;
+            float viewHeight;
             float boardLeft;
             float boardTop;
             bool portrait;
+
+            /// The fit scale of the view in its narrowest window: the width limits the default and the Portrait view there, the height the Wide one
+            [[nodiscard]] float NarrowestScale() const {
+                return std::min(narrowest.first / viewWidth, narrowest.second / viewHeight);
+            }
+            /// Where the safe area of that window (SideInsets: a share of the short side at each side) begins in view units, past the letterbox of the view if it has one
+            [[nodiscard]] float NarrowestSafeLeft() const {
+                const float scale = NarrowestScale();
+                const float letterbox = (narrowest.first - viewWidth * scale) * 0.5f;
+                return std::max(0.0f, (std::min(narrowest.first, narrowest.second) * UIPreview::kSideInsetShare - letterbox) / scale);
+            }
+            /// The width of that safe area in view units
+            [[nodiscard]] float NarrowestSafeWidth() const {
+                return viewWidth - 2.0f * NarrowestSafeLeft();
+            }
         };
 
         const ViewShape kViewShapes[] = {
-            {"default view", {1280.0f, 720.0f}, {kNarrowestWidth, kNarrowestHeight}, kViewWidth, kBoardLeft, kBoardTop, false},
-            {"Portrait view", {kNarrowestWidth, kNarrowestPortraitHeight}, {kNarrowestWidth, kNarrowestPortraitHeight}, kPortraitViewWidth, kPortraitBoardLeft, kPortraitBoardTop, true}};
+            {"default view", {1024.0f, 768.0f}, {kNarrowestWidth, kNarrowestHeight}, kViewWidth, kViewHeight, kBoardLeft, kBoardTop, false},
+            {"Portrait view", {768.0f, 1024.0f}, {kNarrowestWidth, kNarrowestPortraitHeight}, kPortraitViewWidth, kPortraitViewHeight, kPortraitBoardLeft, kPortraitBoardTop, true},
+            {"Wide view", {1280.0f, 720.0f}, {kWideNarrowestWidth, kNarrowestHeight}, kWideViewWidth, kViewHeight, kBoardLeft, kBoardTop, false},
+            {"Tall view", {kNarrowestWidth, kNarrowestTallHeight}, {kNarrowestWidth, kNarrowestTallHeight}, kPortraitViewWidth, kTallViewHeight, kPortraitBoardLeft, kPortraitBoardTop, true}};
         constexpr size_t kBoardEdgeCells = kLastBoardIndex + 1;
         constexpr float kPieceWidth = kCellSize * kCellWidth / kCellHeight;  // a piece fitted by Contain is as high as its cell, as wide as the aspect of its atlas cell, and centered
         constexpr float kPieceLeft = (kCellSize - kPieceWidth) * 0.5f;       // 15.5 units from the left edge of the cell
         constexpr float kPieceRight = kPieceLeft + kPieceWidth;              // 64.5 units
         constexpr float kLabelBand = 30.0f;                                  // a rank number lies in the top 30 units of its cell, a file letter in the bottom 30 (the boxes are 2..28 and 52..78)
 
-        /// Whether a canvas was laid out for the Portrait view: its bounds are the view in units
+        /// Whether a canvas was laid out for a view with the places of Portrait (Portrait or Tall): its bounds are the view in units
         bool LaidOutForPortrait(const UICanvasLayout& layout) {
             return layout.GetResolved().bounds.w == kPortraitViewWidth;
+        }
+
+        /// Whether a canvas was laid out for the Wide view: its bounds are the view in units
+        bool LaidOutForWide(const UICanvasLayout& layout) {
+            return layout.GetResolved().bounds.w == kWideViewWidth;
+        }
+
+        /// Whether a canvas was laid out for the Tall view: its bounds are the view in units
+        bool LaidOutForTall(const UICanvasLayout& layout) {
+            return layout.GetResolved().bounds.h == kTallViewHeight;
         }
 
         /// One label of the board coordinates: its name and the drawn cell it sits in (the rank labels are in the left column, one per row; the file labels in the bottom row, one per column)
@@ -503,6 +565,28 @@ namespace BECore::Chess::Tests {
         constexpr size_t kMaterialRounds = 99;          // one round per sign, "+1" to "+99"
         constexpr int kMostCaptured = 8;                // the longest count word is "x8": the most a row can show is the eight pawns (a test holds it to the summary of two bare kings)
         constexpr const char* kMaterialGroups[] = {"Top", "Bottom"};
+        constexpr const char* kMaterialMarginSet = "";      // the word of a set in its names: Material<Group>... is the margin set (above and below the board in Portrait)
+        constexpr const char* kMaterialPanelSet = "Panel";  // MaterialPanel<Group>... the set in the bands of the move panel
+        constexpr const char* kMaterialSets[] = {kMaterialMarginSet, kMaterialPanelSet};
+        constexpr float kMaterialPanelRowWidth = 52.0f;  // a chip of the panel set is at least this wide (and kMaterialRowHeight high)
+        // The bands of the move panel the panel set lies in (ChessMovePanel.xml): the top one, and the one under the list of 8 rows
+        const Rect kPanelTopBand{kMovePanelLeft, kMovePanelTop, kMovePanelRight - kMovePanelLeft, 56.0f};
+        const Rect kPanelBottomBand{kMovePanelLeft, kMovePanelTop + 56.0f + 8.0f + static_cast<float>(kMovePanelRows) * 56.0f + 8.0f, kMovePanelRight - kMovePanelLeft, 56.0f};
+
+        // The longest words of the move list (the move panel and the menu section "Moves" bind the same variables)
+        constexpr const char* kLongestMoves[] = {"Qh4xe1+", "exd8=Q#", "O-O-O"};  // the longest move of each kind of text the list can hold
+        constexpr const char* kLongestNumber = "100.";
+        constexpr size_t kMovePanelWordRounds = std::size(kLongestMoves);
+
+        /// Sets the 24 variables of the rows to round @p round: the three longest moves and the longest number go round the 16 cells, so each one stands in a White and in a Black cell
+        void PublishMovePanelRound(size_t round) {
+            UIVars& vars = CoreManager::GetUIVars();
+            for (size_t row = 0; row < kMovePanelRows; ++row) {
+                vars.Set(PoolString::Intern(Format("movePanelNumber{}", row).c_str()), kLongestNumber);
+                vars.Set(PoolString::Intern(Format("movePanelWhite{}", row).c_str()), kLongestMoves[(round + row) % std::size(kLongestMoves)]);
+                vars.Set(PoolString::Intern(Format("movePanelBlack{}", row).c_str()), kLongestMoves[(round + row + 1) % std::size(kLongestMoves)]);
+            }
+        }
 
         /// Sets the twelve variables of the display to the words of round @p round: every count word "x1".."x8" (kMostCaptured) stands at every row and every sign "+1".."+99" at both balances once
         /// over the kMaterialRounds rounds
@@ -520,11 +604,23 @@ namespace BECore::Chess::Tests {
             }
         }
 
-        /// Shows the ten rows of the canvas (the component shows only the rows of the pieces that are gone), so the layout holds the lists at their full size
-        void ShowEveryMaterialRow(UICanvasComponent& canvas) {
+        /// Shows the lists and the balances of the set @p set and hides those of the other set, as the component leaves them
+        void ShowMaterialSet(UICanvasComponent& canvas, const char* set) {
+            for (const char* each : kMaterialSets) {
+                const bool shown = StringView(each) == set;
+                for (const char* group : kMaterialGroups) {
+                    EXPECT_TRUE(canvas.SetElementVisible(PoolString::Intern(Format("Material{}{}List", each, group).c_str()), shown)) << each << group;
+                    EXPECT_TRUE(canvas.SetElementVisible(PoolString::Intern(Format("Material{}{}Balance", each, group).c_str()), shown)) << each << group;
+                }
+            }
+        }
+
+        /// Shows the set @p set alone (ShowMaterialSet) with its ten rows (the component shows only the rows of the pieces that are gone), so the layout holds the lists at their full size
+        void ShowEveryMaterialRow(UICanvasComponent& canvas, const char* set = kMaterialMarginSet) {
+            ShowMaterialSet(canvas, set);
             for (const char* group : kMaterialGroups) {
                 for (const char* piece : kMaterialPieces) {
-                    EXPECT_TRUE(canvas.SetElementVisible(PoolString::Intern(Format("Material{}{}Row", group, piece).c_str()), true)) << group << piece;
+                    EXPECT_TRUE(canvas.SetElementVisible(PoolString::Intern(Format("Material{}{}{}Row", set, group, piece).c_str()), true)) << set << group << piece;
                 }
             }
         }
@@ -630,16 +726,98 @@ namespace BECore::Chess::Tests {
             return problems;
         }
 
+        /// What is wrong with the panel set of the canvas Material as it is laid out shown with its ten rows (ShowEveryMaterialRow(canvas, kMaterialPanelSet)), in a window where the move panel is
+        /// shown: one problem to a line, nothing when it is right. A group lies in its band of the panel (the upper one in the top band, the lower one in the band under the list) and in the safe
+        /// area, its rows go along x and keep their size, and no count or sign is cut
+        String MaterialPanelProblems(const UICanvasLayout& layout) {
+            String problems;
+            const float scale = layout.GetResolved().scale;
+            const Rect safe = layout.GetResolved().safeBounds;
+            const auto find = [&](const String& name) -> const UIElement* {
+                const UIElement* element = layout.root->FindByName(PoolString::Intern(name.c_str()));
+                if (element == nullptr) {
+                    problems += Format("{} is missing\n", name.c_str());
+                } else if (element->rect.IsEmpty()) {
+                    problems += Format("{} has an empty rect\n", name.c_str());
+                    return nullptr;
+                }
+                return element;
+            };
+            const auto place = [&](const UIElement& element, const Rect& band) {
+                if (!LiesIn(element.rect, band) || !LiesIn(element.rect, safe)) {
+                    problems += Format("{} ({:.1f}, {:.1f}, {:.1f}, {:.1f}) leaves its band (y {:.0f} to {:.0f}) or the safe area\n", element.name.ToStringView(), element.rect.x, element.rect.y,
+                                       element.rect.w, element.rect.h, band.y, band.y + band.h);
+                }
+            };
+            const auto fits = [&](const UIElement& element) {
+                const UIContentFit fit = element.CheckContent(element.rect.w, element.rect.h, scale);
+                if (fit.hasContent && !fit.fits) {
+                    problems += Format("{} cuts '{}': {:.1f} x {:.1f} units at scale {:.3f}\n", element.name.ToStringView(), ShownText(element).c_str(), element.rect.w, element.rect.h, scale);
+                }
+            };
+            for (const char* group : kMaterialGroups) {
+                const Rect& band = group == kMaterialGroups[0] ? kPanelTopBand : kPanelBottomBand;
+                const UIElement* list = find(Format("MaterialPanel{}List", group));
+                if (list != nullptr) {
+                    place(*list, band);
+                }
+                float previousRowEnd = -1.0f;
+                for (const char* piece : kMaterialPieces) {
+                    const UIElement* row = find(Format("MaterialPanel{}{}Row", group, piece));
+                    const UIElement* icon = find(Format("MaterialPanel{}{}Icon", group, piece));
+                    const UIElement* count = find(Format("MaterialPanel{}{}Count", group, piece));
+                    if (row == nullptr) {
+                        continue;
+                    }
+                    place(*row, band);
+                    if (row->rect.h < kMaterialRowHeight - kPixelTolerance || row->rect.w < kMaterialPanelRowWidth - kPixelTolerance) {
+                        problems += Format("{} is {:.1f} x {:.1f} units, under {:.0f} x {:.0f}\n", row->name.ToStringView(), row->rect.w, row->rect.h, kMaterialPanelRowWidth, kMaterialRowHeight);
+                    }
+                    if (row->rect.x < previousRowEnd - kPixelTolerance) {
+                        problems += Format("{} starts at {:.1f}, before the end of the row before it ({:.1f})\n", row->name.ToStringView(), row->rect.x, previousRowEnd);
+                    }
+                    previousRowEnd = row->rect.x + row->rect.w;
+                    if (list != nullptr && !LiesIn(row->rect, list->rect)) {
+                        problems += Format("{} is not inside its list\n", row->name.ToStringView());
+                    }
+                    for (const UIElement* part : {icon, count}) {
+                        if (part != nullptr && !LiesIn(part->rect, row->rect)) {
+                            problems += Format("{} is not inside its row\n", part->name.ToStringView());
+                        }
+                    }
+                    if (icon != nullptr && count != nullptr && icon->rect.x + icon->rect.w > count->rect.x + kPixelTolerance) {
+                        problems += Format("{} and {} overlap\n", icon->name.ToStringView(), count->name.ToStringView());
+                    }
+                    if (icon != nullptr && icon->GetComponent<UIImageComponent>() == nullptr) {
+                        problems += Format("{} has no UIImageComponent\n", icon->name.ToStringView());
+                    }
+                    if (count != nullptr) {
+                        fits(*count);
+                    }
+                }
+                if (const UIElement* balance = find(Format("MaterialPanel{}Balance", group))) {
+                    place(*balance, band);
+                    fits(*balance);
+                    if (list != nullptr && balance->rect.x < list->rect.x + list->rect.w) {
+                        problems += Format("{} touches {}\n", balance->name.ToStringView(), list->name.ToStringView());
+                    }
+                }
+            }
+            return problems;
+        }
+
         /// The rects of the canvas Material that are on the screen (a row with a rect, a balance) against the controls of the canvas @p other (a label or a button with a rect): the pairs closer than
         /// @p gap, one to a line
         String MaterialClearance(const UICanvasLayout& material, const UICanvasLayout& other, float gap) {
             String problems;
             Vector<const UIElement*> mine;
-            for (const char* group : kMaterialGroups) {
-                for (const char* piece : kMaterialPieces) {
-                    mine.push_back(material.root->FindByName(PoolString::Intern(Format("Material{}{}Row", group, piece).c_str())));
+            for (const char* set : kMaterialSets) {
+                for (const char* group : kMaterialGroups) {
+                    for (const char* piece : kMaterialPieces) {
+                        mine.push_back(material.root->FindByName(PoolString::Intern(Format("Material{}{}{}Row", set, group, piece).c_str())));
+                    }
+                    mine.push_back(material.root->FindByName(PoolString::Intern(Format("Material{}{}Balance", set, group).c_str())));
                 }
-                mine.push_back(material.root->FindByName(PoolString::Intern(Format("Material{}Balance", group).c_str())));
             }
             for (const UIElement* element : mine) {
                 if (element == nullptr || element->rect.IsEmpty()) {
@@ -656,14 +834,22 @@ namespace BECore::Chess::Tests {
         }
 
         // Shared by the files of several topics
-        constexpr const char* kPromotionFen = "8/P6k/8/8/8/8/8/K7 w - - 0 1";                                  // a white pawn on a7, the way to a8 is free
-        constexpr const char* kWhiteTookAPawn = "rnbqkbnr/ppp1pppp/8/3P4/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 3";  // White has taken the d pawn of Black: +1 for White
-        const Color kMaterialChipColor{232, 210, 170, 255};                                                    // the fill of a row (SceneConfig.xml)
+        constexpr const char* kPromotionFen = "8/P6k/8/8/8/8/8/K7 w - - 0 1";                                       // a white pawn on a7, the way to a8 is free
+        constexpr const char* kWhiteTookAPawn = "rnbqkbnr/ppp1pppp/8/3P4/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 3";       // White has taken the d pawn of Black: +1 for White
+        constexpr const char* kBlackCanTakeAPawn = "rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2";  // Black to move: d5e4 takes a pawn
+
+        /// set_state {"fen": ...} of the control API; whether it was taken
+        bool FenSetsTheState(const char* fen) {
+            Json request = Json::object();
+            request["fen"] = fen;
+            return ChessGame::GetActive()->AsControllable()->SetState(request).has_value();
+        }
+        const Color kMaterialChipColor{232, 210, 170, 255};  // the fill of a row (SceneConfig.xml)
         constexpr float kBoardUnits = 640.0f;
         /// The outputs that decide which view is right: phones held upright and sideways, tablets, desktop windows, squares and the degenerate ones
-        const Pair<float, float> kViewOutputs[] = {{480.0f, 853.0f},  {390.0f, 844.0f},  {720.0f, 1280.0f},  {768.0f, 1024.0f}, {800.0f, 800.0f},
-                                                   {1024.0f, 768.0f}, {1280.0f, 720.0f}, {1920.0f, 1080.0f}, {480.0f, 480.0f},  {1.0f, 1.0f},
-                                                   {0.0f, 0.0f},      {874.0f, 1000.0f}, {875.0f, 1000.0f},  {876.0f, 1000.0f}, {2560.0f, 1080.0f}};
+        const Pair<float, float> kViewOutputs[] = {{480.0f, 853.0f},   {390.0f, 844.0f},   {720.0f, 1280.0f},  {768.0f, 1024.0f}, {800.0f, 800.0f},  {1024.0f, 768.0f}, {1280.0f, 720.0f},
+                                                   {1920.0f, 1080.0f}, {480.0f, 480.0f},   {1.0f, 1.0f},       {0.0f, 0.0f},      {874.0f, 1000.0f}, {875.0f, 1000.0f}, {876.0f, 1000.0f},
+                                                   {2560.0f, 1080.0f}, {1390.0f, 1000.0f}, {1400.0f, 1000.0f}, {480.0f, 1040.0f}, {590.0f, 1000.0f}, {600.0f, 1000.0f}, {480.0f, 640.0f}};
         const Color kBoardDimColor{0, 0, 0, 140};                                     // the dim of the result (ChessResultComponent.cpp)
         constexpr const char* kBlackMatesOnA1 = "r5k1/8/8/8/8/8/5PPP/6K1 b - - 0 1";  // Ra1 is mate
         /// A glyph of a label: a texture drawn with one of the two colors of the squares as its tint (the pieces are drawn white, and the text of the HUD too)
@@ -1197,11 +1383,13 @@ namespace BECore::Chess::Tests {
 
         /// A drag of the piece on a square to the middle of another one
         void Drag(const char* from, const char* to) {
+            Draw();  // the points are where the view this frame picks puts the squares
             DragBetween(SquareCenter(from), SquareCenter(to));
         }
 
         /// The same by drawn cells (column from the left, row from the top), for the turned board
         void DragCells(int fromColumn, int fromRow, int toColumn, int toRow) {
+            Draw();
             const Rect from = CellRect(fromColumn, fromRow);
             const Rect to = CellRect(toColumn, toRow);
             DragBetween({from.x + from.w * 0.5f, from.y + from.h * 0.5f}, {to.x + to.w * 0.5f, to.y + to.h * 0.5f});
@@ -1284,9 +1472,9 @@ namespace BECore::Chess::Tests {
             }
         }
 
-        /// Whether the scene draws its Portrait view now (the last draw picked it)
+        /// Whether the scene draws a view with the board and the places of Portrait now (Portrait or Tall; the last draw picked it)
         bool PortraitIsActive() const {
-            return GetScene().GetActiveView().name == PoolString::Intern(kPortraitViewName);
+            return HasPortraitPlaces(GetScene().GetActiveView().name);
         }
 
         /// The size of the view the scene draws now, in scene units
@@ -1382,7 +1570,7 @@ namespace BECore::Chess::Tests {
             canvas->UpdateLayout(1280.0f, 720.0f);  // the reflected fields of the component reach the layout on its first update
 
             const UILayoutContext base = ViewContext();
-            ASSERT_FLOAT_EQ(base.sceneViewWidth, kViewWidth);
+            ASSERT_FLOAT_EQ(base.sceneViewWidth, kWideViewWidth) << "the 1280 x 720 of the fixture is a Wide window";
             ASSERT_FLOAT_EQ(base.sceneViewHeight, kViewHeight);
             UILayoutValidatorOptions options;
             options.minTouchSize = CoreManager::GetUIEnvironment().GetSettings().minTouchSize;
@@ -1472,23 +1660,87 @@ namespace BECore::Chess::Tests {
             return CanvasOf("Material");
         }
 
+        /// The canvas of the move list: the node `MovePanel`
+        IntrusivePtr<UICanvasComponent> MovePanel() const {
+            return CanvasOf("MovePanel");
+        }
+
+        /// An element of the `MovePanel` canvas by name (the test fails when it is not there)
+        UIElement& MovePanelElement(const char* name) const {
+            return ElementOf("MovePanel", name);
+        }
+
+        /// The word of a cell of the move list after one frame: @p side is "White" or "Black"
+        String MovePanelWord(size_t row, const char* side) {
+            Draw();
+            return ShownText(MovePanelElement(Format("MovePanel{}Text{}", side, row).c_str()));
+        }
+
+        /// The rows of the move list the screen has after one frame, shown ones only, joined by " | ": "1. e4 e5", the cell of the last move in brackets ("2. [Nf3]"), a cell with no word left out
+        String ShownMovePanelRows() {
+            return ShownMoveRows("MovePanel");
+        }
+
+        /// ShownMovePanelRows() of the canvas on the node @p node, whose elements are named `<node>Row<i>` and so on (the move panel and the menu section "Moves")
+        String ShownMoveRows(const char* node) {
+            Draw();
+            String rows;
+            for (size_t row = 0; row < kMovePanelRows; ++row) {
+                if (!ElementOf(node, Format("{}Row{}", node, row).c_str()).active.visible) {
+                    continue;
+                }
+                String line = ShownText(ElementOf(node, Format("{}Number{}", node, row).c_str()));
+                for (const char* side : {"White", "Black"}) {
+                    const String word = ShownText(ElementOf(node, Format("{}{}Text{}", node, side, row).c_str()));
+                    if (word.empty()) {
+                        continue;
+                    }
+                    const bool marked = ElementOf(node, Format("{}{}Mark{}", node, side, row).c_str()).active.visible;
+                    line += marked ? Format(" [{}]", word.c_str()) : Format(" {}", word.c_str());
+                }
+                rows += rows.empty() ? "" : " | ";
+                rows += line;
+            }
+            return rows;
+        }
+
         /// An element of the `Material` canvas by name (the test fails when it is not there)
         UIElement& MaterialElement(const char* name) const {
             return ElementOf("Material", name);
         }
 
-        /// The row of a piece in a group of the display as it was laid out in the last draw: @p group is "Top" or "Bottom", @p piece "Queen" .. "Pawn"
-        UIElement& MaterialRow(const char* group, const char* piece) const {
-            return MaterialElement(Format("Material{}{}Row", group, piece).c_str());
+        /// The row of a piece in a group of the display as it was laid out in the last draw: @p group is "Top" or "Bottom", @p piece "Queen" .. "Pawn", @p set kMaterialMarginSet or kMaterialPanelSet
+        UIElement& MaterialRow(const char* group, const char* piece, const char* set = kMaterialMarginSet) const {
+            return MaterialElement(Format("Material{}{}{}Row", set, group, piece).c_str());
         }
 
-        /// Whether that row is on the screen: shown by the component and given a rect by the layout
-        bool RowShown(const char* group, const char* piece) const {
-            const UIElement& row = MaterialRow(group, piece);
+        /// Whether that row of @p set is on the screen: shown by the component and given a rect by the layout
+        bool RowShownIn(const char* set, const char* group, const char* piece) const {
+            const UIElement& row = MaterialRow(group, piece, set);
             return row.active.visible && !row.rect.IsEmpty();
         }
 
-        /// The rows on the screen after the last draw, in the order of the scene ("TopQueen BottomPawn"), nothing when none is
+        /// Whether the row is on the screen in either set (the component never shows both)
+        bool RowShown(const char* group, const char* piece) const {
+            return RowShownIn(kMaterialMarginSet, group, piece) || RowShownIn(kMaterialPanelSet, group, piece);
+        }
+
+        /// Which set the component shows after the last draw, from its lists and balances: "margin", "panel", or "mixed" when the eight do not agree on one set
+        String MaterialPlace() const {
+            bool margin = true;
+            bool panel = true;
+            for (const char* group : kMaterialGroups) {
+                for (const char* part : {"List", "Balance"}) {
+                    margin = margin && MaterialElement(Format("Material{}{}", group, part).c_str()).active.visible;
+                    margin = margin && !MaterialElement(Format("MaterialPanel{}{}", group, part).c_str()).active.visible;
+                    panel = panel && MaterialElement(Format("MaterialPanel{}{}", group, part).c_str()).active.visible;
+                    panel = panel && !MaterialElement(Format("Material{}{}", group, part).c_str()).active.visible;
+                }
+            }
+            return margin ? "margin" : panel ? "panel" : "mixed";
+        }
+
+        /// The rows on the screen after the last draw in either set, in the order of the scene ("TopQueen BottomPawn"), nothing when none is
         String ShownMaterialRows() const {
             String shown;
             for (const char* group : {"Top", "Bottom"}) {
@@ -1507,15 +1759,20 @@ namespace BECore::Chess::Tests {
             return Var(Format("material{}{}", group, piece).c_str());
         }
 
-        /// The sprite the icon of a row has been given
+        /// The sprite the icon of a row has been given; a failure is recorded when the two sets do not have the same one
         String MaterialSprite(const char* group, const char* piece) const {
-            const UIImageComponent* icon = MaterialElement(Format("Material{}{}Icon", group, piece).c_str()).GetComponent<UIImageComponent>();
-            if (icon == nullptr) {
-                ADD_FAILURE() << group << piece << " has no UIImageComponent icon";
-                return {};
+            String sprites[std::size(kMaterialSets)];
+            for (size_t set = 0; set < std::size(kMaterialSets); ++set) {
+                const UIImageComponent* icon = MaterialElement(Format("Material{}{}{}Icon", kMaterialSets[set], group, piece).c_str()).GetComponent<UIImageComponent>();
+                if (icon == nullptr) {
+                    ADD_FAILURE() << kMaterialSets[set] << group << piece << " has no UIImageComponent icon";
+                    return {};
+                }
+                const StringView name = icon->sprite.ToStringView();
+                sprites[set] = String(name.data(), name.size());
             }
-            const StringView name = icon->sprite.ToStringView();
-            return String(name.data(), name.size());
+            EXPECT_EQ(sprites[0], sprites[1]) << group << piece << ": the icons of the margin and of the panel show the same piece";
+            return sprites[0];
         }
 
         /// The twelve variables of the display after a frame, joined: ten counts (top group queen to pawn, then the bottom group) and the two balances ("|" between them)

@@ -25,13 +25,23 @@ namespace BECore::Chess {
     /// The name of the second view of SceneConfig.xml (`viewVariants`), which the components that differ per view pick by
     inline constexpr const char* kPortraitView = "Portrait";
 
+    /// The name of the view that is Portrait made higher for the narrow phones held upright: every place of Portrait holds in it, and the room under the board is the move panel's
+    inline constexpr const char* kTallView = "Tall";
+
+    /// Whether the view named @p view has the board and the places of Portrait (Portrait and Tall)
+    [[nodiscard]] inline bool HasPortraitPlaces(PoolString view) {
+        static const PoolString portrait = PoolString::Intern(kPortraitView);
+        static const PoolString tall = PoolString::Intern(kTallView);
+        return view == portrait || view == tall;
+    }
+
     /**
      * @brief The board of the scene: draws the squares and the highlights of the active model and turns clicks and drags into its moves.
      *
      * Owns no game state: the model is shared with ChessPieceComponent through GameManager::GetActive(). The geometry (origin and cell size) is reflected, in scene units: the engine scales
      * the scene to the window. The pieces, the HUD, the menu and the panels are other nodes of the scene (`Components/CLAUDE.md` tells them).
      *
-     * The scene has two views, so the geometry has two sets: the default fields and the `portrait*` ones, for the view named kPortraitView. Which set holds is changed only on
+     * The board has two places, so the geometry has two sets: the default fields (the default and the Wide view) and the `portrait*` ones (HasPortraitPlaces()). Which set holds is changed only on
      * SceneViewChangedEvent (sent from Scene::Update(), before every update of the frame) and every accessor reads that one choice: the squares drawn, the pieces placed from the same
      * update and the result bar then always agree, which they would not if each asked the scene for its active view at its own moment (a draw may run after the view was picked and before
      * the pieces have moved). Before the first event the default set holds. The event comes one Update after the Draw that picked the view, so for one frame the canvases are already
@@ -43,6 +53,9 @@ namespace BECore::Chess {
      * It is also the frame of the computer opponent and of the analysis: IGame has no per-frame hook, so on every SceneUpdateEvent it runs ChessGame::GetOpponent().Update() and
      * ChessGame::GetAnalyst().Update() (the one place that does either). The opponent plays into the model, so neither can run in OnDraw(). The result of a game is logged once, whoever
      * ended it; a click on the board after the game has ended starts the next one.
+     *
+     * The squares, the marks and the pieces are of ChessGameModel::GetShownPosition(): while an earlier position is viewed the board marks its move and check and draws no hint or
+     * premove, and a press on the board only returns to the game.
      *
      * The board is drawn from Black's side (turned by 180 degrees) exactly when the program plays White, read live (GetBottomColor()); the model and the control API do not turn.
      */

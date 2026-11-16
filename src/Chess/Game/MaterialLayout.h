@@ -23,6 +23,9 @@ namespace BECore::Chess {
     constexpr size_t kMaterialGroupCount = 2;
     constexpr size_t kMaterialRowsPerGroup = 5;
 
+    /// The two sets of both groups, bound to the same words: the margin one (in Portrait above and below the board) and the one in the bands of the move panel; one is shown at a time
+    constexpr size_t kMaterialSetCount = 2;
+
     /// Whether the box of the lists in @p view lies inside the safe area (its edges in view units; the edge itself counts as inside). A narrow window with insets at the sides (a phone
     /// held sideways) leaves the margin of the default view too small, and the lists are then hidden; the balance boxes stay, whatever this says
     [[nodiscard]] constexpr bool MaterialListFits(float safeLeft, float safeTop, float safeRight, float safeBottom, MaterialView view = MaterialView::Default) noexcept {

@@ -15,7 +15,7 @@ namespace BECore::Chess::Tests {
 
     struct HudWords {
         Vector<String> turn;           ///< `{turn}`: whose move it is, who won, "Computer is thinking"
-        Vector<String> status;         ///< `{status}`: the status of the game ("" included) and every sentence of an engine error
+        Vector<String> status;         ///< `{status}`: the status of the game ("" included), the line of a view and every sentence of an engine error
         Vector<String> opponentError;  ///< `{opponentError}` of the opponent panel: "" and every sentence of an engine error
 
         /// How many rounds cover every word: round i takes the word i of each list (the shorter lists wrap round). The elements of the HUD lay out independently of one another,
@@ -63,7 +63,7 @@ namespace BECore::Chess::Tests {
 
     }  // namespace HudWordsDetail
 
-    /// The words of the HUD, from a scratch game of their own that reaches every status, then the thinking form of the turn and the sentence of every kind of engine
+    /// The words of the HUD, from a scratch game of their own that reaches every status and views its start and a move, then the thinking form of the turn and the sentence of every kind of engine
     /// error (also the `opponentError` list: the variable of the panel's error line). The names of the segments of the panel (modes, colors, engines, levels)
     /// are not here: they are elements of the scene that a test walks, and a test holds their text to the tables
     inline HudWords AllHudWords() {
@@ -104,6 +104,14 @@ namespace BECore::Chess::Tests {
         // A new status of the game must get a position above, or its words would stay out of the matrix
         for (const GameStatus status : EnumUtils<GameStatus>::Values()) {
             EXPECT_NE(eastl::find(seen.begin(), seen.end(), status), seen.end()) << "no position of the scratch game reaches " << static_cast<int>(status);
+        }
+
+        // The line of a view, with the widest move number the game is held to (three digits, like the number cell of the move panel)
+        model.SetPosition(PositionFromFen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 999"));
+        Play(model, "e2e4");
+        for (const size_t shown : {size_t{0}, size_t{1}}) {
+            EXPECT_TRUE(model.ShowMoves(shown));
+            Add(words.status, StatusText::Status(model));
         }
 
         model.Reset();

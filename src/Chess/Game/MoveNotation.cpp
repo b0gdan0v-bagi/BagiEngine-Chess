@@ -50,10 +50,10 @@ namespace BECore::Chess {
             bool sameRank = false;
         };
 
-        Rivals FindRivals(const Position& before, Move move, PieceType type) {
+        Rivals FindRivals(const Position& before, Move move, PieceType type, const MoveList& legal) {
             Rivals rivals;
             const Square from = move.From();
-            for (const Move other : MoveGenerator::GenerateLegal(before)) {
+            for (const Move other : legal) {
                 if (other.ToIndex() != move.ToIndex() || other.FromIndex() == move.FromIndex()) {
                     continue;
                 }
@@ -79,6 +79,10 @@ namespace BECore::Chess {
     }  // namespace
 
     String SanOf(const Position& before, Move move) {
+        return SanOf(before, move, MoveGenerator::GenerateLegal(before));
+    }
+
+    String SanOf(const Position& before, Move move, const MoveList& legal) {
         String text;
         const Piece piece = before.GetPieceAt(move.From());
         const Square from = move.From();
@@ -95,7 +99,7 @@ namespace BECore::Chess {
                 }
             } else {
                 text.push_back(PieceLetter(piece.type));
-                const Rivals rivals = FindRivals(before, move, piece.type);
+                const Rivals rivals = FindRivals(before, move, piece.type, legal);
                 if (rivals.any) {
                     if (!rivals.sameFile) {
                         text.push_back(FileLetter(from));

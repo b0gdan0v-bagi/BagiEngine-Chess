@@ -41,15 +41,13 @@ namespace BECore::Chess::Tests {
         constexpr float kThreeQuarters = 0.75f;
         constexpr float kDefaultSlide = 0.15f;  // what SceneConfig.xml gets from the code
         constexpr int kStepsToEnd = 4;          // tween steps (frames after the first) until the slide ends
-        // The view of the scene (config/SceneConfig.xml) and half a square, to turn a square into the output pixel of its middle
-        constexpr float kViewWidth = 840.0f;
-        constexpr float kViewHeight = 800.0f;
+        // Half a square, to turn a square into the output pixel of its middle
         constexpr float kHalfSquare = 40.0f;
         constexpr float kPortraitBoardLeft = 40.0f;  // the board of the Portrait view (720 x 960), the squares 80 units as in the default one
         constexpr float kPortraitBoardTop = 144.0f;
         constexpr float kSquare = 80.0f;
-        constexpr float kUprightWidth = 480.0f;  // a window taller than wide: the scene picks the Portrait view
-        constexpr float kUprightHeight = 853.0f;
+        constexpr float kUprightWidth = 480.0f;  // a 3:4 window: the scene picks the Portrait view (9:16 would be the Tall one, with the same board)
+        constexpr float kUprightHeight = 640.0f;
         constexpr float kDragStepPixels = 20.0f;  // a first motion of a drag, well past the threshold of the board
         constexpr int32_t kPieceLayer = 0;
         constexpr int32_t kDragLayer = 6;  // the layer of a piece in the hand (ChessPieceComponent::kDragLayer, written out here to pin it)
@@ -272,10 +270,15 @@ namespace BECore::Chess::Tests {
             return node;
         }
 
+        /// The fit of the view the scene draws now (the 1280 x 720 of this fixture picks the Wide view after the first draw) into the output
+        ViewTransform ActiveFit() const {
+            return ViewTransform::Fit(GetScene().GetViewWidth(), GetScene().GetViewHeight(), _renderer->width, _renderer->height);
+        }
+
         /// The middle of a square in output pixels, for the fit of the view into the output and the orientation the board has now
         Origin ScreenOf(const char* square) const {
             const Origin cell = PixelOf(square);
-            const Rect at = ViewTransform::Fit(kViewWidth, kViewHeight, _renderer->width, _renderer->height).ToOutput(cell.first + kHalfSquare, cell.second + kHalfSquare, 0.0f, 0.0f);
+            const Rect at = ActiveFit().ToOutput(cell.first + kHalfSquare, cell.second + kHalfSquare, 0.0f, 0.0f);
             return {at.x, at.y};
         }
 
@@ -298,9 +301,15 @@ namespace BECore::Chess::Tests {
             CoreManager::GetUIInput().DispatchMouseMotion(event);
         }
 
-        /// The output is mapped back to the view of the last draw, so the scene is drawn once before the first event
+        /// The output is mapped back to the view of the last draw, so the scene is drawn once before the first event. A draw that picks another view (the first one, here: the 1280 x 720 of
+        /// the fixture is a Wide window) is followed by an update that tells the board, and a draw again, as a frame of the game does
         void PressOn(const char* square) {
+            const uint32_t viewBefore = GetScene().GetViewVersion();
             _manager->DrawAll();
+            if (GetScene().GetViewVersion() != viewBefore) {
+                _manager->UpdateAll();
+                _manager->DrawAll();
+            }
             CoreManager::GetUIInput().DispatchMouseButtonDown(Button(ScreenOf(square), true));
         }
 
@@ -750,6 +759,46 @@ namespace BECore::Chess::Tests {
         Frames(kStepsToEnd);
         ExpectOn(taker, "d5");
         ExpectHidden(taken);
+    }
+
+    TEST_F(ChessPieceAnimationTest, ViewingAnEarlierPositionPlacesThePiecesAtOnceAndTheGameComesBackAtOnce) {
+        Settle();
+        const auto taker = NodeAt("e2");
+        ASSERT_TRUE(Play(Model(), "e2e4"));
+        ASSERT_TRUE(Play(Model(), "d7d5"));
+        const auto taken = NodeAt("d5");
+        ASSERT_TRUE(Play(Model(), "e4d5"));
+        Frames(kStepsToEnd + 1);
+        ExpectHidden(taken);
+
+        // A view jumps over moves, here back over the capture: nothing slides there or back
+        ASSERT_TRUE(Model().ShowMoves(1));
+        Frame();
+        ExpectOn(taker, "e4", "the pawn stands where the first move left it");
+        ExpectOn(taken, "d7", "the taken pawn is back on its square");
+        ASSERT_TRUE(Model().EndViewing());
+        Frame();
+        ExpectOn(taker, "d5", "back in the game at once");
+        ExpectHidden(taken);
+    }
+
+    TEST_F(ChessPieceAnimationTest, AMoveThatEndsAViewIsPlacedAtOnceAndThePromotedPieceKeepsItsSprite) {
+        Settle();
+        StartFrom(kPromotionFen);
+        const auto pawn = PlayAndShow("a7", "a7a8q");
+        Frames(kStepsToEnd);
+        ASSERT_EQ(SpriteOf(pawn), PoolString::Intern("WhiteQueen"));
+
+        ASSERT_TRUE(Model().ShowMoves(0));
+        Frame();
+        ExpectOn(pawn, "a7");
+        EXPECT_EQ(SpriteOf(pawn), PoolString::Intern("WhitePawn")) << "a pawn before it promoted";
+
+        // One more move and one more version than the last frame saw, but the view in between jumped: the pieces snap to the game
+        ASSERT_TRUE(Play(Model(), "h8g7"));
+        Frame();
+        ExpectOn(pawn, "a8", "not slid from a7");
+        EXPECT_EQ(SpriteOf(pawn), PoolString::Intern("WhiteQueen"));
     }
 
 }  // namespace BECore::Chess::Tests

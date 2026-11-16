@@ -8,8 +8,7 @@ namespace BECore::Chess {
 
     namespace {
 
-        bool IsLegal(const Position& position, Move move) {
-            const MoveList legal = MoveGenerator::GenerateLegal(position);
+        bool IsAmongLegalMoves(const MoveList& legal, Move move) {
             return eastl::find(legal.begin(), legal.end(), move) != legal.end();
         }
 
@@ -21,14 +20,15 @@ namespace BECore::Chess {
         if (!parsed) {
             return rows;
         }
-        Position position = *parsed;
+        Position position = eastl::move(*parsed);
 
         for (size_t ply = 0; ply < moves.size(); ++ply) {
             const Move move = moves[ply];
-            if (!IsLegal(position, move)) {
+            const MoveList legal = MoveGenerator::GenerateLegal(position);
+            if (!IsAmongLegalMoves(legal, move)) {
                 break;
             }
-            MoveListEntry entry{SanOf(position, move), static_cast<int>(ply)};
+            MoveListEntry entry{SanOf(position, move, legal), static_cast<int>(ply)};
             if (position.SideToMove() == PieceColor::White) {
                 rows.push_back(MoveListRow{position.FullmoveNumber(), eastl::move(entry), {}});
             } else {

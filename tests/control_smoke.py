@@ -8,7 +8,7 @@ which it finds through the environment variable BAGI_ENGINE_DIR (set by ctest), 
 on the real clock and with --manual-clock; one scenario plays moves before the first frame.
 
 The scenarios of the own engine, the watch (two own engines), the analysis and the ratings, the opponent panel, the captured
-material and "without Stockfish" are base ones: the own engine runs inside the game, so they need nothing from the environment.
+material, the takeback and "without Stockfish" are base ones: the own engine runs inside the game, so they need nothing from the environment.
 Stockfish ("opponent" scenarios) is replaced by tests/fake_uci_engine.py: main() writes a wrapper script that starts it into a
 temporary directory and puts the script in STOCKFISH of the environment, which the game inherits. STOCKFISH comes before PATH in
 the game's search for an engine and the committed config has no path, so a Stockfish installed on this machine is never used. A
@@ -25,7 +25,7 @@ the person's own save folder is never named.
 
 What a recorded scenario can state lives in `tests/scenarios/*.jsonl` (ctest `BagiChessScenario.<file>`, the manual clock, played
 by the engine's bagi_play.py): the refusals, the mate and the game over, the reset, promotion, the numbers of the captured
-material and the clicks of the opponent panel. What stays here needs a wait for the program, a picture, the real clock or an
+material, the clicks of the opponent panel and the takeback. What stays here needs a wait for the program, a picture, the real clock or an
 answer that depends on the build.
 
 Exit code: 0 passed, 1 failed, 77 skipped (the executable does not exist).
@@ -122,14 +122,20 @@ def check_screenshots(client: BagiControlClient) -> None:
     client.call("reset")
     start = take_screenshot(client)
     check(len(start.colors()) >= BOARD_COLORS, f"the screenshot has {len(start.colors())} colours, it does not look like a board")
+    start_panel = panel_band(start)
+    check(band_has_color(start_panel, start.channels, PANEL_PLATE_COLOR), "the plate of the move panel is not drawn at the start")
+    check(not band_has_color(start_panel, start.channels, PANEL_MARK_COLOR), "the move panel marks a move at the start, before any is played")
 
     client.call("perform_action", move("e2e4"))
     moved = take_screenshot(client)
     check(moved.rows != start.rows, "the screenshot did not change after a move")
+    check(panel_band(moved) != start_panel, "the move panel did not change after a move")
+    check(band_has_color(panel_band(moved), moved.channels, PANEL_MARK_COLOR), "the move panel does not mark the move played")
 
     client.call("reset")
     again = take_screenshot(client)
     check(again.rows == start.rows, "the screenshot after a reset is not the one of the start position")
+    check(panel_band(again) == start_panel, "the move panel after a reset is not the one of the start position")
 
     # A position that is set from outside is drawn, and a pawn that promoted is drawn as its new piece
     client.call("set_state", {"fen": PROMOTION_FEN})
@@ -179,6 +185,17 @@ def without_squares(image, squares: list, turned: bool = False) -> list:
     return rows
 
 
+def without_panel(image, rows: list) -> list:
+    """The rows (of `without_squares`, say) of a screenshot with the box of the move panel blanked: the list shows the moves played, which a position set from a FEN does not have."""
+    scale, left, top = view_in_picture(image)
+    first_x, last_x = max(int(left + PANEL_LEFT * scale), 0), min(int(left + PANEL_RIGHT * scale) + 1, image.width)
+    first_y, last_y = max(int(top + PANEL_TOP * scale), 0), min(int(top + PANEL_BOTTOM * scale) + 1, image.height)
+    blanked = [bytearray(row) for row in rows]
+    for y in range(first_y, last_y):
+        blanked[y][first_x * image.channels : last_x * image.channels] = bytes((last_x - first_x) * image.channels)
+    return blanked
+
+
 def run_moves_before_the_first_frame(client: BagiControlClient, headless: bool) -> None:
     """A client that acts at once: the scene registers its pieces in the first frame, after these moves, and has to show them."""
     if not headless:
@@ -195,12 +212,17 @@ def run_moves_before_the_first_frame(client: BagiControlClient, headless: bool) 
     by_fen = take_screenshot(client)
     marked = [OPENING[-1][:2], OPENING[-1][2:4]]
     check(
-        without_squares(by_moves, marked) == without_squares(by_fen, marked),
+        without_panel(by_moves, without_squares(by_moves, marked)) == without_panel(by_fen, without_squares(by_fen, marked)),
         "the scene after moves played before the first frame is not the scene of the same position",
     )
     client.call("reset")
     client.call("step", {"frames": 2})
-    check(by_moves.rows != take_screenshot(client).rows, "the scene still shows the opening after four moves")
+    after_reset = take_screenshot(client)
+    check(by_moves.rows != after_reset.rows, "the scene still shows the opening after four moves")
+    # The list is what a position set from a FEN does not have: the moves played before the first frame are in the panel, with the last one marked
+    check(panel_band(by_moves) != panel_band(after_reset), "the move panel shows no moves after four moves played before the first frame")
+    check(band_has_color(panel_band(by_moves), by_moves.channels, PANEL_MARK_COLOR), "the move panel does not mark the last of the moves played before the first frame")
+    check(not band_has_color(panel_band(by_fen), by_fen.channels, PANEL_MARK_COLOR), "the move panel marks a move in a position set from a FEN")
 
 
 PINNED_SEED = 1
@@ -717,17 +739,38 @@ def run_analysis_scenario(client: BagiControlClient, headless: bool) -> None:
     client.call("perform_action", move(last_move))  # a move for the evaluation to follow, so the game quits with a search under way
 
 
-# The scene is 840 x 800 units, the board 640 x 640 at y 80..720; the window fits the scene by the smaller scale and centers it
-VIEW_WIDTH, VIEW_HEIGHT = 840, 800
+# The scene is 840 x 800 units (1120 x 800, its Wide view, from the aspect 1.4 up), the board 640 x 640 at y 80..720; the window fits the view by the smaller scale and centers it
+VIEW_WIDTH, WIDE_VIEW_WIDTH, VIEW_HEIGHT = 840, 1120, 800
 BOARD_TOP, BOARD_BOTTOM = 80, 720
 BOARD_LEFT, SQUARE_SIZE = 100, 80  # the left edge of the board and the side of a square, in view units
+PANEL_LEFT, PANEL_TOP, PANEL_RIGHT, PANEL_BOTTOM = 760, 80, 1080, 720  # the box of the move panel in the Wide view (Game/MovePanel.h), in view units
 BOARD_BAND_INSET = 2  # rows kept away from the edge of the board, against rounding
+PANEL_INSET = 2  # rows and columns kept away from the edges of the panel, against rounding
+PANEL_PLATE_COLOR = (32, 44, 50)  # the plate of the panel (ChessMovePanel.xml), drawn only where the box lies inside the safe area
+PANEL_MARK_COLOR = (157, 138, 49)  # the gold mark of the last move (245, 205, 50 at alpha 150) over the plate
+
+
+def view_width_of(image) -> int:
+    """The width in units of the view the scene picks for a picture: Wide from the aspect 1.4 up (SceneConfig.xml), the default view below it."""
+    return WIDE_VIEW_WIDTH if image.width / image.height >= WIDE_VIEW_WIDTH / VIEW_HEIGHT else VIEW_WIDTH
 
 
 def view_in_picture(image) -> tuple:
     """Where the scene is in a screenshot: (scale, left, top)."""
-    scale = min(image.width / VIEW_WIDTH, image.height / VIEW_HEIGHT)
-    return scale, (image.width - VIEW_WIDTH * scale) / 2, (image.height - VIEW_HEIGHT * scale) / 2
+    view_width = view_width_of(image)
+    scale = min(image.width / view_width, image.height / VIEW_HEIGHT)
+    return scale, (image.width - view_width * scale) / 2, (image.height - VIEW_HEIGHT * scale) / 2
+
+
+def panel_band(image) -> list:
+    """The part of a screenshot that only the move panel covers: its box, kept PANEL_INSET away from the edges, so that what differs between two pictures of it is the list of moves.
+    The Wide view only has a panel, so a picture of another view is a defect of the run."""
+    check(view_width_of(image) == WIDE_VIEW_WIDTH, f"a picture {image.width}x{image.height} is not in the Wide view, the move panel is not drawn in it")
+    scale, left, top = view_in_picture(image)
+    first_row, last_row = int(top + PANEL_TOP * scale) + PANEL_INSET, int(top + PANEL_BOTTOM * scale) - PANEL_INSET
+    first_column, last_column = int(left + PANEL_LEFT * scale) + PANEL_INSET, int(left + PANEL_RIGHT * scale) - PANEL_INSET
+    check(0 <= first_row < last_row <= image.height and 0 <= first_column < last_column <= image.width, f"the panel band is outside a picture {image.width}x{image.height}")
+    return [row[first_column * image.channels : last_column * image.channels] for row in image.rows[first_row:last_row]]
 
 
 def board_rows(image) -> tuple:
@@ -787,15 +830,17 @@ def check_the_board_turns_with_the_program(client: BagiControlClient) -> None:
     turned_again = take_screenshot(client)
     first, last = board_rows(turned_again)
     check(
-        without_squares(turned_again, marked, turned=True)[first:last] == without_squares(rotated, marked, turned=True)[first:last],
+        without_panel(turned_again, without_squares(turned_again, marked, turned=True))[first:last] == without_panel(rotated, without_squares(rotated, marked, turned=True))[first:last],
         "the board turned again is not the picture it was the first time",
     )
     client.call("set_state", {"opponent": {"plays": None}})
 
 
-# The left margin of the view, where the node Material draws the captured pieces and the balance (SceneConfig.xml): x 0 to 100 of the 840 units
+# The left margin of the view, where the node Material draws the captured pieces and the balance outside the Wide view (and in a Wide window whose side insets cut the move panel): x 0 to 100
 MARGIN_WIDTH = 100
 MARGIN_INSET = 2  # columns and rows kept away from the edges of the margin, against rounding
+# The band of the move panel under its list, where Material draws what the color at the bottom of the board has taken while the panel is shown (ChessMaterial.xml), in view units
+LOWER_GROUP_TOP, LOWER_GROUP_BOTTOM = 600, 656
 CAPTURE_MOVES = ["e2e4", "d7d5", "e4d5"]  # White takes a pawn of Black
 CHIP_COLOR = (232, 210, 170)  # the fill of a row of the display
 
@@ -811,6 +856,16 @@ def margin_band(image) -> list:
     return [row[first_column * image.channels : last_column * image.channels] for row in image.rows[first_row:last_row]]
 
 
+def lower_group_band(image) -> list:
+    """The part of a screenshot that the band of the move panel under its list covers: the captured material of the color at the bottom of the board. Only the Wide view has the panel."""
+    check(view_width_of(image) == WIDE_VIEW_WIDTH, f"a picture {image.width}x{image.height} is not in the Wide view, the move panel is not drawn in it")
+    scale, left, top = view_in_picture(image)
+    first_row, last_row = int(top + LOWER_GROUP_TOP * scale) + PANEL_INSET, int(top + LOWER_GROUP_BOTTOM * scale) - PANEL_INSET
+    first_column, last_column = int(left + PANEL_LEFT * scale) + PANEL_INSET, int(left + PANEL_RIGHT * scale) - PANEL_INSET
+    check(0 <= first_row < last_row <= image.height and 0 <= first_column < last_column <= image.width, f"the band of the lower group is outside a picture {image.width}x{image.height}")
+    return [row[first_column * image.channels : last_column * image.channels] for row in image.rows[first_row:last_row]]
+
+
 def band_has_color(band: list, channels: int, color: tuple) -> bool:
     for row in band:
         for start in range(0, len(row), channels):
@@ -820,9 +875,11 @@ def band_has_color(band: list, channels: int, color: tuple) -> bool:
 
 
 def run_material_scenario(client: BagiControlClient, headless: bool) -> None:
-    """The captured material in the picture: on the headless run the left margin shows it (the numbers of `get_state.material` are `tests/scenarios/captured_material.jsonl`).
+    """The captured material in the picture: the headless window is Wide, so the move panel shows it in its band under the list and the left margin stays empty (the numbers of
+    `get_state.material` are `tests/scenarios/captured_material.jsonl`).
 
-    The margin band of a screenshot (the rows of the board, the columns left of it) is compared, not the whole picture: the HUD says other words in each picture. A position set from outside and a reset in between bring the band back to the one of the start."""
+    That band of a screenshot is compared, not the whole picture: the HUD says other words in each picture. A position set from outside and a reset in between bring the band back to the one of
+    the start."""
     if client.call("status")["manualClock"]:
         client.call("step")  # the scene registers its pieces in the first frame
     client.call("reset")
@@ -830,7 +887,9 @@ def run_material_scenario(client: BagiControlClient, headless: bool) -> None:
     if not headless:
         return
     let_frames_pass(client, 2)  # the display waits for the first layout of its canvas
-    start_band = margin_band(take_screenshot(client))
+    start = take_screenshot(client)
+    start_band = lower_group_band(start)
+    start_margin = margin_band(start)
 
     for uci in CAPTURE_MOVES:
         client.call("perform_action", move(uci))
@@ -840,13 +899,67 @@ def run_material_scenario(client: BagiControlClient, headless: bool) -> None:
         client.call("perform_action", move(uci))
     let_frames_pass(client, 2)
     captured = take_screenshot(client)
-    captured_band = margin_band(captured)
-    check(captured_band != start_band, "the left margin did not change after White took a pawn")
-    check(band_has_color(captured_band, captured.channels, CHIP_COLOR), "no row of the display is drawn in the left margin after the capture")
+    captured_band = lower_group_band(captured)
+    check(captured_band != start_band, "the band of the move panel under the list did not change after White took a pawn")
+    check(band_has_color(captured_band, captured.channels, CHIP_COLOR), "no row of the display is drawn in the move panel after the capture")
+    check(margin_band(captured) == start_margin and not band_has_color(margin_band(captured), captured.channels, CHIP_COLOR), "the left margin shows the material while the move panel does")
 
     client.call("reset")
     let_frames_pass(client, 2)
-    check(margin_band(take_screenshot(client)) == start_band, "the left margin after a reset is not the one of the start position")
+    check(lower_group_band(take_screenshot(client)) == start_band, "the band of the move panel under the list after a reset is not the one of the start position")
+
+
+TAKE_BACK_COLOR = (112, 84, 48)  # the fill of the takeback button of the move panel (ChessMovePanel.xml); greyed it is drawn at half its alpha over the plate
+
+
+def take_back_over_the_api(client: BagiControlClient, expected_moves: list) -> None:
+    """set_state {"takeBack": {}} (the button's rule), then the moves must be these and the pieces at rest."""
+    version = client.call("get_state")["version"]
+    client.call("set_state", {"takeBack": {}})
+    reply = client.call("get_state")
+    check(reply["state"]["moves"] == expected_moves, f"after a takeback the moves are {reply['state']['moves']}, not {expected_moves}")
+    check(reply["version"] > version, "a takeback did not move the state version")
+    let_the_pieces_settle(client)
+
+
+def run_takeback_scenario(client: BagiControlClient, headless: bool) -> None:
+    """The takeback over the control API and by the button of the move panel, and in the picture: a position taken back looks like the same position played (the board and the move
+    panel, the HUD says other words); the button is greyed while there is nothing to take back. The rules of what is taken back are `tests/scenarios/takeback.jsonl` and the gtests.
+
+    The pictures are taken before the button is clicked: a click leaves the pointer over it, and its hover look would change the band."""
+    if client.call("status")["manualClock"]:
+        client.call("step")  # the scene registers its pieces in the first frame
+    client.call("reset")
+    client.call("set_state", {"opponent": {"plays": None}})
+    expect_error("invalid_params", lambda: client.call("set_state", {"takeBack": {}}), "a takeback before the first move")
+    let_frames_pass(client, 2)  # the panel waits for the first layout of its canvas
+    start = take_screenshot(client) if headless else None
+
+    client.call("perform_action", move("e2e4"))
+    let_the_pieces_settle(client)
+    one = take_screenshot(client) if headless else None
+    client.call("perform_action", move("e7e5"))
+    state = client.call("get_state")["state"]
+    check(state["sanMoves"] == ["e4", "e5"] and state["takeBackPlies"] == 1, f"the state has sanMoves {state['sanMoves']} and takeBackPlies {state['takeBackPlies']}")
+
+    take_back_over_the_api(client, ["e2e4"])
+    if headless:
+        back = take_screenshot(client)
+        check(board_band(back) == board_band(one) and panel_band(back) == panel_band(one), "e4 e5 and a takeback do not look like e4 alone")
+        check(band_has_color(panel_band(back), back.channels, TAKE_BACK_COLOR), "the takeback button is greyed while there is a move to take back")
+    take_back_over_the_api(client, [])
+    if headless:
+        back = take_screenshot(client)
+        check(board_band(back) == board_band(start) and panel_band(back) == panel_band(start), "the game taken back to its start does not look like the start")
+        check(not band_has_color(panel_band(back), back.channels, TAKE_BACK_COLOR), "the takeback button is not greyed with nothing to take back")
+
+    client.call("perform_action", move("d2d4"))
+    let_frames_pass(client, 2)  # the button is no longer greyed from the next draw
+    version = client.call("get_state")["version"]
+    clicked = client.call("ui_click", {"name": "MovePanelTakeBack"})
+    check(clicked["consumed"] and clicked["action"] == "ChessTakeBack", f"the click on the takeback button was answered with {clicked}")
+    reply = client.call("get_state")
+    check(reply["state"]["moves"] == [] and reply["version"] > version, f"the button took back to {reply['state']['moves']}")
 
 
 def find_ui_canvas(tree: dict, node: str) -> dict:
@@ -898,7 +1011,7 @@ def check_the_menu_buttons(tree: dict) -> None:
 
     for element in find_ui_canvas(tree, "MenuPanel")["elements"]:
         collect(element)
-    check(sorted(names) == ["MenuClose", "MenuDim", "MenuSectionOpponent"], f"the buttons of the list: {names}")
+    check(sorted(names) == ["MenuClose", "MenuDim", "MenuSectionMoves", "MenuSectionOpponent"], f"the buttons of the list: {names}")
     dim = find_ui_element({"canvases": [find_ui_canvas(tree, "MenuPanel")]}, "MenuDim")
     check(dim["action"] == "ChessCloseMenu", f"the dim of the list: {dim}")
     found = find_ui_element({"canvases": [find_ui_canvas(tree, "MenuPanel")]}, "MenuSectionOpponent")
@@ -1084,6 +1197,8 @@ BASE_SCENARIOS = [
     ("opponent panel, manual clock", ["--manual-clock"], run_opponent_panel_scenario),
     ("captured material, real clock", [], run_material_scenario),
     ("captured material, manual clock", ["--manual-clock"], run_material_scenario),
+    ("takeback, real clock", [], run_takeback_scenario),
+    ("takeback, manual clock", ["--manual-clock"], run_takeback_scenario),
 ]
 
 OPPONENT_SCENARIOS = [

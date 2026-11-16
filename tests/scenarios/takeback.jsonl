@@ -1,0 +1,19 @@
+{"scenario": 1, "game": "Chess", "flags": ["--headless", "--manual-clock"], "title": "Chess: the takeback by the button of the move panel and by set_state, the SAN list and what can be taken back, nothing to take back"}
+{"method": "step", "params": {"frames": 2}}
+{"method": "reset"}
+{"method": "set_state", "params": {"opponent": {"plays": null}}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "get_state", "expect": {"pointers": {"/state/moves": [], "/state/sanMoves": [], "/state/takeBackPlies": 0}, "versionStep": 0}}
+{"method": "ui_click", "params": {"name": "MovePanelTakeBack"}, "expect": {"equal": {"consumed": true, "action": "", "value": ""}}, "note": "greyed before the first move: it emits nothing"}
+{"method": "set_state", "params": {"takeBack": {}}, "expect": {"error": "invalid_params"}}
+{"method": "perform_action", "params": {"type": "move", "uci": "e2e4"}, "expect": {"versionStep": 1}}
+{"method": "perform_action", "params": {"type": "move", "uci": "e7e5"}, "expect": {"versionStep": 1}}
+{"method": "perform_action", "params": {"type": "move", "uci": "g1f3"}, "expect": {"versionStep": 1}}
+{"method": "get_state", "expect": {"pointers": {"/state/sanMoves": ["e4", "e5", "Nf3"], "/state/takeBackPlies": 1}, "versionStep": 0}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "ui_click", "params": {"name": "MovePanelTakeBack"}, "expect": {"equal": {"consumed": true, "action": "ChessTakeBack", "value": ""}}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "get_state", "expect": {"pointers": {"/state/moves": ["e2e4", "e7e5"], "/state/sanMoves": ["e4", "e5"], "/state/turn": "white"}, "versionStep": 1}}
+{"method": "set_state", "params": {"takeBack": {"plies": 3}}, "expect": {"error": "invalid_params"}}
+{"method": "set_state", "params": {"takeBack": {"plies": 2}}, "expect": {"versionStep": 1}}
+{"method": "get_state", "expect": {"pointers": {"/state/fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", "/state/moves": [], "/state/takeBackPlies": 0}, "versionStep": 0, "logClean": true}}

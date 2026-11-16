@@ -21,9 +21,11 @@ namespace BECore::Chess {
     /**
      * @brief The rows of the move list as a score sheet shows them: "1. e4 e5", "2. Nf3 Nc6".
      *
-     * The game is replayed from @p startFen (ChessGameModel::GetStartFen()) and the text of each move is SanOf() on the position before it. The first
-     * number is the fullmove number of the start position; a game that began with Black to move has a first row with no White move, and the number
-     * grows after each Black move. The last row may have no Black move; no moves, no rows.
+     * Not the `MoveList` alias of MoveGenerator.h (a vector of moves of one position): this is the list of a game, as it is shown.
+     *
+     * The game is replayed from @p startFen (ChessGameModel::GetStartFen()) and the text of each move is SanOf() on the position before it (its legal
+     * moves are generated once per ply). The first number is the fullmove number of the start position; a game that began with Black to move has a
+     * first row with no White move, and the number grows after each Black move. The last row may have no Black move; no moves, no rows.
      *
      * A start FEN that does not parse gives no rows. A move that is not legal in its turn (the model never produces one) ends the list there: the
      * rows before it stay.
