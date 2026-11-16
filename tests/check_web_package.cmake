@@ -33,6 +33,12 @@ endforeach()
 # --- the package is exactly the files of the game; a new config or asset file is a conscious change of this list
 set(expected
     assets/chess_test.png
+    assets/sounds/capture.wav
+    assets/sounds/castle.wav
+    assets/sounds/check.wav
+    assets/sounds/game_end.wav
+    assets/sounds/move.wav
+    assets/sounds/promotion.wav
     config/ApplicationConfig.xml
     config/ChessSettings.xml
     config/SceneConfig.xml
