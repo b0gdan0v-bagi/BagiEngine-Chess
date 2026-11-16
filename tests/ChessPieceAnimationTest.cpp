@@ -46,8 +46,8 @@ namespace BECore::Chess::Tests {
         constexpr float kPortraitBoardLeft = 40.0f;  // the board of the Portrait view (720 x 960), the squares 80 units as in the default one
         constexpr float kPortraitBoardTop = 144.0f;
         constexpr float kSquare = 80.0f;
-        constexpr float kUprightWidth = 480.0f;  // a window taller than wide: the scene picks the Portrait view
-        constexpr float kUprightHeight = 853.0f;
+        constexpr float kUprightWidth = 480.0f;  // a 3:4 window: the scene picks the Portrait view (9:16 would be the Tall one, with the same board)
+        constexpr float kUprightHeight = 640.0f;
         constexpr float kDragStepPixels = 20.0f;  // a first motion of a drag, well past the threshold of the board
         constexpr int32_t kPieceLayer = 0;
         constexpr int32_t kDragLayer = 6;  // the layer of a piece in the hand (ChessPieceComponent::kDragLayer, written out here to pin it)

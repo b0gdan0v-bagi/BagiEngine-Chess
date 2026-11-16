@@ -1070,7 +1070,7 @@ namespace BECore::Chess::Tests {
         ShowEveryMaterialRow(*material);
         PublishMaterialRound(0);
 
-        size_t notchCasesWithAnOverlap[2] = {};  // the default view, then Portrait
+        size_t notchCasesWithAnOverlap[2] = {};  // the default view, then the views with the places of Portrait (Portrait and Tall)
         size_t notchCases[2] = {};
         String portraitOverlaps;
         for (const UIMatrixCase& matrixCase : UILayoutMatrix()) {
@@ -1108,7 +1108,8 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(notchCases[0], 32u);
         EXPECT_EQ(notchCasesWithAnOverlap[0], 32u);
         EXPECT_EQ(notchCases[1], 14u);
-        EXPECT_EQ(notchCasesWithAnOverlap[1], 5u) << "only where the view fills the window (a taller window has a bar above it, which takes the notch)";
+        EXPECT_EQ(notchCasesWithAnOverlap[1], 5u) << "only where the view fills the window, 3:4 in Portrait (a taller window has a bar above it, which takes the notch: Tall is "
+                                                     "low enough for 9:16 to keep a bar of 25 px)";
         // The HUD keeps inside the safe area, and a notch pushes its top row down by 7 % of the short side, onto the first row of the upper group
         std::cout << "[   INFO   ] the HUD reaches the top group in " << notchCasesWithAnOverlap[0] << " of " << notchCases[0] << " notch cases of the default view and in "
                   << notchCasesWithAnOverlap[1] << " of " << notchCases[1] << " of Portrait:\n"
@@ -1116,7 +1117,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheShownMaterialStaysInItsPlaceAndClearOfTheHudAndTheCoordinatesInSevenWindowShapes) {
-        // The shapes of the three views: in the default view the groups are in the margin left of the board, in Portrait in the bands above and below it, in Wide in the move panel
+        // The shapes of the four views: in the default view the groups are in the margin left of the board, in Portrait and Tall in the bands above and below it, in Wide in the move panel
         StartFrom("4k3/8/8/8/8/8/8/4K3 w - - 0 1");
         for (const auto& size : {Pair<float, float>{1280.0f, 720.0f}, Pair<float, float>{1024.0f, 768.0f}, Pair<float, float>{800.0f, 800.0f}, Pair<float, float>{2560.0f, 1080.0f},
                                  Pair<float, float>{720.0f, 1280.0f}, Pair<float, float>{768.0f, 1024.0f}, Pair<float, float>{480.0f, 853.0f}}) {

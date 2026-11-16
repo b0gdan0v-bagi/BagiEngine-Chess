@@ -11,7 +11,8 @@
      material (y 92) and the board, Status at y 892 to 948 under the board and the lower row (y 832); the anchors keep them there. Only Status is wider there (60 % of the safe area): the
      safe area of the narrowest window with side insets is 590 units and 48 % of it, 283, cuts the longest sentence, which the 330 of the default view's narrowest window holds.
      The Wide view (1120 x 800, picked from the aspect 1.4 up, SceneConfig.xml) has the same rows: Turn stays at the left, Menu and Reset are at the right end of the safe area (above the
-     move panel, x 760 to 1080) and Status, 48 % of the safe area, is at the bottom right under it. -->
+     move panel, x 760 to 1080) and Status, 48 % of the safe area, is at the bottom right under it. The Tall view (720 x 1204, up to the aspect 0.59) is Portrait with more room at the
+     bottom: the same top row, and Status at the bottom of its safe area (y 1136 to 1192 with no insets), under the move panel. -->
 <node name="Hud" layer="10" contentVersion="5">
   <components>
     <component type="ChessHudComponent" />

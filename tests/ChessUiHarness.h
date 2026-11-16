@@ -69,7 +69,8 @@ namespace BECore::Chess::Tests {
         constexpr float kButtonAir = 8.0f;                  // the text of a button keeps this much from each edge of its fill
         constexpr float kNarrowestWidth = 480.0f;           // the narrowest window of the size matrix, in pixels
         constexpr float kNarrowestHeight = 480.0f;          // the narrowest window with the default (landscape) view: 480 x 480 is a square, which keeps it, at the scale 0.571
-        constexpr float kNarrowestPortraitHeight = 853.0f;  // 9:16 at that width: the Portrait view, at the scale 0.667
+        constexpr float kNarrowestPortraitHeight = 640.0f;  // 3:4 at that width: the Portrait view, at the scale 0.667, filling the window
+        constexpr float kNarrowestTallHeight = 853.0f;      // 9:16 at that width: the Tall view, at the same scale
 
         // The second view of the scene (SceneConfig.xml, `viewVariants`): 720 x 960, the board at (40, 144), a square 80 units as in the default view
         constexpr float kPortraitViewWidth = 720.0f;
@@ -81,6 +82,11 @@ namespace BECore::Chess::Tests {
         constexpr float kPortraitStatusTop = 892.0f;  // Status: 56 units high, 12 above the bottom of the view
         constexpr float kPortraitNotchUnits = 50.4f;  // the top inset of a notch (7 % of the short side) when the view fills the window: 7 % of its 720 units
         constexpr const char* kPortraitViewName = "Portrait";
+
+        // The fourth view (SceneConfig.xml): 720 x 1204, Portrait made higher, every place of Portrait and the move panel under the board; picked up to the aspect 0.59
+        constexpr float kTallViewHeight = 1204.0f;
+        constexpr const char* kTallViewName = "Tall";
+        constexpr float kTallMaxAspect = 0.59f;
 
         // The third view (SceneConfig.xml): 1120 x 800, the board and the margins of the default view and the room for the move panel at the right; picked from the aspect 1.4 up
         constexpr float kWideViewWidth = 1120.0f;
@@ -436,23 +442,18 @@ namespace BECore::Chess::Tests {
             }
         };
 
-        const ViewShape kViewShapes[] = {{"default view", {1024.0f, 768.0f}, {kNarrowestWidth, kNarrowestHeight}, kViewWidth, kViewHeight, kBoardLeft, kBoardTop, false},
-                                         {"Portrait view",
-                                          {kNarrowestWidth, kNarrowestPortraitHeight},
-                                          {kNarrowestWidth, kNarrowestPortraitHeight},
-                                          kPortraitViewWidth,
-                                          kPortraitViewHeight,
-                                          kPortraitBoardLeft,
-                                          kPortraitBoardTop,
-                                          true},
-                                         {"Wide view", {1280.0f, 720.0f}, {kWideNarrowestWidth, kNarrowestHeight}, kWideViewWidth, kViewHeight, kBoardLeft, kBoardTop, false}};
+        const ViewShape kViewShapes[] = {
+            {"default view", {1024.0f, 768.0f}, {kNarrowestWidth, kNarrowestHeight}, kViewWidth, kViewHeight, kBoardLeft, kBoardTop, false},
+            {"Portrait view", {768.0f, 1024.0f}, {kNarrowestWidth, kNarrowestPortraitHeight}, kPortraitViewWidth, kPortraitViewHeight, kPortraitBoardLeft, kPortraitBoardTop, true},
+            {"Wide view", {1280.0f, 720.0f}, {kWideNarrowestWidth, kNarrowestHeight}, kWideViewWidth, kViewHeight, kBoardLeft, kBoardTop, false},
+            {"Tall view", {kNarrowestWidth, kNarrowestTallHeight}, {kNarrowestWidth, kNarrowestTallHeight}, kPortraitViewWidth, kTallViewHeight, kPortraitBoardLeft, kPortraitBoardTop, true}};
         constexpr size_t kBoardEdgeCells = kLastBoardIndex + 1;
         constexpr float kPieceWidth = kCellSize * kCellWidth / kCellHeight;  // a piece fitted by Contain is as high as its cell, as wide as the aspect of its atlas cell, and centered
         constexpr float kPieceLeft = (kCellSize - kPieceWidth) * 0.5f;       // 15.5 units from the left edge of the cell
         constexpr float kPieceRight = kPieceLeft + kPieceWidth;              // 64.5 units
         constexpr float kLabelBand = 30.0f;                                  // a rank number lies in the top 30 units of its cell, a file letter in the bottom 30 (the boxes are 2..28 and 52..78)
 
-        /// Whether a canvas was laid out for the Portrait view: its bounds are the view in units
+        /// Whether a canvas was laid out for a view with the places of Portrait (Portrait or Tall): its bounds are the view in units
         bool LaidOutForPortrait(const UICanvasLayout& layout) {
             return layout.GetResolved().bounds.w == kPortraitViewWidth;
         }
@@ -460,6 +461,11 @@ namespace BECore::Chess::Tests {
         /// Whether a canvas was laid out for the Wide view: its bounds are the view in units
         bool LaidOutForWide(const UICanvasLayout& layout) {
             return layout.GetResolved().bounds.w == kWideViewWidth;
+        }
+
+        /// Whether a canvas was laid out for the Tall view: its bounds are the view in units
+        bool LaidOutForTall(const UICanvasLayout& layout) {
+            return layout.GetResolved().bounds.h == kTallViewHeight;
         }
 
         /// One label of the board coordinates: its name and the drawn cell it sits in (the rank labels are in the left column, one per row; the file labels in the bottom row, one per column)
@@ -805,9 +811,9 @@ namespace BECore::Chess::Tests {
         const Color kMaterialChipColor{232, 210, 170, 255};  // the fill of a row (SceneConfig.xml)
         constexpr float kBoardUnits = 640.0f;
         /// The outputs that decide which view is right: phones held upright and sideways, tablets, desktop windows, squares and the degenerate ones
-        const Pair<float, float> kViewOutputs[] = {{480.0f, 853.0f},  {390.0f, 844.0f},   {720.0f, 1280.0f},  {768.0f, 1024.0f},  {800.0f, 800.0f},  {1024.0f, 768.0f},
-                                                   {1280.0f, 720.0f}, {1920.0f, 1080.0f}, {480.0f, 480.0f},   {1.0f, 1.0f},       {0.0f, 0.0f},      {874.0f, 1000.0f},
-                                                   {875.0f, 1000.0f}, {876.0f, 1000.0f},  {2560.0f, 1080.0f}, {1390.0f, 1000.0f}, {1400.0f, 1000.0f}};
+        const Pair<float, float> kViewOutputs[] = {{480.0f, 853.0f},   {390.0f, 844.0f},   {720.0f, 1280.0f},  {768.0f, 1024.0f}, {800.0f, 800.0f},  {1024.0f, 768.0f}, {1280.0f, 720.0f},
+                                                   {1920.0f, 1080.0f}, {480.0f, 480.0f},   {1.0f, 1.0f},       {0.0f, 0.0f},      {874.0f, 1000.0f}, {875.0f, 1000.0f}, {876.0f, 1000.0f},
+                                                   {2560.0f, 1080.0f}, {1390.0f, 1000.0f}, {1400.0f, 1000.0f}, {480.0f, 1040.0f}, {590.0f, 1000.0f}, {600.0f, 1000.0f}, {480.0f, 640.0f}};
         const Color kBoardDimColor{0, 0, 0, 140};                                     // the dim of the result (ChessResultComponent.cpp)
         constexpr const char* kBlackMatesOnA1 = "r5k1/8/8/8/8/8/5PPP/6K1 b - - 0 1";  // Ra1 is mate
         /// A glyph of a label: a texture drawn with one of the two colors of the squares as its tint (the pieces are drawn white, and the text of the HUD too)
@@ -1430,9 +1436,9 @@ namespace BECore::Chess::Tests {
             }
         }
 
-        /// Whether the scene draws its Portrait view now (the last draw picked it)
+        /// Whether the scene draws a view with the board and the places of Portrait now (Portrait or Tall; the last draw picked it)
         bool PortraitIsActive() const {
-            return GetScene().GetActiveView().name == PoolString::Intern(kPortraitViewName);
+            return HasPortraitPlaces(GetScene().GetActiveView().name);
         }
 
         /// The size of the view the scene draws now, in scene units

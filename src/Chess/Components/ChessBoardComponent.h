@@ -25,13 +25,23 @@ namespace BECore::Chess {
     /// The name of the second view of SceneConfig.xml (`viewVariants`), which the components that differ per view pick by
     inline constexpr const char* kPortraitView = "Portrait";
 
+    /// The name of the view that is Portrait made higher for the narrow phones held upright: every place of Portrait holds in it, and the room under the board is the move panel's
+    inline constexpr const char* kTallView = "Tall";
+
+    /// Whether the view named @p view has the board and the places of Portrait (Portrait and Tall)
+    [[nodiscard]] inline bool HasPortraitPlaces(PoolString view) {
+        static const PoolString portrait = PoolString::Intern(kPortraitView);
+        static const PoolString tall = PoolString::Intern(kTallView);
+        return view == portrait || view == tall;
+    }
+
     /**
      * @brief The board of the scene: draws the squares and the highlights of the active model and turns clicks and drags into its moves.
      *
      * Owns no game state: the model is shared with ChessPieceComponent through GameManager::GetActive(). The geometry (origin and cell size) is reflected, in scene units: the engine scales
      * the scene to the window. The pieces, the HUD, the menu and the panels are other nodes of the scene (`Components/CLAUDE.md` tells them).
      *
-     * The scene has two views, so the geometry has two sets: the default fields and the `portrait*` ones, for the view named kPortraitView. Which set holds is changed only on
+     * The board has two places, so the geometry has two sets: the default fields (the default and the Wide view) and the `portrait*` ones (HasPortraitPlaces()). Which set holds is changed only on
      * SceneViewChangedEvent (sent from Scene::Update(), before every update of the frame) and every accessor reads that one choice: the squares drawn, the pieces placed from the same
      * update and the result bar then always agree, which they would not if each asked the scene for its active view at its own moment (a draw may run after the view was picked and before
      * the pieces have moved). Before the first event the default set holds. The event comes one Update after the Draw that picked the view, so for one frame the canvases are already

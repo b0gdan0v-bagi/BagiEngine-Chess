@@ -84,7 +84,7 @@ namespace BECore::Chess {
     }
 
     void ChessBoardComponent::OnViewChanged(const SceneEvents::SceneViewChangedEvent& event) {
-        _portraitActive = event.view.name == PoolString::Intern(kPortraitView);
+        _portraitActive = HasPortraitPlaces(event.view.name);
         _drag.reset();
     }
 

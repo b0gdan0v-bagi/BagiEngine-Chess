@@ -69,8 +69,7 @@ namespace BECore::Chess {
 
         // The box of the lists is asked per view; the scene's active view is already the one of this draw (it is picked at the start of Draw())
         MaterialView ActiveMaterialView(const Scene& scene) {
-            static const PoolString portrait = PoolString::Intern(kPortraitView);
-            return scene.GetActiveView().name == portrait ? MaterialView::Portrait : MaterialView::Default;
+            return HasPortraitPlaces(scene.GetActiveView().name) ? MaterialView::Portrait : MaterialView::Default;
         }
 
         // The color of a group: the lower one is the color at the bottom of the board, the upper one the other
