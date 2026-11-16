@@ -8,7 +8,7 @@ which it finds through the environment variable BAGI_ENGINE_DIR (set by ctest), 
 on the real clock and with --manual-clock; one scenario plays moves before the first frame.
 
 The scenarios of the own engine, the watch (two own engines), the analysis and the ratings, the opponent panel, the captured
-material and "without Stockfish" are base ones: the own engine runs inside the game, so they need nothing from the environment.
+material, the takeback and "without Stockfish" are base ones: the own engine runs inside the game, so they need nothing from the environment.
 Stockfish ("opponent" scenarios) is replaced by tests/fake_uci_engine.py: main() writes a wrapper script that starts it into a
 temporary directory and puts the script in STOCKFISH of the environment, which the game inherits. STOCKFISH comes before PATH in
 the game's search for an engine and the committed config has no path, so a Stockfish installed on this machine is never used. A
@@ -25,7 +25,7 @@ the person's own save folder is never named.
 
 What a recorded scenario can state lives in `tests/scenarios/*.jsonl` (ctest `BagiChessScenario.<file>`, the manual clock, played
 by the engine's bagi_play.py): the refusals, the mate and the game over, the reset, promotion, the numbers of the captured
-material and the clicks of the opponent panel. What stays here needs a wait for the program, a picture, the real clock or an
+material, the clicks of the opponent panel and the takeback. What stays here needs a wait for the program, a picture, the real clock or an
 answer that depends on the build.
 
 Exit code: 0 passed, 1 failed, 77 skipped (the executable does not exist).
@@ -909,6 +909,59 @@ def run_material_scenario(client: BagiControlClient, headless: bool) -> None:
     check(lower_group_band(take_screenshot(client)) == start_band, "the band of the move panel under the list after a reset is not the one of the start position")
 
 
+TAKE_BACK_COLOR = (112, 84, 48)  # the fill of the takeback button of the move panel (ChessMovePanel.xml); greyed it is drawn at half its alpha over the plate
+
+
+def take_back_over_the_api(client: BagiControlClient, expected_moves: list) -> None:
+    """set_state {"takeBack": {}} (the button's rule), then the moves must be these and the pieces at rest."""
+    version = client.call("get_state")["version"]
+    client.call("set_state", {"takeBack": {}})
+    reply = client.call("get_state")
+    check(reply["state"]["moves"] == expected_moves, f"after a takeback the moves are {reply['state']['moves']}, not {expected_moves}")
+    check(reply["version"] > version, "a takeback did not move the state version")
+    let_the_pieces_settle(client)
+
+
+def run_takeback_scenario(client: BagiControlClient, headless: bool) -> None:
+    """The takeback over the control API and by the button of the move panel, and in the picture: a position taken back looks like the same position played (the board and the move
+    panel, the HUD says other words); the button is greyed while there is nothing to take back. The rules of what is taken back are `tests/scenarios/takeback.jsonl` and the gtests.
+
+    The pictures are taken before the button is clicked: a click leaves the pointer over it, and its hover look would change the band."""
+    if client.call("status")["manualClock"]:
+        client.call("step")  # the scene registers its pieces in the first frame
+    client.call("reset")
+    client.call("set_state", {"opponent": {"plays": None}})
+    expect_error("invalid_params", lambda: client.call("set_state", {"takeBack": {}}), "a takeback before the first move")
+    let_frames_pass(client, 2)  # the panel waits for the first layout of its canvas
+    start = take_screenshot(client) if headless else None
+
+    client.call("perform_action", move("e2e4"))
+    let_the_pieces_settle(client)
+    one = take_screenshot(client) if headless else None
+    client.call("perform_action", move("e7e5"))
+    state = client.call("get_state")["state"]
+    check(state["sanMoves"] == ["e4", "e5"] and state["takeBackPlies"] == 1, f"the state has sanMoves {state['sanMoves']} and takeBackPlies {state['takeBackPlies']}")
+
+    take_back_over_the_api(client, ["e2e4"])
+    if headless:
+        back = take_screenshot(client)
+        check(board_band(back) == board_band(one) and panel_band(back) == panel_band(one), "e4 e5 and a takeback do not look like e4 alone")
+        check(band_has_color(panel_band(back), back.channels, TAKE_BACK_COLOR), "the takeback button is greyed while there is a move to take back")
+    take_back_over_the_api(client, [])
+    if headless:
+        back = take_screenshot(client)
+        check(board_band(back) == board_band(start) and panel_band(back) == panel_band(start), "the game taken back to its start does not look like the start")
+        check(not band_has_color(panel_band(back), back.channels, TAKE_BACK_COLOR), "the takeback button is not greyed with nothing to take back")
+
+    client.call("perform_action", move("d2d4"))
+    let_frames_pass(client, 2)  # the button is no longer greyed from the next draw
+    version = client.call("get_state")["version"]
+    clicked = client.call("ui_click", {"name": "MovePanelTakeBack"})
+    check(clicked["consumed"] and clicked["action"] == "ChessTakeBack", f"the click on the takeback button was answered with {clicked}")
+    reply = client.call("get_state")
+    check(reply["state"]["moves"] == [] and reply["version"] > version, f"the button took back to {reply['state']['moves']}")
+
+
 def find_ui_canvas(tree: dict, node: str) -> dict:
     """The canvas of the node of that name in a `ui_tree` answer."""
     for canvas in tree["canvases"]:
@@ -1144,6 +1197,8 @@ BASE_SCENARIOS = [
     ("opponent panel, manual clock", ["--manual-clock"], run_opponent_panel_scenario),
     ("captured material, real clock", [], run_material_scenario),
     ("captured material, manual clock", ["--manual-clock"], run_material_scenario),
+    ("takeback, real clock", [], run_takeback_scenario),
+    ("takeback, manual clock", ["--manual-clock"], run_takeback_scenario),
 ]
 
 OPPONENT_SCENARIOS = [
