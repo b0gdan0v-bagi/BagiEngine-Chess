@@ -16,6 +16,7 @@ src/Chess/
 ├── Game/                     the rules, plain C++: board, moves, FEN, legal moves, status, ChessGameModel, pure UI helpers
 ├── Engine/                   the opponent: IChessEngine, Stockfish over UCI, the own engine, levels, controller, analyst, MoveRater
 ├── Save/                     the game and the opponent choice kept between runs
+├── Sound/                    the cue of a move, ChessSoundComponent
 ├── Uci/                      the own engine as the UCI program BagiChessUci
 └── Components/               scene glue: board, pieces, result, material, move panel, HUD, panels
 cmake/ChessWeb.cmake          what of config/ and assets/ stays out of the web package
@@ -33,6 +34,7 @@ State lives in `ChessGameModel`; components keep none. Each folder above (and `t
 - `set_state {"takeBack": {"plies": n}}` (alone in its call; without `plies` the button's rule, `takeBackPlies` of the state) takes moves back; nothing to take back is `invalid_params`. `sanMoves` is `moves` in SAN; the move the screen views is not in the state.
 - `material` is derived from the position at every `get_state`. `analysis` is the picked engine, never handicapped, in a process of its own; evaluation and ratings are off at every game start; a hint belongs to its position, is for the person only and is never played; scores are from White's view, `hint.text` from the side to move's. Ratings always use the own engine (the same game rates the same twice).
 - `opponent.seed` (an integer, `set_state {"opponent": {"seed": n}}`, a valid pick alone) varies the own engine among near-equal moves and every handicap's blunder choice and move; 0 is no variety (the old answers). A new game (`Reset`, a start) and a takeback (the button, `set_state {takeBack}`) draw a new one, `set_state {fen}` keeps it, it is not saved; Stockfish's own picks are not seeded. A client that compares answers across resets or takebacks sets the seed after each.
+- A headless or control run plays to SDL's dummy driver (and a machine with no device plays nothing), so the engine's `audio_state` is where to see what the game asked for: the clip and the bus of each move's sound (`src/Chess/Sound/CLAUDE.md`).
 - The state version is the sum of the model's, the controller's and the analyst's revisions: it grows on every change of the state, not on a selection or `thinking`, and never goes back.
 
 ## The web build

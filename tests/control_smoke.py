@@ -145,6 +145,40 @@ def check_screenshots(client: BagiControlClient) -> None:
     check(promoted.rows != before_promotion.rows, "the screenshot did not change after a promotion")
 
 
+# One short line of play that gives three cues: the pawn moves are quiet, the next two take a piece, the bishop checks
+BOARD_SOUNDS = [("e2e4", "move"), ("d7d5", "move"), ("e4d5", "capture"), ("d8d5", "capture"), ("f1b5", "check")]
+SOUND_FRAMES = 2  # the frame after a move plays its cue; one more for margin
+
+
+def audio_state(client: BagiControlClient) -> dict:
+    return client.call("audio_state")
+
+
+def check_the_board_sounds(client: BagiControlClient) -> None:
+    """Every played move asks the audio manager for the clip of its cue on the sfx bus, one request per move; a new game and a takeback ask for nothing.
+
+    `played` is not checked: the backend of a headless run is SDL's dummy driver, and a machine with no audio device plays nothing at all, which is as right."""
+    client.call("reset")
+    let_frames_pass(client, SOUND_FRAMES)
+    quiet = audio_state(client)["requested"]
+    for uci, cue in BOARD_SOUNDS:
+        before = audio_state(client)["requested"]
+        client.call("perform_action", move(uci))
+        let_frames_pass(client, SOUND_FRAMES)
+        after = audio_state(client)
+        check(after["requested"] == before + 1, f"{uci} asked for {after['requested'] - before} sounds, not one")
+        last = after["recent"][-1]
+        check(last["clip"] == f"assets/sounds/{cue}.wav" and last["bus"] == "sfx", f"{uci} should sound as a {cue}, the request is {last}")
+    check(audio_state(client)["requested"] == quiet + len(BOARD_SOUNDS), "the line asked for a sound it should not have")
+
+    before = audio_state(client)["requested"]
+    client.call("set_state", {"takeBack": {"plies": 1}})
+    let_frames_pass(client, SOUND_FRAMES)
+    client.call("reset")
+    let_frames_pass(client, SOUND_FRAMES)
+    check(audio_state(client)["requested"] == before, "a takeback or a reset asked for a sound")
+
+
 def run_chess_scenario(client: BagiControlClient, headless: bool) -> None:
     status = client.call("status")
     games = client.call("list_games")
@@ -166,6 +200,8 @@ def run_chess_scenario(client: BagiControlClient, headless: bool) -> None:
 
     if headless:
         check_screenshots(client)
+
+    check_the_board_sounds(client)
 
 
 def without_squares(image, squares: list, turned: bool = False) -> list:
