@@ -840,7 +840,7 @@ def check_the_board_turns_with_the_program(client: BagiControlClient) -> None:
 MARGIN_WIDTH = 100
 MARGIN_INSET = 2  # columns and rows kept away from the edges of the margin, against rounding
 # The band of the move panel under its list, where Material draws what the color at the bottom of the board has taken while the panel is shown (ChessMaterial.xml), in view units
-LOWER_GROUP_TOP, LOWER_GROUP_BOTTOM = 600, 656
+LOWER_GROUP_TOP, LOWER_GROUP_BOTTOM = 540, 596
 CAPTURE_MOVES = ["e2e4", "d7d5", "e4d5"]  # White takes a pawn of Black
 CHIP_COLOR = (232, 210, 170)  # the fill of a row of the display
 

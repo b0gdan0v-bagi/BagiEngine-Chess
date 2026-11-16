@@ -643,7 +643,7 @@ namespace BECore::Chess::Tests {
         ASSERT_FALSE(PortraitIsActive());
         EXPECT_EQ(ShownMaterialRows(), "BottomPawn");
         EXPECT_EQ(MaterialPlace(), "panel");
-        EXPECT_TRUE(SameRect(MaterialRow("Bottom", "Pawn", kMaterialPanelSet).rect, Rect{768.0f, 608.0f, kMaterialPanelRowWidth, 40.0f})) << "in the panel's band under the list";
+        EXPECT_TRUE(SameRect(MaterialRow("Bottom", "Pawn", kMaterialPanelSet).rect, Rect{768.0f, 548.0f, kMaterialPanelRowWidth, 40.0f})) << "in the panel's band under the list";
 
         ResizeWithoutInsets(kViewShapes[0].output.first, kViewShapes[0].output.second);
         EXPECT_EQ(MaterialPlace(), "margin");
@@ -712,7 +712,7 @@ namespace BECore::Chess::Tests {
         constexpr float kPanelRowStep = 54.0f;    // a chip of the panel set is 52 units wide and 2 apart
         constexpr float kPanelListLeft = 768.0f;  // the inner edge of the panel box
         constexpr float kPanelTopListY = 88.0f;
-        constexpr float kPanelBottomListY = 608.0f;
+        constexpr float kPanelBottomListY = 548.0f;
 
         /// Lays the canvas out in @p context the way the component leaves it: the panel set shown exactly where MovePanelFits says, the margin set otherwise; whether the panel set is shown
         bool LayOutMaterialAsTheComponentShowsIt(UICanvasComponent& canvas, const UILayoutContext& context) {

@@ -19,7 +19,7 @@ namespace BECore::Chess::Tests {
         constexpr const char* kBlackToMoveFen = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1";
         constexpr const char* kPawnOnTheSeventh = "k7/4P3/8/8/8/8/8/7K w - - 0 1";  // e7e8q is a check along the eighth rank
 
-        /// Shows the box, the 8 rows and their marks (the component shows only what the game has), so the layout holds the panel at its full size
+        /// Shows the box, every row and its marks (the component shows only what the game has), so the layout holds the panel at its full size
         void ShowEveryMovePanelRow(UICanvasComponent& canvas) {
             EXPECT_TRUE(canvas.SetElementVisible(PoolString::Intern("MovePanelBox"), true));
             for (size_t row = 0; row < kMovePanelRows; ++row) {
@@ -30,7 +30,7 @@ namespace BECore::Chess::Tests {
             }
         }
 
-        constexpr size_t kRowsPerColumn = kMovePanelRows / 2;  // the rows are two columns of four: one above the other in the Wide view, side by side in the Tall one
+        constexpr size_t kRowsPerColumn = (kMovePanelRows + 1) / 2;  // the rows are two columns, of four and three: one above the other in the Wide view, side by side in the Tall one
 
         /// The view whose box a canvas laid out in this view shows: the Tall one has its own, every other view is asked for the Wide box (which none but Wide holds)
         MovePanelView PanelViewOf(const UICanvasLayout& layout) {
@@ -396,7 +396,7 @@ namespace BECore::Chess::Tests {
             EXPECT_TRUE(ParseMoveListPress(clicker->value.ToStringView()).has_value()) << element->name.CStr();
         }
         EXPECT_EQ(clickable.size(), 2 * kMovePanelRows + 4);
-        for (const char* name : {"MovePanelStepBack", "MovePanelStepForward", "MovePanelLatest", "MovePanelTakeBack", "MovePanelWhite7", "MovePanelBlack0"}) {
+        for (const char* name : {"MovePanelStepBack", "MovePanelStepForward", "MovePanelLatest", "MovePanelTakeBack", "MovePanelWhite6", "MovePanelBlack0"}) {
             EXPECT_NE(eastl::find(clickable.begin(), clickable.end(), String(name)), clickable.end()) << name;
         }
         for (const char* name : {"MovePanelBox", "MovePanelBandTopPlayer", "MovePanelBandBottomPlayer", "MovePanelNumber0"}) {
@@ -458,7 +458,7 @@ namespace BECore::Chess::Tests {
                 report += Format("{}: the box reaches the board or the material\n", matrixCase.label.c_str());
             }
             // The insets move the HUD, not the box: a notch pushes the top row (Menu, Reset) down onto the top band. The home bar of the side insets lifts Status, which the Wide view
-            // keeps low enough to stay clear of the band of the buttons. The 8 rows are clear of the HUD in every case
+            // keeps low enough to stay clear of the band of the buttons. The rows are clear of the HUD in every case
             const UIElement* list = layout.root->FindByName(PoolString::Intern("MovePanelList"));
             ASSERT_NE(list, nullptr);
             String touching;
@@ -641,7 +641,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(ShownMovePanelRows(), "1. f3 e5 | 2. g4 [Qh4#]");
     }
 
-    TEST_F(ChessUiTest, AGameOfTwentyRowsShowsTheLastEightOfThem) {
+    TEST_F(ChessUiTest, AGameOfTwentyRowsShowsTheLastPageOfRows) {
         Settle();
         ASSERT_TRUE(PlayAQuietGame(Model(), 2 * kLongGameRows));
         const Vector<MoveListRow> list = BuildMoveList(Model().GetStartFen(), Model().GetMoves());
@@ -651,14 +651,15 @@ namespace BECore::Chess::Tests {
             const MoveListRow& expected = list[kLongGameRows - kMovePanelRows + row];
             ASSERT_FALSE(expected.white.san.empty() || expected.black.san.empty());
             EXPECT_TRUE(MovePanelElement(Format("MovePanelRow{}", row).c_str()).active.visible) << row;
-            EXPECT_EQ(ShownText(MovePanelElement(Format("MovePanelNumber{}", row).c_str())), Format("{}.", 13 + row)) << "the numbers are those of the game, not of the window";
+            EXPECT_EQ(ShownText(MovePanelElement(Format("MovePanelNumber{}", row).c_str())), Format("{}.", kLongGameRows - kMovePanelRows + 1 + row))
+                << "the numbers are those of the game, not of the window";
             EXPECT_EQ(MovePanelWord(row, "White"), expected.white.san) << row;
             EXPECT_EQ(MovePanelWord(row, "Black"), expected.black.san) << row;
         }
-        EXPECT_TRUE(MovePanelElement("MovePanelBlackMark7").active.visible) << "the last move of the game";
-        EXPECT_FALSE(MovePanelElement("MovePanelWhiteMark7").active.visible);
-        EXPECT_EQ(ShownText(MovePanelElement("MovePanelNumber0")), "13.");
-        EXPECT_EQ(ShownText(MovePanelElement("MovePanelNumber7")), "20.");
+        EXPECT_TRUE(MovePanelElement("MovePanelBlackMark6").active.visible) << "the last move of the game";
+        EXPECT_FALSE(MovePanelElement("MovePanelWhiteMark6").active.visible);
+        EXPECT_EQ(ShownText(MovePanelElement("MovePanelNumber0")), "14.");
+        EXPECT_EQ(ShownText(MovePanelElement("MovePanelNumber6")), "20.");
     }
 
     TEST_F(ChessUiTest, AResetASetStateAndATakebackUpdateTheRowsAndTheMarkInTheSameFrame) {

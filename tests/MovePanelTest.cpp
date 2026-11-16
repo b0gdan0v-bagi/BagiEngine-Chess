@@ -79,7 +79,7 @@ namespace BECore::Chess::Tests {
         EXPECT_FLOAT_EQ(kMovePanelTop, 80.0f);
         EXPECT_FLOAT_EQ(kMovePanelRight, 1080.0f);
         EXPECT_FLOAT_EQ(kMovePanelBottom, 720.0f);
-        EXPECT_EQ(kMovePanelRows, 8u);
+        EXPECT_EQ(kMovePanelRows, 7u);
         EXPECT_GE(kMovePanelLeft, 100.0f + 640.0f) << "the board is 640 units at x = 100";
         EXPECT_FLOAT_EQ(kMovePanelBottom - kMovePanelTop, 640.0f);
     }
@@ -163,7 +163,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(BuildMovePanelRows(RowsOf(30), 59, 3).size(), 3u);
     }
 
-    TEST(MovePanelTest, NoRowsGiveEightEmptyEntries) {
+    TEST(MovePanelTest, NoRowsGiveOnlyEmptyEntries) {
         const Vector<MovePanelRow> panel = BuildMovePanelRows({}, -1);
         ASSERT_EQ(panel.size(), kMovePanelRows);
         for (const MovePanelRow& row : panel) {
@@ -188,43 +188,45 @@ namespace BECore::Chess::Tests {
         }
     }
 
-    TEST(MovePanelTest, TwelveRowsShowTheLastEight) {
+    TEST(MovePanelTest, TwelveRowsShowTheLastPage) {
         const Vector<MovePanelRow> panel = BuildMovePanelRows(RowsOf(12), 23);
         ASSERT_EQ(panel.size(), kMovePanelRows);
         EXPECT_EQ(ShownRows(panel), kMovePanelRows);
-        EXPECT_EQ(panel[0].number, "5.");
-        EXPECT_EQ(panel[0].white.text, "w5");
-        EXPECT_EQ(panel[7].number, "12.");
-        EXPECT_EQ(panel[7].black.text, "b12");
+        EXPECT_EQ(panel[0].number, "6.");
+        EXPECT_EQ(panel[0].white.text, "w6");
+        EXPECT_EQ(panel[kMovePanelRows - 1].number, "12.");
+        EXPECT_EQ(panel[kMovePanelRows - 1].black.text, "b12");
     }
 
-    TEST(MovePanelTest, ExactlyEightRowsAreAllShown) {
-        const Vector<MovePanelRow> panel = BuildMovePanelRows(RowsOf(8), 15);
+    TEST(MovePanelTest, ExactlyAPageOfRowsIsAllShown) {
+        const int rows = static_cast<int>(kMovePanelRows);
+        const Vector<MovePanelRow> panel = BuildMovePanelRows(RowsOf(rows), 2 * rows - 1);
         EXPECT_EQ(ShownRows(panel), kMovePanelRows);
         EXPECT_EQ(panel[0].number, "1.");
-        EXPECT_EQ(panel[7].number, "8.");
+        EXPECT_EQ(panel[kMovePanelRows - 1].number, Format("{}.", kMovePanelRows));
     }
 
     TEST(MovePanelTest, TheWindowIsThePageOfTheCurrentPlyCountedFromTheEnd) {
-        // Twelve rows are the pages 5..12 and 1..4. Ply 9 is the Black move of row 5, on the last page: the window does not move when a row of it is viewed
-        const Vector<MovePanelRow> panel = BuildMovePanelRows(RowsOf(12), 9);
+        // Twelve rows are the pages 6..12 and 1..5. Ply 11 is the Black move of row 6, on the last page: the window does not move when a row of it is viewed
+        const Vector<MovePanelRow> panel = BuildMovePanelRows(RowsOf(12), 11);
         EXPECT_EQ(ShownRows(panel), kMovePanelRows);
-        EXPECT_EQ(panel[0].number, "5.");
+        EXPECT_EQ(panel[0].number, "6.");
         EXPECT_TRUE(panel[0].black.current);
-        EXPECT_EQ(panel[7].number, "12.");
+        EXPECT_EQ(panel[6].number, "12.");
 
-        // Ply 7 is row 4, on the first page, which holds the four rows left
+        // Ply 7 is row 4, on the first page, which holds the five rows left
         const Vector<MovePanelRow> earlier = BuildMovePanelRows(RowsOf(12), 7);
-        EXPECT_EQ(ShownRows(earlier), 4u);
+        EXPECT_EQ(ShownRows(earlier), 5u);
         EXPECT_EQ(earlier[0].number, "1.");
         EXPECT_EQ(earlier[3].number, "4.");
         EXPECT_TRUE(earlier[3].black.current);
-        ExpectEmpty(earlier[4]);
+        EXPECT_EQ(earlier[4].number, "5.");
+        ExpectEmpty(earlier[5]);
 
-        // Twenty rows: the middle page is 5..12
-        const Vector<MovePanelRow> middle = BuildMovePanelRows(RowsOf(20), 10);
-        EXPECT_EQ(middle[0].number, "5.");
-        EXPECT_EQ(middle[7].number, "12.");
+        // Twenty rows: the middle page is 7..13; ply 14 is the White move of row 8
+        const Vector<MovePanelRow> middle = BuildMovePanelRows(RowsOf(20), 14);
+        EXPECT_EQ(middle[0].number, "7.");
+        EXPECT_EQ(middle[6].number, "13.");
         EXPECT_TRUE(middle[1].white.current);
     }
 
@@ -344,9 +346,9 @@ namespace BECore::Chess::Tests {
     TEST(MovePanelTest, ThePositionBeforeTheFirstMoveMarksNothingAndShowsTheFirstPage) {
         const Vector<MovePanelRow> panel = BuildMovePanelRows(RowsOf(12), -1);
         EXPECT_EQ(CurrentCells(panel), 0);
-        EXPECT_EQ(ShownRows(panel), 4u);
+        EXPECT_EQ(ShownRows(panel), 5u);
         EXPECT_EQ(panel[0].number, "1.");
-        EXPECT_EQ(panel[3].number, "4.");
+        EXPECT_EQ(panel[4].number, "5.");
     }
 
     TEST(MovePanelTest, APlyNoRowHasMarksNothing) {
