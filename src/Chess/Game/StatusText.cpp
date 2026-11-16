@@ -42,6 +42,9 @@ namespace BECore::Chess {
                     return "Draw: threefold repetition";
                 case GameStatus::DrawFiftyMoves:
                     return "Draw: fifty-move rule";
+                case GameStatus::Resigned:
+                case GameStatus::DrawAgreed:
+                    return "";
             }
             return "";
         }

@@ -34,6 +34,10 @@ namespace BECore::Chess {
                     return "draw_threefold";
                 case GameStatus::DrawFiftyMoves:
                     return "draw_fifty_moves";
+                case GameStatus::Resigned:
+                    return "resigned";
+                case GameStatus::DrawAgreed:
+                    return "draw_agreed";
             }
             return "ongoing";
         }

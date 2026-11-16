@@ -89,6 +89,7 @@ namespace BECore::Chess {
         _startFen = _position.ToFen();
         _moves.clear();
         _status = EvaluateStatus(_position);
+        _resigned.reset();
         ClearSelection();
         ClearPremoves();
         ++_version;
@@ -98,7 +99,31 @@ namespace BECore::Chess {
         if (_status == GameStatus::Checkmate) {
             return Opposite(_position.SideToMove());
         }
+        if (_status == GameStatus::Resigned && _resigned) {
+            return Opposite(*_resigned);
+        }
         return std::nullopt;
+    }
+
+    std::expected<void, MoveError> ChessGameModel::Resign(PieceColor color) {
+        return EndGame(GameStatus::Resigned, color);
+    }
+
+    std::expected<void, MoveError> ChessGameModel::AgreeDraw() {
+        return EndGame(GameStatus::DrawAgreed, std::nullopt);
+    }
+
+    std::expected<void, MoveError> ChessGameModel::EndGame(GameStatus status, Optional<PieceColor> resigned) {
+        if (IsGameOver()) {
+            return std::unexpected(MoveError::GameOver);
+        }
+        DropView();
+        ClearSelection();
+        ClearPremoves();
+        _status = status;
+        _resigned = resigned;
+        ++_version;
+        return {};
     }
 
     Vector<Square> ChessGameModel::GetLegalMovesFor(Square from) const {
@@ -201,6 +226,7 @@ namespace BECore::Chess {
         ClearSelection();
         ClearPremoves();
         _status = EvaluateStatus(_position);
+        _resigned.reset();
         DrawSeed();  // the person asked for another try, so the program may answer otherwise among near-equal moves
         ++_version;
         return count;

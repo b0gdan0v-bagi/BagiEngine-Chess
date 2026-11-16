@@ -51,4 +51,45 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(mating.GetMoves().size(), 4u);
     }
 
+    TEST(TakeBackTest, ATakebackAfterAResignationPutsTheGameOnAgain) {
+        ChessGameModel model;
+        for (const char* uci : {"e2e4", "e7e5", "g1f3"}) {
+            ASSERT_TRUE(model.TryMove(Mv(uci)).has_value()) << uci;
+        }
+        ASSERT_TRUE(model.Resign(PieceColor::Black).has_value());
+        ASSERT_TRUE(model.IsGameOver());
+
+        const uint64_t version = model.GetVersion();
+        EXPECT_EQ(model.TakeBack(), 1u);
+        EXPECT_EQ(model.GetStatus(), GameStatus::Ongoing);
+        EXPECT_FALSE(model.IsGameOver());
+        EXPECT_FALSE(model.GetResigned().has_value());
+        EXPECT_FALSE(model.GetWinner().has_value());
+        EXPECT_EQ(model.GetVersion(), version + 1);
+        EXPECT_TRUE(model.TryMove(Mv("g1f3")).has_value());
+    }
+
+    TEST(TakeBackTest, ATakebackAfterAnAgreedDrawPutsTheGameOnAgain) {
+        ChessGameModel model;
+        ASSERT_TRUE(model.TryMove(Mv("e2e4")).has_value());
+        ASSERT_TRUE(model.AgreeDraw().has_value());
+
+        EXPECT_EQ(model.TakeBack(), 1u);
+        EXPECT_EQ(model.GetStatus(), GameStatus::Ongoing);
+        EXPECT_FALSE(model.IsGameOver());
+    }
+
+    TEST(TakeBackTest, WithNoMoveToTakeBackAResignedGameStaysResigned) {
+        ChessGameModel model;
+        ASSERT_TRUE(model.Resign(PieceColor::White).has_value());
+        const uint64_t version = model.GetVersion();
+
+        EXPECT_EQ(model.TakeBack(TakeBackPlies(model.GetMoves().size(), model.GetTurn(), std::nullopt)), 0u);
+        EXPECT_EQ(model.TakeBack(), 0u);
+        EXPECT_EQ(model.GetStatus(), GameStatus::Resigned);
+        EXPECT_EQ(model.GetResigned(), PieceColor::White);
+        EXPECT_EQ(model.GetWinner(), PieceColor::Black);
+        EXPECT_EQ(model.GetVersion(), version);
+    }
+
 }  // namespace BECore::Chess::Tests

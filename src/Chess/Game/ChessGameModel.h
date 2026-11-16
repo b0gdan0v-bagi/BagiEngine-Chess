@@ -16,10 +16,10 @@ namespace BECore::Chess {
     /**
      * @brief Stateful match wrapper around Position + MoveGenerator: the position, the selection, the status and the moves
      * played since the game began. Every move goes through TryMove(); once the status is not Ongoing no move is accepted
-     * until Reset() or SetPosition().
+     * until Reset(), SetPosition() or a TakeBack() that takes a move. The person may also end it: Resign(), AgreeDraw().
      *
      * GetVersion() grows with every change a controller has to see (a new game, a position set from outside, a played
-     * move, a takeback, a changed seed) and never goes back. A selection, a pending promotion (a click on the last rank leaves it pending
+     * move, a takeback, a resignation or an agreed draw, a changed seed) and never goes back. A selection, a pending promotion (a click on the last rank leaves it pending
      * until ChoosePromotion() or CancelPromotion()) and the premove queue are no change of the game: they leave the
      * version alone, so a search in flight stays valid. The move PlayPremove() plays moves it, as any move.
      *
@@ -101,8 +101,25 @@ namespace BECore::Chess {
         [[nodiscard]] bool IsGameOver() const noexcept {
             return _status != GameStatus::Ongoing;
         }
-        /// The side that won; empty while the game is on and for every draw.
+        /// The side that won (the other one after a resignation); empty while the game is on and for every draw, an agreed one too.
         [[nodiscard]] Optional<PieceColor> GetWinner() const noexcept;
+        /// The side that resigned; empty unless the status is Resigned.
+        [[nodiscard]] Optional<PieceColor> GetResigned() const noexcept {
+            return _resigned;
+        }
+
+        /**
+         * @brief Ends the game: @p color gives up and the other side wins.
+         *
+         * A change of the game like a move: the version grows once, the selection, a pending promotion, the premove queue and the view are dropped. Any color may
+         * resign, whoever is to move; whose to name is for the caller (ResigningColor()).
+         *
+         * @return nothing, or GameOver when the game is finished already (nothing changes).
+         */
+        std::expected<void, MoveError> Resign(PieceColor color);
+
+        /// Ends the game as a draw by agreement (no winner); like Resign() in every other way. GameOver when the game is finished already.
+        std::expected<void, MoveError> AgreeDraw();
         /// The side to move is in check (checkmate included).
         [[nodiscard]] bool IsInCheck() const noexcept {
             return _position.IsInCheck();
@@ -172,7 +189,7 @@ namespace BECore::Chess {
          * on again, the selection, a pending promotion and the premove queue are dropped, and the handles stand where a game
          * that played only the kept moves would have them (a captured piece is back, a promoted one is a pawn again). The
          * version grows once, whatever the number of plies; with a seed source a new seed is drawn in that step, so the program may answer otherwise. The game goes back at
-         * most to GetStartFen().
+         * most to GetStartFen(). A resignation or an agreed draw ends too: the status is the position's again. With nothing to take back a resigned game stays resigned.
          *
          * @return how many moves were taken back; 0 (no moves, or @p plies is 0) changes nothing, the version included.
          */
@@ -303,6 +320,9 @@ namespace BECore::Chess {
         /// Ends viewing without a word: the game is about to change
         void DropView();
 
+        /// The body of Resign() and AgreeDraw(): ends the game with @p status (@p resigned is who gave up, for Resigned)
+        std::expected<void, MoveError> EndGame(GameStatus status, Optional<PieceColor> resigned);
+
         Position _position = Position::Start();
         String _startFen;
         Vector<Move> _moves;
@@ -310,6 +330,7 @@ namespace BECore::Chess {
         uint32_t _seed = 0;
         SeedSource _seedSource;
         GameStatus _status = GameStatus::Ongoing;
+        Optional<PieceColor> _resigned;
         bool _hasSelected = false;
         Square _selected{};
         MoveList _selectedMoves;
