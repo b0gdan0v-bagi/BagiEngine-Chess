@@ -1,4 +1,4 @@
-# Checks of cmake/ChessWeb.cmake, run by ctest as BagiChessWebPackageCheck:
+# Checks of cmake/ChessWeb.cmake, by hand (off in ctest until the web build, todo entry chess-web-build):
 #   cmake -DGAME_ROOT=<this repository> -DCHECK_DIR=<scratch folder> -P tests/check_web_package.cmake
 # Prints "OK" at the end; the first failed check stops with a FATAL_ERROR that names it.
 cmake_minimum_required(VERSION 3.31)

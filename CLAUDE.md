@@ -48,7 +48,7 @@ The seven sound clips are in the preload package; Web Audio starts after the fir
 - **Off there:** Stockfish (`CHESS_NO_STOCKFISH`, forced ON for the web, usable on the desktop: the game starts with the own engine), `BagiChessUci`, the control API, the editor, the tests.
 - **Config:** the engine's `web/` overlay replaces files of the same name whole. Chess ships no web config of its own (`ChessWebConfigTest`); to differ in the browser the engine has to learn a game overlay.
 - **Search:** single-thread, so the own engine's search is sliced and `co_await`ed (`src/Chess/Engine/CLAUDE.md`, "The sliced search").
-- **Package:** `cmake/ChessWeb.cmake` lists what stays out (`--exclude-file`, unverified without emsdk); `BagiChessWebPackageCheck` fails on any new config or asset file, so adding one is a conscious change of that list.
+- **Package:** `cmake/ChessWeb.cmake` lists what stays out (`--exclude-file`, unverified without emsdk); `tests/check_web_package.cmake` (its fixed file list) is off in ctest until the web build brings it back (`chess-web-build`).
 
 ## Rules
 
