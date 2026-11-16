@@ -1,12 +1,12 @@
 <?xml version="1.0"?>
 <!-- The menu section "Sound": the master volume and the mute. A modal canvas over everything (layer 20, above the HUD and the end-of-game bar), started hidden, built like the opponent
-     panel: the Sound button of the menu list shows it (ChessOpenSection, value sound: the row of Game/MenuSections.cpp); Back returns to the list (ChessOpenMenu) and Close hides both
-     (ChessCloseMenu); the dim is a button of its own with the action of Close and stateLook="false", always the first child. The slider (ChessSetVolume) and the switch of the mute row
+     panel: the Sound button of the menu list shows it (ChessOpenSection, value sound: the row of Game/MenuSections.cpp); the one button, Back, returns to the list (ChessOpenMenu)
+     and fills its row; the dim is a button of its own that hides both (ChessCloseMenu) with stateLook="false", always the first child. The slider (ChessSetVolume) and the switch of the mute row
      (ChessSetMute) carry their own actions; the widgets own no level: they show the variables soundVolume, soundVolumeText and soundMuted, which ChessSoundPanelComponent (listed before the canvas, so the words are there in the frame
      it shows) writes. The slider's step is the same number as kVolumeStep (Sound/SoundLevels.h). Only the master has a row: the buses Sfx and Ui keep the level of the audio config.
      Every name starts with SoundPanel because elements are found by name in every canvas of the scene (Dim, Plate and Title are the opponent panel's). The rows are 56 units, the
      touch size of every control, and the caption of the volume is as wide as the opponent panel's captions. The plate is 94% of the safe area up to 640 units, centered:
-     16 + 44 (title) + 56 (volume) + 56 (mute) + 56 (Back and Close) + 3 x 12 (spacing) + 16 = 280 units high. The slider takes what the caption (150) and the value (72) leave of the
+     16 + 44 (title) + 56 (volume) + 56 (mute) + 56 (Back) + 3 x 12 (spacing) + 16 = 280 units high. The slider takes what the caption (150) and the value (72) leave of the
      narrowest Portrait window (94% of 590 safe units), so the panel needs no variant. The slider has square parts: with partShape="Round" a steady frame with the panel open allocates in ChessUiAllocTest (the pill is drawn as
      geometry). -->
 <node name="SoundPanel" layer="20" contentVersion="5">
@@ -70,12 +70,6 @@
                   <components>
                     <component type="UITextComponent" text="Back" align="Center" verticalAlign="Center" wrap="false"/>
                     <component type="UIInputClicker" action="ChessOpenMenu"/>
-                  </components>
-                </element>
-                <element type="UIElement" name="SoundPanelClose" flex="1" height="56" fontSize="26" color="110,60,60,255">
-                  <components>
-                    <component type="UITextComponent" text="Close" align="Center" verticalAlign="Center" wrap="false"/>
-                    <component type="UIInputClicker" action="ChessCloseMenu"/>
                   </components>
                 </element>
               </children>

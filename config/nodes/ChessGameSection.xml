@@ -1,10 +1,10 @@
 <?xml version="1.0"?>
 <!-- The menu section "Game" (the list's "Resign / Draw"): the two ways to end a game that is not played to its end. A modal canvas over everything (layer 20, above the HUD and the
      end-of-game bar), started hidden, built like the section "Moves": the Resign / Draw button of the menu list shows it (ChessOpenSection, value game: the row of
-     Game/MenuSections.cpp); Back returns to the list (ChessOpenMenu) and Close hides both (ChessCloseMenu); the dim is a button of its own with the action of Close and
-     stateLook="false", always the first child. ChessGameSectionComponent (listed before the canvas) answers ChessResign, ChessDraw, ChessGameYes and ChessGameNo and holds the one UI-only
+     Game/MenuSections.cpp); the one button, Back, returns to the list (ChessOpenMenu) and fills its row; the dim is a button of its own that hides both (ChessCloseMenu)
+     with stateLook="false", always the first child. ChessGameSectionComponent (listed before the canvas) answers ChessResign, ChessDraw, ChessGameYes and ChessGameNo and holds the one UI-only
      state, the question that is open: asking, Resign and Draw give way to the question line {gameQuestion} and the row Yes / No. A hidden element takes no room in a stack, so
-     the plate holds four rows in either state: 16 + 44 (title) + 56 + 56 (Resign and Draw, or the question and Yes / No) + 56 (Back and Close) + 3 x 12 (spacing) + 16 = 280 units high,
+     the plate holds four rows in either state: 16 + 44 (title) + 56 + 56 (Resign and Draw, or the question and Yes / No) + 56 (Back) + 3 x 12 (spacing) + 16 = 280 units high,
      which the safe area of every view has. The HUD's Resign (ChessResign with the section closed) shows the second plate GameSectionConfirm instead, the question and Yes / No
      alone, 16 + 56 + 12 + 56 + 16 = 156 units high: its No hides the canvas, back to the game, not to the menu. The component greys Resign and Draw (the clicker's disabled and the text's fadeWhenDisabled) while the game cannot take them. Every name
      starts with GameSection because elements are found by name in every canvas of the scene. -->
@@ -64,12 +64,6 @@
                   <components>
                     <component type="UITextComponent" text="Back" align="Center" verticalAlign="Center" wrap="false"/>
                     <component type="UIInputClicker" action="ChessOpenMenu"/>
-                  </components>
-                </element>
-                <element type="UIElement" name="GameSectionClose" flex="1" height="56" fontSize="26" color="110,60,60,255">
-                  <components>
-                    <component type="UITextComponent" text="Close" align="Center" verticalAlign="Center" wrap="false"/>
-                    <component type="UIInputClicker" action="ChessCloseMenu"/>
                   </components>
                 </element>
               </children>

@@ -20,7 +20,7 @@
 {"method": "ui_click", "params": {"name": "MenuSectionGame"}, "expect": {"equal": {"consumed": true, "action": "ChessOpenSection", "value": "game"}}}
 {"method": "step", "params": {"frames": 2}}
 {"method": "ui_click", "params": {"name": "GameSectionResign"}, "expect": {"equal": {"consumed": true, "action": "", "value": ""}}, "note": "greyed once the game is over: it emits nothing"}
-{"method": "ui_click", "params": {"name": "GameSectionClose"}, "expect": {"equal": {"consumed": true, "action": "ChessCloseMenu", "value": ""}}}
+{"method": "ui_click", "params": {"name": "GameSectionDim", "at": 0}, "expect": {"equal": {"consumed": true, "action": "ChessCloseMenu", "value": ""}}, "note": "the dim at its left edge, beside the plate: the section has no Close"}
 {"method": "step", "params": {"frames": 2}}
 {"method": "set_state", "params": {"takeBack": {"plies": 1}}, "expect": {"versionStep": 1}}
 {"method": "get_state", "expect": {"pointers": {"/state/status": "ongoing", "/state/winner": null, "/state/moves": [], "/state/turn": "white"}, "versionStep": 0, "logClean": true}}

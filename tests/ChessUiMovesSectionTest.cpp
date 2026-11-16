@@ -94,15 +94,15 @@ namespace BECore::Chess::Tests {
             }
         }
         EXPECT_EQ(ClickerOf(ElementOf(kSectionNode, "MovesSectionBack"))->action, PoolString::Intern("ChessOpenMenu"));
-        EXPECT_EQ(ClickerOf(ElementOf(kSectionNode, "MovesSectionClose"))->action, PoolString::Intern("ChessCloseMenu"));
+        EXPECT_EQ(canvas->GetRoot().FindByName(PoolString::Intern("MovesSectionClose")), nullptr) << "Back is the one button: the dim closes all";
         EXPECT_EQ(ClickerOf(ElementOf(kSectionNode, "MovesSectionDim"))->action, PoolString::Intern("ChessCloseMenu"));
         EXPECT_EQ(canvas->GetRoot().children.front()->name, PoolString::Intern("MovesSectionDim")) << "the first child, so a click on the plate never reaches it";
     }
 
-    TEST_F(ChessUiTest, TheMenuOpensTheMovesSectionAndBackAndCloseAndTheDimLeaveIt) {
+    TEST_F(ChessUiTest, TheMenuOpensTheMovesSectionAndBackAndTheDimLeaveIt) {
         auto section = CanvasOf(kSectionNode);
         ASSERT_TRUE(section);
-        for (const char* way : {"MovesSectionBack", "MovesSectionClose", "MovesSectionDim"}) {
+        for (const char* way : {"MovesSectionBack", "MovesSectionDim"}) {
             SCOPED_TRACE(way);
             ASSERT_TRUE(ClickButton(kMenuColor));
             ASSERT_TRUE(MenuList()->_visible);
@@ -117,7 +117,7 @@ namespace BECore::Chess::Tests {
             const bool clicked = dim ? ClickAtPixel(corner.first, corner.second).Both() : ClickControl(ElementOf(kSectionNode, way)).Both();
             ASSERT_TRUE(clicked);
             EXPECT_FALSE(section->_visible);
-            EXPECT_EQ(MenuList()->_visible, StringView(way) == "MovesSectionBack") << "Back returns to the list, the others close all";
+            EXPECT_EQ(MenuList()->_visible, StringView(way) == "MovesSectionBack") << "Back returns to the list, the dim closes all";
             if (MenuList()->_visible) {
                 ASSERT_TRUE(ClickMenuList("MenuClose").Both());
             }

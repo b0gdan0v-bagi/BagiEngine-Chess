@@ -1153,6 +1153,14 @@ def press_in_the_panel(client: BagiControlClient, name: str, action: str, value:
     return client.call("ui_tree")
 
 
+def close_the_opponent_panel(client: BagiControlClient) -> dict:
+    """A click on the dim of the opponent panel at its left edge, beside the plate (a section has no Close button); gives the tree after two frames."""
+    clicked = client.call("ui_click", {"name": "Dim", "canvas": "OpponentPanel", "at": 0})
+    check(clicked["consumed"] and clicked["action"] == "ChessCloseMenu", f"the click on the dim of the panel was answered with {clicked}, not ChessCloseMenu")
+    let_frames_pass(client, 2)
+    return client.call("ui_tree")
+
+
 def check_the_menu_list_is_hidden(tree: dict) -> None:
     """The list of the menu is a hidden modal canvas (the start, and after Close)."""
     menu = find_ui_canvas(tree, "MenuPanel")
@@ -1202,7 +1210,7 @@ def check_no_group_disabled(tree: dict) -> None:
 def run_opponent_panel_scenario(client: BagiControlClient, headless: bool) -> None:
     """What the opponent panel shows in this build and the program's play behind its buttons (ui_click, the own engine, which needs nothing from the environment).
 
-    The clicks themselves and what the game reads back from them (level, side, engine, mode, Close, the closed panel refusing a click) are
+    The clicks themselves and what the game reads back from them (level, side, engine, mode, the dim that closes it, the closed panel refusing a click) are
     `tests/scenarios/opponent_panel.jsonl`. Here stay what a scenario cannot say: the tree read by element name where the build decides (the Stockfish segment, the one that is
     selected at the start), and the replies of the program, which come on a worker thread: the answer to the person's move, the opening move of the program as White, and a game
     of two people in which the program stays out."""
@@ -1225,7 +1233,7 @@ def run_opponent_panel_scenario(client: BagiControlClient, headless: bool) -> No
     check_the_menu_list_is_shown(tree)
     check_the_menu_buttons(tree)
 
-    # Back and Close: the Opponent button hides the list and opens the panel, Back returns to the list, Close of the list hides it
+    # Back: the Opponent button hides the list and opens the panel, Back returns to the list, Close of the list hides it
     tree = press_in_the_panel(client, "MenuSectionOpponent", "ChessOpenSection", "opponent")
     check(find_ui_canvas(tree, "OpponentPanel")["visible"] is True and find_ui_canvas(tree, "MenuPanel")["visible"] is False, "the Opponent button did not swap the list for the panel")
     tree = press_in_the_panel(client, "OpponentBack", "ChessOpenMenu", "")
@@ -1277,8 +1285,8 @@ def run_opponent_panel_scenario(client: BagiControlClient, headless: bool) -> No
     moves = get_moves(client)
     let_frames_pass(client, FRAMES_WITHOUT_AN_ANSWER)
     check(get_moves(client) == moves and get_opponent(client)["thinking"] is False, "the program moved with nobody picked")
-    tree = press_in_the_panel(client, "OpponentClose", "ChessCloseMenu", "")
-    check(find_ui_canvas(tree, "OpponentPanel")["visible"] is False, "Close did not close the panel")
+    tree = close_the_opponent_panel(client)
+    check(find_ui_canvas(tree, "OpponentPanel")["visible"] is False, "the dim did not close the panel")
 
 
 def run_without_stockfish_scenario(client: BagiControlClient, headless: bool) -> None:
@@ -1301,8 +1309,8 @@ def run_without_stockfish_scenario(client: BagiControlClient, headless: bool) ->
     check(panel_element(tree, "EngineStockfish")["visible"] is False, f"the Stockfish segment is shown: {panel_element(tree, 'EngineStockfish')}")
     check(panel_element(tree, "EngineOwn")["visible"] is True, f"the Own engine segment is not shown: {panel_element(tree, 'EngineOwn')}")
     check_selected(tree, ["EngineOwn"], [])
-    tree = press_in_the_panel(client, "OpponentClose", "ChessCloseMenu", "")
-    check(find_ui_canvas(tree, "OpponentPanel")["visible"] is False, "Close did not close the panel")
+    tree = close_the_opponent_panel(client)
+    check(find_ui_canvas(tree, "OpponentPanel")["visible"] is False, "the dim did not close the panel")
 
     # Stockfish is refused wherever it can be named, also while nobody plays; the opponent stays as it was and the error says why
     refused = [

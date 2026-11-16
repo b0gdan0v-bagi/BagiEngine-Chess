@@ -258,7 +258,9 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(ShownMoveRows("MovesSection"), "1. e4 e5 | 2. [Nf3]");
 
         ASSERT_TRUE(ClickControl(ElementOf("MovesSection", "MovesSectionWhite0")).Both());
-        ASSERT_TRUE(ClickControl(ElementOf("MovesSection", "MovesSectionClose")).Both());
+        const auto dim = DimCorner("MovesSection", "MovesSectionDim");
+        ASSERT_TRUE(ClickAtPixel(dim.first, dim.second).Both());
+        EXPECT_FALSE(section->_visible);
         EXPECT_TRUE(Model().IsViewing()) << "closing the section keeps the view; the board or a move ends it";
         Click("a2");
         EXPECT_FALSE(Model().IsViewing());

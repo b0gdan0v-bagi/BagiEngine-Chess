@@ -79,7 +79,6 @@ namespace BECore::Tests {
   <span id="OpponentError">{opponentError}</span>
   <div id="OpponentButtons" class="row">
     <button id="OpponentBack" data-action="ChessOpenMenu">Back</button>
-    <button id="OpponentClose" data-action="ChessCloseMenu">Close</button>
   </div>
 </div>)";
 
@@ -92,7 +91,6 @@ namespace BECore::Tests {
 .group button  { flex: 1; height: 56px; font-size: 24px; background: rgb(70, 70, 100); }
 #OpponentError { height: 32px; font-size: 22px; text-align: center; vertical-align: middle; color: rgb(240, 120, 120); }
 #OpponentBack  { flex: 1; height: 56px; font-size: 26px; background: rgb(50, 115, 85); }
-#OpponentClose { flex: 1; height: 56px; font-size: 26px; background: rgb(110, 60, 60); }
 )";
 
         // The plate of the list of the menu (the node MenuPanel) in the same form, without the dim. The buttons have no flex: they are rows of a vertical stack, 56 units high each
@@ -118,10 +116,9 @@ namespace BECore::Tests {
 
         constexpr const char* kMenuNames[] = {"MenuPlate", "MenuTitle", "MenuSectionOpponent", "MenuSectionMoves", "MenuSectionGame", "MenuSectionSound", "MenuClose"};
 
-        constexpr const char* kPanelNames[] = {"Plate",       "Title",           "ModeRow",    "ModeCaption",   "ModeGroup",       "ModeTwo",      "ModeComputer",
-                                               "ColorRow",    "ColorCaption",    "ColorGroup", "ColorWhite",    "ColorBlack",      "EngineRow",    "EngineCaption",
-                                               "EngineGroup", "EngineStockfish", "EngineOwn",  "LevelRow",      "LevelCaption",    "LevelGroup",   "LevelEasy",
-                                               "LevelMedium", "LevelHard",       "LevelMax",   "OpponentError", "OpponentButtons", "OpponentBack", "OpponentClose"};
+        constexpr const char* kPanelNames[] = {"Plate",        "Title",      "ModeRow",    "ModeCaption", "ModeGroup",     "ModeTwo",     "ModeComputer",    "ColorRow",        "ColorCaption",
+                                               "ColorGroup",   "ColorWhite", "ColorBlack", "EngineRow",   "EngineCaption", "EngineGroup", "EngineStockfish", "EngineOwn",       "LevelRow",
+                                               "LevelCaption", "LevelGroup", "LevelEasy",  "LevelMedium", "LevelHard",     "LevelMax",    "OpponentError",   "OpponentButtons", "OpponentBack"};
 
         using Chess::Tests::ShippedSceneConfig;
 

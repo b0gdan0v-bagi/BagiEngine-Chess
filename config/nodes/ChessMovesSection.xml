@@ -2,13 +2,13 @@
 <!-- The menu section "Moves": the move list for the windows that have no move panel on the screen (the default and the Portrait view, a Wide window whose side insets cut the
      panel's box, a Tall window with side insets), and in every other window too, for the same list in one place. A modal canvas over everything (layer 20, above the HUD and the
      end-of-game bar), started hidden, built like the opponent panel: the Moves button of the menu list shows it (ChessOpenSection, value moves: the row of Game/MenuSections.cpp);
-     Back returns to the list (ChessOpenMenu) and Close hides both (ChessCloseMenu); the dim is a button of its own with the action of Close and stateLook="false", always the first child.
+     the one button, Back, returns to the list (ChessOpenMenu) and fills its row; the dim is a button of its own that hides both (ChessCloseMenu) with stateLook="false", always the first child.
      The rows are those of the move panel (ChessMovePanel.xml): the same 7 rows of 56 units, a number cell of 56 and White's and Black's cells, the gold Mark of the last move under its
      text, bound to the same variables movePanelNumber<i>, movePanelWhite<i> and movePanelBlack<i>; ChessMovesSectionComponent (listed before the canvas, so the words are there in the
      frame it shows) writes them like the panel's component and shows the rows and marks of this canvas (a hidden row takes no room: the rows pack at the top). Under the list a band of
      56 units holds the step buttons of the panel (‹ › », ChessShowMove) and Take back (ChessTakeBack) in the rest, all answered by ChessMovePanelComponent, and the cells take the same
-     clicks as the panel's; this canvas's component greys its own Take back. The plate is 94% of the safe area up to 640 units, centered: 16 + 44 (title) + 392 (the list) + 56 (the band) + 56 (Back
-     and Close) + 3 x 12 (spacing) + 16 = 616 units high, which the safe area of every view has (about 741 in the narrowest default window under a notch). Every name starts with MovesSection
+     clicks as the panel's; this canvas's component greys its own Take back. The plate is 94% of the safe area up to 640 units, centered: 16 + 44 (title) + 392 (the list) + 56 (the band) + 56 (Back)
+     + 3 x 12 (spacing) + 16 = 616 units high, which the safe area of every view has (about 741 in the narrowest default window under a notch). Every name starts with MovesSection
      because elements are found by name in every canvas of the scene. -->
 <node name="MovesSection" layer="20" contentVersion="5">
   <components>
@@ -310,12 +310,6 @@
                   <components>
                     <component type="UITextComponent" text="Back" align="Center" verticalAlign="Center" wrap="false"/>
                     <component type="UIInputClicker" action="ChessOpenMenu"/>
-                  </components>
-                </element>
-                <element type="UIElement" name="MovesSectionClose" flex="1" height="56" fontSize="26" color="110,60,60,255">
-                  <components>
-                    <component type="UITextComponent" text="Close" align="Center" verticalAlign="Center" wrap="false"/>
-                    <component type="UIInputClicker" action="ChessCloseMenu"/>
                   </components>
                 </element>
               </children>

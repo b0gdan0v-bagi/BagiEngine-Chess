@@ -168,8 +168,8 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(ShownText(MenuButton(kMenuClose)), "Close");
         EXPECT_EQ(ClickerOf(PanelButton("OpponentBack"))->action, PoolString::Intern("ChessOpenMenu"));
         EXPECT_EQ(ShownText(PanelButton("OpponentBack")), "Back");
-        EXPECT_EQ(ClickerOf(PanelButton("OpponentClose"))->action, PoolString::Intern("ChessCloseMenu"));
-        EXPECT_EQ(ShownText(PanelButton("OpponentClose")), "Close");
+        EXPECT_EQ(Panel()->GetRoot().FindByName(PoolString::Intern("OpponentClose")), nullptr) << "Back is the one button of the section: its dim closes all";
+        EXPECT_EQ(ClickerOf(PanelElement("Dim"))->action, PoolString::Intern("ChessCloseMenu"));
         EXPECT_EQ(ClickerOf(*HudElement("Menu"))->action, PoolString::Intern("ChessOpenMenu"));
     }
 
@@ -194,7 +194,7 @@ namespace BECore::Chess::Tests {
 
     // ---- the list of the menu: navigation by real clicks -----------------------------------------------------------------------------------
 
-    TEST_F(ChessUiTest, TheListIsShownOnlyAfterMenuAndEveryWayOutOfTheSectionIsOneOfTwoButtons) {
+    TEST_F(ChessUiTest, TheListIsShownOnlyAfterMenuAndEveryWayOutOfTheSectionIsBackOrTheDim) {
         ActionLog log;
         EXPECT_FALSE(MenuList()->_visible);
         EXPECT_FALSE(Panel()->_visible);
@@ -205,7 +205,8 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(ClickMenuList("MenuSectionOpponent").Both());
         EXPECT_FALSE(MenuList()->_visible);
         EXPECT_TRUE(Panel()->_visible);
-        ASSERT_TRUE(ClickPanel("OpponentClose").Both());
+        const auto dim = DimCorner("OpponentPanel", "Dim");
+        ASSERT_TRUE(ClickAtPixel(dim.first, dim.second).Both());
         EXPECT_FALSE(MenuList()->_visible);
         EXPECT_FALSE(Panel()->_visible);
 

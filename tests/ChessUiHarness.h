@@ -1131,9 +1131,10 @@ namespace BECore::Chess::Tests {
             return Panel() && Panel()->_visible;
         }
 
-        /// The Close button of the opponent panel, clicked where it is laid out; whether the panel and the list are hidden afterwards
+        /// A click on the dim of the opponent panel, beside the plate (the panel has no Close button); whether the panel and the list are hidden afterwards
         bool CloseThePanel() {
-            return ClickPanel("OpponentClose").Both() && Panel() && !Panel()->_visible && MenuList() && !MenuList()->_visible;
+            const auto corner = DimCorner("OpponentPanel", "Dim");
+            return ClickAtPixel(corner.first, corner.second).Both() && Panel() && !Panel()->_visible && MenuList() && !MenuList()->_visible;
         }
 
         /// The canvas of the menu section "Game": the node `GameSection`

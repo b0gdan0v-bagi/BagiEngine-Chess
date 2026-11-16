@@ -203,7 +203,7 @@ namespace BECore::Chess::Tests {
             EXPECT_TRUE(known) << segment.name.c_str() << " emits " << action.CStr() << ", which ChessOpponentPanelComponent does not answer";
         }
         EXPECT_EQ(ClickerOf(PanelButton("OpponentBack"))->action, PoolString::Intern("ChessOpenMenu"));
-        EXPECT_EQ(ClickerOf(PanelButton("OpponentClose"))->action, PoolString::Intern("ChessCloseMenu"));
+        EXPECT_EQ(Panel()->GetRoot().FindByName(PoolString::Intern("OpponentClose")), nullptr) << "Back is the one button: the dim closes all";
         EXPECT_EQ(ClickerOf(*HudElement("Menu"))->action, PoolString::Intern("ChessOpenMenu"));
     }
 
@@ -1040,7 +1040,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(ClickButton(kMenuColor));
         ASSERT_TRUE(MenuList()->_visible);
 
-        // The section replaces the list, Back brings the list back, Close hides both
+        // The section replaces the list, Back brings the list back, the dim hides both
         ASSERT_TRUE(ClickMenuList("MenuSectionOpponent").Both());
         EXPECT_EQ(log.LastAction(), PoolString::Intern("ChessOpenSection"));
         EXPECT_TRUE(Panel()->_visible);

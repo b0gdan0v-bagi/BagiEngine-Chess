@@ -21,7 +21,7 @@ namespace BECore::Chess::Tests {
         }
 
         /// Every control of the section, by name
-        constexpr const char* kSoundControls[] = {"SoundPanelVolume", "SoundPanelMuteRow", "SoundPanelBack", "SoundPanelClose"};
+        constexpr const char* kSoundControls[] = {"SoundPanelVolume", "SoundPanelMuteRow", "SoundPanelBack"};
 
     }  // namespace
 
@@ -85,15 +85,15 @@ namespace BECore::Chess::Tests {
             }
         }
         EXPECT_EQ(ClickerOf(ElementOf(kSoundNode, "SoundPanelBack"))->action, PoolString::Intern("ChessOpenMenu"));
-        EXPECT_EQ(ClickerOf(ElementOf(kSoundNode, "SoundPanelClose"))->action, PoolString::Intern("ChessCloseMenu"));
+        EXPECT_EQ(canvas->GetRoot().FindByName(PoolString::Intern("SoundPanelClose")), nullptr) << "Back is the one button: the dim closes all";
         EXPECT_EQ(ClickerOf(ElementOf(kSoundNode, "SoundPanelDim"))->action, PoolString::Intern("ChessCloseMenu"));
         EXPECT_EQ(canvas->GetRoot().children.front()->name, PoolString::Intern("SoundPanelDim")) << "the first child, so a click on the plate never reaches it";
     }
 
-    TEST_F(ChessUiTest, TheMenuOpensTheSoundSectionAndBackAndCloseAndTheDimLeaveIt) {
+    TEST_F(ChessUiTest, TheMenuOpensTheSoundSectionAndBackAndTheDimLeaveIt) {
         auto section = CanvasOf(kSoundNode);
         ASSERT_TRUE(section);
-        for (const char* way : {"SoundPanelBack", "SoundPanelClose", "SoundPanelDim"}) {
+        for (const char* way : {"SoundPanelBack", "SoundPanelDim"}) {
             SCOPED_TRACE(way);
             ASSERT_TRUE(ClickButton(kMenuColor));
             ASSERT_TRUE(MenuList()->_visible);
@@ -108,7 +108,7 @@ namespace BECore::Chess::Tests {
             const bool clicked = dim ? ClickAtPixel(corner.first, corner.second).Both() : ClickControl(ElementOf(kSoundNode, way)).Both();
             ASSERT_TRUE(clicked);
             EXPECT_FALSE(section->_visible);
-            EXPECT_EQ(MenuList()->_visible, StringView(way) == "SoundPanelBack") << "Back returns to the list, the others close all";
+            EXPECT_EQ(MenuList()->_visible, StringView(way) == "SoundPanelBack") << "Back returns to the list, the dim closes all";
             if (MenuList()->_visible) {
                 ASSERT_TRUE(ClickMenuList("MenuClose").Both());
             }

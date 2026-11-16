@@ -35,7 +35,7 @@ namespace BECore::Chess::Tests {
             const bool confirmOnly = state.question != GameQuestion::None && state.fromHud;
             const bool asking = state.question != GameQuestion::None && !confirmOnly;
             CoreManager::GetUIVars().Set("gameQuestion"_intern, StringView(state.question == GameQuestion::Draw ? StatusText::DrawQuestion() : StatusText::ResignQuestion()));
-            for (const char* name : {"GameSectionPlate", "GameSectionTitle", "GameSectionButtons", "GameSectionBack", "GameSectionClose"}) {
+            for (const char* name : {"GameSectionPlate", "GameSectionTitle", "GameSectionButtons", "GameSectionBack"}) {
                 EXPECT_TRUE(canvas.SetElementVisible(PoolString::Intern(name), !confirmOnly)) << name;
             }
             for (const char* name : {"GameSectionQuestion", "GameSectionAnswers", "GameSectionYes", "GameSectionNo"}) {
@@ -221,12 +221,13 @@ namespace BECore::Chess::Tests {
         const struct {
             const char* name;
             const char* action;
-        } buttons[] = {{"GameSectionResign", "ChessResign"}, {"GameSectionDraw", "ChessDraw"},       {"GameSectionYes", "ChessGameYes"},  {"GameSectionNo", "ChessGameNo"},
-                       {"GameSectionBack", "ChessOpenMenu"}, {"GameSectionClose", "ChessCloseMenu"}, {"GameSectionDim", "ChessCloseMenu"}};
+        } buttons[] = {{"GameSectionResign", "ChessResign"}, {"GameSectionDraw", "ChessDraw"},     {"GameSectionYes", "ChessGameYes"},
+                       {"GameSectionNo", "ChessGameNo"},     {"GameSectionBack", "ChessOpenMenu"}, {"GameSectionDim", "ChessCloseMenu"}};
         for (const auto& [name, action] : buttons) {
             EXPECT_EQ(ClickerOf(ElementOf(kSectionNode, name))->action, PoolString::Intern(action)) << name;
         }
         EXPECT_EQ(canvas->GetRoot().children.front()->name, PoolString::Intern("GameSectionDim")) << "the first child, so a click on the plate never reaches it";
+        EXPECT_EQ(canvas->GetRoot().FindByName(PoolString::Intern("GameSectionClose")), nullptr) << "Back is the one button: the dim closes all";
     }
 
     TEST_F(ChessUiTest, NoWordOfTheGameSectionIsCutInTheNarrowestWindowOfEachViewAndEveryButtonIsATouchTarget) {
@@ -247,10 +248,9 @@ namespace BECore::Chess::Tests {
                 const String problems = PanelProblems(layout, PlateOf(state));
                 EXPECT_TRUE(problems.empty()) << problems.c_str();
 
-                // Four buttons are on the screen in every state of the section (Resign and Draw or Yes and No, and Back and Close), only Yes and No for the HUD's question
+                // Three buttons are on the screen in every state of the section (Resign and Draw or Yes and No, and Back), only Yes and No for the HUD's question
                 size_t onScreen = 0;
-                for (const char* name :
-                     {"GameSectionResign", "GameSectionDraw", "GameSectionYes", "GameSectionNo", "GameSectionBack", "GameSectionClose", "GameSectionConfirmYes", "GameSectionConfirmNo"}) {
+                for (const char* name : {"GameSectionResign", "GameSectionDraw", "GameSectionYes", "GameSectionNo", "GameSectionBack", "GameSectionConfirmYes", "GameSectionConfirmNo"}) {
                     const UIElement& button = ElementOf(kSectionNode, name);
                     if (button.rect.IsEmpty()) {
                         continue;
@@ -261,7 +261,7 @@ namespace BECore::Chess::Tests {
                     const UIContentFit fit = button.CheckContent(button.rect.w - 2.0f * kButtonAir, button.rect.h, scale);
                     EXPECT_TRUE(fit.hasContent && fit.fits) << name << " '" << ShownText(button).c_str() << "' in " << button.rect.w << " units";
                 }
-                EXPECT_EQ(onScreen, state.fromHud ? 2u : 4u);
+                EXPECT_EQ(onScreen, state.fromHud ? 2u : 3u);
             }
         }
         layout.Invalidate();
@@ -269,10 +269,10 @@ namespace BECore::Chess::Tests {
 
     // ---- the section: clicks through the real scene ---------------------------------------------------------------------------------
 
-    TEST_F(ChessUiTest, TheMenuOpensTheGameSectionAndBackAndCloseAndTheDimLeaveIt) {
+    TEST_F(ChessUiTest, TheMenuOpensTheGameSectionAndBackAndTheDimLeaveIt) {
         auto section = GameSection();
         ASSERT_TRUE(section);
-        for (const char* way : {"GameSectionBack", "GameSectionClose", "GameSectionDim"}) {
+        for (const char* way : {"GameSectionBack", "GameSectionDim"}) {
             SCOPED_TRACE(way);
             ASSERT_TRUE(OpenTheGameSection());
             EXPECT_FALSE(MenuList()->_visible);
@@ -283,7 +283,7 @@ namespace BECore::Chess::Tests {
             const auto corner = DimCorner(kSectionNode, way);
             ASSERT_TRUE(dim ? ClickAtPixel(corner.first, corner.second).Both() : ClickGameSection(way).Both());
             EXPECT_FALSE(section->_visible);
-            EXPECT_EQ(MenuList()->_visible, StringView(way) == "GameSectionBack") << "Back returns to the list, the others close all";
+            EXPECT_EQ(MenuList()->_visible, StringView(way) == "GameSectionBack") << "Back returns to the list, the dim closes all";
             if (MenuList()->_visible) {
                 ASSERT_TRUE(ClickMenuList("MenuClose").Both());
             }
@@ -364,13 +364,18 @@ namespace BECore::Chess::Tests {
         EXPECT_TRUE(ElementOf(kSectionNode, "GameSectionDraw").active.visible);
         EXPECT_FALSE(ElementOf(kSectionNode, "GameSectionQuestion").active.visible);
 
-        // Every other way out drops the question as well: Close and Back
-        for (const char* way : {"GameSectionClose", "GameSectionBack"}) {
+        // Every other way out drops the question as well: the dim and Back
+        for (const char* way : {"GameSectionDim", "GameSectionBack"}) {
             SCOPED_TRACE(way);
             ASSERT_TRUE(ClickGameSection("GameSectionResign").Both());
             Draw();
             ASSERT_TRUE(ElementOf(kSectionNode, "GameSectionQuestion").active.visible);
-            ASSERT_TRUE(ClickGameSection(way).Both());
+            if (StringView(way) == "GameSectionDim") {
+                const auto corner = DimCorner(kSectionNode, way);
+                ASSERT_TRUE(ClickAtPixel(corner.first, corner.second).Both());
+            } else {
+                ASSERT_TRUE(ClickGameSection(way).Both());
+            }
             if (MenuList()->_visible) {
                 ASSERT_TRUE(ClickMenuList("MenuSectionGame").Both());
             } else {
@@ -511,7 +516,7 @@ namespace BECore::Chess::Tests {
         for (const char* name : {"GameSectionConfirmQuestion", "GameSectionConfirmYes", "GameSectionConfirmNo"}) {
             EXPECT_FALSE(ElementOf(kSectionNode, name).rect.IsEmpty()) << name << " is on the screen";
         }
-        for (const char* name : {"GameSectionTitle", "GameSectionResign", "GameSectionDraw", "GameSectionQuestion", "GameSectionYes", "GameSectionNo", "GameSectionBack", "GameSectionClose"}) {
+        for (const char* name : {"GameSectionTitle", "GameSectionResign", "GameSectionDraw", "GameSectionQuestion", "GameSectionYes", "GameSectionNo", "GameSectionBack"}) {
             EXPECT_TRUE(ElementOf(kSectionNode, name).rect.IsEmpty()) << name << ": only the question and Yes / No";
         }
 

@@ -44,6 +44,6 @@
 {"method": "ui_click", "params": {"name": "LevelMax"}, "expect": {"equal": {"consumed": true, "action": "ChessSetLevel", "value": "max"}}}
 {"method": "step", "params": {"frames": 2}}
 {"method": "get_state", "expect": {"pointers": {"/state/opponent/level": "max", "/state/opponent/plays": null, "/state/moves": []}, "versionStep": 1}}
-{"method": "ui_click", "params": {"name": "OpponentClose"}, "expect": {"equal": {"consumed": true, "action": "ChessCloseMenu", "value": ""}}}
+{"method": "ui_click", "params": {"name": "Dim", "canvas": "OpponentPanel", "at": 0}, "expect": {"equal": {"consumed": true, "action": "ChessCloseMenu", "value": ""}}, "note": "the dim at its left edge, beside the plate: the panel has no Close"}
 {"method": "step", "params": {"frames": 2}}
 {"method": "ui_click", "params": {"name": "ModeComputer"}, "expect": {"error": "not_clickable", "logClean": true}}
