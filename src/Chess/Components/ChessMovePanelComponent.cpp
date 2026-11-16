@@ -1,9 +1,11 @@
 #include "ChessMovePanelComponent.h"
 
 #include <BECore/GameManager/CoreManager.h>
+#include <BECore/Scene/Scene.h>
 #include <BECore/Scene/SceneNode.h>
 #include <BECore/UI/UICanvasComponent.h>
 #include <Chess/ChessGame.h>
+#include <Chess/Components/ChessBoardComponent.h>
 #include <Chess/Game/ChessGameModel.h>
 #include <Chess/Game/MoveList.h>
 #include <Generated/ChessMovePanelComponent.gen.hpp>
@@ -85,12 +87,15 @@ namespace BECore::Chess {
         if (!canvas) {
             return;
         }
-        // Before the first layout of the canvas the safe area is not known, and the box stays hidden: the next draw has it
+        // Before the first layout of the canvas the safe area is not known, and the box stays hidden: the next draw has it. The scene's active view is already the one of this draw while
+        // the layout may still be the last view's for this one frame; no box lies inside a view that is not its own, so that frame shows none
         const UICanvasLayout& layout = canvas->GetLayout();
         bool fits = false;
         if (layout.HasLayout()) {
             const Rect& safe = layout.GetResolved().safeBounds;
-            fits = MovePanelFits(safe.x, safe.y, safe.x + safe.w, safe.y + safe.h);
+            static const PoolString tall = PoolString::Intern(kTallView);
+            const MovePanelView view = GetScene().GetActiveView().name == tall ? MovePanelView::Tall : MovePanelView::Wide;
+            fits = MovePanelFits(safe.x, safe.y, safe.x + safe.w, safe.y + safe.h, view);
         }
         if (fits != _boxShown) {
             _boxShown = fits;

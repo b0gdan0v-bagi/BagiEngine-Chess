@@ -124,8 +124,9 @@ namespace BECore::Chess {
         bool marginFits = false;
         if (layout.HasLayout()) {
             const Rect& safe = layout.GetResolved().safeBounds;
-            // The rule of the panel itself, on a canvas of the same space and safe area as the panel's: the panel set is shown exactly while the panel is, so the material never goes with it
-            inPanel = MovePanelFits(safe.x, safe.y, safe.x + safe.w, safe.y + safe.h);
+            // The rule of the panel itself, on a canvas of the same space and safe area as the panel's: the panel set is shown exactly while the panel beside the board is, so the material
+            // never goes with it. The panel of the Tall view has no bands for the players: the margin set's rows above and below the board have room there
+            inPanel = MovePanelFits(safe.x, safe.y, safe.x + safe.w, safe.y + safe.h, MovePanelView::Wide);
             marginFits = MaterialListFits(safe.x, safe.y, safe.x + safe.w, safe.y + safe.h, ActiveMaterialView(GetScene()));
         }
         const MaterialNames& names = GetNames();

@@ -124,6 +124,36 @@ namespace BECore::Chess::Tests {
         EXPECT_TRUE(safeIn(853.0f)) << "16:9";
     }
 
+    TEST(MovePanelTest, TheTallBoxIsUnderTheBoardAndTheMaterialAsWideAsTheBoard) {
+        constexpr float kTallBoardBottom = 144.0f + 640.0f;
+        constexpr float kLowerMaterialBottom = 832.0f;  // the lower row of the captured material in the Portrait places (Game/MaterialLayout.h)
+        EXPECT_FLOAT_EQ(kMovePanelTallLeft, 40.0f) << "the board's left edge";
+        EXPECT_FLOAT_EQ(kMovePanelTallRight - kMovePanelTallLeft, 640.0f);
+        EXPECT_GE(kMovePanelTallTop, kTallBoardBottom);
+        EXPECT_GE(kMovePanelTallTop, kLowerMaterialBottom);
+        EXPECT_FLOAT_EQ(kMovePanelTallBottom - kMovePanelTallTop, 4.0f * 56.0f + 8.0f + 56.0f) << "two columns of four rows and the band of the buttons";
+    }
+
+    TEST(MovePanelTest, EachViewIsAskedForItsOwnBoxAndHoldsNoOther) {
+        constexpr float kTallWidth = 720.0f;
+        constexpr float kTallHeight = 1204.0f;
+        EXPECT_TRUE(MovePanelFits(0.0f, 0.0f, kTallWidth, kTallHeight, MovePanelView::Tall));
+        EXPECT_FALSE(MovePanelFits(0.0f, 0.0f, kTallWidth, kTallHeight, MovePanelView::Wide));
+        EXPECT_FALSE(MovePanelFits(0.0f, 0.0f, kWideWidth, kWideHeight, MovePanelView::Tall));
+        EXPECT_FALSE(MovePanelFits(0.0f, 0.0f, 720.0f, 960.0f, MovePanelView::Tall)) << "Portrait is too low";
+        EXPECT_FALSE(MovePanelFits(0.0f, 0.0f, 840.0f, 800.0f, MovePanelView::Tall));
+        EXPECT_EQ(Fits(0.0f, 0.0f, kWideWidth, kWideHeight), MovePanelFits(0.0f, 0.0f, kWideWidth, kWideHeight, MovePanelView::Wide)) << "the Wide box is the default";
+    }
+
+    TEST(MovePanelTest, TheEdgesOfTheTallBoxAreInsideAndOneStepBeyondIsNot) {
+        const auto fits = [](float left, float top, float right, float bottom) { return MovePanelFits(left, top, right, bottom, MovePanelView::Tall); };
+        EXPECT_TRUE(fits(kMovePanelTallLeft, kMovePanelTallTop, kMovePanelTallRight, kMovePanelTallBottom));
+        EXPECT_FALSE(fits(kMovePanelTallLeft + kBeyond, kMovePanelTallTop, kMovePanelTallRight, kMovePanelTallBottom));
+        EXPECT_FALSE(fits(kMovePanelTallLeft, kMovePanelTallTop + kBeyond, kMovePanelTallRight, kMovePanelTallBottom));
+        EXPECT_FALSE(fits(kMovePanelTallLeft, kMovePanelTallTop, kMovePanelTallRight - kBeyond, kMovePanelTallBottom));
+        EXPECT_FALSE(fits(kMovePanelTallLeft, kMovePanelTallTop, kMovePanelTallRight, kMovePanelTallBottom - kBeyond));
+    }
+
     // ---- The window of rows ----
 
     TEST(MovePanelTest, ThereAreAlwaysAsManyEntriesAsAsked) {

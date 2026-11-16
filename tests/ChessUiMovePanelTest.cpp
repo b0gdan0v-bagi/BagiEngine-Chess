@@ -43,13 +43,36 @@ namespace BECore::Chess::Tests {
             }
         }
 
+        constexpr size_t kRowsPerColumn = kMovePanelRows / 2;  // the rows are two columns of four: one above the other in the Wide view, side by side in the Tall one
+
+        /// The view whose box a canvas laid out in this view shows: the Tall one has its own, every other view is asked for the Wide box (which none but Wide holds)
+        MovePanelView PanelViewOf(const UICanvasLayout& layout) {
+            return LaidOutForTall(layout) ? MovePanelView::Tall : MovePanelView::Wide;
+        }
+
+        /// MovePanelFits for the safe area of a laid out canvas, in the view it was laid out for
+        bool PanelFitsIn(const UICanvasLayout& layout) {
+            const Rect safe = layout.GetResolved().safeBounds;
+            return MovePanelFits(safe.x, safe.y, safe.x + safe.w, safe.y + safe.h, PanelViewOf(layout));
+        }
+
+        /// The box of Game/MovePanel.h for the view of a laid out canvas
+        Rect PanelBoxOf(const UICanvasLayout& layout) {
+            if (PanelViewOf(layout) == MovePanelView::Tall) {
+                return Rect{kMovePanelTallLeft, kMovePanelTallTop, kMovePanelTallRight - kMovePanelTallLeft, kMovePanelTallBottom - kMovePanelTallTop};
+            }
+            return Rect{kMovePanelLeft, kMovePanelTop, kMovePanelRight - kMovePanelLeft, kMovePanelBottom - kMovePanelTop};
+        }
+
         /// What is wrong with the canvas MovePanel as it is laid out with the box and every row shown, one problem to a line, nothing when it is right: a name without the prefix, a box that is
-        /// not the one of Game/MovePanel.h, a box that lies inside the safe area exactly where MovePanelFits says it does not, bands and rows of the wrong height or place (the bands of the players
-        /// are where the panel set of Material is drawn: kPanelTopBand, kPanelBottomBand), a word that a cell cuts
+        /// not the one of Game/MovePanel.h for its view, a box that lies inside the safe area exactly where MovePanelFits says it does not, bands and rows of the wrong height or place (the bands
+        /// of the players are where the panel set of Material is drawn in the Wide view: kPanelTopBand, kPanelBottomBand; the Tall view hides them and puts the two columns of rows side by side),
+        /// a word that a cell cuts
         String MovePanelProblems(const UICanvasLayout& layout) {
             String problems;
             const float scale = layout.GetResolved().scale;
             const Rect safe = layout.GetResolved().safeBounds;
+            const bool tall = PanelViewOf(layout) == MovePanelView::Tall;
 
             Vector<PoolString> names;
             CollectNames(*layout.root, names);
@@ -63,11 +86,10 @@ namespace BECore::Chess::Tests {
             if (box == nullptr || box->rect.IsEmpty()) {
                 return problems + "MovePanelBox is missing or has an empty rect\n";
             }
-            const Rect expected{kMovePanelLeft, kMovePanelTop, kMovePanelRight - kMovePanelLeft, kMovePanelBottom - kMovePanelTop};
-            if (!SameRect(box->rect, expected)) {
+            if (!SameRect(box->rect, PanelBoxOf(layout))) {
                 problems += Format("MovePanelBox ({:.1f}, {:.1f}, {:.1f}, {:.1f}) is not the box of Game/MovePanel.h\n", box->rect.x, box->rect.y, box->rect.w, box->rect.h);
             }
-            const bool fits = MovePanelFits(safe.x, safe.y, safe.x + safe.w, safe.y + safe.h);
+            const bool fits = PanelFitsIn(layout);
             if (LiesIn(box->rect, safe) != fits) {
                 problems += Format("MovePanelBox lies in the safe area ({:.1f}, {:.1f}, {:.1f}, {:.1f}): {}, the rule says {}\n", safe.x, safe.y, safe.w, safe.h, LiesIn(box->rect, safe), fits);
             }
@@ -92,6 +114,14 @@ namespace BECore::Chess::Tests {
             const UIElement* list = find("MovePanelList");
             const UIElement* bands[std::size(kPanelBands)] = {};
             for (size_t band = 0; band < std::size(kPanelBands); ++band) {
+                const bool playerBand = band + 1 < std::size(kPanelBands);
+                if (tall && playerBand) {
+                    const UIElement* hidden = layout.root->FindByName(PoolString::Intern(kPanelBands[band]));
+                    if (hidden == nullptr || !hidden->rect.IsEmpty()) {
+                        problems += Format("{} is not hidden in the Tall view, where the material keeps its rows above and below the board\n", kPanelBands[band]);
+                    }
+                    continue;
+                }
                 bands[band] = find(kPanelBands[band]);
                 if (bands[band] != nullptr && (std::abs(bands[band]->rect.h - kBandHeight) > kPixelTolerance || !LiesIn(bands[band]->rect, box->rect))) {
                     problems += Format("{} is not a band of {:.0f} units inside the box\n", kPanelBands[band], kBandHeight);
@@ -107,7 +137,9 @@ namespace BECore::Chess::Tests {
                 !(bands[0]->rect.y + bands[0]->rect.h <= list->rect.y && list->rect.y + list->rect.h <= bands[1]->rect.y && bands[1]->rect.y + bands[1]->rect.h <= bands[2]->rect.y)) {
                 problems += "the box is not the top band, the list, the band of the other player and the band of the buttons, top down and apart\n";
             }
-            float previousBottom = list != nullptr ? list->rect.y : 0.0f;
+            if (tall && list != nullptr && bands[2] != nullptr && list->rect.y + list->rect.h > bands[2]->rect.y) {
+                problems += "the box of the Tall view is not the list and the band of the buttons, top down and apart\n";
+            }
             for (size_t row = 0; row < kMovePanelRows; ++row) {
                 const UIElement* line = find(Format("MovePanelRow{}", row));
                 const UIElement* number = find(Format("MovePanelNumber{}", row));
@@ -119,10 +151,17 @@ namespace BECore::Chess::Tests {
                 if (std::abs(line->rect.h - kRowHeight) > kPixelTolerance) {
                     problems += Format("{} is {:.1f} units high, not {:.0f}\n", line->name.ToStringView(), line->rect.h, kRowHeight);
                 }
-                if (std::abs(line->rect.y - previousBottom) > kPixelTolerance || (list != nullptr && !LiesIn(line->rect, list->rect))) {
-                    problems += Format("{} does not follow the row before it inside the list\n", line->name.ToStringView());
+                // Its place in the list: the rows run down the first column, then the second, which is under the first in the Wide view and beside it in the Tall one
+                if (list != nullptr) {
+                    const size_t column = row / kRowsPerColumn;
+                    const float width = tall ? list->rect.w * 0.5f : list->rect.w;
+                    const size_t step = tall ? row % kRowsPerColumn : row;
+                    const Rect place{list->rect.x + (tall ? static_cast<float>(column) * width : 0.0f), list->rect.y + static_cast<float>(step) * kRowHeight, width, kRowHeight};
+                    if (!SameRect(line->rect, place)) {
+                        problems += Format("{} ({:.1f}, {:.1f}, {:.1f}, {:.1f}) is not in its place of the list ({:.1f}, {:.1f}, {:.1f}, {:.1f})\n", line->name.ToStringView(), line->rect.x,
+                                           line->rect.y, line->rect.w, line->rect.h, place.x, place.y, place.w, place.h);
+                    }
                 }
-                previousBottom = line->rect.y + line->rect.h;
                 if (std::abs(number->rect.w - kNumberWidth) > kPixelTolerance) {
                     problems += Format("{} is {:.1f} units wide, not {:.0f}\n", number->name.ToStringView(), number->rect.w, kNumberWidth);
                 }
@@ -159,8 +198,7 @@ namespace BECore::Chess::Tests {
             canvas.SetElementVisible(boxName, true);
             layout.Invalidate();
             layout.Update(context);
-            const Rect safe = layout.GetResolved().safeBounds;
-            const bool fits = MovePanelFits(safe.x, safe.y, safe.x + safe.w, safe.y + safe.h);
+            const bool fits = PanelFitsIn(layout);
             canvas.SetElementVisible(boxName, fits);
             layout.Invalidate();
             layout.Update(context);
@@ -187,11 +225,11 @@ namespace BECore::Chess::Tests {
             return true;
         }
 
-        /// The elements of the shipped canvas with the box and the rows shown, the text a copy of a test starts from
+        /// The elements of the shipped canvas with the box and the rows shown, the text a copy of a test starts from; the variants keep what they hide
         String ShownMovePanelXml() {
             String xml = ShippedElementsXml("MovePanel");
             const String hidden = " visible=\"false\"";
-            for (size_t at = xml.find(hidden); at != String::npos; at = xml.find(hidden)) {
+            for (size_t at = xml.find(hidden); at != String::npos && at < xml.find("<variants>"); at = xml.find(hidden)) {
                 xml.erase(at, hidden.size());
             }
             return xml;
@@ -223,8 +261,7 @@ namespace BECore::Chess::Tests {
                 String problems = MovePanelProblems(layout);
 
                 // The box as the component shows it, exactly where the rule says: what is on the screen passes the validator
-                const Rect safe = layout.GetResolved().safeBounds;
-                canvas->SetElementVisible(boxName, MovePanelFits(safe.x, safe.y, safe.x + safe.w, safe.y + safe.h));
+                canvas->SetElementVisible(boxName, PanelFitsIn(layout));
                 layout.Invalidate();
                 layout.Update(context);
                 UILayoutValidatorOptions caseOptions = options;
@@ -397,6 +434,7 @@ namespace BECore::Chess::Tests {
         PublishMovePanelRound(0);
 
         size_t shown = 0;
+        size_t shownTall = 0;
         size_t hidden = 0;
         String report;
         for (const UIMatrixCase& matrixCase : UILayoutMatrix()) {
@@ -412,14 +450,17 @@ namespace BECore::Chess::Tests {
                 continue;
             }
             ++shown;
-            if (!LaidOutForWide(layout)) {
-                report += Format("{}: the box is shown in a view that is not Wide\n", matrixCase.label.c_str());
+            const bool tall = LaidOutForTall(layout);
+            shownTall += tall ? 1 : 0;
+            if (!LaidOutForWide(layout) && !tall) {
+                report += Format("{}: the box is shown in a view that is neither Wide nor Tall\n", matrixCase.label.c_str());
             }
             if (!LiesIn(box->rect, layout.GetResolved().safeBounds)) {
                 report += Format("{}: the box is not inside the safe area\n", matrixCase.label.c_str());
             }
-            if (box->rect.x < kBoardLeft + kBoardUnits) {
-                report += Format("{}: the box reaches the board\n", matrixCase.label.c_str());
+            // Right of the board in Wide; under the board and the lower row of the material (the margin set of Portrait) in Tall
+            if (tall ? box->rect.y < kMaterialPortraitListBottom + kMinGap : box->rect.x < kBoardLeft + kBoardUnits) {
+                report += Format("{}: the box reaches the board or the material\n", matrixCase.label.c_str());
             }
             // The insets move the HUD, not the box: a notch pushes the top row (Menu, Reset) down onto the top band, the home bar of the side insets pushes Status up onto the band of the
             // buttons. The 8 rows are clear of the HUD in every case
@@ -439,15 +480,19 @@ namespace BECore::Chess::Tests {
             }
             const bool notch = matrixCase.label.find("notch") != String::npos;
             const bool sideInsets = matrixCase.label.find("side insets") != String::npos;
-            const char* expected = notch ? " Menu Reset" : sideInsets ? " Status" : "";
+            // A notch moves only the top row, far above the box of the Tall view, and side insets hide that box
+            const char* expected = tall ? "" : notch ? " Menu Reset" : sideInsets ? " Status" : "";
             if (touching != expected) {
                 report += Format("{}: the HUD controls closer to the box than {:.0f} units are '{}', not '{}'\n", matrixCase.label.c_str(), kMinGap, touching.c_str(), expected);
             }
             // Per band: a notch reaches the top band only, the home bar of side insets the band of the buttons only; the band of the other player's material is clear in every window
-            const char* expectedPerBand[] = {notch ? " Menu Reset" : "", "", sideInsets ? " Status" : ""};
+            const char* expectedPerBand[] = {notch ? " Menu Reset" : "", "", sideInsets && !tall ? " Status" : ""};
             for (size_t band = 0; band < std::size(kPanelBands); ++band) {
                 const UIElement* element = layout.root->FindByName(PoolString::Intern(kPanelBands[band]));
                 ASSERT_NE(element, nullptr);
+                if (element->rect.IsEmpty()) {
+                    continue;  // the bands of the players in the Tall view
+                }
                 String near;
                 for (const UIElement* control : AllElements(*hud->GetLayout().root)) {
                     if (TextOf(*control) != nullptr && !control->rect.IsEmpty() && Touch(element->rect, control->rect, kMinGap)) {
@@ -464,11 +509,12 @@ namespace BECore::Chess::Tests {
         panel->GetLayout().Invalidate();
         hud->GetLayout().Invalidate();
         EXPECT_TRUE(report.empty()) << report.c_str();
-        EXPECT_GT(shown, 0u);
+        EXPECT_GT(shown, shownTall);
+        EXPECT_GT(shownTall, 0u);
         EXPECT_GT(hidden, 0u) << "the default and the Portrait view never show it";
     }
 
-    TEST_F(ChessUiTest, TheMovePanelIsShownOnlyInTheWideViewAndOnlyWhereTheSideInsetsLeaveItsBox) {
+    TEST_F(ChessUiTest, TheMovePanelBesideTheBoardIsShownOnlyWhereTheSideInsetsLeaveItsBox) {
         ASSERT_TRUE(PlayAll(Model(), {"e2e4"}));
         Settle();
         ASSERT_TRUE(MovePanelElement("MovePanelBox").active.visible) << "a Wide window with no insets";
@@ -501,6 +547,45 @@ namespace BECore::Chess::Tests {
         ResizeWithoutInsets(1280.0f, 720.0f);
         EXPECT_TRUE(MovePanelElement("MovePanelBox").active.visible) << "and comes back when the window has room";
         EXPECT_EQ(ShownMovePanelRows(), "1. e4 [e5]");
+    }
+
+    TEST_F(ChessUiTest, InTheTallViewTheMovePanelIsUnderTheBoardInTwoColumnsAndTheMaterialKeepsItsRows) {
+        ASSERT_TRUE(PlayAQuietGame(Model(), 9)) << "five rows, the last with White's move only: the fifth begins the second column";
+        ResizeWithoutInsets(kNarrowestWidth, kNarrowestTallHeight);
+        ASSERT_EQ(GetScene().GetActiveView().name, PoolString::Intern(kTallViewName));
+        const UIElement& box = MovePanelElement("MovePanelBox");
+        ASSERT_TRUE(box.active.visible);
+        EXPECT_TRUE(SameRect(box.rect, Rect{kMovePanelTallLeft, kMovePanelTallTop, kMovePanelTallRight - kMovePanelTallLeft, kMovePanelTallBottom - kMovePanelTallTop}));
+        EXPECT_TRUE(MovePanelElement("MovePanelBandTopPlayer").rect.IsEmpty());
+        EXPECT_TRUE(MovePanelElement("MovePanelBandBottomPlayer").rect.IsEmpty());
+        EXPECT_FALSE(MovePanelElement("MovePanelBandButtons").rect.IsEmpty()) << "the band of the buttons stays under the list";
+        EXPECT_EQ(MaterialPlace(), "margin") << "above and below the board, as in Portrait";
+
+        const Rect& first = MovePanelElement("MovePanelRow0").rect;
+        const Rect& fifth = MovePanelElement("MovePanelRow4").rect;
+        ASSERT_TRUE(MovePanelElement("MovePanelRow4").active.visible);
+        EXPECT_FLOAT_EQ(fifth.y, first.y) << "the fifth row heads the second column";
+        EXPECT_GE(fifth.x, first.x + first.w - kPixelTolerance);
+        EXPECT_FALSE(MovePanelElement("MovePanelRow5").active.visible);
+        EXPECT_EQ(MovePanelWord(4, "Black"), "") << "the fifth row has White's move only";
+        EXPECT_FALSE(MovePanelWord(4, "White").empty());
+
+        // A notch moves only the top of the safe area, far above the box; side insets take 64.8 units of each side of a view the width limits, more than the 40 the box keeps
+        _renderer->width = kNarrowestWidth;
+        _renderer->height = kNarrowestTallHeight;
+        CoreManager::GetUIEnvironment().SetSafeAreaOverride(UIPreview::SimulatedSafeArea(SafeAreaSimulation::TopNotch, kNarrowestWidth, kNarrowestTallHeight));
+        Settle();
+        EXPECT_TRUE(MovePanelElement("MovePanelBox").active.visible) << "a notch";
+        ResizeWithSideInsets(kNarrowestWidth, kNarrowestTallHeight);
+        EXPECT_FALSE(MovePanelElement("MovePanelBox").active.visible) << "side insets";
+        EXPECT_TRUE(MovePanelElement("MovePanelBox").rect.IsEmpty());
+
+        // Back in a Wide window the two columns are one again, under each other
+        ResizeWithoutInsets(1280.0f, 720.0f);
+        ASSERT_TRUE(MovePanelElement("MovePanelBox").active.visible);
+        EXPECT_FLOAT_EQ(MovePanelElement("MovePanelRow4").rect.y, MovePanelElement("MovePanelRow3").rect.y + kRowHeight);
+        EXPECT_FLOAT_EQ(MovePanelElement("MovePanelRow4").rect.x, MovePanelElement("MovePanelRow0").rect.x);
+        EXPECT_EQ(MaterialPlace(), "panel");
     }
 
     TEST_F(ChessUiTest, TheMovePanelIsHiddenUntilTheCanvasHasBeenLaidOutOnce) {
@@ -677,6 +762,14 @@ namespace BECore::Chess::Tests {
         String moved = shipped;
         ASSERT_NO_FATAL_FAILURE(Replace(moved, R"(name="MovePanelBox" x="760" y="80")", R"(name="MovePanelBox" x="700" y="80")"));
         EXPECT_NE(problemsOf(moved).find("is not the box of Game/MovePanel.h"), String::npos);
+
+        String movedTall = shipped;
+        ASSERT_NO_FATAL_FAILURE(Replace(movedTall, R"(element="MovePanelBox" x="40" y="840")", R"(element="MovePanelBox" x="40" y="800")"));
+        EXPECT_NE(problemsOf(movedTall).find("9:16 480x853 no insets:\nMovePanelBox (40.0, 800.0"), String::npos) << "the box of the Tall view onto the material";
+
+        String oneColumn = shipped;
+        ASSERT_NO_FATAL_FAILURE(Replace(oneColumn, R"(element="MovePanelList" height="224" direction="Horizontal")", R"(element="MovePanelList" height="224" direction="Vertical")"));
+        EXPECT_NE(problemsOf(oneColumn).find("MovePanelRow4 ("), String::npos) << "the columns of the Tall view under each other";
     }
 
 }  // namespace BECore::Chess::Tests

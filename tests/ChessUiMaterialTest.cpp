@@ -704,7 +704,8 @@ namespace BECore::Chess::Tests {
 
     // ---- the captured material in the move panel ------------------------------------------------------------------------------------------
     // In a Wide window where the move panel is shown, the groups are the panel set (MaterialPanel*) in the panel's bands and the margin set is hidden whole; everywhere else the margin set is
-    // where it always was. The component asks the panel's own rule (MovePanelFits), so the material and the panel agree in every window
+    // where it always was. The component asks the panel's own rule (MovePanelFits for the Wide box), so the material and the panel agree in every window; the panel of the Tall view, under the
+    // board, has no bands for the players: the material keeps its rows above and below the board there
 
     namespace {
 
@@ -772,15 +773,18 @@ namespace BECore::Chess::Tests {
             Pair<float, float> size;
             bool sideInsets;
             const char* place;
+            bool panelShown;
         };
-        // The default and the Portrait view, the narrowest Wide window whose side insets cut the panel, and the Wide windows that keep it
-        const Window windows[] = {{{1024.0f, 768.0f}, false, "margin"},
-                                  {{kPortraitWindowWidth, kPortraitWindowHeight}, false, "margin"},
-                                  {{kWideNarrowestWidth, kNarrowestHeight}, true, "margin"},
-                                  {{720.0f, 480.0f}, true, "panel"},
-                                  {{1280.0f, 720.0f}, false, "panel"},
-                                  {{2560.0f, 1080.0f}, false, "panel"},
-                                  {{kNarrowestWidth, kNarrowestHeight}, true, "margin"}};
+        // The default and the Portrait view, the narrowest Wide window whose side insets cut the panel, and the Wide windows that keep it. The Tall view shows the panel under the board
+        // and keeps the material in its rows above and below the board, which have room for it there
+        const Window windows[] = {{{1024.0f, 768.0f}, false, "margin", false},
+                                  {{kPortraitWindowWidth, kPortraitWindowHeight}, false, "margin", false},
+                                  {{kWideNarrowestWidth, kNarrowestHeight}, true, "margin", false},
+                                  {{720.0f, 480.0f}, true, "panel", true},
+                                  {{1280.0f, 720.0f}, false, "panel", true},
+                                  {{2560.0f, 1080.0f}, false, "panel", true},
+                                  {{kNarrowestWidth, kNarrowestHeight}, true, "margin", false},
+                                  {{kNarrowestWidth, kNarrowestTallHeight}, false, "margin", true}};
         for (const Window& window : windows) {
             SCOPED_TRACE(Format("{}x{}{}", window.size.first, window.size.second, window.sideInsets ? " with side insets" : "").c_str());
             if (window.sideInsets) {
@@ -789,7 +793,7 @@ namespace BECore::Chess::Tests {
                 ResizeWithoutInsets(window.size.first, window.size.second);
             }
             EXPECT_EQ(MaterialPlace(), window.place);
-            EXPECT_EQ(MovePanelElement("MovePanelBox").active.visible, StringView(window.place) == "panel") << "the material is in the panel exactly while the panel is shown";
+            EXPECT_EQ(MovePanelElement("MovePanelBox").active.visible, window.panelShown) << "the material is in the panel exactly while the panel is shown beside the board";
             const char* set = StringView(window.place) == "panel" ? kMaterialPanelSet : kMaterialMarginSet;
             const UIElement& balance = MaterialElement(Format("Material{}BottomBalance", set).c_str());
             EXPECT_FALSE(balance.rect.IsEmpty()) << "a balance is on the screen in every window";
