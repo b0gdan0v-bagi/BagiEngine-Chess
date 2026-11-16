@@ -53,7 +53,8 @@ set(expected
     config/nodes/ChessOpponentPanel.xml
     config/nodes/ChessPiece.xml
     config/nodes/ChessPromotionPanel.xml
-    config/nodes/ChessResult.xml)
+    config/nodes/ChessResult.xml
+    config/nodes/ChessSound.xml)
 chess_web_package_files(OUT files GAME_ROOT "${GAME_ROOT}")
 check_equal("the files of the preload package (a new file in config/ or assets/ must be added here, or excluded in cmake/ChessWeb.cmake)" "${files}" "${expected}")
 
