@@ -467,4 +467,93 @@ namespace BECore::Chess::Tests {
         EXPECT_FALSE(greyed("GameSectionDraw"));
     }
 
+    // ---- the HUD's Resign: the section's question, one rule -----------------------------------------------------------------------
+
+    TEST_F(ChessUiTest, TheResignButtonOfTheHudOpensTheSectionWithItsQuestionAndYesResigns) {
+        ASSERT_TRUE(Play(Model(), "e2e4"));
+        UIElement* resign = HudElement("Resign");
+        ASSERT_NE(resign, nullptr);
+        ASSERT_TRUE(IsButton(*resign) && TextOf(*resign) != nullptr);
+        EXPECT_EQ(TextOf(*resign)->text, "Resign") << "a literal: not bound to a variable";
+        EXPECT_EQ(ClickerOf(*resign)->action, PoolString::Intern("ChessResign")) << "the action of the section's Resign: one confirmation, one rule";
+
+        ASSERT_TRUE(ClickControl(*resign).Both());
+        Draw();
+        EXPECT_FALSE(Model().IsGameOver()) << "the HUD's Resign only asks";
+        EXPECT_TRUE(GameSection()->_visible);
+        EXPECT_FALSE(MenuList()->_visible);
+        EXPECT_EQ(ShownText(ElementOf(kSectionNode, "GameSectionQuestion")), "Resign?");
+        EXPECT_TRUE(ElementOf(kSectionNode, "GameSectionQuestion").active.visible);
+        EXPECT_TRUE(ElementOf(kSectionNode, "GameSectionAnswers").active.visible);
+        EXPECT_FALSE(ElementOf(kSectionNode, "GameSectionResign").active.visible);
+
+        ASSERT_TRUE(ClickGameSection("GameSectionYes").Both());
+        EXPECT_EQ(Model().GetStatus(), GameStatus::Resigned);
+        EXPECT_EQ(Model().GetResigned(), PieceColor::Black) << "two people: the side to move";
+        EXPECT_FALSE(GameSection()->_visible);
+        EXPECT_FALSE(MenuList()->_visible);
+        EXPECT_EQ(Var("status"), "Black resigned");
+    }
+
+    TEST_F(ChessUiTest, NoAfterTheResignButtonOfTheHudKeepsTheGameInTheSection) {
+        ASSERT_TRUE(ClickControl(*HudElement("Resign")).Both());
+        ASSERT_TRUE(ClickGameSection("GameSectionNo").Both());
+        Draw();
+        EXPECT_FALSE(Model().IsGameOver());
+        EXPECT_TRUE(GameSection()->_visible) << "No stays in the section, as it does when the section asked";
+        EXPECT_TRUE(ElementOf(kSectionNode, "GameSectionResign").active.visible);
+        EXPECT_FALSE(ElementOf(kSectionNode, "GameSectionQuestion").active.visible);
+        ASSERT_TRUE(ClickGameSection("GameSectionClose").Both());
+        EXPECT_FALSE(GameSection()->_visible);
+    }
+
+    TEST_F(ChessUiTest, TheResignButtonOfTheHudIsGreyedWhileNobodyCanResign) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        CountingFactory factory({New<GatedEngine>(true), New<GatedEngine>(true)});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        _manager->UpdateAll();
+        const auto greyed = [&] {
+            Draw();
+            return ClickerOf(*HudElement("Resign"))->disabled;
+        };
+
+        EXPECT_FALSE(greyed()) << "two people";
+        ControlPlays("white");
+        EXPECT_FALSE(greyed()) << "the person resigns on the program's turn too";
+
+        ControlPlays("both");
+        EXPECT_TRUE(greyed()) << "two programs have no person to resign";
+        Press("ChessResign");
+        Draw();
+        EXPECT_FALSE(GameSection()->_visible) << "a press older than the grey look asks the rule again";
+
+        ControlPlays(nullptr);
+        ASSERT_TRUE(Model().Resign(PieceColor::White).has_value());
+        EXPECT_TRUE(greyed()) << "a finished game";
+        ClickControl(*HudElement("Resign"));
+        EXPECT_FALSE(GameSection()->_visible);
+
+        Model().Reset();
+        EXPECT_FALSE(greyed()) << "a new game";
+    }
+
+    TEST_F(ChessUiTest, TheResignButtonOfTheHudIsInTheTopRowOfTheDefaultAndTheWideViewAndHiddenInPortraitAndTall) {
+        for (const ViewShape& shape : kViewShapes) {
+            SCOPED_TRACE(shape.name);
+            DrawAt(shape.output.first, shape.output.second);
+            const UIElement& resign = *HudElement("Resign");
+            if (shape.portrait) {
+                EXPECT_TRUE(resign.rect.IsEmpty()) << "no room left of Menu in the narrowest window; the menu section stays";
+                continue;
+            }
+            ASSERT_FALSE(resign.rect.IsEmpty());
+            const UIElement& menu = *HudElement("Menu");
+            EXPECT_NEAR(resign.rect.w, menu.rect.w, kPixelTolerance) << "as wide as Menu";
+            EXPECT_NEAR(resign.rect.h, menu.rect.h, kPixelTolerance);
+            EXPECT_NEAR(resign.rect.y, menu.rect.y, kPixelTolerance) << "in the top row";
+            EXPECT_LT(resign.rect.x + resign.rect.w, menu.rect.x) << "left of Menu";
+            EXPECT_GT(resign.rect.x, HudElement("Turn")->rect.x + HudElement("Turn")->rect.w) << "right of Turn";
+        }
+    }
+
 }  // namespace BECore::Chess::Tests

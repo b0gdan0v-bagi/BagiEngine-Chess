@@ -190,8 +190,10 @@ def master_level(client: BagiControlClient) -> dict:
 
 
 def check_the_buttons_click(client: BagiControlClient) -> None:
-    """A click on a button asks for the click clip on the ui bus, one request per click (the menu button opens the list, Close shuts it)."""
-    for name, action in (("Menu", "ChessOpenMenu"), ("MenuClose", "ChessCloseMenu")):
+    """A click on a button asks for the click clip on the ui bus, one request per click (the HUD's Resign opens the section Game with its question, No and Close leave it;
+    the menu button opens the list, Close shuts it)."""
+    buttons = (("Resign", "ChessResign"), ("GameSectionNo", "ChessGameNo"), ("GameSectionClose", "ChessCloseMenu"), ("Menu", "ChessOpenMenu"), ("MenuClose", "ChessCloseMenu"))
+    for name, action in buttons:
         before = audio_state(client)["requested"]
         clicked = client.call("ui_click", {"name": name})
         check(clicked["consumed"] and clicked["action"] == action, f"the click on {name} was answered with {clicked}")
@@ -200,7 +202,10 @@ def check_the_buttons_click(client: BagiControlClient) -> None:
         check(after["requested"] == before + 1, f"the click on {name} asked for {after['requested'] - before} sounds, not one")
         last = after["recent"][-1]
         check(last["clip"] == CLICK_CLIP and last["bus"] == "ui", f"the click on {name} should sound as the click on the ui bus, the request is {last}")
-    check_the_menu_list_is_hidden(client.call("ui_tree"))
+    tree = client.call("ui_tree")
+    check_the_menu_list_is_hidden(tree)
+    check(find_ui_canvas(tree, "GameSection")["visible"] is False, "the section Game should be hidden after its Close")
+    check(client.call("get_state")["state"]["status"] == "ongoing", "No after the HUD's Resign ended the game")
 
 
 def check_the_levels(client: BagiControlClient) -> None:

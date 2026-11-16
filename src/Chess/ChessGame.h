@@ -77,6 +77,10 @@ namespace BECore::Chess {
         /// ChessBoardComponent::OnUpdate); the control adapter makes the same offer through the same function
         std::expected<void, DrawOfferRefusal> OfferDraw();
 
+        /// The color the person resigns for in the game as it stands (ResigningColor()), or nothing when nobody can: a finished game, two programs. The one rule of both
+        /// Resign buttons, the HUD's and the menu section's
+        [[nodiscard]] Optional<PieceColor> ResigningNow() const;
+
         const ChessSaveKeeper& GetKeeper() const noexcept {
             return _keeper;
         }

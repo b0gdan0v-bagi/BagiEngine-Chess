@@ -1614,7 +1614,7 @@ namespace BECore::Chess::Tests {
             EXPECT_TRUE(text.find("{level}") == StringView::npos && text.find("{engine}") == StringView::npos) << found.node().attribute("name").value() << ": " << ToStd(text);
         }
 
-        // The same in the loaded scene: the HUD is Turn, Menu, Reset and Status, and nothing sits at the bottom left
+        // The same in the loaded scene: the HUD is Turn, Resign, Menu, Reset and Status, and nothing sits at the bottom left
         const auto hud = Hud();
         ASSERT_TRUE(hud);
         size_t elements = 0;
@@ -1622,7 +1622,7 @@ namespace BECore::Chess::Tests {
             ++elements;
             EXPECT_NE(child->style.rect.anchor, UIAnchor::BottomLeft) << child->name.CStr() << ": the bottom left of the HUD is empty";
         }
-        EXPECT_EQ(elements, 4u) << "Turn, Menu, Reset, Status";
+        EXPECT_EQ(elements, 5u) << "Turn, Resign, Menu, Reset, Status";
         for (const char* name : {"Side", "Engine", "Level"}) {
             EXPECT_EQ(HudElement(name), nullptr) << name;
             EXPECT_EQ(Panel()->GetRoot().FindByName(PoolString::Intern(name)), nullptr) << name;

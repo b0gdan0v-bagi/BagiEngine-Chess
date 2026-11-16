@@ -18,6 +18,7 @@ namespace BECore::Chess {
      * @brief The menu section "Game" (Resign / Draw), on the node `GameSection` before its canvas: answers `ChessResign`, `ChessDraw`, `ChessGameYes` and `ChessGameNo`.
      *
      * Resign asks "Resign?" and Draw between two people "Agree a draw?" first (Yes / No in the same panel); Draw against the program is offered at once, and the answer shows on the HUD.
+     * The HUD's Resign button emits the same `ChessResign`: the section shows itself with the question open, so both buttons share one confirmation and one rule (ChessGame::ResigningNow()).
      * Yes asks the rule again, because the grey look of the buttons is from the last draw, ends the game and closes the menu (`ChessCloseMenu`). The open question is the one UI-only
      * state of the scene: it is dropped by the menu opening, closing or switching a section, by No, and by any change of the game's version or of the opponent, so a program's move
      * never leaves a question about a position that is gone. Resign and Draw are greyed while the game cannot take them; the words and the greyed look are written only when they change,

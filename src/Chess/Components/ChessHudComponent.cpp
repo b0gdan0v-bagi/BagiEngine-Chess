@@ -1,6 +1,9 @@
 #include "ChessHudComponent.h"
 
 #include <BECore/GameManager/CoreManager.h>
+#include <BECore/Scene/SceneNode.h>
+#include <BECore/UI/UICanvasComponent.h>
+#include <BECore/UI/UIInputClicker.h>
 #include <Chess/ChessGame.h>
 #include <Chess/Engine/OpponentText.h>
 #include <Chess/Game/StatusText.h>
@@ -78,6 +81,16 @@ namespace BECore::Chess {
         vars.Set("opponentEngine"_intern, choice.EngineId());
         vars.Set("opponentLevel"_intern, choice.LevelId());
         vars.Set("opponentError"_intern, StringView(opponentError));
+
+        const bool resignDisabled = !game->ResigningNow();
+        if (resignDisabled != _resignDisabled) {
+            _resignDisabled = resignDisabled;
+            const auto canvas = GetNode().GetComponent<UICanvasComponent>();
+            UIElement* button = canvas ? canvas->GetRoot().FindByName("Resign"_intern) : nullptr;
+            if (UIInputClicker* clicker = button ? button->GetComponent<UIInputClicker>() : nullptr) {
+                clicker->disabled = resignDisabled;
+            }
+        }
     }
 
 }  // namespace BECore::Chess

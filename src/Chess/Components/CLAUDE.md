@@ -6,7 +6,7 @@ Read this before changing `config/SceneConfig.xml` or a file of `config/nodes/` 
 
 ```
 ChessBoardComponent     the board: squares, highlights and coordinates, clicks and drags, the frame (the opponent's, the analyst's and the draw judge's Update() every SceneUpdateEvent, the keeper, the result log)
-ChessHudComponent       on Hud, before its canvas: publishes the UIVars of the HUD and the opponent panel in its draw, answers ChessReset
+ChessHudComponent       on Hud, before its canvas: publishes the UIVars of the HUD and the opponent panel in its draw, greys Resign, answers ChessReset
 ChessMenuComponent      on MenuPanel: ChessOpenMenu, ChessOpenSection, ChessCloseMenu
 ChessOpponentPanelComponent  on OpponentPanel, before its canvas: ChessSet*, the Stockfish segment
 ChessPromotionPanelComponent on PromotionPanel, before its canvas: shown while a promotion is pending, ChessPromote, ChessCancelPromotion
@@ -74,9 +74,11 @@ Node `MovePanel` (`ChessMovePanel.xml`, layer 4, under `Material`, which draws o
 
 ## The HUD
 
-`SceneView` canvas on `Hud` (`ChessHud.xml`, layer 10), controls 56 units high in the margins: `Turn` (`{turn}`), `Menu` (fixed word, `ChessOpenMenu`; the owner wants no button named after a state, and no element is called `Opponent`), `Reset` (`ChessReset`), `Status` (`{status}`; wider in Portrait). The anchors keep the top row above the board and `Status` under it in every view (in Wide at the right end, over and under the move panel's box). The widest sentences only just fit the narrowest window (480 px with insets): a longer one needs a reword or a wider box; an error says what went wrong, never what to do. `ChessHudWebTest` holds the HTML twin of the default view's HUD (no Portrait twin).
+`SceneView` canvas on `Hud` (`ChessHud.xml`, layer 10), controls 56 units high in the margins: `Turn` (`{turn}`), `Resign`, `Menu` (fixed word, `ChessOpenMenu`; no button is named after a state, none is called `Opponent`), `Reset` (`ChessReset`), `Status` (`{status}`; wider in Portrait). The anchors keep the top row above the board and `Status` under it in every view (in Wide at the right end, over and under the move panel's box). The widest sentences only just fit the narrowest window (480 px with insets): a longer one needs a reword or a wider box; an error says what went wrong, never what to do.
 
-`ChessHudComponent` republishes the variables when the model's version, the controller's revision, the draw judge's revision, `IsThinking()`, the person's color or the view changed: `turn` (`StatusText::Turn`, "Computer is thinking", also while a draw offer is judged), `status` (while viewing `StatusText::Viewing`, over all; else a standing error of the opponent, over "Check"; else "Draw declined" until the version moves; else the game status), `opponentError`, and the panel bindings `opponentMode`, `opponentColor` (**the person's** color), `opponentEngine`, `opponentLevel`.
+**`Resign`** (in Wide left of the panel's box, clear of the chips under a notch) emits the section's `ChessResign`: the section opens on "Resign?" (one confirmation; one rule, `ChessGame::ResigningNow()`, also greys it). Hidden in Portrait and Tall (no room).
+
+`ChessHudComponent` republishes the variables only on a change (class comment): `turn` (`StatusText::Turn`, "Computer is thinking", also while a draw offer is judged), `status` (while viewing `StatusText::Viewing`, over all; else a standing error of the opponent, over "Check"; else "Draw declined" until the version moves; else the game status), `opponentError`, and the panel bindings `opponentMode`, `opponentColor` (**the person's** color), `opponentEngine`, `opponentLevel`.
 
 ## The menu
 
@@ -84,7 +86,7 @@ Node `MenuPanel` (`ChessMenuPanel.xml`, layer 20, modal, `visible="false"`): `Me
 
 ## The Game section
 
-Node `GameSection` (`ChessGameSection.xml`, layer 20, modal, hidden), built like `MovesSection`. Resign asks "Resign?", Draw between two people "Agree a draw?" (`{gameQuestion}`, Yes / No); Draw against the program offers at once, the HUD answers. `ChessGameSectionComponent` keeps the **one UI-only state, the open question**, dropped by any menu change, No, and a change of the version or the opponent. Yes asks the rules again (`ResigningColor`, `DrawOfferRefusalFor`), ends the game and closes the menu; the same rules grey the buttons.
+Node `GameSection` (`ChessGameSection.xml`, layer 20, modal, hidden), built like `MovesSection`. Resign asks "Resign?", Draw between two people "Agree a draw?" (`{gameQuestion}`, Yes / No); Draw against the program offers at once, the HUD answers. `ChessGameSectionComponent` keeps the **one UI-only state, the open question**, dropped by any menu change, No, and a change of the version or the opponent. Yes asks the rules again (`ChessGame::ResigningNow()`, `DrawOfferRefusalFor`), ends the game and closes the menu; the same rules grey the buttons.
 
 ## The opponent panel
 

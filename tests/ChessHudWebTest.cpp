@@ -24,16 +24,18 @@ namespace BECore::Tests {
         constexpr float kViewHeight = 800.0f;  ///< viewHeight of ChessScene
 
         // The HUD of Chess in HTML + CSS (the engine's web front-end, UIWebCompiler); the test below checks that it lays out like the HUD of config/SceneConfig.xml. The twin is the HUD of the
-        // default view (840 x 800, the context of every case here): the scene's HUD has a variant for its Portrait view (720 x 960: Status is wider there) and one for its Wide view (Status
-        // is lower there), which the twin does not follow, so there is no portrait or wide twin.
+        // default view (840 x 800, the context of every case here): the scene's HUD has a variant for its Portrait view (720 x 960: Status is wider there and Resign is hidden) and one for its
+        // Wide view (Status is lower there), which the twin does not follow, so there is no portrait or wide twin.
         constexpr const char* kChessHudHtml = R"(
 <span id="Turn">{turn}</span>
+<button id="Resign" data-action="ChessResign">Resign</button>
 <button id="Menu" data-action="ChessOpenMenu">Menu</button>
 <button id="Reset" data-action="ChessReset">Reset</button>
 <span id="Status">{status}</span>)";
 
         constexpr const char* kChessHudCss = R"(
-#Turn   { left: 12px; top: 12px; width: 320px; height: 56px; font-size: 28px; vertical-align: middle; }
+#Turn   { left: 12px; top: 12px; width: 300px; height: 56px; font-size: 28px; vertical-align: middle; }
+#Resign { anchor: top-right; right: 256px; top: 12px; width: 110px; height: 56px; font-size: 26px; background: rgb(120, 52, 52); }
 #Menu   { anchor: top-right; right: 134px; top: 12px; width: 110px; height: 56px; font-size: 24px; background: rgb(45, 75, 120); }
 #Reset  { anchor: top-right; right: 12px; top: 12px; width: 110px; height: 56px; font-size: 26px; background: rgb(40, 90, 60); }
 #Status { anchor: bottom-right; right: 12px; bottom: 12px; width: 48%; height: 56px; font-size: 28px; text-align: right; vertical-align: middle; }
@@ -310,7 +312,7 @@ namespace BECore::Tests {
         for (const auto& [width, height] : {Pair<float, float>{1280.0f, 720.0f}, {480.0f, 480.0f}, {720.0f, 1280.0f}, {2560.0f, 1080.0f}}) {
             web.At(width, height);
             xml.At(width, height);
-            for (const char* name : {"Turn", "Menu", "Reset", "Status"}) {
+            for (const char* name : {"Turn", "Resign", "Menu", "Reset", "Status"}) {
                 SCOPED_TRACE(Format("{} at {}x{}", name, width, height).c_str());
                 ExpectSameRect(xml.Find(name), web.Find(name), name);
             }

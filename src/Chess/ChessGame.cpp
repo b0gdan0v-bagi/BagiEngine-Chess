@@ -1,5 +1,6 @@
 #include "ChessGame.h"
 
+#include <Chess/Game/GameEnding.h>
 #include <Games/GameManager.h>
 #include <Generated/ChessGame.gen.hpp>
 #include <random>
@@ -94,6 +95,14 @@ namespace BECore::Chess {
 
     std::expected<void, DrawOfferRefusal> ChessGame::OfferDraw() {
         return PersonOffersDraw(_model, _opponent.GetSides(), _drawJudge);
+    }
+
+    Optional<PieceColor> ChessGame::ResigningNow() const {
+        if (_model.IsGameOver()) {
+            return std::nullopt;
+        }
+        const ProgramSides sides = _opponent.GetSides();
+        return ResigningColor(_model.GetTurn(), _opponent.GetPlays(), sides.white && sides.black);
     }
 
     void ChessGame::Reset() {

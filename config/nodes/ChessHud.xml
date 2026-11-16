@@ -2,9 +2,12 @@
 <!-- The HUD is in the margins of the view (space="SceneView"): it scales and moves with the board and never covers it, whatever the shape of the window.
      The board is 640 x 640 at (100, 80); the margin is 80 units above and below, so one row of 56-unit controls fits in each (12 units from the edge of the
      safe area), and a 56-unit button is still a 32 px touch target at the smallest fit scale of the size matrix (0.57, the 840 units of the width in a 480 px window).
-     The top row is Turn (left), Menu and Reset (right); the bottom margin holds only Status (bottom right). Every element is anchored to a corner, so the row is
-     as wide as the safe area, which is about 689 units in the narrowest window of the matrix (480 px with side insets): Turn (320), Menu (110) and Reset (110) with
-     their gaps add up to less than that, and ChessUiTest lays every word the game can show into them. Menu is the one button that opens the menu (the list panel
+     The top row is Turn (left), Resign, Menu and Reset (right); the bottom margin holds only Status (bottom right). Every element is anchored to a corner, so the row is
+     as wide as the safe area, which is about 689 units in the narrowest window of the matrix (480 px with side insets): Turn (300), Resign, Menu and Reset (110 each) with
+     their gaps add up to less than that, and ChessUiTest lays every word the game can show into them. Resign emits ChessResign, the action of the menu section's Resign:
+     ChessGameSectionComponent shows that section with its question "Resign?" open, so Yes / No and the rule are the section's; ChessHudComponent greys it while nobody can
+     resign (a finished game, two programs). Portrait and Tall have no room for it (their narrowest window leaves 34 units between Turn and Menu), so their variant hides it there and
+     the menu section stays the way to resign. Menu is the one button that opens the menu (the list panel
      node MenuPanel, ChessMenuPanel.xml): it emits ChessOpenMenu, is always shown, and its text is the fixed word "Menu", not a state; the side, the engine and the level
      are chosen in the opponent panel, which the list opens and which also shows what is picked now, and not on buttons of the HUD: the margins are full.
      The numbers are those of the default view. The Portrait view (720 x 960, the board at (40, 144) to (680, 784)) has the same rows: the top row at y 12 to 68 above the upper row of the
@@ -20,9 +23,15 @@
     <component type="ChessHudComponent" />
     <component type="UICanvasComponent" space="SceneView" useSafeArea="true">
       <elements>
-        <element type="UIElement" name="Turn" x="12" y="12" width="320" height="56" fontSize="28">
+        <element type="UIElement" name="Turn" x="12" y="12" width="300" height="56" fontSize="28">
           <components>
             <component type="UITextComponent" text="{turn}" verticalAlign="Center"/>
+          </components>
+        </element>
+        <element type="UIElement" name="Resign" anchor="TopRight" x="-256" y="12" width="110" height="56" fontSize="26" color="120,52,52,255">
+          <components>
+            <component type="UITextComponent" text="Resign" align="Center" verticalAlign="Center" wrap="false" fadeWhenDisabled="true"/>
+            <component type="UIInputClicker" action="ChessResign"/>
           </components>
         </element>
         <element type="UIElement" name="Menu" anchor="TopRight" x="-134" y="12" width="110" height="56" fontSize="24" color="45,75,120,255">
@@ -47,11 +56,13 @@
         <variant when="orientation:portrait">
           <overrides>
             <set element="Status" width="60%" />
+            <set element="Resign" visible="false" />
           </overrides>
         </variant>
         <variant when="minAspect:1.3">
           <overrides>
             <set element="Status" y="0" height="38" />
+            <set element="Resign" x="-368" />
           </overrides>
         </variant>
       </variants>

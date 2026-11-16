@@ -54,6 +54,9 @@ namespace BECore::Chess::Tests {
                 ASSERT_NE(element, nullptr) << name;
                 EXPECT_FALSE(element->rect.IsEmpty()) << name << " is shown";
             }
+            const UIElement* resign = layout.root->FindByName(PoolString::Intern("Resign"));
+            ASSERT_NE(resign, nullptr);
+            EXPECT_EQ(resign->rect.IsEmpty(), LaidOutForPortrait(layout)) << "Resign is shown exactly where the top row has room for it";
         }
         layout.Invalidate();
     }
@@ -83,9 +86,13 @@ namespace BECore::Chess::Tests {
             DrawAt(size.first, size.second);
             const float boardTop = PortraitIsActive() ? kPortraitBoardTop : kBoardTop;
             const float boardBottom = PortraitIsActive() ? kPortraitBoardBottom : kBoardBottom;
-            for (const char* name : {"Turn", "Menu", "Reset"}) {
+            for (const char* name : {"Turn", "Resign", "Menu", "Reset"}) {
                 const UIElement* element = canvas->GetRoot().FindByName(PoolString::Intern(name));
                 ASSERT_NE(element, nullptr);
+                if (StringView(name) == "Resign" && PortraitIsActive()) {
+                    EXPECT_TRUE(element->rect.IsEmpty()) << "hidden in Portrait and Tall, at " << size.first << "x" << size.second;
+                    continue;
+                }
                 ASSERT_FALSE(element->rect.IsEmpty()) << name << " is shown at " << size.first << "x" << size.second;
                 EXPECT_LE(element->rect.y + element->rect.h, boardTop + 0.01f) << name << " at " << size.first << "x" << size.second;
             }

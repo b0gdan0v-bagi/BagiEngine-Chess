@@ -1,12 +1,12 @@
 #include "ChessGameSectionComponent.h"
 
 #include <BECore/GameManager/CoreManager.h>
+#include <BECore/Scene/Scene.h>
 #include <BECore/Scene/SceneNode.h>
 #include <BECore/UI/UICanvasComponent.h>
 #include <BECore/UI/UIInputClicker.h>
 #include <Chess/ChessGame.h>
 #include <Chess/Engine/DrawOffer.h>
-#include <Chess/Game/GameEnding.h>
 #include <Chess/Game/StatusText.h>
 #include <Events/InputEvents.h>
 #include <Generated/ChessGameSectionComponent.gen.hpp>
@@ -14,16 +14,6 @@
 namespace BECore::Chess {
 
     namespace {
-
-        /// The color the person resigns for now, or nothing when nobody can (a finished game, two programs)
-        Optional<PieceColor> ResigningNow(const ChessGame& game) {
-            const ChessGameModel& model = game.GetModel();
-            if (model.IsGameOver()) {
-                return std::nullopt;
-            }
-            const ProgramSides sides = game.GetOpponent().GetSides();
-            return ResigningColor(model.GetTurn(), game.GetOpponent().GetPlays(), sides.white && sides.black);
-        }
 
         bool CanOfferDraw(const ChessGame& game) {
             return !DrawOfferRefusalFor(game.GetModel(), game.GetOpponent().GetSides()).has_value();
@@ -62,7 +52,7 @@ namespace BECore::Chess {
         const GameQuestion question = _asking;
         _asking = GameQuestion::None;
         if (question == GameQuestion::Resign) {
-            if (const Optional<PieceColor> color = ResigningNow(game)) {
+            if (const Optional<PieceColor> color = game.ResigningNow()) {
                 static_cast<void>(game.GetModel().Resign(*color));
             }
         } else if (question == GameQuestion::Draw) {
@@ -90,7 +80,10 @@ namespace BECore::Chess {
         if (yes) {
             Answer(*game);
         } else if (resign) {
-            if (ResigningNow(*game)) {
+            if (game->ResigningNow()) {
+                // The HUD's Resign comes while no modal canvas is shown (they cover the HUD), so showing this one is all the menu would do; an action of the menu
+                // would click a second time
+                UICanvasComponent::SetVisibleByName(GetScene(), GetNode().GetName(), true);
                 Ask(GameQuestion::Resign, *game);
             }
         } else if (CanOfferDraw(*game)) {
@@ -136,7 +129,7 @@ namespace BECore::Chess {
         _greyModel = model;
         _greyVersion = version;
         _greyRevision = revision;
-        const bool resignDisabled = !game || !ResigningNow(*game);
+        const bool resignDisabled = !game || !game->ResigningNow();
         const bool drawDisabled = !game || !CanOfferDraw(*game);
         if (resignDisabled != _resignDisabled) {
             _resignDisabled = resignDisabled;
