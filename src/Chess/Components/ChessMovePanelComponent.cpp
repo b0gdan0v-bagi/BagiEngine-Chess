@@ -16,11 +16,19 @@ namespace BECore::Chess {
     }
 
     void ChessMovePanelComponent::OnAction(const InputEvents::ActionEvent& event) {
-        if (event.action != "ChessShowMove"_intern) {
+        const bool takeBack = event.action == "ChessTakeBack"_intern;
+        if (!takeBack && event.action != "ChessShowMove"_intern) {
             return;
         }
         ChessGameModel* model = ChessGame::GetActiveModel();
         if (!model) {
+            return;
+        }
+        if (takeBack) {
+            // The rule is asked again: the button's grey look is from the last draw, and the game may have moved since
+            if (const size_t plies = TakeBackPliesNow(model)) {
+                model->TakeBack(plies);
+            }
             return;
         }
         const Optional<MoveListPress> press = ParseMoveListPress(event.value.ToStringView());
@@ -68,6 +76,9 @@ namespace BECore::Chess {
         const ChessGameModel* model = ChessGame::GetActiveModel();
         if (_published.Changed(model)) {
             Publish(model);
+        }
+        if (const auto canvas = GetNode().GetComponent<UICanvasComponent>()) {
+            _takeBack.Sync(*canvas, model);
         }
         SyncBox();
     }

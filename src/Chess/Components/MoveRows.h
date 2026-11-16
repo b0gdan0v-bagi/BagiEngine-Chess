@@ -50,4 +50,23 @@ namespace BECore::Chess {
         Array<bool, kMovePanelRows> _blackMarked{};
     };
 
+    /// How many moves one press of the takeback takes back in the game of @p model now (TakeBackPlies() with the side the active opponent plays); 0: nothing, also with no game
+    [[nodiscard]] size_t TakeBackPliesNow(const ChessGameModel* model);
+
+    /**
+     * @brief The takeback button `<prefix>TakeBack` of one canvas: greyed (its clicker `disabled`) while TakeBackPliesNow() is 0, so a press that would do nothing looks it.
+     *
+     * The node file authors it disabled, as the game starts with no move. Remembers what it set, so a call changes the clicker only when the answer changes.
+     */
+    class TakeBackOnCanvas {
+    public:
+        explicit TakeBackOnCanvas(StringView prefix);
+
+        void Sync(UICanvasComponent& canvas, const ChessGameModel* model);
+
+    private:
+        PoolString _name;
+        bool _disabled = true;
+    };
+
 }  // namespace BECore::Chess

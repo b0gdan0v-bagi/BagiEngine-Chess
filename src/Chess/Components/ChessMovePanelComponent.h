@@ -22,6 +22,9 @@ namespace BECore::Chess {
      *
      * It answers `ChessShowMove`, the press of a cell or a step button of the move list (`value`: ParseMoveListPress()), for this canvas and for the menu section "Moves", whose rows
      * are the same: the model shows the position the press asks for (ChessGameModel::ShowMoves()). A value of no press logs one warning; a cell with no move does nothing.
+     *
+     * It answers `ChessTakeBack` of both canvases too: ChessGameModel::TakeBack() of TakeBackPliesNow() moves (nothing when that is 0), which ends a view, drops the selection and the
+     * premoves and moves the version (the program's search in flight goes stale). Each canvas's own component greys its button (TakeBackOnCanvas).
      */
     class ChessMovePanelComponent : public IComponent {
         BE_CLASS(ChessMovePanelComponent)
@@ -43,6 +46,7 @@ namespace BECore::Chess {
 
         MoveRowsKey _published;
         MoveRowsOnCanvas _rows{"MovePanel"};
+        TakeBackOnCanvas _takeBack{"MovePanel"};
         bool _boxShown = false;  ///< The scene starts with the box hidden
     };
 

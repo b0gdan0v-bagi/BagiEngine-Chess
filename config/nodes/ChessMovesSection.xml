@@ -6,8 +6,8 @@
      The rows are those of the move panel (ChessMovePanel.xml): the same 8 rows of 56 units, a number cell of 56 and White's and Black's cells, the gold Mark of the last move under its
      text, bound to the same variables movePanelNumber<i>, movePanelWhite<i> and movePanelBlack<i>; ChessMovesSectionComponent (listed before the canvas, so the words are there in the
      frame it shows) writes them like the panel's component and shows the rows and marks of this canvas (a hidden row takes no room: the rows pack at the top). Under the list a band of
-     56 units holds the step buttons of the panel (‹ › », ChessShowMove, answered by ChessMovePanelComponent; the rest is kept for the takeback), and the cells take the same
-     clicks as the panel's. The plate is 94% of the safe area up to 640 units, centered: 16 + 44 (title) + 448 (the list) + 56 (the band) + 56 (Back
+     56 units holds the step buttons of the panel (‹ › », ChessShowMove) and Take back (ChessTakeBack) in the rest, all answered by ChessMovePanelComponent, and the cells take the same
+     clicks as the panel's; this canvas's component greys its own Take back. The plate is 94% of the safe area up to 640 units, centered: 16 + 44 (title) + 448 (the list) + 56 (the band) + 56 (Back
      and Close) + 3 x 12 (spacing) + 16 = 672 units high, which the safe area of every view has (about 741 in the narrowest default window under a notch). Every name starts with MovesSection
      because elements are found by name in every canvas of the scene. -->
 <node name="MovesSection" layer="20" contentVersion="5">
@@ -329,6 +329,12 @@
                   <components>
                     <component type="UITextComponent" text="&#xBB;" align="Center" verticalAlign="Center" wrap="false"/>
                     <component type="UIInputClicker" action="ChessShowMove" value="latest"/>
+                  </components>
+                </element>
+                <element type="UIElement" name="MovesSectionTakeBack" flex="1" fontSize="22" color="112,84,48,255">
+                  <components>
+                    <component type="UITextComponent" text="Take back" align="Center" verticalAlign="Center" wrap="false" fadeWhenDisabled="true"/>
+                    <component type="UIInputClicker" action="ChessTakeBack" disabled="true"/>
                   </components>
                 </element>
               </children>

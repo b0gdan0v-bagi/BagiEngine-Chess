@@ -127,6 +127,20 @@ namespace BECore::Chess::Tests {
             if (tall && list != nullptr && bands[2] != nullptr && list->rect.y + list->rect.h > bands[2]->rect.y) {
                 problems += "the box of the Tall view is not the list and the band of the buttons, top down and apart\n";
             }
+            // The validator does not see a word cut by the air a button keeps inside its fill; Take back has only the rest of the band
+            for (const char* name : {"MovePanelStepBack", "MovePanelStepForward", "MovePanelLatest", "MovePanelTakeBack"}) {
+                const UIElement* button = find(name);
+                if (button == nullptr) {
+                    continue;
+                }
+                const UIContentFit fit = button->CheckContent(button->rect.w - 2.0f * kButtonAir, button->rect.h, scale);
+                if (fit.hasContent && !fit.fits) {
+                    problems += Format("{} cuts '{}': {:.1f} units wide at scale {:.3f}\n", name, ShownText(*button).c_str(), button->rect.w, scale);
+                }
+                if (bands[2] != nullptr && !LiesIn(button->rect, bands[2]->rect)) {
+                    problems += Format("{} is not in the band of the buttons\n", name);
+                }
+            }
             for (size_t row = 0; row < kMovePanelRows; ++row) {
                 const UIElement* line = find(Format("MovePanelRow{}", row));
                 const UIElement* number = find(Format("MovePanelNumber{}", row));
@@ -357,13 +371,14 @@ namespace BECore::Chess::Tests {
         EXPECT_LT(lastMark, plateOfThePanel) << "and under the panels";
     }
 
-    TEST_F(ChessUiTest, OnlyTheCellsAndTheStepButtonsOfTheMovePanelTakeAClickAndTheBoardAndResetStillGetTheirOwn) {
+    TEST_F(ChessUiTest, OnlyTheCellsAndTheButtonsOfTheMovePanelTakeAClickAndTheBoardAndResetStillGetTheirOwn) {
         ASSERT_TRUE(PlayAll(Model(), {"e2e4", "e7e5"}));
         Settle();
         const auto canvas = MovePanel();
         ASSERT_TRUE(canvas);
         ASSERT_TRUE(MovePanelElement("MovePanelBox").active.visible);
-        // The cells of the moves and the three buttons of the band are buttons of ChessShowMove; nothing else blocks or takes the pointer
+        // The cells of the moves and the three step buttons of the band are buttons of ChessShowMove, Take back of ChessTakeBack; nothing else blocks or takes the pointer
+        const PoolString takeBack = PoolString::Intern("MovePanelTakeBack");
         Vector<String> clickable;
         for (const UIElement* element : AllElements(canvas->GetRoot())) {
             EXPECT_FALSE(element->blocksInput) << element->name.CStr();
@@ -373,11 +388,15 @@ namespace BECore::Chess::Tests {
             clickable.push_back(String(element->name.ToStringView()));
             const UIInputClicker* clicker = ClickerOf(*element);
             ASSERT_NE(clicker, nullptr) << element->name.CStr();
+            if (element->name == takeBack) {
+                EXPECT_EQ(clicker->action, PoolString::Intern("ChessTakeBack"));
+                continue;
+            }
             EXPECT_EQ(clicker->action, PoolString::Intern("ChessShowMove")) << element->name.CStr();
             EXPECT_TRUE(ParseMoveListPress(clicker->value.ToStringView()).has_value()) << element->name.CStr();
         }
-        EXPECT_EQ(clickable.size(), 2 * kMovePanelRows + 3);
-        for (const char* name : {"MovePanelStepBack", "MovePanelStepForward", "MovePanelLatest", "MovePanelWhite7", "MovePanelBlack0"}) {
+        EXPECT_EQ(clickable.size(), 2 * kMovePanelRows + 4);
+        for (const char* name : {"MovePanelStepBack", "MovePanelStepForward", "MovePanelLatest", "MovePanelTakeBack", "MovePanelWhite7", "MovePanelBlack0"}) {
             EXPECT_NE(eastl::find(clickable.begin(), clickable.end(), String(name)), clickable.end()) << name;
         }
         for (const char* name : {"MovePanelBox", "MovePanelBandTopPlayer", "MovePanelBandBottomPlayer", "MovePanelNumber0"}) {
@@ -479,6 +498,14 @@ namespace BECore::Chess::Tests {
                     report +=
                         Format("{}: the HUD controls closer to {} than {:.0f} units are '{}', not '{}'\n", matrixCase.label.c_str(), kPanelBands[band], kMinGap, near.c_str(), expectedPerBand[band]);
                 }
+            }
+            // Status, pushed onto the band of the buttons, centres its text under the middle of its box: the word of Take back, in the middle of the button, stays clear of that text
+            const UIElement* takeBack = layout.root->FindByName(PoolString::Intern("MovePanelTakeBack"));
+            const UIElement* status = hud->GetLayout().root->FindByName(PoolString::Intern("Status"));
+            ASSERT_NE(takeBack, nullptr);
+            ASSERT_NE(status, nullptr);
+            if (Touch(takeBack->rect, status->rect, 0.0f) && status->rect.y < takeBack->rect.y + takeBack->rect.h * 0.5f) {
+                report += Format("{}: Status reaches the middle of Take back, where its word is\n", matrixCase.label.c_str());
             }
         }
         panel->SetElementVisible(PoolString::Intern("MovePanelBox"), false);
