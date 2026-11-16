@@ -34,6 +34,9 @@ namespace BECore::Chess {
      * Reset(), inside the version step of the new game. SetPosition() keeps the seed: it is no new draw, so a position set from
      * outside stays reproducible. SetSeed() moves the version only when the value changes, so a search in flight is dropped.
      *
+     * Viewing (ShowMoves()) shows an earlier position of the game on the board while the game stays where it is: a second set
+     * of the handles and a copy of the position, read through the GetShown...() calls. It is no change of the game either.
+     *
      * Visual pieces are tracked through opaque handles, so the scene can render moves and captures without re-deriving
      * identity from piece type and color. A handle is bound at registration to its starting square and follows its piece
      * through captures, castling, en passant and promotion (it then reports the promoted type); Reset() sends it back.
@@ -174,6 +177,37 @@ namespace BECore::Chess {
          */
         size_t TakeBack(size_t plies = 1);
 
+        /**
+         * @brief Shows the position after the first @p count moves for viewing only; @p count of GetMoves().size() or more is the game's own position, which ends viewing.
+         *
+         * The game does not change: GetPosition(), the moves, the status, the version and GetSquareOf() stay, GetShownPosition(), GetShownSquareOf() and GetShownPieceOf()
+         * give the earlier position. The version stays because a view is like a selection: a search in flight remains valid. Starting to view drops the selection and a pending
+         * promotion (they belong to the game's position); the premove queue stays. Every change of the game (a move, Reset(), SetPosition(), TakeBack()) ends viewing, so a new
+         * move is never hidden, and so does a click on the board (OnSquareClicked(), OnPremoveClicked()), which then does nothing else.
+         *
+         * @return whether what is shown changed
+         */
+        bool ShowMoves(size_t count);
+
+        /// Shows the game's own position again: ShowMoves(GetMoves().size())
+        bool EndViewing();
+
+        [[nodiscard]] bool IsViewing() const noexcept {
+            return _viewing;
+        }
+        /// The moves played up to the shown position: GetMoves().size() unless viewing
+        [[nodiscard]] size_t GetShownMoveCount() const noexcept {
+            return _viewing ? _viewMoveCount : _moves.size();
+        }
+        /// The position the board shows: the viewed one while viewing, else GetPosition()
+        [[nodiscard]] const Position& GetShownPosition() const noexcept {
+            return _viewing ? _viewPosition : _position;
+        }
+        /// GetSquareOf() in the shown position
+        [[nodiscard]] Square GetShownSquareOf(PieceHandle handle) const;
+        /// GetPieceOf() in the shown position (a pawn that promotes later is still a pawn there)
+        [[nodiscard]] Piece GetShownPieceOf(PieceHandle handle) const;
+
         /// A pawn was clicked onto its last rank and waits for the piece it becomes (ChoosePromotion()); nothing has moved
         [[nodiscard]] bool HasPendingPromotion() const noexcept {
             return _hasPendingPromotion;
@@ -242,20 +276,29 @@ namespace BECore::Chess {
             bool active = false;
         };
 
+        using PieceTracks = HashMap<PieceHandle, PieceTrack>;
+
         void RecomputeLegalMoves();
-        void RelocatePieces(Move move);
-        void Capture(Square at);
-        PieceTrack* MoveHandle(Square from, Square to);
+        static void RelocatePieces(PieceTracks& tracks, Move move);
+        static void Capture(PieceTracks& tracks, Square at);
+        static PieceTrack* MoveHandle(PieceTracks& tracks, Square from, Square to);
+        static const PieceTrack* FindActive(const PieceTracks& tracks, PieceHandle handle);
 
         void BeginGame(const Position& position);
 
-        void PlaceHandlesAtStart();
+        static void PlaceHandlesAtStart(PieceTracks& tracks);
 
-        /// Hands the pieces of @p position out to the registered handles; the handles left over go off the board
-        void DealPieces(const Position& position);
+        /// Hands the pieces of @p position out to the handles of @p pieces; the handles left over go off the board
+        static void DealPieces(PieceTracks& pieces, const Position& position);
 
-        /// Puts the handles where the game has them: dealt to the position it began from, then moved by each move played
-        void ReplayPieces();
+        /// Puts the handles of @p tracks where the game has them after its first @p moveCount moves: dealt to the position it began from, then moved by each of those moves
+        void ReplayPieces(PieceTracks& tracks, size_t moveCount) const;
+
+        /// Builds the shown position and its handles for _viewMoveCount
+        void BuildView();
+
+        /// Ends viewing without a word: the game is about to change
+        void DropView();
 
         Position _position = Position::Start();
         String _startFen;
@@ -273,7 +316,12 @@ namespace BECore::Chess {
         Vector<Premove> _premoves;
         Optional<PieceColor> _premoveColor;
 
-        HashMap<PieceHandle, PieceTrack> _pieces;
+        PieceTracks _pieces;
+
+        bool _viewing = false;
+        size_t _viewMoveCount = 0;
+        Position _viewPosition = Position::Start();
+        PieceTracks _viewPieces;
     };
 
 }  // namespace BECore::Chess
