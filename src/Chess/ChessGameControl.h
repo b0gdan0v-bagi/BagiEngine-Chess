@@ -38,7 +38,7 @@ namespace BECore::Chess {
      * be used while plays is null; one never stands in for the other); level and engine are those of the seat that plays when exactly one plays, else of White's seat. seats is
      * {"white": {"engine", "level"}, "black": {"engine", "level"}}, always there: the choice of each color, also for a color that nobody plays. seed is the integer 0..4294967295 of the game
      * that varies the own engine's pick among near-equal moves and the choice and move of every handicap (not Stockfish's own picks): 0 is no variety (every engine plays as it always did), a
-     * reset draws a new one, a set_state fen keeps it; the same position, seed and depth give the same answer. thinking is whether a program
+     * reset and a takeback draw a new one, a set_state fen keeps it; the same position, seed and depth give the same answer. thinking is whether a program
      * (either) is searching for its move, error null or {"kind", "detail"} (kind in snake_case:
      * "launch_failed", "timeout", "process_died", "protocol_error", "illegal_move", "no_move", "bad_request", "cancelled", "unsupported"; detail is the sentence
      * of the log). While an error stands the program does not play and waits for the version of the game to move (a reset, set_state, a move of someone else) or
@@ -98,7 +98,8 @@ namespace BECore::Chess {
      * moves played; without plies, what the person's takeback button takes (takeBackPlies: one move with two people or two programs; against the program the person's last move with its
      * answer, or only the person's move while the program is to move). Nothing can be taken back (no move; the only move is the program's) or a plies out of range is invalid_params and
      * changes nothing. A takeback is a change of the game: the version moves, a finished game is on again, a running search of the program and a standing opponent error go at the next frame,
-     * and the program answers again when it is its turn; the hint goes and the kept moves are rated again. The seed stays, so the own engine may play the same answer.
+     * and the program answers again when it is its turn; the hint goes and the kept moves are rated again. A new seed is drawn as at a reset, so the own engine may answer otherwise among
+     * near-equal moves (a client that compares answers across a takeback sets the seed after it).
      *
      * The state version is the version of the game (a changed seed moves it) plus the revision of the opponent (a pick, an error that appears or goes) plus the revision of the analyst (a switch of
      * the evaluation or the ratings, a hint asked or dropped, an answer or a rating that arrives or is dropped, an error that appears or goes, also the rater's, which is not in get_state), so a push

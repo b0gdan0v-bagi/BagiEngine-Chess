@@ -22,12 +22,16 @@ namespace BECore::Chess {
     }
 
     void ChessGameModel::Reset() {
+        DrawSeed();
+        BeginGame(Position::Start());
+        PlaceHandlesAtStart(_pieces);
+    }
+
+    void ChessGameModel::DrawSeed() {
         if (_seedSource) {
             const uint32_t drawn = _seedSource();
             _seed = drawn == 0 ? 1 : drawn;  // 0 is "no variety", never a drawn seed
         }
-        BeginGame(Position::Start());
-        PlaceHandlesAtStart(_pieces);
     }
 
     void ChessGameModel::SetSeed(uint32_t seed) noexcept {
@@ -197,6 +201,7 @@ namespace BECore::Chess {
         ClearSelection();
         ClearPremoves();
         _status = EvaluateStatus(_position);
+        DrawSeed();  // the person asked for another try, so the program may answer otherwise among near-equal moves
         ++_version;
         return count;
     }

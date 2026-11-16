@@ -1576,4 +1576,32 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(model.GetSeed(), 5U);
     }
 
+    TEST(ChessGameModelTest, ATakebackWithASeedSourceDrawsTheSeedInItsOneVersionStep) {
+        ChessGameModel model;
+        uint32_t next = 7;
+        model.SetSeedSource([&next]() { return next++; });
+        model.Reset();
+        ASSERT_EQ(model.GetSeed(), 7U);
+        ASSERT_TRUE(Play(model, "e2e4"));
+        ASSERT_TRUE(Play(model, "e7e5"));
+
+        const uint64_t before = model.GetVersion();
+        ASSERT_EQ(model.TakeBack(2), 2U);
+        EXPECT_EQ(model.GetSeed(), 8U);
+        EXPECT_EQ(model.GetVersion(), before + 1) << "the takeback and its seed are one step";
+
+        EXPECT_EQ(model.TakeBack(), 0U);
+        EXPECT_EQ(model.TakeBack(0), 0U);
+        EXPECT_EQ(model.GetSeed(), 8U) << "a takeback of nothing draws nothing";
+        EXPECT_EQ(model.GetVersion(), before + 1);
+    }
+
+    TEST(ChessGameModelTest, ATakebackOfABareModelKeepsItsSeed) {
+        ChessGameModel model;
+        model.SetSeed(123);
+        ASSERT_TRUE(Play(model, "e2e4"));
+        ASSERT_EQ(model.TakeBack(), 1U);
+        EXPECT_EQ(model.GetSeed(), 123U) << "no source: what the tests and a pinned client set stays";
+    }
+
 }  // namespace BECore::Chess::Tests

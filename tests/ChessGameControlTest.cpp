@@ -2666,6 +2666,19 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(MoveCount(), 0u);
     }
 
+    TEST_F(ChessGameControlTest, ATakebackDrawsANewSeedAndASeedAfterItPinsTheGame) {
+        uint32_t next = 4242;
+        model.SetSeedSource([&next] { return next++; });
+        ASSERT_TRUE(control.Reset(Json::object()).has_value());
+        ASSERT_EQ(OpponentMember("seed").get<int64_t>(), 4242);
+        Perform("e2e4");
+        ASSERT_TRUE(control.SetState(TakeBackRequest()).has_value());
+        EXPECT_EQ(OpponentMember("seed").get<int64_t>(), 4243) << "as after a reset";
+
+        SetOpponent(OpponentSeedRequest(Json(1)));
+        EXPECT_EQ(OpponentMember("seed").get<int64_t>(), 1);
+    }
+
     TEST_F(ChessGameControlTest, ATakebackIsAloneInItsCallAndAnObjectOfPliesOnly) {
         Perform("e2e4");
         const uint64_t version = control.GetStateVersion();

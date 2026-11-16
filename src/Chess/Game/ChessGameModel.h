@@ -31,7 +31,7 @@ namespace BECore::Chess {
      *
      * The seed varies what an engine picks among equal options (0 = no variety, the engines behave as they always did). A bare
      * model has seed 0 and keeps it over Reset(); a model with a seed source (SetSeedSource()) draws a new non-zero seed in
-     * Reset(), inside the version step of the new game. SetPosition() keeps the seed: it is no new draw, so a position set from
+     * Reset() and in a TakeBack() that takes something, inside their version step. SetPosition() keeps the seed: it is no new draw, so a position set from
      * outside stays reproducible. SetSeed() moves the version only when the value changes, so a search in flight is dropped.
      *
      * Viewing (ShowMoves()) shows an earlier position of the game on the board while the game stays where it is: a second set
@@ -46,7 +46,7 @@ namespace BECore::Chess {
         /// Opaque caller-provided identity (e.g. a ChessPieceComponent*).
         using PieceHandle = const void*;
 
-        /// Where Reset() gets a new seed from; returns any value (a 0 becomes 1).
+        /// Where Reset() and TakeBack() get a new seed from; returns any value (a 0 becomes 1).
         using SeedSource = MoveOnlyFunction<uint32_t()>;
 
         ChessGameModel();
@@ -54,7 +54,7 @@ namespace BECore::Chess {
         /// Restart from the standard opening position; with a seed source, also with a new seed (one version step for both).
         void Reset();
 
-        /// Empty (the default) keeps the seed over Reset().
+        /// Empty (the default) keeps the seed over Reset() and TakeBack().
         void SetSeedSource(SeedSource source) {
             _seedSource = std::move(source);
         }
@@ -171,7 +171,8 @@ namespace BECore::Chess {
          * The position goes back (its history of repetitions with it, so the threefold rule stays right), a finished game is
          * on again, the selection, a pending promotion and the premove queue are dropped, and the handles stand where a game
          * that played only the kept moves would have them (a captured piece is back, a promoted one is a pawn again). The
-         * version grows once, whatever the number of plies. The game goes back at most to GetStartFen().
+         * version grows once, whatever the number of plies; with a seed source a new seed is drawn in that step, so the program may answer otherwise. The game goes back at
+         * most to GetStartFen().
          *
          * @return how many moves were taken back; 0 (no moves, or @p plies is 0) changes nothing, the version included.
          */
@@ -285,6 +286,8 @@ namespace BECore::Chess {
         static const PieceTrack* FindActive(const PieceTracks& tracks, PieceHandle handle);
 
         void BeginGame(const Position& position);
+        /// A new non-zero seed from the source; without a source the seed stays. Moves no version: the caller's step covers it
+        void DrawSeed();
 
         static void PlaceHandlesAtStart(PieceTracks& tracks);
 
