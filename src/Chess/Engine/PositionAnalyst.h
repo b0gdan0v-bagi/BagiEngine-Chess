@@ -87,6 +87,9 @@ namespace BECore::Chess {
         /// How an engine is made; an empty one puts the default back (MakeAnalysisEngine over empty settings). Read at the next search. The rater gets the same factory
         void SetEngineFactory(AnalysisEngineFactory factory);
 
+        /// Makes an engine through the factory set (or the default). For the owner that hands the same factory to another object, which is move-only and so cannot be given twice
+        [[nodiscard]] std::expected<ChessEnginePtr, EngineError> MakeEngine(OpponentEngine engine) const;
+
         /**
          * @brief Tells the analyst which engine the person has picked, at once. Update() does the same with its argument; a caller that changes the pick between two frames and then reads
          * (the control adapter) calls this to have the reads right.
@@ -178,8 +181,6 @@ namespace BECore::Chess {
 
         /// Runs on the pool: asks the engine and leaves the answer in @p search. Its arguments are by value, so the frame owns everything it uses
         static Task<void> RunSearch(IntrusivePtrAtomic<Search> search, SearchRequest request);
-
-        [[nodiscard]] std::expected<ChessEnginePtr, EngineError> MakeEngine(OpponentEngine engine) const;
 
         /// Update() without the rater
         void UpdateSearch(const ChessGameModel& model, OpponentEngine picked);

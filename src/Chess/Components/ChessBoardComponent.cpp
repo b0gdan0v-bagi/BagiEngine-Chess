@@ -96,6 +96,9 @@ namespace BECore::Chess {
         // The opponent plays here, on the main thread, and not in OnDraw(): it changes the model
         game->GetOpponent().Update();
         game->GetAnalyst().Update(game->GetModel(), game->GetOpponent().GetEngine());  // the search runs on the pool; never waits
+        if (game->GetDrawJudge().Update(game->GetModel()) == DrawVerdict::Accepted) {
+            static_cast<void>(game->GetModel().AgreeDraw());  // the judge gives a verdict only for the version it was asked at, so the game is still on
+        }
         static_cast<void>(game->GetChoice().Color());  // reading it remembers the person's color of a side set from outside (the control API) before that side is cleared
         game->UpdateKeeper();                          // after the opponent and the choice: a move the program just played is saved in this frame's key
         LogResultOnce(game->GetModel());

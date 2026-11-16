@@ -31,6 +31,11 @@ namespace BECore::Chess {
         return chess ? &chess->GetAnalyst() : nullptr;
     }
 
+    DrawOfferJudge* ChessGame::GetActiveDrawJudge() {
+        ChessGame* chess = GetActive();
+        return chess ? &chess->GetDrawJudge() : nullptr;
+    }
+
     ChessGame::ChessGame() : _opponent(_model), _choice(_opponent), _control(_model, _opponent, _analyst) {
         // A new game draws a new seed; a device per draw because the source has to be copyable and a Reset is rare
         _model.SetSeedSource([]() -> uint32_t {
@@ -40,6 +45,8 @@ namespace BECore::Chess {
         });
         // The settings are read at the time of the search, so the ones Start() loads are the ones used
         _analyst.SetEngineFactory([this](OpponentEngine engine) { return MakeAnalysisEngine(engine, _opponent.GetSettings()); });
+        // A factory is move-only and the analyst's is replaced by tests after this constructor, so the judge asks the analyst at the time of the offer
+        _drawJudge.SetEngineFactory([this](OpponentEngine engine) { return _analyst.MakeEngine(engine); });
     }
 
     IControllableGame* ChessGame::AsControllable() {
@@ -63,6 +70,7 @@ namespace BECore::Chess {
         [[maybe_unused]] const auto engine = _opponent.SetEngine(_opponent.DefaultEngine());
         _choice.Reset();      // a new game starts with White remembered as the person's color
         _analyst.Shutdown();  // nothing is analysed or rated until the evaluation or the ratings are switched on or a hint is asked for
+        _drawJudge.Shutdown();
         // Last: the game it restores goes into the fresh model and choice above, and the key it takes is that of the game it leaves
         _keeper.Start(_model, _opponent, _choice);
         _stopped = false;
@@ -81,6 +89,20 @@ namespace BECore::Chess {
         _stopped = true;
         _opponent.Shutdown();
         _analyst.Shutdown();
+        _drawJudge.Shutdown();
+    }
+
+    std::expected<void, DrawOfferRefusal> ChessGame::OfferDraw() {
+        const ProgramSides sides = _opponent.GetSides();
+        if (const Optional<DrawOfferRefusal> refusal = DrawOfferRefusalFor(_model, sides)) {
+            return std::unexpected(*refusal);
+        }
+        if (!sides.white && !sides.black) {
+            static_cast<void>(_model.AgreeDraw());  // the refusal above ruled out the only error, a finished game
+            return {};
+        }
+        _drawJudge.Offer(_model, sides.white ? PieceColor::White : PieceColor::Black);
+        return {};
     }
 
     void ChessGame::Reset() {

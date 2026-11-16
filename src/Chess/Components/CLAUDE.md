@@ -5,7 +5,7 @@ Read this before changing `config/SceneConfig.xml` or a file of `config/nodes/` 
 ## Files
 
 ```
-ChessBoardComponent     the board: squares, highlights and coordinates, clicks and drags, the frame (the opponent's and the analyst's Update() every SceneUpdateEvent, the keeper, the result log)
+ChessBoardComponent     the board: squares, highlights and coordinates, clicks and drags, the frame (the opponent's, the analyst's and the draw judge's Update() every SceneUpdateEvent, the keeper, the result log)
 ChessHudComponent       on Hud, before its canvas: publishes the UIVars of the HUD and the opponent panel in its draw, answers ChessReset
 ChessMenuComponent      on MenuPanel: ChessOpenMenu, ChessOpenSection, ChessCloseMenu
 ChessOpponentPanelComponent  on OpponentPanel, before its canvas: ChessSet*, the Stockfish segment
@@ -73,7 +73,7 @@ Node `MovePanel` (`ChessMovePanel.xml`, layer 4, under `Material`, which draws o
 
 `SceneView` canvas on `Hud` (`ChessHud.xml`, layer 10), controls 56 units high in the margins: `Turn` (`{turn}`), `Menu` (fixed word, `ChessOpenMenu`; the owner wants no button named after a state, and no element is called `Opponent`), `Reset` (`ChessReset`), `Status` (`{status}`; wider in Portrait). The anchors keep the top row above the board and `Status` under it in every view (in Wide, `Menu`, `Reset` and `Status` are at the right end, over and under the move panel's box; `Status` lower there, "The move panel"). The widest sentences only just fit the narrowest window (480 px with insets): a longer one needs a reword or a wider box; an error says what went wrong, never what to do. `ChessUiTest` holds the layout on the matrix with every word of `tests/HudWords.h`, `ChessHudWebTest` the HTML twin of the default view's HUD (no Portrait twin).
 
-`ChessHudComponent` republishes the variables when the model's version, the controller's revision, `IsThinking()`, the person's color or the view changed: `turn` (`StatusText::Turn`, "Computer is thinking"), `status` (while viewing `StatusText::Viewing`, over all; else a standing error of the opponent, over "Check"; else the game status), `opponentError`, and the panel bindings `opponentMode`, `opponentColor` (**the person's** color), `opponentEngine`, `opponentLevel`.
+`ChessHudComponent` republishes the variables when the model's version, the controller's revision, the draw judge's revision, `IsThinking()`, the person's color or the view changed: `turn` (`StatusText::Turn`, "Computer is thinking", also while the draw judge is `Pending`), `status` (while viewing `StatusText::Viewing`, over all; else a standing error of the opponent; else "Draw declined" while the judge shows `Declined` for the model's version; else the game status, "Check" included), `opponentError`, and the panel bindings `opponentMode`, `opponentColor` (**the person's** color), `opponentEngine`, `opponentLevel`.
 
 ## The menu
 
