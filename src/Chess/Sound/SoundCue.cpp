@@ -6,19 +6,21 @@ namespace BECore::Chess {
 
         struct CueEntry {
             StringView path;
+            AudioBus bus;
             float volume;
         };
 
         constexpr float kFullVolume = 1.0f;
 
         // Indexed by SoundCue; a clip that sits louder or softer than its neighbours is trimmed here, not in the file
-        constexpr Array<CueEntry, 6> kCues{{
-            {"assets/sounds/move.wav", kFullVolume},
-            {"assets/sounds/capture.wav", kFullVolume},
-            {"assets/sounds/castle.wav", kFullVolume},
-            {"assets/sounds/check.wav", kFullVolume},
-            {"assets/sounds/promotion.wav", kFullVolume},
-            {"assets/sounds/game_end.wav", kFullVolume},
+        constexpr Array<CueEntry, 7> kCues{{
+            {"assets/sounds/move.wav", AudioBus::Sfx, kFullVolume},
+            {"assets/sounds/capture.wav", AudioBus::Sfx, kFullVolume},
+            {"assets/sounds/castle.wav", AudioBus::Sfx, kFullVolume},
+            {"assets/sounds/check.wav", AudioBus::Sfx, kFullVolume},
+            {"assets/sounds/promotion.wav", AudioBus::Sfx, kFullVolume},
+            {"assets/sounds/game_end.wav", AudioBus::Sfx, kFullVolume},
+            {"assets/sounds/click.wav", AudioBus::Ui, kFullVolume},
         }};
         static_assert(kCues.size() == EnumUtils<SoundCue>::Values().size(), "a cue needs its row");
 
@@ -58,8 +60,17 @@ namespace BECore::Chess {
         return paths[static_cast<size_t>(cue)];
     }
 
+    AudioBus CueBus(SoundCue cue) {
+        return EntryOf(cue).bus;
+    }
+
     float CueVolume(SoundCue cue) {
         return EntryOf(cue).volume;
+    }
+
+    bool ActionClicks(PoolString action) {
+        static const PoolString silent = PoolString::Intern("ChessSetVolume");
+        return action != silent;
     }
 
 }  // namespace BECore::Chess

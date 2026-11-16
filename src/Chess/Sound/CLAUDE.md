@@ -4,7 +4,7 @@ The sound of the board: one clip per played move, asked of `CoreManager::GetAudi
 
 ```
 Sound/
-├── SoundCue.*               pure: SoundCue (CORE_ENUM), MoveOutcome, CueOfMove, ClipPath, CueVolume, kSoundCueBus; no scene, no audio manager
+├── SoundCue.*               pure: SoundCue (CORE_ENUM), MoveOutcome, CueOfMove, ClipPath, CueVolume, CueBus, ActionClicks; no scene, no audio manager
 └── ChessSoundComponent.*    scene glue on the node Sound (config/nodes/ChessSound.xml): plays the cue of a move that was just played
 ```
 

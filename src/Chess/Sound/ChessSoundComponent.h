@@ -8,6 +8,10 @@ namespace BECore {
         struct SceneUpdateEvent;
     }
 
+    namespace InputEvents {
+        struct ActionEvent;
+    }
+
 }  // namespace BECore
 
 namespace BECore::Chess {
@@ -15,7 +19,7 @@ namespace BECore::Chess {
     class ChessGameModel;
 
     /**
-     * @brief Plays the sound of a move (SoundCue.h) on the board's bus when the active game's move list grows, whoever made the move.
+     * @brief Plays the sound of a move (SoundCue.h) when the active game's move list grows, whoever made the move, and the click of a button on the Ui bus on every action but the volume slider's.
      *
      * Draws nothing and keeps no game state: it remembers the model, its move count and its piece count of the last frame, and plays when the same model has more moves now. A first sighting
      * of a model, a smaller or equal count (a reset, a takeback, a position set from a FEN, a restored game before the first frame) only takes the new numbers, so nothing is asked for.
@@ -32,6 +36,7 @@ namespace BECore::Chess {
 
     private:
         void OnUpdate(const SceneEvents::SceneUpdateEvent& event);
+        void OnAction(const InputEvents::ActionEvent& event);
 
         /// Only compared, never read: a model that is gone is noticed by the active model being null or another one
         const ChessGameModel* _seenModel = nullptr;

@@ -10,7 +10,7 @@ namespace BECore::Chess::Tests {
 
         constexpr uint32_t kSampleRate = 44100;
         constexpr float kMaxPeak = 0.95f;
-        constexpr double kMinSeconds = 0.05;
+        constexpr double kMinSeconds = 0.02;  // a tick of a button is shorter than a knock
         constexpr double kMaxSeconds = 2.0;
         constexpr double kEndSeconds = 0.002;  // the stretch at the end that has to be near silence: a tone cut off there clicks
         constexpr float kEndLevel = 0.02f;

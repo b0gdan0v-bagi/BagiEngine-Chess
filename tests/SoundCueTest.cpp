@@ -93,6 +93,31 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(CueAfter(kStart, {"g1f3", "g8f6", "f3g1", "f6g8"}), SoundCue::Move);
     }
 
+    TEST(SoundCueTest, NoMoveEverGetsTheClickOfAButton) {
+        EXPECT_NE(CueAfter(kStart, {"e2e4"}), SoundCue::Click);
+        EXPECT_NE(CueAfter(kBothCastles, {"e1g1"}), SoundCue::Click);
+        EXPECT_NE(CueAfter(kPromotionAhead, {"e7e8q"}), SoundCue::Click);
+        EXPECT_NE(CueAfter(kStart, {"f2f3", "e7e5", "g2g4", "d8h4"}), SoundCue::Click);
+        EXPECT_NE(CueOfMove(MoveOutcome{}), SoundCue::Click) << "not even a default outcome";
+    }
+
+    TEST(SoundCueTest, TheBoardPlaysOnTheSfxBusAndTheButtonOnTheUiBus) {
+        for (const SoundCue cue : EnumUtils<SoundCue>::Values()) {
+            SCOPED_TRACE(String(EnumUtils<SoundCue>::ToString(cue)).c_str());
+            EXPECT_EQ(CueBus(cue), cue == SoundCue::Click ? AudioBus::Ui : AudioBus::Sfx);
+        }
+        EXPECT_EQ(ClipPath(SoundCue::Click), PoolString::Intern("assets/sounds/click.wav"));
+    }
+
+    TEST(SoundCueTest, EveryActionClicksButTheVolumeSlidersOne) {
+        EXPECT_FALSE(ActionClicks(PoolString::Intern("ChessSetVolume")));
+        for (const char* action : {"ChessOpenMenu", "ChessReset", "ChessSetLevel", "ChessSetMute", "NoSuchAction", ""}) {
+            SCOPED_TRACE(action);
+            EXPECT_TRUE(ActionClicks(PoolString::Intern(action)));
+        }
+        EXPECT_TRUE(ActionClicks(PoolString())) << "an action with no name";
+    }
+
     TEST(SoundCueTest, EveryCueHasItsOwnClipAndAVolumeThatCanBeHeard) {
         HashSet<PoolString> seen;
         for (const SoundCue cue : EnumUtils<SoundCue>::Values()) {

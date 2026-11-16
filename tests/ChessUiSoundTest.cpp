@@ -16,7 +16,7 @@ namespace BECore::Chess::Tests {
         void ExpectOneRequestFor(const Vector<AudioPlayRecord>& requests, SoundCue cue) {
             ASSERT_EQ(requests.size(), 1u);
             EXPECT_EQ(requests[0].clip, ClipPath(cue));
-            EXPECT_EQ(requests[0].bus, kSoundCueBus);
+            EXPECT_EQ(requests[0].bus, CueBus(cue));
             EXPECT_EQ(requests[0].volume, CueVolume(cue));
         }
 
@@ -209,5 +209,114 @@ namespace BECore::Chess::Tests {
         _manager->UpdateAll();
         EXPECT_EQ(AudioRequests(), before);
     }
+
+    /// A real click (what the UI took of its press and release) that asks for the click sound and for nothing else
+#define EXPECT_ONE_CLICK(click)                                                                                                                                                                        \
+    do {                                                                                                                                                                                               \
+        const uint64_t clickBefore = AudioRequests();                                                                                                                                                  \
+        EXPECT_TRUE((click).Both());                                                                                                                                                                   \
+        _manager->UpdateAll();                                                                                                                                                                         \
+        ExpectOneRequestFor(AudioRequestsSince(clickBefore), SoundCue::Click);                                                                                                                         \
+    } while (false)
+
+    TEST_F(ChessUiTest, TheButtonsOfTheHudAskForOneClickAndSoDoesTheCloseOfTheMenu) {
+        _manager->UpdateAll();
+        EXPECT_ONE_CLICK(ClickControl(*HudElement("Menu")));
+        ASSERT_TRUE(MenuList()->_visible);
+        EXPECT_ONE_CLICK(ClickMenuList("MenuClose"));
+        EXPECT_FALSE(MenuList()->_visible);
+    }
+
+    TEST_F(ChessUiTest, ResetAfterAMoveAsksForTheClickOnlyAndTheResetItselfIsSilent) {
+        _manager->UpdateAll();
+        ASSERT_TRUE(PlayAll(Model(), {"e2e4", "e7e5"}));
+        _manager->UpdateAll();
+
+        EXPECT_ONE_CLICK(ClickControl(*HudElement("Reset")));
+        EXPECT_TRUE(Model().GetMoves().empty());
+    }
+
+    TEST_F(ChessUiTest, TheButtonsOfTheMovePanelAskForOneClickAndTheDisabledTakeBackForNone) {
+        Settle();
+        const uint64_t idle = AudioRequests();
+        const UIElement& takeBack = MovePanelElement("MovePanelTakeBack");
+        ASSERT_TRUE(ClickerOf(takeBack)->disabled);
+        ClickControl(takeBack);
+        _manager->UpdateAll();
+        EXPECT_EQ(AudioRequests(), idle) << "a disabled button emits no action";
+
+        ASSERT_TRUE(PlayAll(Model(), {"e2e4", "e7e5", "g1f3"}));
+        Settle();
+        _manager->UpdateAll();
+        EXPECT_ONE_CLICK(ClickControl(MovePanelElement("MovePanelStepBack")));
+        EXPECT_ONE_CLICK(ClickControl(MovePanelElement("MovePanelStepForward")));
+        EXPECT_ONE_CLICK(ClickControl(MovePanelElement("MovePanelLatest")));
+        EXPECT_ONE_CLICK(ClickControl(takeBack));
+        EXPECT_EQ(Model().GetMoves().size(), 2u);
+    }
+
+    TEST_F(ChessUiTest, TheButtonsOfTheMenuAndOfItsSectionsAskForOneClick) {
+        _manager->UpdateAll();
+        EXPECT_ONE_CLICK(ClickControl(*HudElement("Menu")));
+        EXPECT_ONE_CLICK(ClickMenuList("MenuSectionOpponent"));
+        ASSERT_TRUE(Panel()->_visible);
+        EXPECT_ONE_CLICK(ClickPanel("LevelEasy"));
+        EXPECT_ONE_CLICK(ClickPanel("OpponentBack"));
+        EXPECT_ONE_CLICK(ClickMenuList("MenuSectionMoves"));
+        ASSERT_TRUE(CanvasOf("MovesSection")->_visible);
+        EXPECT_ONE_CLICK(ClickControl(ElementOf("MovesSection", "MovesSectionBack")));
+        ASSERT_TRUE(MenuList()->_visible);
+
+        const auto dim = DimCorner("MenuPanel", "MenuDim");
+        EXPECT_ONE_CLICK(ClickAtPixel(dim.first, dim.second));
+        EXPECT_FALSE(MenuList()->_visible);
+    }
+
+    TEST_F(ChessUiTest, APromotionButtonAsksForTheClickAtOnceAndForThePromotionOnTheNextFrame) {
+        StartFrom(kPromotionFen);
+        ClickMove("a7", "a8");
+        ASSERT_TRUE(Model().HasPendingPromotion());
+        _manager->UpdateAll();
+        const uint64_t before = AudioRequests();
+
+        ASSERT_TRUE(ClickPromotion("PromoteQueen").Both());
+        EXPECT_FALSE(Model().HasPendingPromotion());
+        const Vector<AudioPlayRecord> atTheClick = AudioRequestsSince(before);
+        ASSERT_EQ(atTheClick.size(), 1u);
+        EXPECT_EQ(atTheClick[0].clip, ClipPath(SoundCue::Click));
+        EXPECT_EQ(atTheClick[0].bus, AudioBus::Ui);
+
+        _manager->UpdateAll();
+        const Vector<AudioPlayRecord> requests = AudioRequestsSince(before);
+        ASSERT_EQ(requests.size(), 2u);
+        EXPECT_EQ(requests[1].clip, ClipPath(SoundCue::Promotion));
+        EXPECT_EQ(requests[1].bus, AudioBus::Sfx);
+    }
+
+    TEST_F(ChessUiTest, ASquareOfTheBoardAndAnElementWithNoClickerAskForNoClick) {
+        Settle();
+        const uint64_t before = AudioRequests();
+
+        Click("e2");
+        ASSERT_TRUE(Model().HasSelection());
+        _manager->UpdateAll();
+        EXPECT_EQ(AudioRequests(), before) << "a square is no action";
+
+        ASSERT_EQ(ClickerOf(*HudElement("Turn")), nullptr);
+        ClickControl(*HudElement("Turn"));
+        _manager->UpdateAll();
+        EXPECT_EQ(AudioRequests(), before);
+    }
+
+    TEST_F(ChessUiTest, SteadyFramesAfterClicksAskForNothing) {
+        _manager->UpdateAll();
+        EXPECT_ONE_CLICK(ClickControl(*HudElement("Menu")));
+        EXPECT_ONE_CLICK(ClickMenuList("MenuClose"));
+        const uint64_t before = AudioRequests();
+        IdleFrames();
+        EXPECT_EQ(AudioRequests(), before);
+    }
+
+#undef EXPECT_ONE_CLICK
 
 }  // namespace BECore::Chess::Tests
