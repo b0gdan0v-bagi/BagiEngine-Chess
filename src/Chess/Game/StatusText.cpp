@@ -43,10 +43,15 @@ namespace BECore::Chess {
                 case GameStatus::DrawFiftyMoves:
                     return "Draw: fifty-move rule";
                 case GameStatus::Resigned:
+                    return Format("{} resigned", ColorName(model.GetResigned().value_or(PieceColor::White)));
                 case GameStatus::DrawAgreed:
-                    return "";
+                    return "Draw agreed";
             }
             return "";
+        }
+
+        String DrawDeclined() {
+            return "Draw declined";
         }
 
         String Viewing(const ChessGameModel& model) {

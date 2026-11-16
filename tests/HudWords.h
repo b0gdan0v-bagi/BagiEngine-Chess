@@ -63,9 +63,9 @@ namespace BECore::Chess::Tests {
 
     }  // namespace HudWordsDetail
 
-    /// The words of the HUD, from a scratch game of their own that reaches every status and views its start and a move, then the thinking form of the turn and the sentence of every kind of engine
-    /// error (also the `opponentError` list: the variable of the panel's error line). The names of the segments of the panel (modes, colors, engines, levels)
-    /// are not here: they are elements of the scene that a test walks, and a test holds their text to the tables
+    /// The words of the HUD, from a scratch game of their own that reaches every status and views its start and a move, then the thinking form of the turn, the declined draw and the sentence of every
+    /// kind of engine error (also the `opponentError` list: the variable of the panel's error line). The names of the segments of the panel (modes, colors, engines, levels) are not here: they are
+    /// elements of the scene that a test walks, and a test holds their text to the tables
     inline HudWords AllHudWords() {
         using namespace HudWordsDetail;
         HudWords words;
@@ -101,6 +101,15 @@ namespace BECore::Chess::Tests {
         }
         Collect(words, seen, model);
 
+        for (const PieceColor loser : {PieceColor::White, PieceColor::Black}) {
+            model.Reset();
+            EXPECT_TRUE(model.Resign(loser).has_value());
+            Collect(words, seen, model);
+        }
+        model.Reset();
+        EXPECT_TRUE(model.AgreeDraw().has_value());
+        Collect(words, seen, model);
+
         // A new status of the game must get a position above, or its words would stay out of the matrix
         for (const GameStatus status : EnumUtils<GameStatus>::Values()) {
             EXPECT_NE(eastl::find(seen.begin(), seen.end(), status), seen.end()) << "no position of the scratch game reaches " << static_cast<int>(status);
@@ -117,6 +126,7 @@ namespace BECore::Chess::Tests {
         model.Reset();
         Add(words.turn, StatusText::Turn(model, true));
 
+        Add(words.status, StatusText::DrawDeclined());
         for (const EngineErrorKind kind : EnumUtils<EngineErrorKind>::Values()) {
             Add(words.status, OpponentText::Error(EngineError{kind, {}}));
         }

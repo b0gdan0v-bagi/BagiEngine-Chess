@@ -134,6 +134,45 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(ShownText(Label("Status")), "Checkmate");
     }
 
+    TEST_F(ChessUiTest, TheHudNamesAResignationAndAnAgreedDraw) {
+        ASSERT_TRUE(Model().Resign(PieceColor::White).has_value());
+        Draw();
+        EXPECT_EQ(ShownText(Label("Turn")), "Black wins");
+        EXPECT_EQ(ShownText(Label("Status")), "White resigned");
+
+        Model().Reset();
+        ASSERT_TRUE(Model().AgreeDraw().has_value());
+        Draw();
+        EXPECT_EQ(ShownText(Label("Turn")), "Draw");
+        EXPECT_EQ(ShownText(Label("Status")), "Draw agreed");
+    }
+
+    TEST_F(ChessUiTest, TheResultBarIsTheWinnersColorAfterAResignationAndGrayAfterAnAgreedDraw) {
+        // The colors of ChessResultComponent.cpp
+        const Color whiteWon{245, 245, 245, 245};
+        const Color blackWon{25, 25, 25, 245};
+        const Color drawn{140, 140, 140, 245};
+
+        ASSERT_TRUE(Model().Resign(PieceColor::White).has_value());
+        Draw();
+        EXPECT_FALSE(RectCalls(blackWon).empty()) << "White resigned: the bar of Black";
+        EXPECT_TRUE(RectCalls(whiteWon).empty());
+        EXPECT_TRUE(RectCalls(drawn).empty());
+
+        Model().Reset();
+        ASSERT_TRUE(Model().Resign(PieceColor::Black).has_value());
+        Draw();
+        EXPECT_FALSE(RectCalls(whiteWon).empty()) << "Black resigned: the bar of White";
+        EXPECT_TRUE(RectCalls(blackWon).empty());
+
+        Model().Reset();
+        ASSERT_TRUE(Model().AgreeDraw().has_value());
+        Draw();
+        EXPECT_FALSE(RectCalls(drawn).empty()) << "an agreed draw has no winner";
+        EXPECT_TRUE(RectCalls(whiteWon).empty());
+        EXPECT_TRUE(RectCalls(blackWon).empty());
+    }
+
     TEST_F(ChessUiTest, TheWordsAreDrawnAsText) {
         Draw();
 
