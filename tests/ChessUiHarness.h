@@ -99,6 +99,7 @@ namespace BECore::Chess::Tests {
         const Color kSelectedColor{120, 200, 120, 200};
         const Color kLegalMoveColor{120, 200, 120, 120};
         const Color kCheckColor{230, 60, 60, 210};
+        const Color kMateColor{150, 20, 20, 240};  // the king's square once mated
         const Color kHintFromColor{60, 130, 230, 110};
         const Color kHintToColor{60, 130, 230, 200};
         const Color kLastMoveColor{245, 205, 50, 140};  // the two squares of the last move, one color for both

@@ -183,7 +183,8 @@ namespace BECore::Chess {
             float kx = 0.0f;
             float ky = 0.0f;
             SquareToPixel(king.file, king.rank, bottom, kx, ky);
-            renderer.DrawFilledRect(kx, ky, squareSize, squareSize, !viewing && model->IsGameOver() ? kMateSquare : kCheckSquare);
+            // Only a mate looks like one: a game resigned or agreed drawn while in check ends with the king merely in check
+            renderer.DrawFilledRect(kx, ky, squareSize, squareSize, !viewing && model->GetStatus() == GameStatus::Checkmate ? kMateSquare : kCheckSquare);
         }
 
         // The hint, under the selection, once the engine has answered for this very position: the analyst gives nothing for another version, so any change of the position takes it off at the next

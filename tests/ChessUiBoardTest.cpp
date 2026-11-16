@@ -152,6 +152,27 @@ namespace BECore::Chess::Tests {
         EXPECT_TRUE(SameRect(check[0]->rect, SquareRect("e8")));
     }
 
+    TEST_F(ChessUiTest, OnlyAMateLooksMatedAndAGameResignedOrDrawnInCheckKeepsTheCheck) {
+        ASSERT_TRUE(PlayAll(Model(), {"f2f3", "e7e5", "g2g4", "d8h4"}));
+        ASSERT_EQ(Model().GetStatus(), GameStatus::Checkmate);
+        Draw();
+        ASSERT_EQ(RectCalls(kMateColor).size(), 1u);
+        EXPECT_TRUE(SameRect(RectCalls(kMateColor)[0]->rect, SquareRect("e1")));
+        EXPECT_TRUE(RectCalls(kCheckColor).empty());
+
+        for (const bool resign : {true, false}) {
+            SCOPED_TRACE(resign ? "resigned" : "drawn");
+            StartFrom(kBlackInCheck);
+            ASSERT_TRUE(Model().IsInCheck());
+            ASSERT_TRUE(resign ? Model().Resign(PieceColor::Black).has_value() : Model().AgreeDraw().has_value());
+            ASSERT_TRUE(Model().IsGameOver());
+            Draw();
+            EXPECT_TRUE(RectCalls(kMateColor).empty()) << "the king was not mated";
+            ASSERT_EQ(RectCalls(kCheckColor).size(), 1u);
+            EXPECT_TRUE(SameRect(RectCalls(kCheckColor)[0]->rect, SquareRect("e8")));
+        }
+    }
+
     TEST_F(ChessUiTest, APromotionInTheTurnedBoardAsksInAPlateThatDoesNotMove) {
         const auto plateOf = [this]() -> Optional<Rect> {
             Draw();

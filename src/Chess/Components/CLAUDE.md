@@ -32,7 +32,7 @@ ChessResultComponent    its own node (layer 1): dims the board and draws the res
 
 ## Highlights
 
-Order inside the board's `OnDraw()`: squares, the last move (`kLastMoveSquare`; castling marks the king only), the check (`kMateSquare` once over), the hint (`kHintFromSquare` / `kHintToSquare`, while the analyst has one and the game is not over), the premoves (`kPremoveSquare`), then the selection and its legal targets last so they stay readable. Each has a hue of its own. Nothing is kept: a move, reset or `set_state` takes a mark off at the next draw. **While an earlier position is viewed** (`ChessGameModel::IsViewing()`) the marks are those of `GetShownPosition()` (its move, its check), with no hint, premove, selection or result dim; a press on the board only ends the view, also in a finished game.
+Order inside the board's `OnDraw()`: squares, the last move (`kLastMoveSquare`; castling marks the king only), the check (`kMateSquare` only on a checkmate; a game resigned or drawn in check keeps the check's hue), the hint (`kHintFromSquare` / `kHintToSquare`, while the analyst has one and the game is not over), the premoves (`kPremoveSquare`), then the selection and its legal targets last so they stay readable. Each has a hue of its own. Nothing is kept: a move, reset or `set_state` takes a mark off at the next draw. **While an earlier position is viewed** (`ChessGameModel::IsViewing()`) the marks are those of `GetShownPosition()` (its move, its check), with no hint, premove, selection or result dim; a press on the board only ends the view, also in a finished game.
 
 ## The pieces
 
