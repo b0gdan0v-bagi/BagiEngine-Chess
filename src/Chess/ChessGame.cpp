@@ -36,7 +36,7 @@ namespace BECore::Chess {
         return chess ? &chess->GetDrawJudge() : nullptr;
     }
 
-    ChessGame::ChessGame() : _opponent(_model), _choice(_opponent), _control(_model, _opponent, _analyst) {
+    ChessGame::ChessGame() : _opponent(_model), _choice(_opponent), _control(_model, _opponent, _analyst, _drawJudge) {
         // A new game draws a new seed; a device per draw because the source has to be copyable and a Reset is rare
         _model.SetSeedSource([]() -> uint32_t {
             //-NoStd: the operating system's randomness is the real boundary of the seed
@@ -93,16 +93,7 @@ namespace BECore::Chess {
     }
 
     std::expected<void, DrawOfferRefusal> ChessGame::OfferDraw() {
-        const ProgramSides sides = _opponent.GetSides();
-        if (const Optional<DrawOfferRefusal> refusal = DrawOfferRefusalFor(_model, sides)) {
-            return std::unexpected(*refusal);
-        }
-        if (!sides.white && !sides.black) {
-            static_cast<void>(_model.AgreeDraw());  // the refusal above ruled out the only error, a finished game
-            return {};
-        }
-        _drawJudge.Offer(_model, sides.white ? PieceColor::White : PieceColor::Black);
-        return {};
+        return PersonOffersDraw(_model, _opponent.GetSides(), _drawJudge);
     }
 
     void ChessGame::Reset() {

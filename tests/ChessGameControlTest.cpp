@@ -80,7 +80,7 @@ namespace BECore::Chess::Tests {
                 ::BECore::Tests::EngineEnvironment::EnsureCoreServices();  // TaskManager, which the searches run on
             }
 
-            ChessGameControlTest() : opponent(model), control(model, opponent, analyst) {
+            ChessGameControlTest() : opponent(model), control(model, opponent, analyst, drawJudge) {
 #if CHESS_NO_STOCKFISH
                 // The cases below are a world of doubles in which "stockfish" is a name a test factory answers. A build without Stockfish starts with the own engine, so the
                 // fixture picks the name first, through a factory that makes any double. The cases of a real game of that build are those that say `WithoutStockfish`
@@ -223,9 +223,17 @@ namespace BECore::Chess::Tests {
                 return FromStdString(AnalysisOfState().dump()) + " v" + ToString(control.GetStateVersion());
             }
 
+            /// What ChessBoardComponent does with the draw judge in a frame: its step, and an accepted verdict ends the game
+            void DrawFrame() {
+                if (drawJudge.Update(model) == DrawVerdict::Accepted) {
+                    static_cast<void>(model.AgreeDraw());
+                }
+            }
+
             ChessGameModel model;
             OpponentController opponent;
             PositionAnalyst analyst;
+            DrawOfferJudge drawJudge;
             ChessGameControl control;
         };
 
@@ -719,7 +727,8 @@ namespace BECore::Chess::Tests {
         ChessGameModel freshModel;
         OpponentController freshOpponent(freshModel);
         PositionAnalyst freshAnalyst;
-        ChessGameControl freshControl(freshModel, freshOpponent, freshAnalyst);
+        DrawOfferJudge freshJudge;
+        ChessGameControl freshControl(freshModel, freshOpponent, freshAnalyst, freshJudge);
         const auto freshState = freshControl.GetState();
         ASSERT_TRUE(freshState.has_value());
         const Json* freshOpponentState = FindJsonMember(*freshState, "opponent");
@@ -2859,6 +2868,188 @@ namespace BECore::Chess::Tests {
         Perform("b8c6");  // Black is to move again: the takeback took e7e5
     }
 
+    // ---- Offering a draw (set_state {"draw"}) ----
+
+    namespace {
+
+        /// {"draw": {}}
+        Json DrawRequest() {
+            Json request = Json::object();
+            request["draw"] = Json::object();
+            return request;
+        }
+
+        constexpr int kEvenScore = 0;
+        constexpr int kProgramIsClearlyBetter = 300;  // centipawns for the program, far over what it accepts a draw at
+
+        AnalysisScore Cp(int value) {
+            return AnalysisScore{AnalysisScoreKind::Centipawns, value};
+        }
+
+    }  // namespace
+
+    TEST_F(ChessGameControlTest, TheStateHasNoDrawOfferUntilOneIsMade) {
+        const Json state = State();
+        const Json* offer = FindJsonMember(state, "drawOffer");
+        ASSERT_NE(offer, nullptr);
+        EXPECT_TRUE(offer->is_null());
+    }
+
+    TEST_F(ChessGameControlTest, WithTwoPeopleADrawIsAgreedAtOnceAndATakebackPutsTheGameOnAgain) {
+        Perform("e2e4");
+        Perform("e7e5");
+        const uint64_t version = control.GetStateVersion();
+
+        ASSERT_TRUE(control.SetState(DrawRequest()).has_value());
+
+        const Json state = State();
+        EXPECT_EQ(StringMember(state, "status"), "draw_agreed");
+        EXPECT_TRUE(state["winner"].is_null()) << "an agreed draw has no winner";
+        EXPECT_TRUE(state["drawOffer"].is_null());
+        EXPECT_EQ(control.GetStateVersion(), version + 1);
+        EXPECT_TRUE(Actions().empty());
+        EXPECT_FALSE(control.PerformAction(MoveAction("g1f3")).has_value());
+
+        ASSERT_TRUE(control.SetState(TakeBackRequest()).has_value());
+        EXPECT_EQ(StringMember(State(), "status"), "ongoing");
+        EXPECT_FALSE(Actions().empty());
+    }
+
+    TEST_F(ChessGameControlTest, AgainstTheProgramTheCallAnswersAtOnceAndTheVerdictComesWithTheFrames) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        CountingFactory opponentFactory({New<InstantEngine>()});
+        opponent.SetEngineFactory(opponentFactory.AsFactory());
+        const auto judge = New<AnalysingEngine>(Cp(kEvenScore));
+        judge->Gate(true);
+        CountingAnalysisFactory judgeFactory({judge});
+        drawJudge.SetEngineFactory(judgeFactory.AsFactory());
+        SetOpponent(OpponentRequest("black"));  // the person has White and is to move
+        const uint64_t before = control.GetStateVersion();
+
+        ASSERT_TRUE(control.SetState(DrawRequest()).has_value());
+
+        const Json pending = State();
+        EXPECT_EQ(StringMember(pending, "status"), "ongoing") << "the program has not answered yet";
+        EXPECT_EQ(StringMember(pending["drawOffer"], "state"), "pending");
+        EXPECT_GT(control.GetStateVersion(), before) << "a client that waits for a change sees the offer";
+        const uint64_t offered = control.GetStateVersion();
+
+        ASSERT_TRUE(control.SetState(DrawRequest()).has_value()) << "an offer that is pending is not an error";
+        EXPECT_EQ(control.GetStateVersion(), offered) << "and changes nothing";
+        EXPECT_TRUE(WaitUntil([&] { return judge->Calls() == 1; }));
+        EXPECT_EQ(judgeFactory.Engines().size(), 1u);
+        EXPECT_EQ(judgeFactory.Engines()[0], "own");
+        EXPECT_EQ(judge->Calls(), 1);
+
+        judge->Open();
+        ASSERT_TRUE(WaitUntil([&] {
+            DrawFrame();
+            return model.IsGameOver();
+        }));
+        const Json state = State();
+        EXPECT_EQ(StringMember(state, "status"), "draw_agreed");
+        EXPECT_TRUE(state["winner"].is_null());
+        EXPECT_TRUE(state["drawOffer"].is_null());
+        EXPECT_GT(control.GetStateVersion(), offered);
+    }
+
+    TEST_F(ChessGameControlTest, AnOfferTheProgramRefusesIsDeclinedUntilTheVersionMoves) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        CountingFactory opponentFactory({New<InstantEngine>()});
+        opponent.SetEngineFactory(opponentFactory.AsFactory());
+        const auto judge = New<AnalysingEngine>(Cp(-kProgramIsClearlyBetter));  // for the side to move, the person
+        CountingAnalysisFactory judgeFactory({judge});
+        drawJudge.SetEngineFactory(judgeFactory.AsFactory());
+        SetOpponent(OpponentRequest("black"));
+
+        ASSERT_TRUE(control.SetState(DrawRequest()).has_value());
+        ASSERT_TRUE(WaitUntil([&] {
+            DrawFrame();
+            return drawJudge.GetState(model) == DrawOfferState::Declined;
+        }));
+        const Json declined = State();
+        EXPECT_EQ(StringMember(declined, "status"), "ongoing");
+        EXPECT_EQ(StringMember(declined["drawOffer"], "state"), "declined");
+        const uint64_t version = control.GetStateVersion();
+
+        ASSERT_TRUE(control.SetState(DrawRequest()).has_value()) << "the same position is not offered again, and that is no error";
+        for (int frame = 0; frame < 100; ++frame) {
+            DrawFrame();
+        }
+        EXPECT_EQ(control.GetStateVersion(), version);
+        EXPECT_EQ(judge->Calls(), 1);
+        EXPECT_EQ(StringMember(State()["drawOffer"], "state"), "declined");
+
+        Perform("e2e4");
+        EXPECT_TRUE(State()["drawOffer"].is_null()) << "a move clears it";
+    }
+
+    TEST_F(ChessGameControlTest, ADrawIsRefusedWithTwoProgramsAndOnTheTurnOfTheProgramAndChangesNothing) {
+        CountingFactory factory({New<InstantEngine>(), New<InstantEngine>()});
+        opponent.SetEngineFactory(factory.AsFactory());
+        SetOpponent(OpponentRequest("white"));  // the program plays White and is to move
+        uint64_t version = control.GetStateVersion();
+        EXPECT_EQ(SetStateError(DrawRequest()), "invalid_params");
+        EXPECT_EQ(control.GetStateVersion(), version);
+        EXPECT_TRUE(State()["drawOffer"].is_null());
+
+        SetOpponent(OpponentRequest("both"));
+        version = control.GetStateVersion();
+        EXPECT_EQ(SetStateError(DrawRequest()), "invalid_params");
+        EXPECT_EQ(control.GetStateVersion(), version);
+        EXPECT_EQ(StringMember(State(), "status"), "ongoing");
+    }
+
+    TEST_F(ChessGameControlTest, ABadDrawIsInvalidParamsAndChangesNothing) {
+        Perform("e2e4");
+        const uint64_t version = control.GetStateVersion();
+        Json withMember = DrawRequest();
+        withMember["draw"]["reason"] = "tired";
+        EXPECT_EQ(SetStateError(withMember), "invalid_params");
+        Json notAnObject = Json::object();
+        notAnObject["draw"] = true;
+        EXPECT_EQ(SetStateError(notAnObject), "invalid_params");
+        Json nullDraw = Json::object();
+        nullDraw["draw"] = Json();
+        EXPECT_EQ(SetStateError(nullDraw), "invalid_params");
+
+        Json withFen = DrawRequest();
+        withFen["fen"] = MakeJsonString(kMateInOneFen);
+        EXPECT_EQ(SetStateError(withFen), "invalid_params");
+        Json withOpponent = DrawRequest();
+        withOpponent["opponent"] = Json::object();
+        EXPECT_EQ(SetStateError(withOpponent), "invalid_params");
+        Json withAnalysis = DrawRequest();
+        withAnalysis["analysis"] = Json::object();
+        EXPECT_EQ(SetStateError(withAnalysis), "invalid_params");
+        Json withTakeBack = DrawRequest();
+        withTakeBack["takeBack"] = Json::object();
+        EXPECT_EQ(SetStateError(withTakeBack), "invalid_params");
+        Json withResign = DrawRequest();
+        withResign["resign"] = Json::object();
+        EXPECT_EQ(SetStateError(withResign), "invalid_params");
+
+        EXPECT_EQ(StringMember(State(), "status"), "ongoing");
+        EXPECT_EQ(MoveCount(), 1u);
+        EXPECT_EQ(control.GetStateVersion(), version);
+    }
+
+    TEST_F(ChessGameControlTest, OfferingADrawInAFinishedGameIsGameOver) {
+        ASSERT_TRUE(control.SetState(DrawRequest()).has_value());
+        const uint64_t version = control.GetStateVersion();
+        EXPECT_EQ(SetStateError(DrawRequest()), "game_over") << "a draw that was agreed is over";
+        EXPECT_EQ(control.GetStateVersion(), version);
+
+        ASSERT_TRUE(control.Reset(Json::object()).has_value());
+        ASSERT_TRUE(control.SetState(ResignRequest(Json("white"))).has_value());
+        EXPECT_EQ(SetStateError(DrawRequest()), "game_over");
+        EXPECT_EQ(StringMember(State(), "status"), "resigned");
+
+        SetFen(kMateInOneFen);
+        Perform("a1a8");
+        EXPECT_EQ(SetStateError(DrawRequest()), "game_over");
+    }
+
 #if CHESS_NO_STOCKFISH
 
     // ---- Without Stockfish (CHESS_NO_STOCKFISH): the default factory of a real controller ----
@@ -2867,7 +3058,7 @@ namespace BECore::Chess::Tests {
 
         /// A control adapter over a controller of its own, with the default factory and the default engine of this build
         struct RealDefaults {
-            RealDefaults() : opponent(model), control(model, opponent, analyst) {}
+            RealDefaults() : opponent(model), control(model, opponent, analyst, drawJudge) {}
 
             Json OpponentState() const {
                 const auto state = control.GetState();
@@ -2878,6 +3069,7 @@ namespace BECore::Chess::Tests {
             ChessGameModel model;
             OpponentController opponent;
             PositionAnalyst analyst;
+            DrawOfferJudge drawJudge;
             ChessGameControl control;
         };
 

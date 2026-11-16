@@ -189,6 +189,8 @@ namespace BECore::Chess {
         constexpr const char* kResignUsage =
             "'resign' has to be an object like {} (the person's color, or the side to move with two people) or {\"color\": \"white\"} (the member is optional, \"white\" or \"black\")";
 
+        constexpr const char* kDrawUsage = "'draw' has to be an empty object {}: the person offers a draw (nothing else is a member of it)";
+
         constexpr const char* kTakeBackUsage = "'takeBack' has to be an object like {} (the button's rule) or {\"plies\": 2} (the member is an optional integer from 1 to the moves played)";
 
         /// The SAN of every move of the game, in the order of GetMoves()
@@ -292,7 +294,8 @@ namespace BECore::Chess {
 
     }  // namespace
 
-    ChessGameControl::ChessGameControl(ChessGameModel& model, OpponentController& opponent, PositionAnalyst& analyst) : _model(model), _opponent(opponent), _analyst(analyst) {}
+    ChessGameControl::ChessGameControl(ChessGameModel& model, OpponentController& opponent, PositionAnalyst& analyst, DrawOfferJudge& drawJudge)
+        : _model(model), _opponent(opponent), _analyst(analyst), _drawJudge(drawJudge) {}
 
     MoveList ChessGameControl::LegalMoves() const {
         return _model.IsGameOver() ? MoveList() : MoveGenerator::GenerateLegal(_model.GetPosition());
@@ -327,6 +330,7 @@ namespace BECore::Chess {
         state["opponent"] = OpponentJson();
         state["material"] = MaterialJson(_model.GetPosition());
         state["analysis"] = AnalysisJson();
+        state["drawOffer"] = DrawOfferJson();
         return state;
     }
 
@@ -357,6 +361,16 @@ namespace BECore::Chess {
         opponent["thinking"] = _opponent.IsThinking();
         opponent["error"] = ErrorJson(error);
         return opponent;
+    }
+
+    Json ChessGameControl::DrawOfferJson() const {
+        const DrawOfferState offer = _drawJudge.GetState(_model);
+        if (offer == DrawOfferState::Idle) {
+            return Json();
+        }
+        Json described = Json::object();
+        described["state"] = offer == DrawOfferState::Pending ? "pending" : "declined";
+        return described;
     }
 
     Json ChessGameControl::AnalysisJson() const {
@@ -472,23 +486,30 @@ namespace BECore::Chess {
         const Json* analysisMember = FindJsonMember(state, "analysis");
         const Json* takeBackMember = FindJsonMember(state, "takeBack");
         const Json* resignMember = FindJsonMember(state, "resign");
-        if (!fenMember && !opponentMember && !analysisMember && !takeBackMember && !resignMember) {
+        const Json* drawMember = FindJsonMember(state, "draw");
+        if (!fenMember && !opponentMember && !analysisMember && !takeBackMember && !resignMember && !drawMember) {
             return std::unexpected(MakeControlError(ControlErrors::kInvalidParams,
                                                     "'fen' (a FEN string), 'opponent' ({\"plays\", \"level\", \"engine\", \"white\", \"black\", \"seed\"}), both, or "
-                                                    "'analysis' ({\"evaluation\", \"hint\", \"ratings\"}), 'takeBack' ({\"plies\"}) or 'resign' ({\"color\"}) alone are needed"));
+                                                    "'analysis' ({\"evaluation\", \"hint\", \"ratings\"}), 'takeBack' ({\"plies\"}), 'resign' ({\"color\"}) or 'draw' ({}) alone are needed"));
         }
         if (takeBackMember) {
-            if (fenMember || opponentMember || analysisMember || resignMember) {
+            if (fenMember || opponentMember || analysisMember || resignMember || drawMember) {
                 return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, "'takeBack' cannot be combined with another member: what it takes back depends on the game they change"));
             }
             return SetTakeBack(*takeBackMember);
         }
         if (resignMember) {
-            if (fenMember || opponentMember || analysisMember) {
+            if (fenMember || opponentMember || analysisMember || drawMember) {
                 return std::unexpected(
                     MakeControlError(ControlErrors::kInvalidParams, "'resign' cannot be combined with another member: who resigns depends on the game and the opponent they change"));
             }
             return SetResign(*resignMember);
+        }
+        if (drawMember) {
+            if (fenMember || opponentMember || analysisMember) {
+                return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, "'draw' cannot be combined with another member: the offer is judged for the game and the opponent they change"));
+            }
+            return SetDraw(*drawMember);
         }
         if (analysisMember && (fenMember || opponentMember)) {
             return std::unexpected(MakeControlError(ControlErrors::kInvalidParams,
@@ -627,8 +648,27 @@ namespace BECore::Chess {
         return {};
     }
 
+    std::expected<void, ControlError> ChessGameControl::SetDraw(const Json& draw) {
+        if (!draw.is_object() || !draw.empty()) {
+            return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, kDrawUsage));
+        }
+        const std::expected<void, DrawOfferRefusal> offered = PersonOffersDraw(_model, _opponent.GetSides(), _drawJudge);
+        if (offered) {
+            return {};
+        }
+        switch (offered.error()) {
+            case DrawOfferRefusal::GameOver:
+                return std::unexpected(MakeControlError(ChessControlErrors::kGameOver, Format("the game is over ({}): there is nothing to offer a draw in", StatusName(_model.GetStatus()))));
+            case DrawOfferRefusal::NotYourTurn:
+                return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, "the program plays the side to move: a draw is offered on the person's turn"));
+            case DrawOfferRefusal::NoPerson:
+                return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, "two programs play: nobody is there to offer a draw"));
+        }
+        return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, kDrawUsage));
+    }
+
     uint64_t ChessGameControl::GetStateVersion() const {
-        return _model.GetVersion() + _opponent.GetRevision() + _analyst.GetRevision();
+        return _model.GetVersion() + _opponent.GetRevision() + _analyst.GetRevision() + _drawJudge.GetRevision();
     }
 
 }  // namespace BECore::Chess

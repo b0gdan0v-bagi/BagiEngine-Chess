@@ -124,4 +124,16 @@ namespace BECore::Chess {
         Resolve(DrawVerdict::Declined);
     }
 
+    std::expected<void, DrawOfferRefusal> PersonOffersDraw(ChessGameModel& model, ProgramSides programPlays, DrawOfferJudge& judge) {
+        if (const Optional<DrawOfferRefusal> refusal = DrawOfferRefusalFor(model, programPlays)) {
+            return std::unexpected(*refusal);
+        }
+        if (!programPlays.white && !programPlays.black) {
+            static_cast<void>(model.AgreeDraw());  // the refusal above ruled out the only error, a finished game
+            return {};
+        }
+        judge.Offer(model, programPlays.white ? PieceColor::White : PieceColor::Black);
+        return {};
+    }
+
 }  // namespace BECore::Chess

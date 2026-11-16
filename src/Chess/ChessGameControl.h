@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Chess/Engine/DrawOfferJudge.h>
 #include <Chess/Engine/OpponentController.h>
 #include <Chess/Engine/PositionAnalyst.h>
 #include <Chess/Game/ChessGameModel.h>
@@ -23,7 +24,7 @@ namespace BECore::Chess {
     /**
      * @brief The external control API of Chess: the position, the legal moves, a way to play one, to load a position and to pick the computer opponent.
      *
-     * State: {"fen", "board", "turn", "status", "winner", "inCheck", "legalMoveCount", "startFen", "moves", "sanMoves", "takeBackPlies", "opponent", "material", "analysis"}.
+     * State: {"fen", "board", "turn", "status", "winner", "inCheck", "legalMoveCount", "startFen", "moves", "sanMoves", "takeBackPlies", "opponent", "material", "analysis", "drawOffer"}.
      * board is 8 strings, rank 8 first, file a first: white pieces are upper case (PNBRQK), black ones lower case, '.' is an
      * empty square. turn and winner are "white" or "black" (winner is null until a side has won). status is one of
      * "ongoing", "checkmate", "stalemate", "draw_insufficient_material", "draw_threefold", "draw_fifty_moves", "resigned", "draw_agreed"; everything but
@@ -79,7 +80,7 @@ namespace BECore::Chess {
      * SetState takes {"fen": ".."} (any position that Position::FromFen() accepts, which may be a finished game), {"opponent": {"plays": .., "level": ..,
      * "engine": .., "white": {"engine": .., "level": ..}, "black": {..}, "seed": n}} (inside it a missing member means unchanged, per seat; plays is "white", "black", "both" or null;
      * seed is an integer 0..4294967295, anything else is invalid_params, and it is a valid pick alone; a seed that equals the current one changes nothing;
-     * level and engine an id, "stockfish" or "own" for the engine, exactly as written) or both; none of fen, opponent, analysis, takeBack, resign is invalid_params. level and engine set BOTH
+     * level and engine an id, "stockfish" or "own" for the engine, exactly as written) or both; none of fen, opponent, analysis, takeBack, resign, draw is invalid_params. level and engine set BOTH
      * seats; the seat objects "white" and "black" (members optional, nothing else allowed in them) then override one seat; plays says who plays and a missing
      * plays keeps the sides as they are. "both" starts a game of two programs, each with an engine object of its own; "plays": "white" while both play is a takeover (the person
      * has Black, White's program and its search stay), null ends it. Everything is checked before anything changes, so a refused call (invalid_params) changes nothing.
@@ -106,16 +107,24 @@ namespace BECore::Chess {
      * is no such color and a missing one is invalid_params. A color that is not "white" or "black", another member inside resign or a resign that is not an object is invalid_params and changes
      * nothing; a finished game is game_over. The version moves once; takeBack puts the game on again (a resignation is not in the moves), list_actions is empty after it, as after a mate.
      *
+     * SetState also takes {"draw": {}} **alone** (a member inside it, or draw combined with another member, is invalid_params): the person offers a draw. With two people the game ends at once
+     * as "draw_agreed" (the client stands for both). Against the program (it plays one color) the call answers ok and the own engine judges the position in the background (the verdict comes
+     * with the frames, not with the call): drawOffer is {"state": "pending"} while it judges, then either status "draw_agreed" (no winner; drawOffer null again) or {"state": "declined"}, which
+     * stays until the version of the game moves (a move, a reset, a takeback, set_state). The program accepts when its own score for the position is at most 50 centipawns in its favour; a
+     * mate against it accepts, a mate for it refuses, and a search that fails declines. An offer for a position that was offered already (pending or declined) changes nothing. With two
+     * programs, and while the program is to move (the offer is the person's, made on their turn), draw is invalid_params; a finished game is game_over. drawOffer is null when there is no offer
+     * for the position now on the board.
+     *
      * The state version is the version of the game (a changed seed moves it) plus the revision of the opponent (a pick, an error that appears or goes) plus the revision of the analyst (a switch of
-     * the evaluation or the ratings, a hint asked or dropped, an answer or a rating that arrives or is dropped, an error that appears or goes, also the rater's, which is not in get_state), so a push
-     * reports a change of the opponent and a hint or a rating that came as well; it never goes back.
+     * the evaluation or the ratings, a hint asked or dropped, an answer or a rating that arrives or is dropped, an error that appears or goes, also the rater's, which is not in get_state) plus
+     * that of the draw offer (an offer, its verdict, a drop), so a push reports a change of the opponent, a hint, a rating or a verdict that came as well; it never goes back.
      *
      * The analyst is told of a changed engine pick by SetState at once, so a get_state right after never shows the old engine's answer.
      */
     class ChessGameControl : public IControllableGame {
     public:
-        /// All three must outlive the adapter (ChessGame declares them before it)
-        ChessGameControl(ChessGameModel& model, OpponentController& opponent, PositionAnalyst& analyst);
+        /// All four must outlive the adapter (ChessGame declares them before it)
+        ChessGameControl(ChessGameModel& model, OpponentController& opponent, PositionAnalyst& analyst, DrawOfferJudge& drawJudge);
 
         [[nodiscard]] std::expected<Json, ControlError> GetState() const override;
         [[nodiscard]] std::expected<Json, ControlError> GetActions() const override;
@@ -130,13 +139,16 @@ namespace BECore::Chess {
 
         [[nodiscard]] Json OpponentJson() const;
         [[nodiscard]] Json AnalysisJson() const;
+        [[nodiscard]] Json DrawOfferJson() const;
         std::expected<void, ControlError> SetAnalysis(const Json& analysis);
         std::expected<void, ControlError> SetTakeBack(const Json& takeBack);
         std::expected<void, ControlError> SetResign(const Json& resign);
+        std::expected<void, ControlError> SetDraw(const Json& draw);
 
         ChessGameModel& _model;
         OpponentController& _opponent;
         PositionAnalyst& _analyst;
+        DrawOfferJudge& _drawJudge;
     };
 
 }  // namespace BECore::Chess

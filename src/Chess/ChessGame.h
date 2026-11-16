@@ -73,12 +73,8 @@ namespace BECore::Chess {
             return _drawJudge;
         }
 
-        /**
-         * @brief The person offers a draw: the one door of the menu button and the control API.
-         *
-         * Two people agree at once (the game ends as DrawAgreed). Against the program the offer goes to the judge, whose verdict comes with the frames (ChessBoardComponent::OnUpdate); an offer
-         * the judge already has for this version does nothing. The refusal is DrawOfferRefusalFor()'s and changes nothing.
-         */
+        /// The person offers a draw, for the menu's button (PersonOffersDraw(): two people agree at once, against the program the judge's verdict comes with the frames of
+        /// ChessBoardComponent::OnUpdate); the control adapter makes the same offer through the same function
         std::expected<void, DrawOfferRefusal> OfferDraw();
 
         const ChessSaveKeeper& GetKeeper() const noexcept {

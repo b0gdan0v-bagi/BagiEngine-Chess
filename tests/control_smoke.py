@@ -961,6 +961,30 @@ def run_takeback_scenario(client: BagiControlClient, headless: bool) -> None:
     reply = client.call("get_state")
     check(reply["state"]["moves"] == [] and reply["version"] > version, f"the button took back to {reply['state']['moves']}")
 
+    check_a_draw_ends_the_game_and_a_takeback_reopens_it(client)
+
+
+def check_a_draw_ends_the_game_and_a_takeback_reopens_it(client: BagiControlClient) -> None:
+    """Two people: set_state {"draw": {}} agrees a draw at once (no judge, no frame needed), and the takeback of the move list puts the game on again."""
+    client.call("reset")
+    client.call("set_state", {"opponent": {"plays": None}})
+    client.call("perform_action", move("e2e4"))
+    client.call("perform_action", move("e7e5"))
+    version = client.call("get_state")["version"]
+
+    client.call("set_state", {"draw": {}})
+    reply = client.call("get_state")
+    state = reply["state"]
+    check(state["status"] == "draw_agreed" and state["winner"] is None and state["drawOffer"] is None, f"an agreed draw reads {state['status']}, winner {state['winner']}, offer {state['drawOffer']}")
+    check(reply["version"] > version, "an agreed draw did not move the state version")
+    check(client.call("list_actions")["actions"] == [], "a game ended by agreement still lists moves")
+    expect_error("game_over", lambda: client.call("set_state", {"draw": {}}), "a draw offered in a game that was agreed")
+
+    client.call("set_state", {"takeBack": {}})
+    state = client.call("get_state")["state"]
+    check(state["status"] == "ongoing" and state["moves"] == ["e2e4"], f"after the takeback the game reads {state['status']} with the moves {state['moves']}")
+    let_the_pieces_settle(client)
+
 
 def find_ui_canvas(tree: dict, node: str) -> dict:
     """The canvas of the node of that name in a `ui_tree` answer."""

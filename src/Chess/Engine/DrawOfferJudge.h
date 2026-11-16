@@ -119,4 +119,12 @@ namespace BECore::Chess {
         uint64_t _revision = 0;
     };
 
+    /**
+     * @brief The person offers a draw: the one body behind every door (ChessGame::OfferDraw() for the menu, the control adapter).
+     *
+     * Refused as DrawOfferRefusalFor() says, and nothing changes then. Two people agree at once: the game ends as DrawAgreed. Against the program the offer goes to @p judge, whose verdict
+     * comes with the frames; an offer the judge already has for this version does nothing. @p programPlays is the sides the program plays.
+     */
+    std::expected<void, DrawOfferRefusal> PersonOffersDraw(ChessGameModel& model, ProgramSides programPlays, DrawOfferJudge& judge);
+
 }  // namespace BECore::Chess
