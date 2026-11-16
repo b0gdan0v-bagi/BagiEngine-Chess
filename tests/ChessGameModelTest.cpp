@@ -1604,4 +1604,134 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(model.GetSeed(), 123U) << "no source: what the tests and a pinned client set stays";
     }
 
+    // ---- Resignation and an agreed draw ----
+
+    TEST(ChessGameModelTest, EitherColorResignsAndTheOtherWins) {
+        for (const PieceColor loser : {PieceColor::White, PieceColor::Black}) {
+            ChessGameModel model;
+            ASSERT_TRUE(Play(model, "e2e4"));
+            const uint64_t version = model.GetVersion();
+
+            ASSERT_TRUE(model.Resign(loser).has_value());
+            EXPECT_EQ(model.GetStatus(), GameStatus::Resigned);
+            EXPECT_TRUE(model.IsGameOver());
+            EXPECT_EQ(model.GetResigned(), loser) << "whoever is to move";
+            EXPECT_EQ(model.GetWinner(), Opposite(loser));
+            EXPECT_EQ(model.GetVersion(), version + 1);
+            EXPECT_EQ(model.GetMoves().size(), 1U) << "the position is as it was";
+        }
+    }
+
+    TEST(ChessGameModelTest, AnAgreedDrawHasNoWinnerAndNobodyResigned) {
+        ChessGameModel model;
+        ASSERT_TRUE(Play(model, "e2e4"));
+        const uint64_t version = model.GetVersion();
+
+        ASSERT_TRUE(model.AgreeDraw().has_value());
+        EXPECT_EQ(model.GetStatus(), GameStatus::DrawAgreed);
+        EXPECT_TRUE(model.IsGameOver());
+        EXPECT_FALSE(model.GetWinner().has_value());
+        EXPECT_FALSE(model.GetResigned().has_value());
+        EXPECT_EQ(model.GetVersion(), version + 1);
+    }
+
+    TEST(ChessGameModelTest, ANewEndOfAFinishedGameIsGameOverAndChangesNothing) {
+        ChessGameModel resigned;
+        ASSERT_TRUE(resigned.Resign(PieceColor::White).has_value());
+        const uint64_t version = resigned.GetVersion();
+        EXPECT_EQ(resigned.Resign(PieceColor::Black).error(), MoveError::GameOver);
+        EXPECT_EQ(resigned.AgreeDraw().error(), MoveError::GameOver);
+        EXPECT_EQ(resigned.GetStatus(), GameStatus::Resigned);
+        EXPECT_EQ(resigned.GetResigned(), PieceColor::White) << "the first resignation stands";
+        EXPECT_EQ(resigned.GetVersion(), version);
+
+        ChessGameModel drawn;
+        ASSERT_TRUE(drawn.AgreeDraw().has_value());
+        EXPECT_EQ(drawn.Resign(PieceColor::White).error(), MoveError::GameOver);
+        EXPECT_EQ(drawn.AgreeDraw().error(), MoveError::GameOver);
+        EXPECT_EQ(drawn.GetStatus(), GameStatus::DrawAgreed);
+
+        ChessGameModel mated;
+        ClickMoves(mated, {"f2", "f3", "e7", "e5", "g2", "g4", "d8", "h4"});
+        ASSERT_EQ(mated.GetStatus(), GameStatus::Checkmate);
+        EXPECT_EQ(mated.Resign(PieceColor::White).error(), MoveError::GameOver);
+        EXPECT_EQ(mated.AgreeDraw().error(), MoveError::GameOver);
+        EXPECT_EQ(mated.GetStatus(), GameStatus::Checkmate);
+    }
+
+    TEST(ChessGameModelTest, NoMoveIsAcceptedAfterAResignationOrAnAgreedDraw) {
+        ChessGameModel resigned;
+        ASSERT_TRUE(resigned.Resign(PieceColor::Black).has_value());
+        EXPECT_EQ(resigned.TryMove(Mv("e2e4")).error(), MoveError::GameOver);
+        EXPECT_FALSE(Click(resigned, "e2"));
+        EXPECT_FALSE(resigned.HasSelection()) << "a click on the board of a finished game selects nothing";
+
+        ChessGameModel drawn;
+        ASSERT_TRUE(drawn.AgreeDraw().has_value());
+        EXPECT_EQ(drawn.TryMove(Mv("e2e4")).error(), MoveError::GameOver);
+        EXPECT_TRUE(drawn.GetMoves().empty());
+    }
+
+    TEST(ChessGameModelTest, EndingTheGameDropsSelectionPromotionPremovesAndView) {
+        ChessGameModel selected;
+        Click(selected, "e2");
+        ASSERT_TRUE(selected.HasSelection());
+        ASSERT_TRUE(selected.Resign(PieceColor::White).has_value());
+        EXPECT_FALSE(selected.HasSelection());
+        EXPECT_TRUE(selected.GetLegalMoves().empty());
+
+        ChessGameModel promoting;
+        promoting.SetPosition(PositionFromFen("7k/P7/8/8/8/8/8/K7 w - - 0 1"));
+        Click(promoting, "a7");
+        Click(promoting, "a8");
+        ASSERT_TRUE(promoting.HasPendingPromotion());
+        ASSERT_TRUE(promoting.AgreeDraw().has_value());
+        EXPECT_FALSE(promoting.HasPendingPromotion());
+        EXPECT_FALSE(promoting.HasSelection());
+
+        ChessGameModel premoving = BlackToMoveAfterE4();
+        ASSERT_TRUE(Queue(premoving, "d2", "d4"));
+        ASSERT_TRUE(premoving.Resign(PieceColor::White).has_value());
+        EXPECT_TRUE(premoving.GetPremoves().empty());
+        EXPECT_FALSE(premoving.GetPremoveColor().has_value());
+
+        ChessGameModel viewing;
+        ASSERT_TRUE(Play(viewing, "e2e4"));
+        ASSERT_TRUE(Play(viewing, "e7e5"));
+        ASSERT_TRUE(viewing.ShowMoves(1));
+        ASSERT_TRUE(viewing.IsViewing());
+        ASSERT_TRUE(viewing.Resign(PieceColor::Black).has_value());
+        EXPECT_FALSE(viewing.IsViewing());
+        EXPECT_EQ(viewing.GetShownMoveCount(), 2U);
+    }
+
+    TEST(ChessGameModelTest, ResetAndSetPositionStartANewGameAfterAResignationOrAnAgreedDraw) {
+        ChessGameModel model;
+        ASSERT_TRUE(Play(model, "e2e4"));
+        ASSERT_TRUE(model.Resign(PieceColor::White).has_value());
+        model.Reset();
+        EXPECT_EQ(model.GetStatus(), GameStatus::Ongoing);
+        EXPECT_FALSE(model.GetResigned().has_value());
+        EXPECT_FALSE(model.GetWinner().has_value());
+        EXPECT_TRUE(Play(model, "e2e4"));
+
+        ASSERT_TRUE(model.Resign(PieceColor::Black).has_value());
+        model.SetPosition(PositionFromFen(kKiwipeteFen));
+        EXPECT_EQ(model.GetStatus(), GameStatus::Ongoing);
+        EXPECT_FALSE(model.GetResigned().has_value());
+        EXPECT_FALSE(model.GetWinner().has_value());
+
+        ASSERT_TRUE(model.AgreeDraw().has_value());
+        model.Reset();
+        EXPECT_EQ(model.GetStatus(), GameStatus::Ongoing);
+        EXPECT_FALSE(model.IsGameOver());
+    }
+
+    TEST(ChessGameModelTest, AResignationOnAFinishedGameThatBeganFinishedIsGameOver) {
+        ChessGameModel model;
+        model.SetPosition(PositionFromFen("7k/5Q2/6K1/8/8/8/8/8 b - - 0 1"));
+        ASSERT_EQ(model.GetStatus(), GameStatus::Stalemate);
+        EXPECT_EQ(model.Resign(PieceColor::Black).error(), MoveError::GameOver);
+    }
+
 }  // namespace BECore::Chess::Tests

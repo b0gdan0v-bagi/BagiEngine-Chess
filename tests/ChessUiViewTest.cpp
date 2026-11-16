@@ -7,8 +7,7 @@ namespace BECore::Chess::Tests {
 
     namespace {
 
-        const Color kMateColor{150, 20, 20, 240};  // the king's square once mated (ChessBoardComponent.cpp)
-        const Color kStepColor{58, 74, 84, 255};   // the step buttons of the move list (ChessMovePanel.xml, ChessMovesSection.xml)
+        const Color kStepColor{58, 74, 84, 255};  // the step buttons of the move list (ChessMovePanel.xml, ChessMovesSection.xml)
         const Color kMovePanelPlateColor{32, 44, 50, 255};
 
     }  // namespace

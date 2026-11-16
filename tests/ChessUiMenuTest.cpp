@@ -13,9 +13,11 @@ namespace BECore::Chess::Tests {
         constexpr const char* kMenuClose = "MenuClose";
         constexpr const char* kSectionButtonPrefix = "MenuSection";
 
-        /// The name of the button of a section in the scene: MenuSectionOpponent
+        /// The name of the button of a section in the scene: its id with a capital, MenuSectionOpponent (the word on the button is the row's label, "Resign / Draw" for MenuSectionGame)
         String MenuSectionButton(const MenuSection& section) {
-            return Format("{}{}", kSectionButtonPrefix, section.label);
+            String id(section.id);
+            id[0] = static_cast<char>(id[0] - 'a' + 'A');
+            return Format("{}{}", kSectionButtonPrefix, id);
         }
 
         /// The buttons of the list in the order of the scene: one per row of the table, then Close
@@ -108,7 +110,7 @@ namespace BECore::Chess::Tests {
             EXPECT_LE(plate.rect.y + plate.rect.h, ViewHeight() + kPixelTolerance);
             EXPECT_NEAR(plate.rect.x + plate.rect.w * 0.5f, ViewWidth() * 0.5f, 0.5f) << "the plate is centered in the view";
             EXPECT_LE(plate.rect.w, 640.0f + kPixelTolerance);
-            EXPECT_NEAR(plate.rect.h, MenuPlateHeight(), kPixelTolerance) << "16 + 44 + 56 per section + 56 + 12 per gap + 16: 360 with three sections";
+            EXPECT_NEAR(plate.rect.h, MenuPlateHeight(), kPixelTolerance) << "16 + 44 + 56 per section + 56 + 12 per gap + 16: 428 with four sections";
 
             // The title, then the sections in the order of the table, then Close: one column, 12 units apart, 16 inside the plate
             const UIElement* above = &ElementOf("MenuPanel", "MenuTitle");
@@ -352,7 +354,7 @@ namespace BECore::Chess::Tests {
     TEST_F(ChessUiTest, AMenuPlateTooLowForItsButtonsIsCaught) {
         // A fixed-height plate does not grow: with a section button more than the height was written for, Close sticks out of it
         String xml = ShippedElementsXml("MenuPanel");
-        ASSERT_NO_FATAL_FAILURE(Replace(xml, R"(height="360")", R"(height="150")"));
+        ASSERT_NO_FATAL_FAILURE(Replace(xml, R"(height="428")", R"(height="150")"));
         CanvasCopy copy(xml);
         LayOutInTheNarrowestWindow(copy.layout);
         const String problems = PanelProblems(copy.layout, kMenuPlate);

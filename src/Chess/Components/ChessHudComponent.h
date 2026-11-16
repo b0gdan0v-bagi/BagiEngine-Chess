@@ -13,9 +13,11 @@ namespace BECore::Chess {
      * @brief The HUD of the scene, on the node `Hud` before its canvas: publishes the UIVars that the HUD and the opponent panel show and answers `ChessReset`.
      *
      * The variables (`turn`, `status`, `opponentError` and the panel bindings `opponentMode`, `opponentColor`, `opponentEngine`, `opponentLevel`) are written in OnDraw(), before the canvas of
-     * the node draws and after the board's update of the frame has let the program move, and only when the model's version, the controller's revision, IsThinking(), the person's color
-     * or the view of an earlier position changed (`status` then says what is viewed, StatusText::Viewing()). `opponentColor` is the PERSON's color, the opposite of the control API's
-     * `opponent.plays`. Owns no game state.
+     * the node draws and after the board's update of the frame has let the program move, and only when the model's version, the controller's revision, the draw judge's revision,
+     * IsThinking(), the person's color or the view of an earlier position changed (`status` then says what is viewed, StatusText::Viewing()). `turn` says the program is thinking also
+     * while it judges a draw offer; `status` says "Draw declined" for a refused one until the game's version moves. `opponentColor` is the PERSON's color, the opposite of the control API's
+     * `opponent.plays`. Greys the `Resign` button (the clicker's disabled) while nobody can resign (ChessGame::ResigningNow()), with the same change check; ChessGameSectionComponent answers
+     * its `ChessResign`. Owns no game state.
      */
     class ChessHudComponent : public IComponent {
         BE_CLASS(ChessHudComponent)
@@ -35,9 +37,11 @@ namespace BECore::Chess {
         uint64_t _publishedVersion = 0;
         const void* _publishedModel = nullptr;  // another game starts the count of versions again
         uint64_t _publishedRevision = 0;
+        uint64_t _publishedJudgeRevision = 0;            // the draw offer shows (pending, declined) without a version step of the game
         bool _publishedThinking = false;                 // a search starts and ends without a move of the game
         PieceColor _publishedColor = PieceColor::White;  // changes with no revision of the controller while two people play
         Optional<size_t> _publishedShown;                // the moves shown while viewing; empty: the game's own position
+        bool _resignDisabled = false;                    // what the clicker of Resign has: the XML starts it enabled
     };
 
 }  // namespace BECore::Chess

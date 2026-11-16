@@ -1,6 +1,9 @@
 #include "ChessHudComponent.h"
 
 #include <BECore/GameManager/CoreManager.h>
+#include <BECore/Scene/SceneNode.h>
+#include <BECore/UI/UICanvasComponent.h>
+#include <BECore/UI/UIInputClicker.h>
 #include <Chess/ChessGame.h>
 #include <Chess/Engine/OpponentText.h>
 #include <Chess/Game/StatusText.h>
@@ -37,25 +40,37 @@ namespace BECore::Chess {
         // Read on every refresh, also when nothing else changed: it remembers the person's color, which a set_state of the control API could otherwise take with it
         const PieceColor personColor = choice.Color();
         // A search starts and ends without a move of the game, and a side or a level changes without one; the person's color changes without any of them while two people play
-        const bool thinking = opponent.IsThinking();
+        const DrawOfferJudge& judge = game->GetDrawJudge();
+        const DrawOfferState offer = judge.GetState(model);
+        const bool thinking = opponent.IsThinking() || offer == DrawOfferState::Pending;
         // A view starts, steps and ends without a version step of the game
         const Optional<size_t> shown = model.IsViewing() ? Optional<size_t>(model.GetShownMoveCount()) : std::nullopt;
-        const bool opponentChanged = &model != _publishedModel || opponent.GetRevision() != _publishedRevision;
+        const bool opponentChanged = &model != _publishedModel || opponent.GetRevision() != _publishedRevision || judge.GetRevision() != _publishedJudgeRevision;
         if (!opponentChanged && model.GetVersion() == _publishedVersion && thinking == _publishedThinking && personColor == _publishedColor && shown == _publishedShown) {
             return;
         }
         _publishedModel = &model;
         _publishedVersion = model.GetVersion();
         _publishedRevision = opponent.GetRevision();
+        _publishedJudgeRevision = judge.GetRevision();
         _publishedThinking = thinking;
         _publishedColor = personColor;
         _publishedShown = shown;
 
-        // While an error of the opponent stands the game is stalled by it, so its sentence wins over "Check"; a view wins over both: the board shows another position and the
-        // line says how to get back to the game (the panel keeps the error, and the line has it again when the view ends)
+        // While an error of the opponent stands the game is stalled by it, so its sentence wins over the others; a refused draw offer wins over the game's own status ("Check"); a view
+        // wins over all: the board shows another position and the line says how to get back to the game (the panel keeps the error, and the line has it again when the view ends)
         const Optional<EngineError>& error = opponent.GetError();
         const String turn = StatusText::Turn(model, thinking);
-        const String status = error && !shown ? OpponentText::Error(*error) : StatusText::Status(model);
+        String status;
+        if (shown) {
+            status = StatusText::Status(model);
+        } else if (error) {
+            status = OpponentText::Error(*error);
+        } else if (offer == DrawOfferState::Declined) {
+            status = StatusText::DrawDeclined();
+        } else {
+            status = StatusText::Status(model);
+        }
         const String opponentError = error ? OpponentText::Error(*error) : String();
         UIVars& vars = CoreManager::GetUIVars();
         vars.Set("turn"_intern, StringView(turn));
@@ -66,6 +81,16 @@ namespace BECore::Chess {
         vars.Set("opponentEngine"_intern, choice.EngineId());
         vars.Set("opponentLevel"_intern, choice.LevelId());
         vars.Set("opponentError"_intern, StringView(opponentError));
+
+        const bool resignDisabled = !game->ResigningNow();
+        if (resignDisabled != _resignDisabled) {
+            _resignDisabled = resignDisabled;
+            const auto canvas = GetNode().GetComponent<UICanvasComponent>();
+            UIElement* button = canvas ? canvas->GetRoot().FindByName("Resign"_intern) : nullptr;
+            if (UIInputClicker* clicker = button ? button->GetComponent<UIInputClicker>() : nullptr) {
+                clicker->disabled = resignDisabled;
+            }
+        }
     }
 
 }  // namespace BECore::Chess

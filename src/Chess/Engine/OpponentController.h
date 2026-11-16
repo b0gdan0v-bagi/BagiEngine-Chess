@@ -81,7 +81,7 @@ namespace BECore::Chess {
      * goes in the frame in which the program's answer lands. A pick that changes a side or a choice and Shutdown() drop the queue (a refused pick and a pick that changes nothing keep it). Who may
      * premove is the board's decision (ChessBoardComponent).
      *
-     * This class, EngineOpponent, PositionAnalyst and MoveRater are the only ones of Engine/ that log.
+     * This class, EngineOpponent, PositionAnalyst, MoveRater and DrawOfferJudge are the only ones of Engine/ that log.
      */
     class OpponentController {
     public:

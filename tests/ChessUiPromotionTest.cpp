@@ -208,11 +208,8 @@ namespace BECore::Chess::Tests {
             const char* action;
         };
         // The dim of a modal canvas is its first element, and a click on it does what the panel's Close or Cancel does
-        const ModalRow rows[] = {{"MenuPanel", "MenuDim", "ChessCloseMenu"},
-                                 {"OpponentPanel", "Dim", "ChessCloseMenu"},
-                                 {"MovesSection", "MovesSectionDim", "ChessCloseMenu"},
-                                 {"SoundPanel", "SoundPanelDim", "ChessCloseMenu"},
-                                 {"PromotionPanel", "PromotionDim", "ChessCancelPromotion"}};
+        const ModalRow rows[] = {{"MenuPanel", "MenuDim", "ChessCloseMenu"},          {"OpponentPanel", "Dim", "ChessCloseMenu"},        {"MovesSection", "MovesSectionDim", "ChessCloseMenu"},
+                                 {"GameSection", "GameSectionDim", "ChessCloseMenu"}, {"SoundPanel", "SoundPanelDim", "ChessCloseMenu"}, {"PromotionPanel", "PromotionDim", "ChessCancelPromotion"}};
         size_t modals = 0;
         for (const auto& node : GetScene().GetRootNode().GetChildren()) {
             const auto canvas = node->GetComponent<UICanvasComponent>();
@@ -249,6 +246,9 @@ namespace BECore::Chess::Tests {
             }
             if (StringView(node) == "MovesSection") {
                 return ClickButton(kMenuColor) && ClickMenuList("MenuSectionMoves").Both();
+            }
+            if (StringView(node) == "GameSection") {
+                return ClickButton(kMenuColor) && ClickMenuList("MenuSectionGame").Both();
             }
             if (StringView(node) == "SoundPanel") {
                 return ClickButton(kMenuColor) && ClickMenuList("MenuSectionSound").Both();

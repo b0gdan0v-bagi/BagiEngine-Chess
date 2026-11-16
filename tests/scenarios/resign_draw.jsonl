@@ -1,0 +1,26 @@
+{"scenario": 1, "game": "Chess", "flags": ["--headless", "--manual-clock"], "title": "Chess: the person resigns through the menu section Game (two people: the side to move), the result in the state, the takeback that puts the game on again, the section greyed after the end"}
+{"method": "step", "params": {"frames": 2}}
+{"method": "reset"}
+{"method": "set_state", "params": {"opponent": {"plays": null}}}
+{"method": "perform_action", "params": {"type": "move", "uci": "e2e4"}, "expect": {"versionStep": 1}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "ui_click", "params": {"name": "Menu"}, "expect": {"equal": {"consumed": true, "action": "ChessOpenMenu", "value": ""}}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "ui_click", "params": {"name": "MenuSectionGame"}, "expect": {"equal": {"consumed": true, "action": "ChessOpenSection", "value": "game"}}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "ui_click", "params": {"name": "GameSectionResign"}, "expect": {"equal": {"consumed": true, "action": "ChessResign", "value": ""}}, "note": "it only asks: the game is not over yet"}
+{"method": "step", "params": {"frames": 2}}
+{"method": "get_state", "expect": {"pointers": {"/state/status": "ongoing", "/state/winner": null}, "versionStep": 0}}
+{"method": "ui_click", "params": {"name": "GameSectionYes"}, "expect": {"equal": {"consumed": true, "action": "ChessGameYes", "value": ""}}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "get_state", "expect": {"pointers": {"/state/status": "resigned", "/state/winner": "white", "/state/turn": "black", "/state/drawOffer": null}, "versionStep": 1}, "note": "Black was to move, so Black resigned"}
+{"method": "list_actions", "expect": {"pointers": {"/actions": []}}}
+{"method": "ui_click", "params": {"name": "Menu"}, "expect": {"equal": {"consumed": true, "action": "ChessOpenMenu", "value": ""}}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "ui_click", "params": {"name": "MenuSectionGame"}, "expect": {"equal": {"consumed": true, "action": "ChessOpenSection", "value": "game"}}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "ui_click", "params": {"name": "GameSectionResign"}, "expect": {"equal": {"consumed": true, "action": "", "value": ""}}, "note": "greyed once the game is over: it emits nothing"}
+{"method": "ui_click", "params": {"name": "GameSectionClose"}, "expect": {"equal": {"consumed": true, "action": "ChessCloseMenu", "value": ""}}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "set_state", "params": {"takeBack": {"plies": 1}}, "expect": {"versionStep": 1}}
+{"method": "get_state", "expect": {"pointers": {"/state/status": "ongoing", "/state/winner": null, "/state/moves": [], "/state/turn": "white"}, "versionStep": 0, "logClean": true}}

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Chess/ChessGameControl.h>
+#include <Chess/Engine/DrawOfferJudge.h>
 #include <Chess/Engine/OpponentChoice.h>
 #include <Chess/Engine/OpponentController.h>
 #include <Chess/Engine/PositionAnalyst.h>
@@ -15,11 +16,12 @@ namespace BECore::Chess {
      *
      * Owns the model the scene shares (components reach it, the opponent, the choice and the analyst through the GetActive*() calls), the computer opponent (OpponentController), the choice the
      * opponent panel makes over it (OpponentChoice: it remembers the person's color while nobody plays), the analysis of the position (PositionAnalyst, with the default factory over the settings the
-     * controller holds), the save keeper and the adapter of the control API (ChessGameControl). A game starts with nobody as the opponent (it is made when a side is picked) and the analysis off.
+     * controller holds), the judge of the person's draw offers (DrawOfferJudge, which makes its engine through the analyst's factory, so a factory given to the analyst reaches it too), the
+     * save keeper and the adapter of the control API (ChessGameControl). A game starts with nobody as the opponent (it is made when a side is picked) and the analysis off.
      *
-     * IGame has no per-frame hook, so ChessBoardComponent runs GetOpponent().Update(), GetAnalyst().Update() and UpdateKeeper() every frame. Start() ends by restoring the saved game, the
-     * opponent choice and the player's audio levels (ChessSaveKeeper, when the run asks for it). Stop() starts by writing them, then destroys the opponent and shuts the analyst down, which happens
-     * before the task system goes down (Application::Cleanup()): a search that nobody cancelled would hold the join of the pool.
+     * IGame has no per-frame hook, so ChessBoardComponent runs GetOpponent().Update(), GetAnalyst().Update(), GetDrawJudge().Update() and UpdateKeeper() every frame. Start() ends by restoring
+     * the saved game, the opponent choice and the player's audio levels (ChessSaveKeeper, when the run asks for it). Stop() starts by writing them, then destroys the opponent and shuts the analyst
+     * and the judge down, which happens before the task system goes down (Application::Cleanup()): a search that nobody cancelled would hold the join of the pool.
      */
     class ChessGame : public IGame {
         BE_CLASS(ChessGame)
@@ -64,6 +66,21 @@ namespace BECore::Chess {
             return _analyst;
         }
 
+        DrawOfferJudge& GetDrawJudge() noexcept {
+            return _drawJudge;
+        }
+        const DrawOfferJudge& GetDrawJudge() const noexcept {
+            return _drawJudge;
+        }
+
+        /// The person offers a draw, for the menu's button (PersonOffersDraw(): two people agree at once, against the program the judge's verdict comes with the frames of
+        /// ChessBoardComponent::OnUpdate); the control adapter makes the same offer through the same function
+        std::expected<void, DrawOfferRefusal> OfferDraw();
+
+        /// The color the person resigns for in the game as it stands (ResigningColor()), or nothing when nobody can: a finished game, two programs. The one rule of both
+        /// Resign buttons, the HUD's and the menu section's
+        [[nodiscard]] Optional<PieceColor> ResigningNow() const;
+
         const ChessSaveKeeper& GetKeeper() const noexcept {
             return _keeper;
         }
@@ -87,11 +104,15 @@ namespace BECore::Chess {
         /// The analyst of the active game
         static PositionAnalyst* GetActiveAnalyst();
 
+        /// The judge of draw offers of the active game
+        static DrawOfferJudge* GetActiveDrawJudge();
+
     private:
         ChessGameModel _model;
         OpponentController _opponent;  ///< after the model (it holds a reference to it) and before the adapter
         OpponentChoice _choice;        ///< after the controller (it holds a reference to it)
         PositionAnalyst _analyst;      ///< after the controller (its factory reads the controller's settings) and before the adapter
+        DrawOfferJudge _drawJudge;     ///< after the analyst (its factory asks it) and before the adapter
         ChessSaveKeeper _keeper;       ///< after everything it reads (it is handed the model, the controller and the choice in each call, and destroyed first)
         ChessGameControl _control;
         bool _stopped = false;  ///< between Stop() and the next Start(): UpdateKeeper() writes nothing

@@ -190,8 +190,10 @@ def master_level(client: BagiControlClient) -> dict:
 
 
 def check_the_buttons_click(client: BagiControlClient) -> None:
-    """A click on a button asks for the click clip on the ui bus, one request per click (the menu button opens the list, Close shuts it)."""
-    for name, action in (("Menu", "ChessOpenMenu"), ("MenuClose", "ChessCloseMenu")):
+    """A click on a button asks for the click clip on the ui bus, one request per click (the HUD's Resign asks its question alone and No returns to the game;
+    the menu button opens the list, Close shuts it)."""
+    buttons = (("Resign", "ChessResign"), ("GameSectionConfirmNo", "ChessGameNo"), ("Menu", "ChessOpenMenu"), ("MenuClose", "ChessCloseMenu"))
+    for name, action in buttons:
         before = audio_state(client)["requested"]
         clicked = client.call("ui_click", {"name": name})
         check(clicked["consumed"] and clicked["action"] == action, f"the click on {name} was answered with {clicked}")
@@ -200,7 +202,10 @@ def check_the_buttons_click(client: BagiControlClient) -> None:
         check(after["requested"] == before + 1, f"the click on {name} asked for {after['requested'] - before} sounds, not one")
         last = after["recent"][-1]
         check(last["clip"] == CLICK_CLIP and last["bus"] == "ui", f"the click on {name} should sound as the click on the ui bus, the request is {last}")
-    check_the_menu_list_is_hidden(client.call("ui_tree"))
+    tree = client.call("ui_tree")
+    check_the_menu_list_is_hidden(tree)
+    check(find_ui_canvas(tree, "GameSection")["visible"] is False, "the question of the HUD's Resign should be hidden after its No")
+    check(client.call("get_state")["state"]["status"] == "ongoing", "No after the HUD's Resign ended the game")
 
 
 def check_the_levels(client: BagiControlClient) -> None:
@@ -1099,6 +1104,30 @@ def run_takeback_scenario(client: BagiControlClient, headless: bool) -> None:
     reply = client.call("get_state")
     check(reply["state"]["moves"] == [] and reply["version"] > version, f"the button took back to {reply['state']['moves']}")
 
+    check_a_draw_ends_the_game_and_a_takeback_reopens_it(client)
+
+
+def check_a_draw_ends_the_game_and_a_takeback_reopens_it(client: BagiControlClient) -> None:
+    """Two people: set_state {"draw": {}} agrees a draw at once (no judge, no frame needed), and the takeback of the move list puts the game on again."""
+    client.call("reset")
+    client.call("set_state", {"opponent": {"plays": None}})
+    client.call("perform_action", move("e2e4"))
+    client.call("perform_action", move("e7e5"))
+    version = client.call("get_state")["version"]
+
+    client.call("set_state", {"draw": {}})
+    reply = client.call("get_state")
+    state = reply["state"]
+    check(state["status"] == "draw_agreed" and state["winner"] is None and state["drawOffer"] is None, f"an agreed draw reads {state['status']}, winner {state['winner']}, offer {state['drawOffer']}")
+    check(reply["version"] > version, "an agreed draw did not move the state version")
+    check(client.call("list_actions")["actions"] == [], "a game ended by agreement still lists moves")
+    expect_error("game_over", lambda: client.call("set_state", {"draw": {}}), "a draw offered in a game that was agreed")
+
+    client.call("set_state", {"takeBack": {}})
+    state = client.call("get_state")["state"]
+    check(state["status"] == "ongoing" and state["moves"] == ["e2e4"], f"after the takeback the game reads {state['status']} with the moves {state['moves']}")
+    let_the_pieces_settle(client)
+
 
 def find_ui_canvas(tree: dict, node: str) -> dict:
     """The canvas of the node of that name in a `ui_tree` answer."""
@@ -1138,7 +1167,7 @@ def check_the_menu_list_is_shown(tree: dict) -> None:
 
 
 def check_the_menu_buttons(tree: dict) -> None:
-    """The buttons of the list: one per section the build has (Opponent), Close and the dim that closes it like Close; no Resign, Puzzles or Editor button."""
+    """The buttons of the list: one per section the build has (Opponent, Moves, Resign / Draw), Close and the dim that closes it like Close; no Puzzles or Editor button."""
     names = []
 
     def collect(element: dict) -> None:
@@ -1149,7 +1178,7 @@ def check_the_menu_buttons(tree: dict) -> None:
 
     for element in find_ui_canvas(tree, "MenuPanel")["elements"]:
         collect(element)
-    check(sorted(names) == ["MenuClose", "MenuDim", "MenuSectionMoves", "MenuSectionOpponent", "MenuSectionSound"], f"the buttons of the list: {names}")
+    check(sorted(names) == ["MenuClose", "MenuDim", "MenuSectionGame", "MenuSectionMoves", "MenuSectionOpponent", "MenuSectionSound"], f"the buttons of the list: {names}")
     dim = find_ui_element({"canvases": [find_ui_canvas(tree, "MenuPanel")]}, "MenuDim")
     check(dim["action"] == "ChessCloseMenu", f"the dim of the list: {dim}")
     found = find_ui_element({"canvases": [find_ui_canvas(tree, "MenuPanel")]}, "MenuSectionOpponent")

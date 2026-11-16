@@ -99,6 +99,7 @@ namespace BECore::Chess::Tests {
         const Color kSelectedColor{120, 200, 120, 200};
         const Color kLegalMoveColor{120, 200, 120, 120};
         const Color kCheckColor{230, 60, 60, 210};
+        const Color kMateColor{150, 20, 20, 240};  // the king's square once mated
         const Color kHintFromColor{60, 130, 230, 110};
         const Color kHintToColor{60, 130, 230, 200};
         const Color kLastMoveColor{245, 205, 50, 140};  // the two squares of the last move, one color for both
@@ -1133,6 +1134,27 @@ namespace BECore::Chess::Tests {
         /// The Close button of the opponent panel, clicked where it is laid out; whether the panel and the list are hidden afterwards
         bool CloseThePanel() {
             return ClickPanel("OpponentClose").Both() && Panel() && !Panel()->_visible && MenuList() && !MenuList()->_visible;
+        }
+
+        /// The canvas of the menu section "Game": the node `GameSection`
+        IntrusivePtr<UICanvasComponent> GameSection() const {
+            return CanvasOf("GameSection");
+        }
+
+        /// A click on a control of the Game section, by name
+        Taken ClickGameSection(const char* name) {
+            return ClickControl(ElementOf("GameSection", name));
+        }
+
+        /// The Menu button of the HUD and then the Resign / Draw button of the list, clicked where they are drawn; whether the section is shown afterwards
+        bool OpenTheGameSection() {
+            if (!ClickButton(kMenuColor)) {
+                return false;
+            }
+            if (!MenuList() || !MenuList()->_visible || !ClickMenuList("MenuSectionGame").Both()) {
+                return false;
+            }
+            return GameSection() && GameSection()->_visible;
         }
 
         /// The canvas of the promotion panel: the node `PromotionPanel`

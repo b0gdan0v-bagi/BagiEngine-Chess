@@ -54,6 +54,9 @@ namespace BECore::Chess::Tests {
                 ASSERT_NE(element, nullptr) << name;
                 EXPECT_FALSE(element->rect.IsEmpty()) << name << " is shown";
             }
+            const UIElement* resign = layout.root->FindByName(PoolString::Intern("Resign"));
+            ASSERT_NE(resign, nullptr);
+            EXPECT_EQ(resign->rect.IsEmpty(), LaidOutForPortrait(layout)) << "Resign is shown exactly where the top row has room for it";
         }
         layout.Invalidate();
     }
@@ -83,9 +86,13 @@ namespace BECore::Chess::Tests {
             DrawAt(size.first, size.second);
             const float boardTop = PortraitIsActive() ? kPortraitBoardTop : kBoardTop;
             const float boardBottom = PortraitIsActive() ? kPortraitBoardBottom : kBoardBottom;
-            for (const char* name : {"Turn", "Menu", "Reset"}) {
+            for (const char* name : {"Turn", "Resign", "Menu", "Reset"}) {
                 const UIElement* element = canvas->GetRoot().FindByName(PoolString::Intern(name));
                 ASSERT_NE(element, nullptr);
+                if (StringView(name) == "Resign" && PortraitIsActive()) {
+                    EXPECT_TRUE(element->rect.IsEmpty()) << "hidden in Portrait and Tall, at " << size.first << "x" << size.second;
+                    continue;
+                }
                 ASSERT_FALSE(element->rect.IsEmpty()) << name << " is shown at " << size.first << "x" << size.second;
                 EXPECT_LE(element->rect.y + element->rect.h, boardTop + 0.01f) << name << " at " << size.first << "x" << size.second;
             }
@@ -132,6 +139,45 @@ namespace BECore::Chess::Tests {
         Draw();
         EXPECT_EQ(ShownText(Label("Turn")), "White wins");
         EXPECT_EQ(ShownText(Label("Status")), "Checkmate");
+    }
+
+    TEST_F(ChessUiTest, TheHudNamesAResignationAndAnAgreedDraw) {
+        ASSERT_TRUE(Model().Resign(PieceColor::White).has_value());
+        Draw();
+        EXPECT_EQ(ShownText(Label("Turn")), "Black wins");
+        EXPECT_EQ(ShownText(Label("Status")), "White resigned");
+
+        Model().Reset();
+        ASSERT_TRUE(Model().AgreeDraw().has_value());
+        Draw();
+        EXPECT_EQ(ShownText(Label("Turn")), "Draw");
+        EXPECT_EQ(ShownText(Label("Status")), "Draw agreed");
+    }
+
+    TEST_F(ChessUiTest, TheResultBarIsTheWinnersColorAfterAResignationAndGrayAfterAnAgreedDraw) {
+        // The colors of ChessResultComponent.cpp
+        const Color whiteWon{245, 245, 245, 245};
+        const Color blackWon{25, 25, 25, 245};
+        const Color drawn{140, 140, 140, 245};
+
+        ASSERT_TRUE(Model().Resign(PieceColor::White).has_value());
+        Draw();
+        EXPECT_FALSE(RectCalls(blackWon).empty()) << "White resigned: the bar of Black";
+        EXPECT_TRUE(RectCalls(whiteWon).empty());
+        EXPECT_TRUE(RectCalls(drawn).empty());
+
+        Model().Reset();
+        ASSERT_TRUE(Model().Resign(PieceColor::Black).has_value());
+        Draw();
+        EXPECT_FALSE(RectCalls(whiteWon).empty()) << "Black resigned: the bar of White";
+        EXPECT_TRUE(RectCalls(blackWon).empty());
+
+        Model().Reset();
+        ASSERT_TRUE(Model().AgreeDraw().has_value());
+        Draw();
+        EXPECT_FALSE(RectCalls(drawn).empty()) << "an agreed draw has no winner";
+        EXPECT_TRUE(RectCalls(whiteWon).empty());
+        EXPECT_TRUE(RectCalls(blackWon).empty());
     }
 
     TEST_F(ChessUiTest, TheWordsAreDrawnAsText) {
@@ -489,6 +535,7 @@ namespace BECore::Chess::Tests {
                                                        {"MenuPanel", "TheMenuPanelPassesTheSizeMatrix"},
                                                        {"OpponentPanel", "ThePanelPassesTheSizeMatrix"},
                                                        {"MovesSection", "TheMovesSectionPassesTheSizeMatrixWithTheLongestMoves"},
+                                                       {"GameSection", "TheGameSectionPassesTheSizeMatrixWithEveryWord"},
                                                        {"SoundPanel", "TheSoundPanelPassesTheSizeMatrix"},
                                                        {"PromotionPanel", "ThePromotionPanelPassesTheSizeMatrix"}};
 

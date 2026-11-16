@@ -75,6 +75,44 @@ namespace BECore::Chess::Tests {
         ExpectWords(model, "Draw", "Draw: threefold repetition");
     }
 
+    TEST(StatusTextTest, AResignationNamesTheWinnerAndWhoResigned) {
+        ChessGameModel white;
+        ASSERT_TRUE(white.Resign(PieceColor::White).has_value());
+        ExpectWords(white, "Black wins", "White resigned");
+
+        ChessGameModel black;
+        ASSERT_TRUE(Play(black, "e2e4"));
+        ASSERT_TRUE(black.Resign(PieceColor::Black).has_value());
+        ExpectWords(black, "White wins", "Black resigned");
+        EXPECT_EQ(StatusText::Turn(black, true), "White wins") << "a finished game is never thinking";
+    }
+
+    TEST(StatusTextTest, AnAgreedDrawIsADrawWithNoWinner) {
+        ChessGameModel model;
+        ASSERT_TRUE(model.AgreeDraw().has_value());
+        ExpectWords(model, "Draw", "Draw agreed");
+    }
+
+    TEST(StatusTextTest, TheViewingLineStillWinsOverTheEndOfAResignedGame) {
+        ChessGameModel model;
+        ASSERT_TRUE(Play(model, "e2e4"));
+        ASSERT_TRUE(Play(model, "e7e5"));
+        ASSERT_TRUE(model.Resign(PieceColor::White).has_value());
+        ASSERT_TRUE(model.ShowMoves(1));
+        ExpectWords(model, "Black wins", "At move 1 - tap board");
+        ASSERT_TRUE(model.EndViewing());
+        EXPECT_EQ(StatusText::Status(model), "White resigned");
+    }
+
+    TEST(StatusTextTest, ADeclinedDrawHasItsOwnWords) {
+        EXPECT_EQ(StatusText::DrawDeclined(), "Draw declined");
+    }
+
+    TEST(StatusTextTest, TheMenuAsksBeforeItEndsTheGame) {
+        EXPECT_EQ(StatusText::ResignQuestion(), "Resign?");
+        EXPECT_EQ(StatusText::DrawQuestion(), "Agree a draw?");
+    }
+
     TEST(StatusTextTest, WhileTheComputerThinksTheTurnSaysSoInsteadOfWhoseMoveItIs) {
         ChessGameModel model;
         EXPECT_EQ(StatusText::Turn(model, true), "Computer is thinking");
