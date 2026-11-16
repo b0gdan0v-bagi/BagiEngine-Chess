@@ -836,9 +836,11 @@ def check_the_board_turns_with_the_program(client: BagiControlClient) -> None:
     client.call("set_state", {"opponent": {"plays": None}})
 
 
-# The left margin of the view, where the node Material draws the captured pieces and the balance (SceneConfig.xml): x 0 to 100 of the 840 units
+# The left margin of the view, where the node Material draws the captured pieces and the balance outside the Wide view (and in a Wide window whose side insets cut the move panel): x 0 to 100
 MARGIN_WIDTH = 100
 MARGIN_INSET = 2  # columns and rows kept away from the edges of the margin, against rounding
+# The band of the move panel under its list, where Material draws what the color at the bottom of the board has taken while the panel is shown (ChessMaterial.xml), in view units
+LOWER_GROUP_TOP, LOWER_GROUP_BOTTOM = 600, 656
 CAPTURE_MOVES = ["e2e4", "d7d5", "e4d5"]  # White takes a pawn of Black
 CHIP_COLOR = (232, 210, 170)  # the fill of a row of the display
 
@@ -854,6 +856,16 @@ def margin_band(image) -> list:
     return [row[first_column * image.channels : last_column * image.channels] for row in image.rows[first_row:last_row]]
 
 
+def lower_group_band(image) -> list:
+    """The part of a screenshot that the band of the move panel under its list covers: the captured material of the color at the bottom of the board. Only the Wide view has the panel."""
+    check(view_width_of(image) == WIDE_VIEW_WIDTH, f"a picture {image.width}x{image.height} is not in the Wide view, the move panel is not drawn in it")
+    scale, left, top = view_in_picture(image)
+    first_row, last_row = int(top + LOWER_GROUP_TOP * scale) + PANEL_INSET, int(top + LOWER_GROUP_BOTTOM * scale) - PANEL_INSET
+    first_column, last_column = int(left + PANEL_LEFT * scale) + PANEL_INSET, int(left + PANEL_RIGHT * scale) - PANEL_INSET
+    check(0 <= first_row < last_row <= image.height and 0 <= first_column < last_column <= image.width, f"the band of the lower group is outside a picture {image.width}x{image.height}")
+    return [row[first_column * image.channels : last_column * image.channels] for row in image.rows[first_row:last_row]]
+
+
 def band_has_color(band: list, channels: int, color: tuple) -> bool:
     for row in band:
         for start in range(0, len(row), channels):
@@ -863,9 +875,11 @@ def band_has_color(band: list, channels: int, color: tuple) -> bool:
 
 
 def run_material_scenario(client: BagiControlClient, headless: bool) -> None:
-    """The captured material in the picture: on the headless run the left margin shows it (the numbers of `get_state.material` are `tests/scenarios/captured_material.jsonl`).
+    """The captured material in the picture: the headless window is Wide, so the move panel shows it in its band under the list and the left margin stays empty (the numbers of
+    `get_state.material` are `tests/scenarios/captured_material.jsonl`).
 
-    The margin band of a screenshot (the rows of the board, the columns left of it) is compared, not the whole picture: the HUD says other words in each picture. A position set from outside and a reset in between bring the band back to the one of the start."""
+    That band of a screenshot is compared, not the whole picture: the HUD says other words in each picture. A position set from outside and a reset in between bring the band back to the one of
+    the start."""
     if client.call("status")["manualClock"]:
         client.call("step")  # the scene registers its pieces in the first frame
     client.call("reset")
@@ -873,7 +887,9 @@ def run_material_scenario(client: BagiControlClient, headless: bool) -> None:
     if not headless:
         return
     let_frames_pass(client, 2)  # the display waits for the first layout of its canvas
-    start_band = margin_band(take_screenshot(client))
+    start = take_screenshot(client)
+    start_band = lower_group_band(start)
+    start_margin = margin_band(start)
 
     for uci in CAPTURE_MOVES:
         client.call("perform_action", move(uci))
@@ -883,13 +899,14 @@ def run_material_scenario(client: BagiControlClient, headless: bool) -> None:
         client.call("perform_action", move(uci))
     let_frames_pass(client, 2)
     captured = take_screenshot(client)
-    captured_band = margin_band(captured)
-    check(captured_band != start_band, "the left margin did not change after White took a pawn")
-    check(band_has_color(captured_band, captured.channels, CHIP_COLOR), "no row of the display is drawn in the left margin after the capture")
+    captured_band = lower_group_band(captured)
+    check(captured_band != start_band, "the band of the move panel under the list did not change after White took a pawn")
+    check(band_has_color(captured_band, captured.channels, CHIP_COLOR), "no row of the display is drawn in the move panel after the capture")
+    check(margin_band(captured) == start_margin and not band_has_color(margin_band(captured), captured.channels, CHIP_COLOR), "the left margin shows the material while the move panel does")
 
     client.call("reset")
     let_frames_pass(client, 2)
-    check(margin_band(take_screenshot(client)) == start_band, "the left margin after a reset is not the one of the start position")
+    check(lower_group_band(take_screenshot(client)) == start_band, "the band of the move panel under the list after a reset is not the one of the start position")
 
 
 def find_ui_canvas(tree: dict, node: str) -> dict:

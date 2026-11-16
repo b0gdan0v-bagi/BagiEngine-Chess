@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!-- The captured pieces and the balance of the material, in the left margin of the view (x 0 to 100; the board is 100 to 740). A canvas of the SceneView space with no safe area,
      like BoardCoordinates: it is at fixed scene units next to the board, and ChessMaterialComponent decides what a narrow window with insets leaves of it. Layer 5: over the pieces (0)
-     and the result bar (1), under the HUD (10) and the panels (20); the component is listed before the canvas so that it gives the variables their words before the canvas draws in the
+     and the result bar (1) and the plate of the move panel (4), under the HUD (10) and the panels (20); the component is listed before the canvas so that it gives the variables their words before the canvas draws in the
      same frame. Nothing here takes a click (no blocksInput, nothing interactive, not modal), so the board and the Reset button get every press. The right margin is left free.
      Two groups mirrored about the middle of the board: the lower one (MaterialBottom*, y 500) is what the color at the bottom of the board has taken, the upper one (MaterialTop*, y 84)
      what the other color has taken; they swap when the board turns. A group is a list of five rows in the order queen, rook, bishop, knight, pawn, each a chip with the picture of a piece

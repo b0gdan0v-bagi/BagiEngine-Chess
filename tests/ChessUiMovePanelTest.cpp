@@ -268,7 +268,8 @@ namespace BECore::Chess::Tests {
             ASSERT_GE(indexOf(name), 0) << "the scene has the node " << name;
         }
         const auto layerOf = [&](const char* name) { return nodes[static_cast<size_t>(indexOf(name))]->GetLayer(); };
-        EXPECT_EQ(layerOf("MovePanel"), 5);
+        EXPECT_EQ(layerOf("MovePanel"), 4);
+        EXPECT_LT(layerOf("MovePanel"), layerOf("Material")) << "under the material, which draws the players' rows over the bands of the box";
         EXPECT_GT(indexOf("MovePanel"), indexOf("Material")) << "written after the material, before the HUD";
         EXPECT_LT(indexOf("MovePanel"), indexOf("Hud"));
         EXPECT_GT(layerOf("MovePanel"), layerOf("Board"));
@@ -312,6 +313,7 @@ namespace BECore::Chess::Tests {
         long lastMark = -1;
         long resetButton = -1;
         long plateOfThePanel = -1;
+        long firstChip = -1;
         for (size_t i = 0; i < calls.size(); ++i) {
             const DrawCall& call = calls[i];
             const long at = static_cast<long>(i);
@@ -329,12 +331,17 @@ namespace BECore::Chess::Tests {
                 resetButton = at;
             } else if (call.kind == DrawKind::Rect && SameColor(call.color, kPlateColor)) {
                 plateOfThePanel = at;
+            } else if (call.kind == DrawKind::Rect && SameColor(call.color, kMaterialChipColor)) {
+                firstChip = firstChip < 0 ? at : firstChip;
             }
         }
         ASSERT_GE(lastSquare, 0);
         ASSERT_GE(firstPiece, 0) << "the king is drawn";
         ASSERT_GE(dim, 0) << "the game is over: the board is dimmed";
         ASSERT_GE(plateOfTheList, 0) << "the box is drawn";
+        ASSERT_EQ(MaterialPlace(), "panel");
+        ASSERT_GE(firstChip, 0) << "most of the pieces are gone: the material is drawn in the bands of the box";
+        EXPECT_LT(plateOfTheList, firstChip) << "the chips of the material are drawn on the plate, not under it";
         ASSERT_GE(lastMark, 0) << "the move of the mate is marked";
         ASSERT_GE(resetButton, 0);
         ASSERT_GE(plateOfThePanel, 0) << "the opponent panel is open";
