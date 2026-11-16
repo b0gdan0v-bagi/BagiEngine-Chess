@@ -70,7 +70,7 @@ namespace BECore::Chess {
      * Update(), Cancel() and Shutdown() forward to it. The rater has an engine of its own (the factory is asked for OpponentEngine::Own, whatever the person picked) and a history rule of its own,
      * not the version rule. IsThinking() is the analyst's only.
      *
-     * Logging: with EngineOpponent, OpponentController and MoveRater, one of the classes of Engine/ that log.
+     * Logging: with EngineOpponent, OpponentController, MoveRater and DrawOfferJudge, one of the classes of Engine/ that log.
      */
     class PositionAnalyst {
     public:
