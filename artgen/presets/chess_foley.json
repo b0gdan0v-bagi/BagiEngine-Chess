@@ -1,0 +1,12 @@
+{
+  "preset": 1,
+  "title": "Chess foley: wooden pieces on a wooden board",
+  "workflow": "sao_sfx",
+  "prompt": "{subject}, close dry foley recording of a wooden chess set, solid hardwood, quiet room, single isolated sound",
+  "negative": "music, voice, speech, hiss, noise, reverb, echo, metal, glass, plastic, crowd, ambience",
+  "params": {
+    "duration": 1.0,
+    "steps": 60,
+    "cfg": 6.0
+  }
+}

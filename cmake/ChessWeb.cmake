@@ -3,7 +3,8 @@
 # =============================================================================
 # Included by CMakeLists.txt and, alone, by tests/check_web_package.cmake (cmake -P), so the pure functions are checked on a desktop
 # without an Emscripten SDK. The engine's be_web_preload_args (engine/cmake/BagiWeb.cmake) packs every file of config/ and assets/ of the
-# game with no filter; a doc, a person's ChessSettings.local.xml (a Stockfish path) or an imgui.ini must not be served to others.
+# game with no filter; a doc, a person's ChessSettings.local.xml (a Stockfish path), an imgui.ini or the provenance of a generated asset
+# (*.artgen.json: the paths of the machine it was made on) must not be served to others.
 #
 # Unverified: needs emsdk. emcc has --exclude-file <pattern> (a glob, fnmatch against the full path of a file as file_packager walks the
 # folder), and the patterns below are written for that: a leading "*/" stands for the folders above a name. It applies to every
@@ -32,6 +33,7 @@ function(chess_web_exclude_patterns)
         "*/.DS_Store"
         "*.py"
         "*/__pycache__/*"
+        "*.artgen.json"
         PARENT_SCOPE)
 endfunction()
 

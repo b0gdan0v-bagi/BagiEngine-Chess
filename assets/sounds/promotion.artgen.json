@@ -1,0 +1,67 @@
+{
+  "accepted": {
+    "channels": 1,
+    "clip": "assets/sounds/promotion.wav",
+    "peakDb": -3.0,
+    "processing": {
+      "fadeInMs": 5.0,
+      "fadeOutMs": 250.0,
+      "maxSeconds": 1.5,
+      "mono": true,
+      "peakDb": -3.0,
+      "sampleRate": 44100,
+      "trimDb": -50.0
+    },
+    "sampleRate": 44100,
+    "seconds": 0.4071201814058957,
+    "source": "D:/AHobbyProjects/BagiEngine-Chess/artgen/out/a_bright_rising_four_note_arpeggio_chime_a_rewar_7100.flac"
+  },
+  "channels": 2,
+  "date": "2026-11-16T19:11:41+00:00",
+  "duration": 1.5,
+  "generator": {
+    "name": "comfyui",
+    "url": "http://127.0.0.1:8188",
+    "version": "0.45.0"
+  },
+  "generatorFile": "artgen_a_bright_rising_four_note_arpeggio_chime_a_rewar_00005.flac",
+  "kind": "audio",
+  "models": {
+    "ckpt_name": [
+      "stable-audio-open-1.0.safetensors"
+    ],
+    "clip_name": [
+      "t5_base.safetensors"
+    ]
+  },
+  "negative": "voice, speech, drums, hiss, noise, long reverb, distortion, electric guitar, synth bass, crowd",
+  "params": {
+    "cfg": 6.0,
+    "duration": 1.5,
+    "steps": 60
+  },
+  "preset": "draft",
+  "presetData": {
+    "negative": "voice, speech, drums, hiss, noise, long reverb, distortion, electric guitar, synth bass, crowd",
+    "params": {
+      "cfg": 6.0,
+      "duration": 1.5,
+      "steps": 60
+    },
+    "preset": 1,
+    "prompt": "{subject}, soft wooden marimba tone, warm, clean, short game interface cue, dry close recording",
+    "title": "Chess cue: soft wooden tonal cue",
+    "workflow": "sao_sfx"
+  },
+  "presetHash": "5b5a455f31cfbc8f1de7a25b9da31de21e090eda96cd6268f464f73a3d32642d",
+  "presetSource": "draft",
+  "prompt": "a bright rising four-note arpeggio chime, a reward, soft wooden marimba tone, warm, clean, short game interface cue, dry close recording",
+  "provenance": 1,
+  "sampleRate": 44100,
+  "seconds": 1.486077097505669,
+  "seed": 7100,
+  "size": null,
+  "subject": "a bright rising four-note arpeggio chime, a reward",
+  "workflow": "sao_sfx",
+  "workflowHash": "28d849466488c4a44563e376a815b40c8ae90d9ced420362841325993b9ccc04"
+}

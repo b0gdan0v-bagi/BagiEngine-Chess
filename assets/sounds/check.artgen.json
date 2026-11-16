@@ -1,0 +1,67 @@
+{
+  "accepted": {
+    "channels": 1,
+    "clip": "assets/sounds/check.wav",
+    "peakDb": -2.999999523162842,
+    "processing": {
+      "fadeInMs": 5.0,
+      "fadeOutMs": 150.0,
+      "maxSeconds": 1.0,
+      "mono": true,
+      "peakDb": -3.0,
+      "sampleRate": 44100,
+      "trimDb": -50.0
+    },
+    "sampleRate": 44100,
+    "seconds": 0.9970294784580499,
+    "source": "D:/AHobbyProjects/BagiEngine-Chess/artgen/out/two_short_rising_notes_an_alert_7100.flac"
+  },
+  "channels": 2,
+  "date": "2026-11-16T19:11:35+00:00",
+  "duration": 1.0,
+  "generator": {
+    "name": "comfyui",
+    "url": "http://127.0.0.1:8188",
+    "version": "0.45.0"
+  },
+  "generatorFile": "artgen_two_short_rising_notes_an_alert_00005.flac",
+  "kind": "audio",
+  "models": {
+    "ckpt_name": [
+      "stable-audio-open-1.0.safetensors"
+    ],
+    "clip_name": [
+      "t5_base.safetensors"
+    ]
+  },
+  "negative": "voice, speech, drums, hiss, noise, long reverb, distortion, electric guitar, synth bass, crowd",
+  "params": {
+    "cfg": 6.0,
+    "duration": 1.0,
+    "steps": 60
+  },
+  "preset": "draft",
+  "presetData": {
+    "negative": "voice, speech, drums, hiss, noise, long reverb, distortion, electric guitar, synth bass, crowd",
+    "params": {
+      "cfg": 6.0,
+      "duration": 1.0,
+      "steps": 60
+    },
+    "preset": 1,
+    "prompt": "{subject}, soft wooden marimba tone, warm, clean, short game interface cue, dry close recording",
+    "title": "Chess cue: soft wooden tonal cue",
+    "workflow": "sao_sfx"
+  },
+  "presetHash": "1ae7ed6361e53d67222240b9ee276f2ca358687bb3f5e36e53f16603b538f750",
+  "presetSource": "draft",
+  "prompt": "two short rising notes, an alert, soft wooden marimba tone, warm, clean, short game interface cue, dry close recording",
+  "provenance": 1,
+  "sampleRate": 44100,
+  "seconds": 1.0216780045351475,
+  "seed": 7100,
+  "size": null,
+  "subject": "two short rising notes, an alert",
+  "workflow": "sao_sfx",
+  "workflowHash": "28d849466488c4a44563e376a815b40c8ae90d9ced420362841325993b9ccc04"
+}

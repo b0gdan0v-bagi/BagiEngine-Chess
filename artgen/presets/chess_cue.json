@@ -1,0 +1,12 @@
+{
+  "preset": 1,
+  "title": "Chess cue: soft wooden tonal cue",
+  "workflow": "sao_sfx",
+  "prompt": "{subject}, soft wooden marimba tone, warm, clean, short game interface cue, dry close recording",
+  "negative": "voice, speech, drums, hiss, noise, long reverb, distortion, electric guitar, synth bass, crowd",
+  "params": {
+    "duration": 1.5,
+    "steps": 60,
+    "cfg": 6.0
+  }
+}

@@ -21,13 +21,20 @@ game.
 | Path | What | Licence | Licence file | In a game |
 |------|------|---------|--------------|-----------|
 | `assets/chess_test.png` | the piece atlas, 700x381, six pieces in two colors (`config/TextureLibrary.xml`) | Beerware, by the owner's decision of 2026-11-15 | `LICENSE` | ships (desktop and web) |
-| `assets/sounds/capture.wav` | the sound of a capture (a harder knock with a click), synthesized by `tools/make_sounds.py` | Beerware | `LICENSE` | ships (desktop and web) |
-| `assets/sounds/castle.wav` | the sound of castling (two knocks), synthesized by `tools/make_sounds.py` | Beerware | `LICENSE` | ships (desktop and web) |
-| `assets/sounds/check.wav` | the sound of a check (two rising tones), synthesized by `tools/make_sounds.py` | Beerware | `LICENSE` | ships (desktop and web) |
-| `assets/sounds/click.wav` | the sound of a button (a short dry tick), synthesized by `tools/make_sounds.py` | Beerware | `LICENSE` | ships (desktop and web) |
-| `assets/sounds/game_end.wav` | the sound of the end of a game (a falling chord), synthesized by `tools/make_sounds.py` | Beerware | `LICENSE` | ships (desktop and web) |
-| `assets/sounds/move.wav` | the sound of a move (a wooden knock), synthesized by `tools/make_sounds.py` | Beerware | `LICENSE` | ships (desktop and web) |
-| `assets/sounds/promotion.wav` | the sound of a promotion (four rising notes), synthesized by `tools/make_sounds.py` | Beerware | `LICENSE` | ships (desktop and web) |
+| `assets/sounds/capture.wav` | the sound of a capture (a piece knocked aside onto the board), generated with Stable Audio Open 1.0 (seed 7100, `/artgen`), chosen by the owner by ear | Beerware; the model's output under the Stability AI Community License (commercial use while the yearly revenue is under USD 1M, `engine/THIRD_PARTY_NOTICES.md`) | `LICENSE` | ships (desktop and web) |
+| `assets/sounds/capture.artgen.json` | the provenance of `capture.wav`: model files, prompt, seed, preset, the processing at Accept | Beerware | `LICENSE` | desktop only (kept out of the web package) |
+| `assets/sounds/castle.wav` | the sound of castling (two knocks), generated with Stable Audio Open 1.0 (seed 7100, `/artgen`), chosen by the owner by ear | Beerware; the model's output under the Stability AI Community License (commercial use while the yearly revenue is under USD 1M, `engine/THIRD_PARTY_NOTICES.md`) | `LICENSE` | ships (desktop and web) |
+| `assets/sounds/castle.artgen.json` | the provenance of `castle.wav`: model files, prompt, seed, preset, the processing at Accept | Beerware | `LICENSE` | desktop only (kept out of the web package) |
+| `assets/sounds/check.wav` | the sound of a check (two rising marimba notes), generated with Stable Audio Open 1.0 (seed 7100, `/artgen`), chosen by the owner by ear | Beerware; the model's output under the Stability AI Community License (commercial use while the yearly revenue is under USD 1M, `engine/THIRD_PARTY_NOTICES.md`) | `LICENSE` | ships (desktop and web) |
+| `assets/sounds/check.artgen.json` | the provenance of `check.wav`: model files, prompt, seed, preset, the processing at Accept | Beerware | `LICENSE` | desktop only (kept out of the web package) |
+| `assets/sounds/click.wav` | the sound of a button (a dry wooden tick), generated with Stable Audio Open 1.0 (seed 7100, `/artgen`), chosen by the owner by ear | Beerware; the model's output under the Stability AI Community License (commercial use while the yearly revenue is under USD 1M, `engine/THIRD_PARTY_NOTICES.md`) | `LICENSE` | ships (desktop and web) |
+| `assets/sounds/click.artgen.json` | the provenance of `click.wav`: model files, prompt, seed, preset, the processing at Accept | Beerware | `LICENSE` | desktop only (kept out of the web package) |
+| `assets/sounds/game_end.wav` | the sound of the end of a game (a falling chord that rings out), generated with Stable Audio Open 1.0 (seed 7100, `/artgen`), chosen by the owner by ear | Beerware; the model's output under the Stability AI Community License (commercial use while the yearly revenue is under USD 1M, `engine/THIRD_PARTY_NOTICES.md`) | `LICENSE` | ships (desktop and web) |
+| `assets/sounds/game_end.artgen.json` | the provenance of `game_end.wav`: model files, prompt, seed, preset, the processing at Accept | Beerware | `LICENSE` | desktop only (kept out of the web package) |
+| `assets/sounds/move.wav` | the sound of a move (a wooden piece set down), generated with Stable Audio Open 1.0 (seed 7100, `/artgen`), chosen by the owner by ear | Beerware; the model's output under the Stability AI Community License (commercial use while the yearly revenue is under USD 1M, `engine/THIRD_PARTY_NOTICES.md`) | `LICENSE` | ships (desktop and web) |
+| `assets/sounds/move.artgen.json` | the provenance of `move.wav`: model files, prompt, seed, preset, the processing at Accept | Beerware | `LICENSE` | desktop only (kept out of the web package) |
+| `assets/sounds/promotion.wav` | the sound of a promotion (a rising chime), generated with Stable Audio Open 1.0 (seed 7100, `/artgen`), chosen by the owner by ear | Beerware; the model's output under the Stability AI Community License (commercial use while the yearly revenue is under USD 1M, `engine/THIRD_PARTY_NOTICES.md`) | `LICENSE` | ships (desktop and web) |
+| `assets/sounds/promotion.artgen.json` | the provenance of `promotion.wav`: model files, prompt, seed, preset, the processing at Accept | Beerware | `LICENSE` | desktop only (kept out of the web package) |
 
 ## Stockfish
 
@@ -48,7 +55,7 @@ owner's reading of the licence, not legal advice.
 ## The web package
 
 What `cmake/ChessWeb.cmake` lets into the browser package from the game is `config/` (four XML files) and `assets/chess_test.png` with the seven `assets/sounds/*.wav`; the
-`.md` files, `*.local.xml` (a Stockfish path), `imgui.ini` and `.py` files stay out (`BagiChessWebPackageCheck` holds the list).
+`.md` files, `*.local.xml` (a Stockfish path), `imgui.ini`, `.py` files and the `*.artgen.json` provenance files (paths of the owner's machine, no use to a player) stay out (`BagiChessWebPackageCheck` holds the list).
 Beside them the engine's `config/`, `assets/` (its fonts with their licence texts) and the `web/config` overlay are packaged, and the wasm module
 contains the engine's libraries: their notices are in `engine/THIRD_PARTY_NOTICES.md`. Stockfish, the own UCI program and the control
 API are not in the web build.

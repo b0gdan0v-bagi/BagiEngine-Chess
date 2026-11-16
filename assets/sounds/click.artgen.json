@@ -1,0 +1,67 @@
+{
+  "accepted": {
+    "channels": 1,
+    "clip": "assets/sounds/click.wav",
+    "peakDb": -8.0,
+    "processing": {
+      "fadeInMs": 5.0,
+      "fadeOutMs": 30.0,
+      "maxSeconds": 0.15000000596046448,
+      "mono": true,
+      "peakDb": -8.0,
+      "sampleRate": 44100,
+      "trimDb": -50.0
+    },
+    "sampleRate": 44100,
+    "seconds": 0.15,
+    "source": "D:/AHobbyProjects/BagiEngine-Chess/artgen/out/a_tiny_dry_wooden_tick_a_soft_button_click_7100.flac"
+  },
+  "channels": 2,
+  "date": "2026-11-16T19:11:29+00:00",
+  "duration": 1.0,
+  "generator": {
+    "name": "comfyui",
+    "url": "http://127.0.0.1:8188",
+    "version": "0.45.0"
+  },
+  "generatorFile": "artgen_a_tiny_dry_wooden_tick_a_soft_button_click_00005.flac",
+  "kind": "audio",
+  "models": {
+    "ckpt_name": [
+      "stable-audio-open-1.0.safetensors"
+    ],
+    "clip_name": [
+      "t5_base.safetensors"
+    ]
+  },
+  "negative": "music, voice, speech, hiss, noise, reverb, echo, metal, glass, plastic, crowd, ambience",
+  "params": {
+    "cfg": 6.0,
+    "duration": 1.0,
+    "steps": 60
+  },
+  "preset": "draft",
+  "presetData": {
+    "negative": "music, voice, speech, hiss, noise, reverb, echo, metal, glass, plastic, crowd, ambience",
+    "params": {
+      "cfg": 6.0,
+      "duration": 1.0,
+      "steps": 60
+    },
+    "preset": 1,
+    "prompt": "{subject}, close dry foley recording of a wooden chess set, solid hardwood, quiet room, single isolated sound",
+    "title": "Chess foley: wooden pieces on a wooden board",
+    "workflow": "sao_sfx"
+  },
+  "presetHash": "eb2341b02bd1cd243554756e202bf4bb646797ab3eb870bc9d5bfb26f5f55dcf",
+  "presetSource": "draft",
+  "prompt": "a tiny dry wooden tick, a soft button click, close dry foley recording of a wooden chess set, solid hardwood, quiet room, single isolated sound",
+  "provenance": 1,
+  "sampleRate": 44100,
+  "seconds": 1.0216780045351475,
+  "seed": 7100,
+  "size": null,
+  "subject": "a tiny dry wooden tick, a soft button click",
+  "workflow": "sao_sfx",
+  "workflowHash": "28d849466488c4a44563e376a815b40c8ae90d9ced420362841325993b9ccc04"
+}

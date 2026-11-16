@@ -3,7 +3,7 @@
 #include <gtest/gtest.h>
 #include <tests/ChessTestUtil.h>
 
-/// The clips the cues name (Sound/SoundCue.h), read from the source tree and decoded the way the engine does; they are made by tools/make_sounds.py, which has its own --check
+/// The clips the cues name (Sound/SoundCue.h), read from the source tree and decoded the way the engine does; they are generated (src/Chess/Sound/CLAUDE.md, "The clips"), and these checks are their numbers
 namespace BECore::Chess::Tests {
 
     namespace {

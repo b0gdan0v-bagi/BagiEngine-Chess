@@ -19,13 +19,13 @@ endfunction()
 foreach(_name
         config/CLAUDE.md config/README.md assets/notes.md
         config/ChessSettings.local.xml config/imgui.ini config/.DS_Store assets/.DS_Store
-        assets/tool.py assets/__pycache__/tool.cpython-312.pyc config/sub/CLAUDE.md)
+        assets/tool.py assets/__pycache__/tool.cpython-312.pyc config/sub/CLAUDE.md assets/sounds/move.artgen.json)
     chess_web_excluded("${_name}" OUT _excluded)
     check_equal("excluded: ${_name}" "${_excluded}" "TRUE")
 endforeach()
 foreach(_name
         config/ApplicationConfig.xml config/ChessSettings.xml config/SceneConfig.xml config/TextureLibrary.xml
-        assets/chess_test.png config/localxml.xml assets/imgui.png config/nodes/ChessHud.xml)
+        assets/chess_test.png config/localxml.xml assets/imgui.png config/nodes/ChessHud.xml assets/artgen.json)
     chess_web_excluded("${_name}" OUT _excluded)
     check_equal("not excluded: ${_name}" "${_excluded}" "FALSE")
 endforeach()
@@ -67,7 +67,7 @@ file(REMOVE_RECURSE "${scratch}")
 foreach(_name ${expected})
     file(WRITE "${scratch}/${_name}" "x")
 endforeach()
-foreach(_stray config/CLAUDE.md config/ChessSettings.local.xml config/imgui.ini assets/.DS_Store assets/__pycache__/a.pyc)
+foreach(_stray config/CLAUDE.md config/ChessSettings.local.xml config/imgui.ini assets/.DS_Store assets/__pycache__/a.pyc assets/sounds/move.artgen.json)
     file(WRITE "${scratch}/${_stray}" "x")
 endforeach()
 chess_web_package_files(OUT files GAME_ROOT "${scratch}")
