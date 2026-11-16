@@ -1,5 +1,7 @@
 #pragma once
 
+#include <BECore/Audio/AudioManager.h>
+#include <BECore/GameManager/CoreManager.h>
 #include <Chess/Engine/ChessEngine.h>
 #include <Chess/Game/GameStatus.h>
 #include <Chess/Game/Move.h>
@@ -48,6 +50,21 @@ namespace BECore::Chess::Tests {
         (void)scheduler.ProcessBackgroundSlices(TaskManager::GetInstance().GetFrameBudget());
 #endif
     }
+
+    /// The levels of the process-wide audio manager as they were, put back after the scope: a test that sets a volume or a mute (or starts a game that restores one) holds this, so no
+    /// level stays behind for the next test
+    class ScopedAudioLevels {
+    public:
+        ScopedAudioLevels() : _saved(CoreManager::GetAudio().GetSettings()) {}
+        ~ScopedAudioLevels() {
+            CoreManager::GetAudio().ApplySettings(_saved);
+        }
+        ScopedAudioLevels(const ScopedAudioLevels&) = delete;
+        ScopedAudioLevels& operator=(const ScopedAudioLevels&) = delete;
+
+    private:
+        AudioSettings _saved;
+    };
 
     /// An environment variable set (or removed, for nullptr) for the length of a scope and put back after it. A test that starts a game reads STOCKFISH and PATH through
     /// FindStockfish(), so it fixes them with this instead of taking the machine's
