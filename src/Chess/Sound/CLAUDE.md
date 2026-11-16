@@ -1,11 +1,13 @@
 # Chess sound (src/Chess/Sound)
 
-The sound of the board: one clip per played move, asked of `CoreManager::GetAudio()` (`engine/src/Modules/BECore/Audio/CLAUDE.md`).
+The sound of the board (one clip per played move) and of the buttons, and the menu section `Sound`, asked of `CoreManager::GetAudio()` (`engine/src/Modules/BECore/Audio/CLAUDE.md`).
 
 ```
 Sound/
-├── SoundCue.*               pure: SoundCue (CORE_ENUM), MoveOutcome, CueOfMove, ClipPath, CueVolume, CueBus, ActionClicks; no scene, no audio manager
-└── ChessSoundComponent.*    scene glue on the node Sound (config/nodes/ChessSound.xml): plays the cue of a move that was just played
+├── SoundCue.*                   pure: SoundCue (CORE_ENUM), MoveOutcome, CueOfMove, ClipPath, CueVolume, CueBus, ActionClicks; no scene, no audio manager
+├── ChessSoundComponent.*        scene glue on the node Sound (config/nodes/ChessSound.xml): plays the cue of a move that was just played and the click of a button
+├── SoundLevels.*                pure: the slider's step, ParseVolume, ParseMuted, VolumeVarText, VolumePercentText
+└── ChessSoundPanelComponent.*   scene glue on the node SoundPanel (config/nodes/ChessSoundPanel.xml): the section's answers and variables
 ```
 
 ## The cue of a move
@@ -22,8 +24,20 @@ A steady frame allocates nothing (`ChessUiAllocTest`): the clip paths are `PoolS
 
 ## The clips
 
-`tools/make_sounds.py` synthesizes the six files of `assets/sounds/` (standard library only, a fixed seed per clip, so the bytes are the same on every run); `--check` exits 1 when a file differs from what the script makes. Nobody could listen on the build machine: the numbers are checked (rate, peak below 1 at master 1, a fade at both ends, the lengths), not the sound. To replace a clip by hand drop its entry from the script (else `--check` fails and the next run overwrites it), keep the name and give its row in `THIRD_PARTY_NOTICES.md` the author and the licence. A new clip needs its cue in `SoundCue.cpp`, its row in `THIRD_PARTY_NOTICES.md` and its line in `tests/check_web_package.cmake`; `ChessSoundFilesTest` fails on a `.wav` that no cue names.
+`tools/make_sounds.py` synthesizes the seven files of `assets/sounds/` (standard library only, a fixed seed per clip, so the bytes are the same on every run); `--check` exits 1 when a file differs from what the script makes. Nobody could listen on the build machine: the numbers are checked (rate, peak below 1 at master 1, a fade at both ends, the lengths), not the sound. To replace a clip by hand drop its entry from the script (else `--check` fails and the next run overwrites it), keep the name and give its row in `THIRD_PARTY_NOTICES.md` the author and the licence. A new clip needs its cue in `SoundCue.cpp`, its row in `THIRD_PARTY_NOTICES.md` and its line in `tests/check_web_package.cmake`; `ChessSoundFilesTest` fails on a `.wav` that no cue names.
+
+## The buttons
+
+`ChessSoundComponent` also answers every `InputEvents::ActionEvent` with the `Click` cue on the `Ui` bus (`CueBus`: the bus is a field of the cue's table row, so it cannot drift from the clip), one request per action, except `ChessSetVolume` (`ActionClicks`): the slider emits on every step of a drag, and a click per step is noise. The mute switch is a button and clicks. A disabled button emits no action, so it is silent. `CueOfMove` never gives `Click`. Two components get one event in no defined order: a click on the mute switch may be recorded before or after the mute applies; the request is recorded either way, so no test may depend on the order.
+
+## The options
+
+The menu section `Sound` (`SoundPanel`) has the master volume (a slider, steps of `kVolumeStep`) and the mute, nothing else: `Sfx` and `Ui` keep the config's level and have no row (the saved `audio` slot holds all four, so a row needs no new file). `ChessSoundPanelComponent` answers `ChessSetVolume` and `ChessSetMute` with `SetMasterVolume` / `SetMasterMuted`; a value that does not parse (`SoundLevels`) changes nothing and logs one warning. It publishes `soundVolume`, `soundVolumeText` and `soundMuted` to `UIVars` in `OnDraw` only when `GetLevelsRevision()` moved (and at the first draw), so a level set by `audio_set` or restored from a save shows at the next draw and a steady frame writes nothing; the widgets own no level, and a muted master keeps its volume, so the slider still shows it. Every element name of the node starts with `SoundPanel` (names are found in every canvas).
+
+## The levels between runs
+
+`ChessSaveKeeper` keeps the master and the buses in the engine's `audio` slot beside the game, under the same gate: `src/Chess/Save/CLAUDE.md`.
 
 ## Tests
 
-`SoundCueTest` (the rule over real positions, the table), `ChessSoundFilesTest` (each clip decodes, mono, not clipping, a quiet end, no stray file), `ChessUiSoundTest` (the shipped scene: one request per move for each way of playing, none for each of the cases above) and the control smoke (`audio_state` shows the clip and the bus after `perform_action`; `played` is not asserted, a headless run plays to SDL's dummy driver).
+`SoundCueTest` (the rule over real positions, the table), `ChessSoundFilesTest` (each clip decodes, mono, not clipping, a quiet end, no stray file), `ChessUiSoundTest` (the shipped scene: one request per move for each way of playing, one click per button, none for each of the cases above), `SoundLevelsTest`, `ChessUiSoundPanelTest` (the section: matrix, real clicks, the levels, `ScopedAudioLevels` keeps the process-wide manager clean) and the control smoke (`audio_state` shows the clip and the bus after `perform_action` and after `ui_click`; `audio_set` shows a level and a move still records its request; a level survives a quit and a start on one `--save-dir` and is not read without one; `played` is not asserted, a headless run plays to SDL's dummy driver).

@@ -178,6 +178,53 @@ def check_the_board_sounds(client: BagiControlClient) -> None:
     let_frames_pass(client, SOUND_FRAMES)
     check(audio_state(client)["requested"] == before, "a takeback or a reset asked for a sound")
 
+    check_the_buttons_click(client)
+    check_the_levels(client)
+
+
+CLICK_CLIP = "assets/sounds/click.wav"
+
+
+def master_level(client: BagiControlClient) -> dict:
+    return audio_state(client)["levels"]["master"]
+
+
+def check_the_buttons_click(client: BagiControlClient) -> None:
+    """A click on a button asks for the click clip on the ui bus, one request per click (the menu button opens the list, Close shuts it)."""
+    for name, action in (("Menu", "ChessOpenMenu"), ("MenuClose", "ChessCloseMenu")):
+        before = audio_state(client)["requested"]
+        clicked = client.call("ui_click", {"name": name})
+        check(clicked["consumed"] and clicked["action"] == action, f"the click on {name} was answered with {clicked}")
+        let_frames_pass(client, SOUND_FRAMES)
+        after = audio_state(client)
+        check(after["requested"] == before + 1, f"the click on {name} asked for {after['requested'] - before} sounds, not one")
+        last = after["recent"][-1]
+        check(last["clip"] == CLICK_CLIP and last["bus"] == "ui", f"the click on {name} should sound as the click on the ui bus, the request is {last}")
+    check_the_menu_list_is_hidden(client.call("ui_tree"))
+
+
+def check_the_levels(client: BagiControlClient) -> None:
+    """A level set over the control API shows in the state; the request of a sound is recorded at any level (the gain is the backend's). Ends with the defaults put back."""
+    client.call("reset")
+    let_frames_pass(client, SOUND_FRAMES)
+    try:
+        levels = client.call("audio_set", {"bus": "master", "volume": 0})
+        check(levels["master"]["volume"] == 0, f"audio_set did not set the master volume: {levels}")
+        before = audio_state(client)["requested"]
+        client.call("perform_action", move("e2e4"))
+        let_frames_pass(client, SOUND_FRAMES)
+        after = audio_state(client)
+        check(after["requested"] == before + 1 and after["recent"][-1]["bus"] == "sfx", f"a move at volume 0 did not ask for one sfx sound: {after['recent'][-1]}")
+        check(after["levels"]["master"]["volume"] == 0, f"the master volume moved by itself: {after['levels']}")
+
+        levels = client.call("audio_set", {"bus": "master", "muted": True})
+        check(levels["master"]["muted"] is True and levels["master"]["volume"] == 0, f"the mute did not show or lost the volume: {levels}")
+    finally:
+        client.call("audio_set", {"bus": "master", "volume": 1, "muted": False})
+    check(master_level(client) == {"volume": 1, "muted": False}, f"the defaults were not put back: {master_level(client)}")
+    client.call("reset")
+    let_frames_pass(client, SOUND_FRAMES)
+
 
 def run_chess_scenario(client: BagiControlClient, headless: bool) -> None:
     status = client.call("status")
@@ -1047,7 +1094,7 @@ def check_the_menu_buttons(tree: dict) -> None:
 
     for element in find_ui_canvas(tree, "MenuPanel")["elements"]:
         collect(element)
-    check(sorted(names) == ["MenuClose", "MenuDim", "MenuSectionMoves", "MenuSectionOpponent"], f"the buttons of the list: {names}")
+    check(sorted(names) == ["MenuClose", "MenuDim", "MenuSectionMoves", "MenuSectionOpponent", "MenuSectionSound"], f"the buttons of the list: {names}")
     dim = find_ui_element({"canvases": [find_ui_canvas(tree, "MenuPanel")]}, "MenuDim")
     check(dim["action"] == "ChessCloseMenu", f"the dim of the list: {dim}")
     found = find_ui_element({"canvases": [find_ui_canvas(tree, "MenuPanel")]}, "MenuSectionOpponent")
@@ -1244,6 +1291,8 @@ OPPONENT_SCENARIOS = [
 
 
 SAVED_CHOICE = {"engine": "own", "plays": "black", "level": "easy"}
+SAVED_VOLUME = 0.4
+VOLUME_TOLERANCE = 1e-6  # the level is a float32, the wire a double
 
 
 class RestartPhase:
@@ -1278,13 +1327,16 @@ class RestartPhase:
         play_against_the_own_engine(client)
         self.before = self.read(client)
         check(len(self.before["moves"]) == 2, f"unexpected game {self.before}")
-        # quit (by play()) goes through ChessGame::Stop(), which writes the game
+        client.call("audio_set", {"bus": "master", "volume": SAVED_VOLUME})
+        # quit (by play()) goes through ChessGame::Stop(), which writes the game and the levels
 
     def come_back(self, client: BagiControlClient, headless: bool) -> None:
         if client.call("status")["manualClock"]:
             client.call("step")
         after = self.read(client)
         check(after == self.before, f"the game did not come back after a restart: {self.before} then {after}")
+        check(abs(master_level(client)["volume"] - SAVED_VOLUME) < VOLUME_TOLERANCE, f"the master volume did not come back after a restart: {master_level(client)}")
+        client.call("audio_set", {"bus": "master", "volume": 1})  # the exit writes the levels: the next start finds the defaults
         client.call("reset")  # the exit writes the new game
 
     def keep_the_fresh_game(self, client: BagiControlClient, headless: bool) -> None:
@@ -1305,6 +1357,7 @@ def run_without_a_save_folder(client: BagiControlClient, headless: bool) -> None
     check_start_position(client)
     opponent = get_opponent(client)
     check(opponent["plays"] is None and opponent["error"] is None, f"a game started with no save folder has an opponent: {opponent}")
+    check(master_level(client) == {"volume": 1.0, "muted": False}, f"a game started with no save folder read the levels of a save: {master_level(client)}")
 
 
 def main() -> int:
