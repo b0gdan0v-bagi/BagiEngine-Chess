@@ -63,6 +63,6 @@ Read by the skills `perf` and `perf-investigate` and by the sentinel step of `to
 ## Notes
 
 - Headless, the present of the SDL software renderer is most of a frame whatever the scene draws; `work_ms` (the frame without the present) is the number that moves with scene and UI code.
-- Windows: the runner builds with plain `cmake`, so it runs as `python engine/CI/scripts/vs_env.py python engine/tools/perf/perf.py ...`; a Release build is `cmake --preset windows-clang-release -DENGINE_CCACHE=OFF` (in a worker, ccache shares absolute paths with other workers and breaks). The allocation counts, `ChessUiAllocTest` and the zones of a trace need the profile preset.
+- Windows: the runner builds with plain `cmake`, so it runs as `python engine/CI/scripts/vs_env.py python engine/tools/perf/perf.py ...`; a Release build is `cmake --preset windows-clang-release`. The allocation counts, `ChessUiAllocTest` and the zones of a trace need the profile preset.
 - The zones a trace shows are listed in `src/Chess/Engine/CLAUDE.md` ("Profiler zones").
 - The sentinel (`todo-merge`): `ask`.
