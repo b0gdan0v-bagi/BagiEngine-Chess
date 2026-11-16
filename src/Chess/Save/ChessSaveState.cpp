@@ -40,6 +40,20 @@ namespace BECore::Chess {
             return std::nullopt;
         }
 
+        constexpr StringView kResignedId = "resigned";
+        constexpr StringView kDrawAgreedId = "draw_agreed";
+
+        StringView EndedId(GameStatus status) {
+            switch (status) {
+                case GameStatus::Resigned:
+                    return kResignedId;
+                case GameStatus::DrawAgreed:
+                    return kDrawAgreedId;
+                default:
+                    return {};
+            }
+        }
+
         StringView View(const String& text) {
             return StringView(text);
         }
@@ -106,6 +120,7 @@ namespace BECore::Chess {
         state.blackEngine = Own(OpponentEngineId(black.engine));
         state.blackLevel = Own(GetOpponentLevels()[black.level].id);
         state.personColor = Own(choice.ColorId());
+        state.ended = Own(EndedId(model.GetStatus()));
         return state;
     }
 
@@ -125,7 +140,11 @@ namespace BECore::Chess {
             return std::unexpected(std::move(moves.error()));
         }
         plan.moves = std::move(*moves);
-        plan.finished = scratch.IsGameOver();
+        const StringView ended = View(state.ended);
+        if (!ended.empty() && ended != kResignedId && ended != kDrawAgreedId) {
+            return Corrupt("way the game ended is not resigned or draw_agreed");
+        }
+        plan.finished = scratch.IsGameOver() || !ended.empty();
 
         const Optional<ProgramSides> plays = ParsePlays(View(state.plays));
         if (!plays) {

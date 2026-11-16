@@ -45,7 +45,7 @@ namespace BECore::Chess::Tests {
         /// The fields of a state as one comparable text
         String Describe(const ChessSaveState& state) {
             String text;
-            for (const String* field : {&state.startFen, &state.moves, &state.plays, &state.whiteEngine, &state.whiteLevel, &state.blackEngine, &state.blackLevel, &state.personColor}) {
+            for (const String* field : {&state.startFen, &state.moves, &state.plays, &state.whiteEngine, &state.whiteLevel, &state.blackEngine, &state.blackLevel, &state.personColor, &state.ended}) {
                 text += String(field->c_str(), field->size()) + "|";
             }
             return text;
@@ -313,6 +313,68 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(target.controller.GetSeatChoice(PieceColor::Black), Seat(OpponentEngine::Own, "hard"));
     }
 
+    // A resignation or an agreed draw leaves only legal moves in the file, so `ended` alone makes it a finished game
+    TEST_F(ChessSaveStateTest, AResignedOrAgreedGameIsNotRestoredButTheChoiceIs) {
+        struct Ending {
+            StringView id;
+            bool resign;
+        };
+        for (const Ending ending : {Ending{"resigned", true}, Ending{"draw_agreed", false}}) {
+            SCOPED_TRACE(String(ending.id.data(), ending.id.size()));
+            SavedGame source;
+            PlayLine(source.model, kGameInProgress);
+            ASSERT_TRUE(source.controller.ChooseSeats(ProgramSides::Of(PieceColor::Black), Seat(OpponentEngine::Own, "hard"), Seat(OpponentEngine::Own, "hard")).has_value());
+            ASSERT_TRUE((ending.resign ? source.model.Resign(PieceColor::White) : source.model.AgreeDraw()).has_value());
+            ASSERT_TRUE(_service.Save(kChessSaveSlot, kChessSaveSchema, source.Captured()).has_value());
+            ChessSaveState state;
+            ASSERT_TRUE(_service.Load(kChessSaveSlot, kChessSaveSchema, state).has_value());
+            EXPECT_EQ(state.ended, String(ending.id.data(), ending.id.size()));
+            const std::expected<RestorePlan, SaveError> plan = Validate(state);
+            ASSERT_TRUE(plan.has_value());
+            EXPECT_TRUE(plan->finished);
+
+            SavedGame target;
+            const uint64_t versionBefore = target.model.GetVersion();
+            ASSERT_TRUE(LoadAndRestore(target).has_value());
+
+            EXPECT_EQ(target.model.GetVersion(), versionBefore);
+            EXPECT_EQ(target.model.GetStatus(), GameStatus::Ongoing);
+            EXPECT_TRUE(target.model.GetMoves().empty());
+            EXPECT_EQ(target.controller.GetPlays(), PieceColor::Black);
+            EXPECT_EQ(target.controller.GetSeatChoice(PieceColor::Black), Seat(OpponentEngine::Own, "hard"));
+        }
+    }
+
+    TEST_F(ChessSaveStateTest, AGameThatIsNotEndedSavesAnEmptyEnded) {
+        SavedGame game;
+        PlayLine(game.model, kGameInProgress);
+
+        EXPECT_TRUE(game.Captured().ended.empty());
+    }
+
+    TEST_F(ChessSaveStateTest, AFileWithoutEndedLoadsAsAGameInProgress) {
+        // The file an older program wrote: the same fields, none of `ended`
+        const ChessSaveState full = GoodState();
+        const auto saved = _service.Save(kChessSaveSlot, kChessSaveSchema, [&full](ISerializer& serializer) {
+            serializer.WriteAttribute("startFen", StringView(full.startFen));
+            serializer.WriteAttribute("moves", StringView(full.moves));
+            serializer.WriteAttribute("plays", StringView(full.plays));
+            serializer.WriteAttribute("whiteEngine", StringView(full.whiteEngine));
+            serializer.WriteAttribute("whiteLevel", StringView(full.whiteLevel));
+            serializer.WriteAttribute("blackEngine", StringView(full.blackEngine));
+            serializer.WriteAttribute("blackLevel", StringView(full.blackLevel));
+            serializer.WriteAttribute("personColor", StringView(full.personColor));
+        });
+        ASSERT_TRUE(saved.has_value()) << saved.error().detail.c_str();
+
+        SavedGame target;
+        const auto restored = LoadAndRestore(target);
+
+        ASSERT_TRUE(restored.has_value()) << restored.error().detail.c_str();
+        EXPECT_EQ(MovesText(target.model), full.moves);
+        EXPECT_EQ(target.model.GetStatus(), GameStatus::Ongoing);
+    }
+
     TEST_F(ChessSaveStateTest, APickTheControllerRefusesLeavesThePositionRestoredAndTheProgramOut) {
         SavedGame source;
         PlayLine(source.model, kGameInProgress);
@@ -409,6 +471,11 @@ namespace BECore::Chess::Tests {
             state.personColor = "white";
         });
         ExpectRefused(SaveErrorKind::Corrupt, "both play white");
+    }
+
+    TEST_F(ChessSaveStateTest, AnUnknownWayOfEndingIsRefused) {
+        SaveAltered([](ChessSaveState& state) { state.ended = "mated"; });
+        ExpectRefused(SaveErrorKind::Corrupt, "ended");
     }
 
     TEST_F(ChessSaveStateTest, AnEmptyFileIsRefused) {

@@ -16,8 +16,8 @@ namespace BECore::Chess {
     /**
      * @brief The game and the opponent choice as a save file holds them. Ids and text only, so the file does not depend on the order of an enum.
      *
-     * Not saved: the selection, a pending promotion, the analysis (its switches, hints, ratings) and the takeback stack: they all start as at a new game. Every field is a string the
-     * restore checks (Validate()), so a file that was edited or damaged is refused and never applied in part.
+     * Not saved: the selection, a pending promotion, the analysis (its switches, hints, ratings), the takeback stack and who resigned (a finished game is not restored): they all start as at a new
+     * game. Every field is a string the restore checks (Validate()), so a file that was edited or damaged is refused and never applied in part.
      */
     struct ChessSaveState {
         BE_CLASS(ChessSaveState)
@@ -35,13 +35,15 @@ namespace BECore::Chess {
         BE_REFLECT_FIELD String blackLevel;
         /// The color the person plays, "white" or "black" (OpponentChoice::Color())
         BE_REFLECT_FIELD String personColor;
+        /// How the game ended without the moves saying so: "" (not ended that way), "resigned" or "draw_agreed". A resigned game has only legal moves and would come back alive without it
+        BE_REFLECT_FIELD String ended;
     };
 
     /// A save that Validate() has checked completely: everything Apply() needs, already parsed
     struct RestorePlan {
         Position start = Position::Start();  ///< the position the game began from
         Vector<Move> moves;                  ///< legal in their turn, one after the other, from @p start
-        bool finished = false;               ///< the game of the file is over: Apply() restores the opponent choice only
+        bool finished = false;               ///< the game of the file is over (by its moves or by `ended`): Apply() restores the opponent choice only
         ProgramSides plays;
         SeatChoice white;
         SeatChoice black;
