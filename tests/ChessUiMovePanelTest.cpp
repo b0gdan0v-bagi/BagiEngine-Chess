@@ -7,7 +7,8 @@ namespace BECore::Chess::Tests {
 
     namespace {
 
-        constexpr float kTitleHeight = 56.0f;
+        constexpr float kBandHeight = 56.0f;
+        constexpr const char* kPanelBands[] = {"MovePanelBandTopPlayer", "MovePanelBandBottomPlayer", "MovePanelBandButtons"};  // in the order of the box, top down
         constexpr float kRowHeight = 56.0f;
         constexpr float kNumberWidth = 56.0f;
         constexpr const char* kMovePanelPrefix = "MovePanel";
@@ -43,7 +44,8 @@ namespace BECore::Chess::Tests {
         }
 
         /// What is wrong with the canvas MovePanel as it is laid out with the box and every row shown, one problem to a line, nothing when it is right: a name without the prefix, a box that is
-        /// not the one of Game/MovePanel.h, a box that lies inside the safe area exactly where MovePanelFits says it does not, bands and rows of the wrong height, a word that a cell cuts
+        /// not the one of Game/MovePanel.h, a box that lies inside the safe area exactly where MovePanelFits says it does not, bands and rows of the wrong height or place (the bands of the players
+        /// are where the panel set of Material is drawn: kPanelTopBand, kPanelBottomBand), a word that a cell cuts
         String MovePanelProblems(const UICanvasLayout& layout) {
             String problems;
             const float scale = layout.GetResolved().scale;
@@ -87,13 +89,24 @@ namespace BECore::Chess::Tests {
                 }
             };
 
-            if (const UIElement* title = find("MovePanelTitle")) {
-                if (std::abs(title->rect.h - kTitleHeight) > kPixelTolerance || !LiesIn(title->rect, box->rect)) {
-                    problems += "MovePanelTitle is not the band of 56 units at the top of the box\n";
-                }
-                fitsIn(*title);
-            }
             const UIElement* list = find("MovePanelList");
+            const UIElement* bands[std::size(kPanelBands)] = {};
+            for (size_t band = 0; band < std::size(kPanelBands); ++band) {
+                bands[band] = find(kPanelBands[band]);
+                if (bands[band] != nullptr && (std::abs(bands[band]->rect.h - kBandHeight) > kPixelTolerance || !LiesIn(bands[band]->rect, box->rect))) {
+                    problems += Format("{} is not a band of {:.0f} units inside the box\n", kPanelBands[band], kBandHeight);
+                }
+            }
+            if (bands[0] != nullptr && (!LiesIn(bands[0]->rect, kPanelTopBand) || std::abs(bands[0]->rect.y - kPanelTopBand.y) > kPixelTolerance)) {
+                problems += "MovePanelBandTopPlayer is not the top band, where the panel set of Material draws the upper group\n";
+            }
+            if (bands[1] != nullptr && (!LiesIn(bands[1]->rect, kPanelBottomBand) || std::abs(bands[1]->rect.y - kPanelBottomBand.y) > kPixelTolerance)) {
+                problems += "MovePanelBandBottomPlayer is not the band where the panel set of Material draws the lower group\n";
+            }
+            if (list != nullptr && bands[0] != nullptr && bands[1] != nullptr && bands[2] != nullptr &&
+                !(bands[0]->rect.y + bands[0]->rect.h <= list->rect.y && list->rect.y + list->rect.h <= bands[1]->rect.y && bands[1]->rect.y + bands[1]->rect.h <= bands[2]->rect.y)) {
+                problems += "the box is not the top band, the list, the band of the other player and the band of the buttons, top down and apart\n";
+            }
             float previousBottom = list != nullptr ? list->rect.y : 0.0f;
             for (size_t row = 0; row < kMovePanelRows; ++row) {
                 const UIElement* line = find(Format("MovePanelRow{}", row));
@@ -343,12 +356,12 @@ namespace BECore::Chess::Tests {
             EXPECT_FALSE(element->blocksInput) << element->name.CStr();
             EXPECT_FALSE(element->IsInteractive()) << element->name.CStr();
         }
-        // a hit test of the canvas finds nothing at the middle of any element, and a press on the box, the title and the rows is not taken by the UI
+        // a hit test of the canvas finds nothing at the middle of any element, and a press on the box, a band and the rows is not taken by the UI
         for (const UIElement* element : AllElements(canvas->GetRoot())) {
             const Rect& rect = element->rect;
             EXPECT_EQ(canvas->GetLayout().HitTest(rect.x + rect.w * 0.5f, rect.y + rect.h * 0.5f), nullptr) << element->name.CStr();
         }
-        for (const char* name : {"MovePanelBox", "MovePanelTitle", "MovePanelRow0", "MovePanelWhite0", "MovePanelBlack0"}) {
+        for (const char* name : {"MovePanelBox", "MovePanelBandTopPlayer", "MovePanelRow0", "MovePanelWhite0", "MovePanelBlack0"}) {
             const auto [x, y] = ScreenCenter(MovePanelElement(name));
             EXPECT_FALSE(CoreManager::GetUIInput().DispatchMouseButtonDown(Button(x, y, true))) << name;
             EXPECT_FALSE(CoreManager::GetUIInput().DispatchMouseButtonUp(Button(x, y, false))) << name;
@@ -401,8 +414,8 @@ namespace BECore::Chess::Tests {
             if (box->rect.x < kBoardLeft + kBoardUnits) {
                 report += Format("{}: the box reaches the board\n", matrixCase.label.c_str());
             }
-            // The insets move the HUD, not the box: a notch pushes the top row (Menu, Reset) down onto the title band, the home bar of the side insets pushes Status up onto the empty band
-            // under the list. The 8 rows are clear of the HUD in every case
+            // The insets move the HUD, not the box: a notch pushes the top row (Menu, Reset) down onto the top band, the home bar of the side insets pushes Status up onto the band of the
+            // buttons. The 8 rows are clear of the HUD in every case
             const UIElement* list = layout.root->FindByName(PoolString::Intern("MovePanelList"));
             ASSERT_NE(list, nullptr);
             String touching;
@@ -417,9 +430,27 @@ namespace BECore::Chess::Tests {
                     touching += Format(" {}", control->name.ToStringView());
                 }
             }
-            const char* expected = matrixCase.label.find("notch") != String::npos ? " Menu Reset" : matrixCase.label.find("side insets") != String::npos ? " Status" : "";
+            const bool notch = matrixCase.label.find("notch") != String::npos;
+            const bool sideInsets = matrixCase.label.find("side insets") != String::npos;
+            const char* expected = notch ? " Menu Reset" : sideInsets ? " Status" : "";
             if (touching != expected) {
                 report += Format("{}: the HUD controls closer to the box than {:.0f} units are '{}', not '{}'\n", matrixCase.label.c_str(), kMinGap, touching.c_str(), expected);
+            }
+            // Per band: a notch reaches the top band only, the home bar of side insets the band of the buttons only; the band of the other player's material is clear in every window
+            const char* expectedPerBand[] = {notch ? " Menu Reset" : "", "", sideInsets ? " Status" : ""};
+            for (size_t band = 0; band < std::size(kPanelBands); ++band) {
+                const UIElement* element = layout.root->FindByName(PoolString::Intern(kPanelBands[band]));
+                ASSERT_NE(element, nullptr);
+                String near;
+                for (const UIElement* control : AllElements(*hud->GetLayout().root)) {
+                    if (TextOf(*control) != nullptr && !control->rect.IsEmpty() && Touch(element->rect, control->rect, kMinGap)) {
+                        near += Format(" {}", control->name.ToStringView());
+                    }
+                }
+                if (near != expectedPerBand[band]) {
+                    report +=
+                        Format("{}: the HUD controls closer to {} than {:.0f} units are '{}', not '{}'\n", matrixCase.label.c_str(), kPanelBands[band], kMinGap, near.c_str(), expectedPerBand[band]);
+                }
             }
         }
         panel->SetElementVisible(PoolString::Intern("MovePanelBox"), false);
@@ -475,11 +506,9 @@ namespace BECore::Chess::Tests {
         EXPECT_TRUE(MovePanelElement("MovePanelBox").active.visible) << "a Wide window has room once the layout is known";
     }
 
-    TEST_F(ChessUiTest, TheMovePanelStartsWithTheTitleAndNoRow) {
+    TEST_F(ChessUiTest, TheMovePanelStartsWithNoRow) {
         Settle();
         EXPECT_EQ(ShownMovePanelRows(), "");
-        EXPECT_EQ(ShownText(MovePanelElement("MovePanelTitle")), "Moves");
-        EXPECT_TRUE(MovePanelElement("MovePanelTitle").active.visible);
         for (size_t row = 0; row < kMovePanelRows; ++row) {
             EXPECT_FALSE(MovePanelElement(Format("MovePanelRow{}", row).c_str()).active.visible) << row;
             for (const char* side : kSides) {
@@ -591,7 +620,6 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(MovePanelWord(0, "White"), "");
         EXPECT_EQ(MovePanelWord(0, "Black"), "");
         EXPECT_FALSE(MovePanelElement("MovePanelBlackMark0").active.visible);
-        EXPECT_EQ(ShownText(MovePanelElement("MovePanelTitle")), "Moves") << "the title is not a state";
     }
 
     TEST_F(ChessUiTest, ABrokenCopyOfTheMovePanelCanvasIsCaughtByTheChecks) {
@@ -622,8 +650,14 @@ namespace BECore::Chess::Tests {
         EXPECT_NE(problemsOf(noMark).find("MovePanelBlackMark3 is missing"), String::npos) << "a row without its mark";
 
         String unprefixed = shipped;
-        ASSERT_NO_FATAL_FAILURE(Replace(unprefixed, R"(name="MovePanelTitle")", R"(name="Title")"));
-        EXPECT_NE(problemsOf(unprefixed).find("Title does not start with MovePanel"), String::npos) << "elements are found by name in every canvas";
+        ASSERT_NO_FATAL_FAILURE(Replace(unprefixed, R"(name="MovePanelBandButtons")", R"(name="BandButtons")"));
+        EXPECT_NE(problemsOf(unprefixed).find("BandButtons does not start with MovePanel"), String::npos) << "elements are found by name in every canvas";
+
+        String swapped = shipped;
+        ASSERT_NO_FATAL_FAILURE(Replace(swapped, R"(name="MovePanelBandBottomPlayer")", R"(name="MovePanelBandSwap")"));
+        ASSERT_NO_FATAL_FAILURE(Replace(swapped, R"(name="MovePanelBandButtons")", R"(name="MovePanelBandBottomPlayer")"));
+        ASSERT_NO_FATAL_FAILURE(Replace(swapped, R"(name="MovePanelBandSwap")", R"(name="MovePanelBandButtons")"));
+        EXPECT_NE(problemsOf(swapped).find("MovePanelBandBottomPlayer is not the band where the panel set of Material draws"), String::npos) << "the bands under the list in the other order";
 
         String bigFont = shipped;
         ASSERT_NO_FATAL_FAILURE(Replace(bigFont, R"(name="MovePanelWhiteText0" anchor="Stretch" fontSize="24")", R"(name="MovePanelWhiteText0" anchor="Stretch" fontSize="90")"));

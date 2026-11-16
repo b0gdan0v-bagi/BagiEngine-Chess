@@ -4,11 +4,13 @@
      safe area, like Material, so ChessMovePanelComponent decides what a window with insets leaves of it: in the default and the Portrait view (narrower than the box) and in a Wide window whose
      side insets cut the box (700 x 480) MovePanelBox stays hidden. Layer 5: over the pieces (0) and the result bar (1), under the HUD (10) and the panels (20); the component is listed before
      the canvas so that it gives the variables their words before the canvas draws in the same frame. Nothing here takes a click (no blocksInput, nothing interactive, not modal), so the board
-     and the HUD get every press. The box is one stack on a dark plate (not a color of the board): a title band of 56 units ("Moves"), the list of 8 rows of 56 (448: the touch height the clickable
-     rows of a later stage need, 32 px at the smallest Wide scale 0.6), and two bands of 56 that stay empty (MovePanelBandButtons, MovePanelBandPlayer: reserved for the takeback buttons and the
-     other player's row), with 8 units between them: 56 + 8 + 448 + 8 + 56 + 8 + 56 = 640. A row is a number cell of 56 units and two cells (White's and Black's, half of the rest each); the cell of the last
-     move shows its Mark, a fill in the gold of the board's last-move squares (245, 205, 50) under the text. The component writes movePanelNumber<i>, movePanelWhite<i> and movePanelBlack<i> of the
-     8 rows and shows only the rows the game has (a hidden row takes no room, so the rows pack at the top); the list shows the last 8 rows of the game. The text of a move is at most 7 characters
+     and the HUD get every press. The box is one stack on a dark plate (not a color of the board): a band of 56 units, the list of 8 rows of 56 (448: the touch height the clickable rows of a later
+     stage need, 32 px at the smallest Wide scale 0.6) and two bands of 56, with 8 units between them: 56 + 8 + 448 + 8 + 56 + 8 + 56 = 640. The bands are empty here: the captured material of
+     the player at the top of the board is drawn by the canvas of Material over MovePanelBandTopPlayer, the other player's over MovePanelBandBottomPlayer (ChessMaterial.xml has to agree with
+     these places), and MovePanelBandButtons, the lowest, is kept for the takeback buttons. The box has no title, the top band being the material's. A notch pushes Menu and Reset onto the top
+     band; the side insets of a phone held sideways push Status onto the lowest band, never onto the one under the list, which is why the material is there. A row is a number cell of 56 units
+     and two cells (White's and Black's, half of the rest each); the cell of the last move shows its Mark, a fill in the gold of the board's last-move squares (245, 205, 50) under the text. The
+     component writes movePanelNumber<i>, movePanelWhite<i> and movePanelBlack<i> of the 8 rows and shows only the rows the game has (a hidden row takes no room, so the rows pack at the top); the list shows the last 8 rows of the game. The text of a move is at most 7 characters
      ("Qh4xe1+", "exd8=Q#") in a cell of 122 units, the number "100." in 56: a font of 24 and 22 units fits both at the smallest Wide scale, ChessUiTest lays the longest words out on the size matrix.
      Every name starts with MovePanel because elements are found by name in every canvas of the scene. -->
 <node name="MovePanel" layer="5" contentVersion="5">
@@ -18,11 +20,7 @@
       <elements>
         <element type="UIStack" name="MovePanelBox" x="760" y="80" width="320" height="640" direction="Vertical" spacing="8" padding="8,0,8,0" crossAlign="Stretch" color="32,44,50,255" visible="false">
           <children>
-            <element type="UIElement" name="MovePanelTitle" height="56" fontSize="28">
-              <components>
-                <component type="UITextComponent" text="Moves" textColor="236,238,244,255" align="Center" verticalAlign="Center" wrap="false"/>
-              </components>
-            </element>
+            <element type="UIElement" name="MovePanelBandTopPlayer" height="56"/>
             <element type="UIStack" name="MovePanelList" height="448" direction="Vertical" crossAlign="Stretch">
               <children>
             <element type="UIStack" name="MovePanelRow0" height="56" direction="Horizontal" spacing="4" crossAlign="Stretch" visible="false">
@@ -259,8 +257,8 @@
             </element>
               </children>
             </element>
+            <element type="UIElement" name="MovePanelBandBottomPlayer" height="56"/>
             <element type="UIElement" name="MovePanelBandButtons" height="56"/>
-            <element type="UIElement" name="MovePanelBandPlayer" height="56"/>
           </children>
         </element>
       </elements>

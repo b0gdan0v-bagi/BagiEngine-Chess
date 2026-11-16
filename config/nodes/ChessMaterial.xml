@@ -14,7 +14,12 @@
      The numbers above are those of the default view. In the Portrait view (the variant for orientation:portrait; the board is at (40, 144) to (680, 784)) the two lists are horizontal: the upper group
      above the board at (40, 92), 336 x 40 (5 x 64 + 4 x 4; a horizontal list stretches the 40-unit height to its rows, which take a width of 64 here), the lower group under it at (40, 792); they
      mirror and swap with the turn of the board as before. Their box, (40, 92) to (376, 832), is the Portrait one of Game/MaterialLayout.h (the rows show while it lies inside the safe area).
-     A balance is a 48 x 40 box at x 384, beside the end of its list, never hidden. -->
+     A balance is a 48 x 40 box at x 384, beside the end of its list, never hidden.
+     The MaterialPanel* elements are a second set of the same two groups for the Wide view, drawn in the bands of the move panel (ChessMovePanel.xml, the box (760, 80) to (1080, 720)): the upper
+     group at y 88 in MovePanelBandTopPlayer (80 to 136), the lower one at y 608 in MovePanelBandBottomPlayer (600 to 656), each a horizontal list of five chips of 52 x 40 from x 768 (the inner
+     edge of the box) and its balance in a 32 x 40 box ending at 1072. They bind the same variables and their icons get the same sprites. ChessMaterialComponent shows exactly one set: this
+     one while the move panel is shown (MovePanelFits, the rule of the panel itself, so the material never goes with a hidden panel), the margin set otherwise; the hidden set's lists and
+     balances are hidden whole. The longest row (eight pawns, two knights, bishops and rooks, the queen, "+39") fits the 304 inner units at the smallest Wide scale. -->
 <node name="Material" layer="5" contentVersion="5">
   <components>
     <component type="ChessMaterialComponent" />
@@ -176,6 +181,164 @@
         <element type="UIElement" name="MaterialBottomBalance" x="77" y="500" width="23" height="28" fontSize="20">
           <components>
             <component type="UITextComponent" text="{materialBottomBalance}" align="Center" verticalAlign="Center" overflow="AutoFit" wrap="false" minFontSize="12"/>
+          </components>
+        </element>
+        <element type="UIStack" name="MaterialPanelTopList" x="768" y="88" width="268" height="40" direction="Horizontal" spacing="2" crossAlign="Stretch" visible="false">
+          <children>
+            <element type="UIStack" name="MaterialPanelTopQueenRow" width="52" direction="Horizontal" spacing="2" padding="2" crossAlign="Stretch" color="232,210,170,255" visible="false">
+              <children>
+                <element type="UIElement" name="MaterialPanelTopQueenIcon" width="24">
+                  <components>
+                    <component type="UIImageComponent"/>
+                  </components>
+                </element>
+                <element type="UIElement" name="MaterialPanelTopQueenCount" flex="1" fontSize="18">
+                  <components>
+                    <component type="UITextComponent" text="{materialTopQueen}" textColor="70,45,30,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                  </components>
+                </element>
+              </children>
+            </element>
+            <element type="UIStack" name="MaterialPanelTopRookRow" width="52" direction="Horizontal" spacing="2" padding="2" crossAlign="Stretch" color="232,210,170,255" visible="false">
+              <children>
+                <element type="UIElement" name="MaterialPanelTopRookIcon" width="24">
+                  <components>
+                    <component type="UIImageComponent"/>
+                  </components>
+                </element>
+                <element type="UIElement" name="MaterialPanelTopRookCount" flex="1" fontSize="18">
+                  <components>
+                    <component type="UITextComponent" text="{materialTopRook}" textColor="70,45,30,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                  </components>
+                </element>
+              </children>
+            </element>
+            <element type="UIStack" name="MaterialPanelTopBishopRow" width="52" direction="Horizontal" spacing="2" padding="2" crossAlign="Stretch" color="232,210,170,255" visible="false">
+              <children>
+                <element type="UIElement" name="MaterialPanelTopBishopIcon" width="24">
+                  <components>
+                    <component type="UIImageComponent"/>
+                  </components>
+                </element>
+                <element type="UIElement" name="MaterialPanelTopBishopCount" flex="1" fontSize="18">
+                  <components>
+                    <component type="UITextComponent" text="{materialTopBishop}" textColor="70,45,30,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                  </components>
+                </element>
+              </children>
+            </element>
+            <element type="UIStack" name="MaterialPanelTopKnightRow" width="52" direction="Horizontal" spacing="2" padding="2" crossAlign="Stretch" color="232,210,170,255" visible="false">
+              <children>
+                <element type="UIElement" name="MaterialPanelTopKnightIcon" width="24">
+                  <components>
+                    <component type="UIImageComponent"/>
+                  </components>
+                </element>
+                <element type="UIElement" name="MaterialPanelTopKnightCount" flex="1" fontSize="18">
+                  <components>
+                    <component type="UITextComponent" text="{materialTopKnight}" textColor="70,45,30,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                  </components>
+                </element>
+              </children>
+            </element>
+            <element type="UIStack" name="MaterialPanelTopPawnRow" width="52" direction="Horizontal" spacing="2" padding="2" crossAlign="Stretch" color="232,210,170,255" visible="false">
+              <children>
+                <element type="UIElement" name="MaterialPanelTopPawnIcon" width="24">
+                  <components>
+                    <component type="UIImageComponent"/>
+                  </components>
+                </element>
+                <element type="UIElement" name="MaterialPanelTopPawnCount" flex="1" fontSize="18">
+                  <components>
+                    <component type="UITextComponent" text="{materialTopPawn}" textColor="70,45,30,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                  </components>
+                </element>
+              </children>
+            </element>
+          </children>
+        </element>
+        <element type="UIElement" name="MaterialPanelTopBalance" x="1040" y="88" width="32" height="40" fontSize="20" visible="false">
+          <components>
+            <component type="UITextComponent" text="{materialTopBalance}" textColor="236,238,244,255" align="Center" verticalAlign="Center" overflow="AutoFit" wrap="false" minFontSize="12"/>
+          </components>
+        </element>
+        <element type="UIStack" name="MaterialPanelBottomList" x="768" y="608" width="268" height="40" direction="Horizontal" spacing="2" crossAlign="Stretch" visible="false">
+          <children>
+            <element type="UIStack" name="MaterialPanelBottomQueenRow" width="52" direction="Horizontal" spacing="2" padding="2" crossAlign="Stretch" color="232,210,170,255" visible="false">
+              <children>
+                <element type="UIElement" name="MaterialPanelBottomQueenIcon" width="24">
+                  <components>
+                    <component type="UIImageComponent"/>
+                  </components>
+                </element>
+                <element type="UIElement" name="MaterialPanelBottomQueenCount" flex="1" fontSize="18">
+                  <components>
+                    <component type="UITextComponent" text="{materialBottomQueen}" textColor="70,45,30,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                  </components>
+                </element>
+              </children>
+            </element>
+            <element type="UIStack" name="MaterialPanelBottomRookRow" width="52" direction="Horizontal" spacing="2" padding="2" crossAlign="Stretch" color="232,210,170,255" visible="false">
+              <children>
+                <element type="UIElement" name="MaterialPanelBottomRookIcon" width="24">
+                  <components>
+                    <component type="UIImageComponent"/>
+                  </components>
+                </element>
+                <element type="UIElement" name="MaterialPanelBottomRookCount" flex="1" fontSize="18">
+                  <components>
+                    <component type="UITextComponent" text="{materialBottomRook}" textColor="70,45,30,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                  </components>
+                </element>
+              </children>
+            </element>
+            <element type="UIStack" name="MaterialPanelBottomBishopRow" width="52" direction="Horizontal" spacing="2" padding="2" crossAlign="Stretch" color="232,210,170,255" visible="false">
+              <children>
+                <element type="UIElement" name="MaterialPanelBottomBishopIcon" width="24">
+                  <components>
+                    <component type="UIImageComponent"/>
+                  </components>
+                </element>
+                <element type="UIElement" name="MaterialPanelBottomBishopCount" flex="1" fontSize="18">
+                  <components>
+                    <component type="UITextComponent" text="{materialBottomBishop}" textColor="70,45,30,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                  </components>
+                </element>
+              </children>
+            </element>
+            <element type="UIStack" name="MaterialPanelBottomKnightRow" width="52" direction="Horizontal" spacing="2" padding="2" crossAlign="Stretch" color="232,210,170,255" visible="false">
+              <children>
+                <element type="UIElement" name="MaterialPanelBottomKnightIcon" width="24">
+                  <components>
+                    <component type="UIImageComponent"/>
+                  </components>
+                </element>
+                <element type="UIElement" name="MaterialPanelBottomKnightCount" flex="1" fontSize="18">
+                  <components>
+                    <component type="UITextComponent" text="{materialBottomKnight}" textColor="70,45,30,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                  </components>
+                </element>
+              </children>
+            </element>
+            <element type="UIStack" name="MaterialPanelBottomPawnRow" width="52" direction="Horizontal" spacing="2" padding="2" crossAlign="Stretch" color="232,210,170,255" visible="false">
+              <children>
+                <element type="UIElement" name="MaterialPanelBottomPawnIcon" width="24">
+                  <components>
+                    <component type="UIImageComponent"/>
+                  </components>
+                </element>
+                <element type="UIElement" name="MaterialPanelBottomPawnCount" flex="1" fontSize="18">
+                  <components>
+                    <component type="UITextComponent" text="{materialBottomPawn}" textColor="70,45,30,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
+                  </components>
+                </element>
+              </children>
+            </element>
+          </children>
+        </element>
+        <element type="UIElement" name="MaterialPanelBottomBalance" x="1040" y="608" width="32" height="40" fontSize="20" visible="false">
+          <components>
+            <component type="UITextComponent" text="{materialBottomBalance}" textColor="236,238,244,255" align="Center" verticalAlign="Center" overflow="AutoFit" wrap="false" minFontSize="12"/>
           </components>
         </element>
       </elements>

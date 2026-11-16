@@ -538,6 +538,13 @@ namespace BECore::Chess::Tests {
         constexpr size_t kMaterialRounds = 99;          // one round per sign, "+1" to "+99"
         constexpr int kMostCaptured = 8;                // the longest count word is "x8": the most a row can show is the eight pawns (a test holds it to the summary of two bare kings)
         constexpr const char* kMaterialGroups[] = {"Top", "Bottom"};
+        constexpr const char* kMaterialMarginSet = "";      // the word of a set in its names: Material<Group>... is the margin set (above and below the board in Portrait)
+        constexpr const char* kMaterialPanelSet = "Panel";  // MaterialPanel<Group>... the set in the bands of the move panel
+        constexpr const char* kMaterialSets[] = {kMaterialMarginSet, kMaterialPanelSet};
+        constexpr float kMaterialPanelRowWidth = 52.0f;  // a chip of the panel set is at least this wide (and kMaterialRowHeight high)
+        // The bands of the move panel the panel set lies in (ChessMovePanel.xml): the top one, and the one under the list of 8 rows
+        const Rect kPanelTopBand{kMovePanelLeft, kMovePanelTop, kMovePanelRight - kMovePanelLeft, 56.0f};
+        const Rect kPanelBottomBand{kMovePanelLeft, kMovePanelTop + 56.0f + 8.0f + static_cast<float>(kMovePanelRows) * 56.0f + 8.0f, kMovePanelRight - kMovePanelLeft, 56.0f};
 
         /// Sets the twelve variables of the display to the words of round @p round: every count word "x1".."x8" (kMostCaptured) stands at every row and every sign "+1".."+99" at both balances once
         /// over the kMaterialRounds rounds
@@ -555,11 +562,23 @@ namespace BECore::Chess::Tests {
             }
         }
 
-        /// Shows the ten rows of the canvas (the component shows only the rows of the pieces that are gone), so the layout holds the lists at their full size
-        void ShowEveryMaterialRow(UICanvasComponent& canvas) {
+        /// Shows the lists and the balances of the set @p set and hides those of the other set, as the component leaves them
+        void ShowMaterialSet(UICanvasComponent& canvas, const char* set) {
+            for (const char* each : kMaterialSets) {
+                const bool shown = StringView(each) == set;
+                for (const char* group : kMaterialGroups) {
+                    EXPECT_TRUE(canvas.SetElementVisible(PoolString::Intern(Format("Material{}{}List", each, group).c_str()), shown)) << each << group;
+                    EXPECT_TRUE(canvas.SetElementVisible(PoolString::Intern(Format("Material{}{}Balance", each, group).c_str()), shown)) << each << group;
+                }
+            }
+        }
+
+        /// Shows the set @p set alone (ShowMaterialSet) with its ten rows (the component shows only the rows of the pieces that are gone), so the layout holds the lists at their full size
+        void ShowEveryMaterialRow(UICanvasComponent& canvas, const char* set = kMaterialMarginSet) {
+            ShowMaterialSet(canvas, set);
             for (const char* group : kMaterialGroups) {
                 for (const char* piece : kMaterialPieces) {
-                    EXPECT_TRUE(canvas.SetElementVisible(PoolString::Intern(Format("Material{}{}Row", group, piece).c_str()), true)) << group << piece;
+                    EXPECT_TRUE(canvas.SetElementVisible(PoolString::Intern(Format("Material{}{}{}Row", set, group, piece).c_str()), true)) << set << group << piece;
                 }
             }
         }
@@ -665,16 +684,98 @@ namespace BECore::Chess::Tests {
             return problems;
         }
 
+        /// What is wrong with the panel set of the canvas Material as it is laid out shown with its ten rows (ShowEveryMaterialRow(canvas, kMaterialPanelSet)), in a window where the move panel is
+        /// shown: one problem to a line, nothing when it is right. A group lies in its band of the panel (the upper one in the top band, the lower one in the band under the list) and in the safe
+        /// area, its rows go along x and keep their size, and no count or sign is cut
+        String MaterialPanelProblems(const UICanvasLayout& layout) {
+            String problems;
+            const float scale = layout.GetResolved().scale;
+            const Rect safe = layout.GetResolved().safeBounds;
+            const auto find = [&](const String& name) -> const UIElement* {
+                const UIElement* element = layout.root->FindByName(PoolString::Intern(name.c_str()));
+                if (element == nullptr) {
+                    problems += Format("{} is missing\n", name.c_str());
+                } else if (element->rect.IsEmpty()) {
+                    problems += Format("{} has an empty rect\n", name.c_str());
+                    return nullptr;
+                }
+                return element;
+            };
+            const auto place = [&](const UIElement& element, const Rect& band) {
+                if (!LiesIn(element.rect, band) || !LiesIn(element.rect, safe)) {
+                    problems += Format("{} ({:.1f}, {:.1f}, {:.1f}, {:.1f}) leaves its band (y {:.0f} to {:.0f}) or the safe area\n", element.name.ToStringView(), element.rect.x, element.rect.y,
+                                       element.rect.w, element.rect.h, band.y, band.y + band.h);
+                }
+            };
+            const auto fits = [&](const UIElement& element) {
+                const UIContentFit fit = element.CheckContent(element.rect.w, element.rect.h, scale);
+                if (fit.hasContent && !fit.fits) {
+                    problems += Format("{} cuts '{}': {:.1f} x {:.1f} units at scale {:.3f}\n", element.name.ToStringView(), ShownText(element).c_str(), element.rect.w, element.rect.h, scale);
+                }
+            };
+            for (const char* group : kMaterialGroups) {
+                const Rect& band = group == kMaterialGroups[0] ? kPanelTopBand : kPanelBottomBand;
+                const UIElement* list = find(Format("MaterialPanel{}List", group));
+                if (list != nullptr) {
+                    place(*list, band);
+                }
+                float previousRowEnd = -1.0f;
+                for (const char* piece : kMaterialPieces) {
+                    const UIElement* row = find(Format("MaterialPanel{}{}Row", group, piece));
+                    const UIElement* icon = find(Format("MaterialPanel{}{}Icon", group, piece));
+                    const UIElement* count = find(Format("MaterialPanel{}{}Count", group, piece));
+                    if (row == nullptr) {
+                        continue;
+                    }
+                    place(*row, band);
+                    if (row->rect.h < kMaterialRowHeight - kPixelTolerance || row->rect.w < kMaterialPanelRowWidth - kPixelTolerance) {
+                        problems += Format("{} is {:.1f} x {:.1f} units, under {:.0f} x {:.0f}\n", row->name.ToStringView(), row->rect.w, row->rect.h, kMaterialPanelRowWidth, kMaterialRowHeight);
+                    }
+                    if (row->rect.x < previousRowEnd - kPixelTolerance) {
+                        problems += Format("{} starts at {:.1f}, before the end of the row before it ({:.1f})\n", row->name.ToStringView(), row->rect.x, previousRowEnd);
+                    }
+                    previousRowEnd = row->rect.x + row->rect.w;
+                    if (list != nullptr && !LiesIn(row->rect, list->rect)) {
+                        problems += Format("{} is not inside its list\n", row->name.ToStringView());
+                    }
+                    for (const UIElement* part : {icon, count}) {
+                        if (part != nullptr && !LiesIn(part->rect, row->rect)) {
+                            problems += Format("{} is not inside its row\n", part->name.ToStringView());
+                        }
+                    }
+                    if (icon != nullptr && count != nullptr && icon->rect.x + icon->rect.w > count->rect.x + kPixelTolerance) {
+                        problems += Format("{} and {} overlap\n", icon->name.ToStringView(), count->name.ToStringView());
+                    }
+                    if (icon != nullptr && icon->GetComponent<UIImageComponent>() == nullptr) {
+                        problems += Format("{} has no UIImageComponent\n", icon->name.ToStringView());
+                    }
+                    if (count != nullptr) {
+                        fits(*count);
+                    }
+                }
+                if (const UIElement* balance = find(Format("MaterialPanel{}Balance", group))) {
+                    place(*balance, band);
+                    fits(*balance);
+                    if (list != nullptr && balance->rect.x < list->rect.x + list->rect.w) {
+                        problems += Format("{} touches {}\n", balance->name.ToStringView(), list->name.ToStringView());
+                    }
+                }
+            }
+            return problems;
+        }
+
         /// The rects of the canvas Material that are on the screen (a row with a rect, a balance) against the controls of the canvas @p other (a label or a button with a rect): the pairs closer than
         /// @p gap, one to a line
         String MaterialClearance(const UICanvasLayout& material, const UICanvasLayout& other, float gap) {
             String problems;
             Vector<const UIElement*> mine;
-            for (const char* group : kMaterialGroups) {
-                for (const char* piece : kMaterialPieces) {
-                    mine.push_back(material.root->FindByName(PoolString::Intern(Format("Material{}{}Row", group, piece).c_str())));
+            for (const char* set : kMaterialSets) {
+                for (const char* group : kMaterialGroups) {
+                    for (const char* piece : kMaterialPieces) {
+                        mine.push_back(material.root->FindByName(PoolString::Intern(Format("Material{}{}{}Row", set, group, piece).c_str())));
+                    }
+                    mine.push_back(material.root->FindByName(PoolString::Intern(Format("Material{}{}Balance", set, group).c_str())));
                 }
-                mine.push_back(material.root->FindByName(PoolString::Intern(Format("Material{}Balance", group).c_str())));
             }
             for (const UIElement* element : mine) {
                 if (element == nullptr || element->rect.IsEmpty()) {
@@ -1561,18 +1662,38 @@ namespace BECore::Chess::Tests {
             return ElementOf("Material", name);
         }
 
-        /// The row of a piece in a group of the display as it was laid out in the last draw: @p group is "Top" or "Bottom", @p piece "Queen" .. "Pawn"
-        UIElement& MaterialRow(const char* group, const char* piece) const {
-            return MaterialElement(Format("Material{}{}Row", group, piece).c_str());
+        /// The row of a piece in a group of the display as it was laid out in the last draw: @p group is "Top" or "Bottom", @p piece "Queen" .. "Pawn", @p set kMaterialMarginSet or kMaterialPanelSet
+        UIElement& MaterialRow(const char* group, const char* piece, const char* set = kMaterialMarginSet) const {
+            return MaterialElement(Format("Material{}{}{}Row", set, group, piece).c_str());
         }
 
-        /// Whether that row is on the screen: shown by the component and given a rect by the layout
-        bool RowShown(const char* group, const char* piece) const {
-            const UIElement& row = MaterialRow(group, piece);
+        /// Whether that row of @p set is on the screen: shown by the component and given a rect by the layout
+        bool RowShownIn(const char* set, const char* group, const char* piece) const {
+            const UIElement& row = MaterialRow(group, piece, set);
             return row.active.visible && !row.rect.IsEmpty();
         }
 
-        /// The rows on the screen after the last draw, in the order of the scene ("TopQueen BottomPawn"), nothing when none is
+        /// Whether the row is on the screen in either set (the component never shows both)
+        bool RowShown(const char* group, const char* piece) const {
+            return RowShownIn(kMaterialMarginSet, group, piece) || RowShownIn(kMaterialPanelSet, group, piece);
+        }
+
+        /// Which set the component shows after the last draw, from its lists and balances: "margin", "panel", or "mixed" when the eight do not agree on one set
+        String MaterialPlace() const {
+            bool margin = true;
+            bool panel = true;
+            for (const char* group : kMaterialGroups) {
+                for (const char* part : {"List", "Balance"}) {
+                    margin = margin && MaterialElement(Format("Material{}{}", group, part).c_str()).active.visible;
+                    margin = margin && !MaterialElement(Format("MaterialPanel{}{}", group, part).c_str()).active.visible;
+                    panel = panel && MaterialElement(Format("MaterialPanel{}{}", group, part).c_str()).active.visible;
+                    panel = panel && !MaterialElement(Format("Material{}{}", group, part).c_str()).active.visible;
+                }
+            }
+            return margin ? "margin" : panel ? "panel" : "mixed";
+        }
+
+        /// The rows on the screen after the last draw in either set, in the order of the scene ("TopQueen BottomPawn"), nothing when none is
         String ShownMaterialRows() const {
             String shown;
             for (const char* group : {"Top", "Bottom"}) {
@@ -1591,15 +1712,20 @@ namespace BECore::Chess::Tests {
             return Var(Format("material{}{}", group, piece).c_str());
         }
 
-        /// The sprite the icon of a row has been given
+        /// The sprite the icon of a row has been given; a failure is recorded when the two sets do not have the same one
         String MaterialSprite(const char* group, const char* piece) const {
-            const UIImageComponent* icon = MaterialElement(Format("Material{}{}Icon", group, piece).c_str()).GetComponent<UIImageComponent>();
-            if (icon == nullptr) {
-                ADD_FAILURE() << group << piece << " has no UIImageComponent icon";
-                return {};
+            String sprites[std::size(kMaterialSets)];
+            for (size_t set = 0; set < std::size(kMaterialSets); ++set) {
+                const UIImageComponent* icon = MaterialElement(Format("Material{}{}{}Icon", kMaterialSets[set], group, piece).c_str()).GetComponent<UIImageComponent>();
+                if (icon == nullptr) {
+                    ADD_FAILURE() << kMaterialSets[set] << group << piece << " has no UIImageComponent icon";
+                    return {};
+                }
+                const StringView name = icon->sprite.ToStringView();
+                sprites[set] = String(name.data(), name.size());
             }
-            const StringView name = icon->sprite.ToStringView();
-            return String(name.data(), name.size());
+            EXPECT_EQ(sprites[0], sprites[1]) << group << piece << ": the icons of the margin and of the panel show the same piece";
+            return sprites[0];
         }
 
         /// The twelve variables of the display after a frame, joined: ten counts (top group queen to pawn, then the bottom group) and the two balances ("|" between them)
