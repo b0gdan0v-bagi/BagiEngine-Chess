@@ -36,6 +36,7 @@ set(expected
     assets/sounds/capture.wav
     assets/sounds/castle.wav
     assets/sounds/check.wav
+    assets/sounds/click.wav
     assets/sounds/game_end.wav
     assets/sounds/move.wav
     assets/sounds/promotion.wav

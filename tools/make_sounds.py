@@ -16,6 +16,7 @@ The clips (one per sound cue of the game):
   check.wav      0.35 s  two short tones, the second higher: a rising question
   promotion.wav  0.50 s  four rising notes of a major chord, ringing
   game_end.wav   1.20 s  a slow falling triad that rings out
+  click.wav      0.05 s  a dry tick for every button: bright noise and a faint high thump, the quietest clip
 
 No ear checked them: only their numbers (length, peak, the ends) are. To replace a clip by hand, drop its entry from
 CLIPS below (otherwise --check fails and the next run overwrites the file), put the new file under the same name and keep
@@ -158,6 +159,13 @@ def make_promotion() -> bytes:
     return finish(clip, peak=0.65, fade_out=0.15)
 
 
+def make_click() -> bytes:
+    clip = Clip(0.05)
+    knock(clip, random.Random(1007), 0.0, freq=1400.0, drop=0.2, thump=0.25, noise=0.2, noise_cutoff=4000.0,
+          click=1.0, click_cutoff=3000.0, decay=90.0)
+    return finish(clip, peak=0.5, fade_out=0.02)
+
+
 def make_game_end() -> bytes:
     clip = Clip(1.20)
     for index, freq in enumerate((440.0, 349.2, 293.7, 146.8)):
@@ -173,6 +181,7 @@ CLIPS = {
     "check.wav": make_check,
     "promotion.wav": make_promotion,
     "game_end.wav": make_game_end,
+    "click.wav": make_click,
 }
 
 
