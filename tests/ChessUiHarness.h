@@ -552,6 +552,21 @@ namespace BECore::Chess::Tests {
         const Rect kPanelTopBand{kMovePanelLeft, kMovePanelTop, kMovePanelRight - kMovePanelLeft, 56.0f};
         const Rect kPanelBottomBand{kMovePanelLeft, kMovePanelTop + 56.0f + 8.0f + static_cast<float>(kMovePanelRows) * 56.0f + 8.0f, kMovePanelRight - kMovePanelLeft, 56.0f};
 
+        // The longest words of the move list (the move panel and the menu section "Moves" bind the same variables)
+        constexpr const char* kLongestMoves[] = {"Qh4xe1+", "exd8=Q#", "O-O-O"};  // the longest move of each kind of text the list can hold
+        constexpr const char* kLongestNumber = "100.";
+        constexpr size_t kMovePanelWordRounds = std::size(kLongestMoves);
+
+        /// Sets the 24 variables of the rows to round @p round: the three longest moves and the longest number go round the 16 cells, so each one stands in a White and in a Black cell
+        void PublishMovePanelRound(size_t round) {
+            UIVars& vars = CoreManager::GetUIVars();
+            for (size_t row = 0; row < kMovePanelRows; ++row) {
+                vars.Set(PoolString::Intern(Format("movePanelNumber{}", row).c_str()), kLongestNumber);
+                vars.Set(PoolString::Intern(Format("movePanelWhite{}", row).c_str()), kLongestMoves[(round + row) % std::size(kLongestMoves)]);
+                vars.Set(PoolString::Intern(Format("movePanelBlack{}", row).c_str()), kLongestMoves[(round + row + 1) % std::size(kLongestMoves)]);
+            }
+        }
+
         /// Sets the twelve variables of the display to the words of round @p round: every count word "x1".."x8" (kMostCaptured) stands at every row and every sign "+1".."+99" at both balances once
         /// over the kMaterialRounds rounds
         void PublishMaterialRound(size_t round) {
@@ -1642,19 +1657,24 @@ namespace BECore::Chess::Tests {
 
         /// The rows of the move list the screen has after one frame, shown ones only, joined by " | ": "1. e4 e5", the cell of the last move in brackets ("2. [Nf3]"), a cell with no word left out
         String ShownMovePanelRows() {
+            return ShownMoveRows("MovePanel");
+        }
+
+        /// ShownMovePanelRows() of the canvas on the node @p node, whose elements are named `<node>Row<i>` and so on (the move panel and the menu section "Moves")
+        String ShownMoveRows(const char* node) {
             Draw();
             String rows;
             for (size_t row = 0; row < kMovePanelRows; ++row) {
-                if (!MovePanelElement(Format("MovePanelRow{}", row).c_str()).active.visible) {
+                if (!ElementOf(node, Format("{}Row{}", node, row).c_str()).active.visible) {
                     continue;
                 }
-                String line = ShownText(MovePanelElement(Format("MovePanelNumber{}", row).c_str()));
+                String line = ShownText(ElementOf(node, Format("{}Number{}", node, row).c_str()));
                 for (const char* side : {"White", "Black"}) {
-                    const String word = MovePanelWord(row, side);
+                    const String word = ShownText(ElementOf(node, Format("{}{}Text{}", node, side, row).c_str()));
                     if (word.empty()) {
                         continue;
                     }
-                    const bool marked = MovePanelElement(Format("MovePanel{}Mark{}", side, row).c_str()).active.visible;
+                    const bool marked = ElementOf(node, Format("{}{}Mark{}", node, side, row).c_str()).active.visible;
                     line += marked ? Format(" [{}]", word.c_str()) : Format(" {}", word.c_str());
                 }
                 rows += rows.empty() ? "" : " | ";

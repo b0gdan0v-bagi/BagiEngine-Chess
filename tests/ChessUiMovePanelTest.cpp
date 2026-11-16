@@ -12,25 +12,12 @@ namespace BECore::Chess::Tests {
         constexpr float kRowHeight = 56.0f;
         constexpr float kNumberWidth = 56.0f;
         constexpr const char* kMovePanelPrefix = "MovePanel";
-        constexpr const char* kLongestMoves[] = {"Qh4xe1+", "exd8=Q#", "O-O-O"};  // the longest move of each kind of text the list can hold
-        constexpr const char* kLongestNumber = "100.";
-        constexpr size_t kMovePanelWordRounds = std::size(kLongestMoves);
         constexpr const char* kSides[] = {"White", "Black"};
         const Color kMovePanelPlateColor{32, 44, 50, 255};   // the plate of the box (ChessMovePanel.xml)
         const Color kMovePanelMarkColor{245, 205, 50, 150};  // the gold of the board's last-move squares, with the alpha of the mark
         constexpr size_t kLongGameRows = 20;
         constexpr const char* kBlackToMoveFen = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1";
         constexpr const char* kPawnOnTheSeventh = "k7/4P3/8/8/8/8/8/7K w - - 0 1";  // e7e8q is a check along the eighth rank
-
-        /// Sets the 24 variables of the rows to round @p round: the three longest moves and the longest number go round the 16 cells, so each one stands in a White and in a Black cell
-        void PublishMovePanelRound(size_t round) {
-            UIVars& vars = CoreManager::GetUIVars();
-            for (size_t row = 0; row < kMovePanelRows; ++row) {
-                vars.Set(PoolString::Intern(Format("movePanelNumber{}", row).c_str()), kLongestNumber);
-                vars.Set(PoolString::Intern(Format("movePanelWhite{}", row).c_str()), kLongestMoves[(round + row) % std::size(kLongestMoves)]);
-                vars.Set(PoolString::Intern(Format("movePanelBlack{}", row).c_str()), kLongestMoves[(round + row + 1) % std::size(kLongestMoves)]);
-            }
-        }
 
         /// Shows the box, the 8 rows and their marks (the component shows only what the game has), so the layout holds the panel at its full size
         void ShowEveryMovePanelRow(UICanvasComponent& canvas) {

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <BECore/Scene/IComponent.h>
-#include <Chess/Game/MovePanel.h>
+#include <Chess/Components/MoveRows.h>
 
 namespace BECore::Chess {
 
@@ -31,13 +31,11 @@ namespace BECore::Chess {
         /// Shows or hides the box after the safe area of the canvas
         void SyncBox();
 
-        bool _published = false;  ///< Whether the rows below were written at least once
+        bool _published = false;  ///< Whether the rows were written at least once
         const ChessGameModel* _publishedModel = nullptr;
         uint64_t _publishedVersion = 0;
-        Array<bool, kMovePanelRows> _rowShown{};  ///< The scene starts with every row, mark and the box hidden
-        Array<bool, kMovePanelRows> _whiteMarked{};
-        Array<bool, kMovePanelRows> _blackMarked{};
-        bool _boxShown = false;
+        MoveRowsOnCanvas _rows{"MovePanel"};
+        bool _boxShown = false;  ///< The scene starts with the box hidden
     };
 
 }  // namespace BECore::Chess
