@@ -16,6 +16,14 @@ namespace BECore::Chess {
     }
 
     void ChessMovePanelComponent::OnAction(const InputEvents::ActionEvent& event) {
+        if (event.action == "ChessHint"_intern) {
+            AskForHint();
+            return;
+        }
+        if (event.action == "ChessSetEvaluation"_intern) {
+            SetEvaluation(event.value.ToStringView());
+            return;
+        }
         const bool takeBack = event.action == "ChessTakeBack"_intern;
         if (!takeBack && event.action != "ChessShowMove"_intern) {
             return;
@@ -40,6 +48,35 @@ namespace BECore::Chess {
         if (const Optional<size_t> shown = ShownMovesAfter(*press, CurrentMovePanelRows(model), model->GetShownMoveCount(), model->GetMoves().size())) {
             model->ShowMoves(*shown);
         }
+    }
+
+    void ChessMovePanelComponent::AskForHint() {
+        ChessGameModel* model = ChessGame::GetActiveModel();
+        PositionAnalyst* analyst = ChessGame::GetActiveAnalyst();
+        // The rule is asked again: the button's grey look is from the last draw, and the game may have moved since
+        if (!analyst || !HintAllowedNow(model)) {
+            return;
+        }
+        if (model->IsViewing()) {
+            model->EndViewing();
+        }
+        analyst->SetPicked(ChessGame::GetActiveOpponent()->GetEngine());
+        const auto asked = analyst->RequestHint(*model);
+        EXPECT(asked.has_value(), "ChessMovePanelComponent: HintRefusalFor and RequestHint disagree");
+    }
+
+    void ChessMovePanelComponent::SetEvaluation(StringView value) {
+        PositionAnalyst* analyst = ChessGame::GetActiveAnalyst();
+        const OpponentController* opponent = ChessGame::GetActiveOpponent();
+        if (!analyst || !opponent) {
+            return;
+        }
+        if (value != "true" && value != "false") {
+            LOG_WARNING("ChessSetEvaluation ignored: '{}' is neither true nor false"_format(value));
+            return;
+        }
+        analyst->SetPicked(opponent->GetEngine());
+        analyst->SetEvaluation(value == "true");
     }
 
     void ChessMovePanelComponent::Publish(const ChessGameModel* model) {
@@ -77,8 +114,13 @@ namespace BECore::Chess {
         if (_published.Changed(model)) {
             Publish(model);
         }
+        if (_analysisPublished.Changed(model, ChessGame::GetActiveAnalyst())) {
+            PublishAnalysisWords(model, ChessGame::GetActiveAnalyst());
+        }
         if (const auto canvas = GetNode().GetComponent<UICanvasComponent>()) {
             _takeBack.Sync(*canvas, model);
+            _hint.Sync(*canvas, model);
+            _tallHint.Sync(*canvas, model);
         }
         SyncBox();
     }

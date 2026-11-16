@@ -11,7 +11,7 @@ namespace BECore::Chess::Tests {
         constexpr const char* kSectionPlate = "MovesSectionPlate";
         constexpr const char* kSides[] = {"White", "Black"};
 
-        /// Shows the 8 rows and their marks (the component shows only what the game has), so the layout holds the list at its full size
+        /// Shows every row and its marks (the component shows only what the game has), so the layout holds the list at its full size
         void ShowEverySectionRow(UICanvasComponent& canvas) {
             for (size_t row = 0; row < kMovePanelRows; ++row) {
                 EXPECT_TRUE(canvas.SetElementVisible(PoolString::Intern(Format("MovesSectionRow{}", row).c_str()), true)) << row;

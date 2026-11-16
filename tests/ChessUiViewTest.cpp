@@ -169,17 +169,17 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, ViewingAnEarlyMoveOfALongGameShowsItsPageOfRows) {
         Settle();
-        ASSERT_TRUE(PlayAQuietGame(Model(), 40)) << "twenty rows: the pages 13..20, 5..12 and 1..4";
+        ASSERT_TRUE(PlayAQuietGame(Model(), 40)) << "twenty rows: the pages 14..20, 7..13 and 1..6";
         Draw();
-        EXPECT_EQ(ShownText(MovePanelElement("MovePanelNumber0")), "13.");
+        EXPECT_EQ(ShownText(MovePanelElement("MovePanelNumber0")), "14.");
         ASSERT_TRUE(Model().ShowMoves(15));  // the White move of row 8
         Draw();
-        EXPECT_EQ(ShownText(MovePanelElement("MovePanelNumber0")), "5.");
-        EXPECT_TRUE(MovePanelElement("MovePanelWhiteMark3").active.visible);
+        EXPECT_EQ(ShownText(MovePanelElement("MovePanelNumber0")), "7.");
+        EXPECT_TRUE(MovePanelElement("MovePanelWhiteMark1").active.visible);
         ASSERT_TRUE(Model().ShowMoves(3));  // the White move of row 2
         Draw();
         EXPECT_EQ(ShownText(MovePanelElement("MovePanelNumber0")), "1.");
-        EXPECT_FALSE(MovePanelElement("MovePanelRow4").active.visible) << "the first page holds the four rows left";
+        EXPECT_FALSE(MovePanelElement("MovePanelRow6").active.visible) << "the first page holds the six rows left";
         EXPECT_TRUE(MovePanelElement("MovePanelWhiteMark1").active.visible);
     }
 
@@ -201,27 +201,27 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheStepButtonsOfTheMovePanelWalkTheGameAndItsPagesAndLatestReturns) {
-        ASSERT_TRUE(PlayAQuietGame(Model(), 40)) << "twenty rows: the pages 13..20, 5..12 and 1..4";
+        ASSERT_TRUE(PlayAQuietGame(Model(), 40)) << "twenty rows: the pages 14..20, 7..13 and 1..6";
         Settle();
         ASSERT_TRUE(ClickControl(MovePanelElement("MovePanelStepForward")).Both());
         EXPECT_FALSE(Model().IsViewing()) << "nothing after the game";
-        for (size_t step = 1; step <= 16; ++step) {
+        for (size_t step = 1; step <= 14; ++step) {
             ASSERT_TRUE(ClickControl(MovePanelElement("MovePanelStepBack")).Both()) << step;
             EXPECT_EQ(Model().GetShownMoveCount(), 40u - step);
         }
         Draw();
-        EXPECT_EQ(ShownText(MovePanelElement("MovePanelNumber0")), "5.") << "ply 23 is in row 12, on the page before the last";
-        EXPECT_TRUE(MovePanelElement("MovePanelBlackMark7").active.visible);
+        EXPECT_EQ(ShownText(MovePanelElement("MovePanelNumber0")), "7.") << "ply 25 is in row 13, on the page before the last";
+        EXPECT_TRUE(MovePanelElement("MovePanelBlackMark6").active.visible);
         ASSERT_TRUE(ClickControl(MovePanelElement("MovePanelStepForward")).Both());
-        EXPECT_EQ(Model().GetShownMoveCount(), 25u);
+        EXPECT_EQ(Model().GetShownMoveCount(), 27u);
         Draw();
-        EXPECT_EQ(ShownText(MovePanelElement("MovePanelNumber0")), "13.") << "ply 24 opens row 13, the last page";
+        EXPECT_EQ(ShownText(MovePanelElement("MovePanelNumber0")), "14.") << "ply 26 opens row 14, the last page";
         EXPECT_TRUE(MovePanelElement("MovePanelWhiteMark0").active.visible);
 
         ASSERT_TRUE(ClickControl(MovePanelElement("MovePanelLatest")).Both());
         EXPECT_FALSE(Model().IsViewing());
         Draw();
-        EXPECT_TRUE(MovePanelElement("MovePanelBlackMark7").active.visible);
+        EXPECT_TRUE(MovePanelElement("MovePanelBlackMark6").active.visible);
     }
 
     TEST_F(ChessUiTest, AClickOnACellOfTheTallPanelViewsTheMoveOfItsColumn) {

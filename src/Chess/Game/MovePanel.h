@@ -12,7 +12,7 @@ namespace BECore::Chess {
     constexpr float kMovePanelBottom = 720.0f;
 
     /// The box of the panel in the Tall view of the scene (720 x 1204 units): under the board and the lower row of the captured material, as wide as the board; the rows are two columns of
-    /// four there. ChessMovePanel.xml has to agree with these numbers too. In view units
+    /// four and three there. ChessMovePanel.xml has to agree with these numbers too. In view units
     constexpr float kMovePanelTallLeft = 40.0f;
     constexpr float kMovePanelTallTop = 840.0f;
     constexpr float kMovePanelTallRight = 680.0f;
@@ -22,7 +22,7 @@ namespace BECore::Chess {
     CORE_ENUM(MovePanelView, uint8_t, Wide, Tall)
 
     /// The rows of the list the panel has room for: one page of the game (BuildMovePanelRows())
-    constexpr size_t kMovePanelRows = 8;
+    constexpr size_t kMovePanelRows = 7;
 
     /// What a row says in the place of the White move of a game that began with Black to move
     constexpr StringView kMovePanelAbsentMove = "...";

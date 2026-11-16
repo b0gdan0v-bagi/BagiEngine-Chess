@@ -10,7 +10,7 @@ Part of the Chess documentation (overview, control API and rules are in the root
 ├── ChessEngine.*, Analysis.*, SearchRequest.*   IChessEngine (FindMove blocking; FindMoveAsync / AnalyseAsync as coroutines, request and token BY VALUE; the default bodies call the blocking call, so UciEngine and the doubles block, OwnEngine yields between slices, BlunderEngine forwards; Analyse defaults to Unsupported), the pure analysis (best line first, `Second()` null for one line), the request
 ├── UciProtocol.*, UciProcess.*, UciEngine.*   the UCI text (pure), a child process talked to in lines (a stub where CHESS_HAS_UCI_PROCESS is 0), the engine over them; FindStockfish(path)
 ├── EngineOpponent.*, OpponentController.*, OpponentChoice.*   the opponent of a game, its seats, the choice as the panel makes it
-├── MoveRating.*, MoveRater.*, AnalysisEngineFactory.h, PositionAnalyst.*   the pure rule of a rating, the background rater, the background analysis
+├── MoveRating.*, MoveRater.*, AnalysisEngineFactory.h, PositionAnalyst.*, AnalysisText.*   the pure rule of a rating, the background rater, the background analysis, its words
 ├── OpponentSettings.*, OpponentEngines.*, OpponentLevels.*, BlunderEngine.*, OpponentText.*   the Stockfish path, the engine pick (Stockfish, Own), the four strengths (easy, medium, hard, max), the handicap, the HUD words (the HUD words are pure, `Game/` must not know the engine, and the single source of the panel's words)
 └── Evaluation.*, Search.*, TranspositionTable.*, OwnEngine.*   the engine of our own
 ```

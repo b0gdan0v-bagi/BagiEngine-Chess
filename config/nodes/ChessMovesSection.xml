@@ -3,12 +3,12 @@
      panel's box, a Tall window with side insets), and in every other window too, for the same list in one place. A modal canvas over everything (layer 20, above the HUD and the
      end-of-game bar), started hidden, built like the opponent panel: the Moves button of the menu list shows it (ChessOpenSection, value moves: the row of Game/MenuSections.cpp);
      Back returns to the list (ChessOpenMenu) and Close hides both (ChessCloseMenu); the dim is a button of its own with the action of Close and stateLook="false", always the first child.
-     The rows are those of the move panel (ChessMovePanel.xml): the same 8 rows of 56 units, a number cell of 56 and White's and Black's cells, the gold Mark of the last move under its
+     The rows are those of the move panel (ChessMovePanel.xml): the same 7 rows of 56 units, a number cell of 56 and White's and Black's cells, the gold Mark of the last move under its
      text, bound to the same variables movePanelNumber<i>, movePanelWhite<i> and movePanelBlack<i>; ChessMovesSectionComponent (listed before the canvas, so the words are there in the
      frame it shows) writes them like the panel's component and shows the rows and marks of this canvas (a hidden row takes no room: the rows pack at the top). Under the list a band of
      56 units holds the step buttons of the panel (‹ › », ChessShowMove) and Take back (ChessTakeBack) in the rest, all answered by ChessMovePanelComponent, and the cells take the same
-     clicks as the panel's; this canvas's component greys its own Take back. The plate is 94% of the safe area up to 640 units, centered: 16 + 44 (title) + 448 (the list) + 56 (the band) + 56 (Back
-     and Close) + 3 x 12 (spacing) + 16 = 672 units high, which the safe area of every view has (about 741 in the narrowest default window under a notch). Every name starts with MovesSection
+     clicks as the panel's; this canvas's component greys its own Take back. The plate is 94% of the safe area up to 640 units, centered: 16 + 44 (title) + 392 (the list) + 56 (the band) + 56 (Back
+     and Close) + 3 x 12 (spacing) + 16 = 616 units high, which the safe area of every view has (about 741 in the narrowest default window under a notch). Every name starts with MovesSection
      because elements are found by name in every canvas of the scene. -->
 <node name="MovesSection" layer="20" contentVersion="5">
   <components>
@@ -20,14 +20,14 @@
             <component type="UIInputClicker" action="ChessCloseMenu" stateLook="false"/>
           </components>
         </element>
-        <element type="UIStack" name="MovesSectionPlate" anchor="Center" width="94%" maxWidth="640" height="672" direction="Vertical" spacing="12" padding="16" crossAlign="Stretch" color="36,40,52,255" blocksInput="true">
+        <element type="UIStack" name="MovesSectionPlate" anchor="Center" width="94%" maxWidth="640" height="616" direction="Vertical" spacing="12" padding="16" crossAlign="Stretch" color="36,40,52,255" blocksInput="true">
           <children>
             <element type="UIElement" name="MovesSectionTitle" height="44" fontSize="30">
               <components>
                 <component type="UITextComponent" text="Moves" align="Center"/>
               </components>
             </element>
-            <element type="UIStack" name="MovesSectionList" height="448" direction="Vertical" crossAlign="Stretch">
+            <element type="UIStack" name="MovesSectionList" height="392" direction="Vertical" crossAlign="Stretch">
               <children>
                 <element type="UIStack" name="MovesSectionRow0" height="56" direction="Horizontal" spacing="4" crossAlign="Stretch" visible="false">
                   <children>
@@ -268,41 +268,6 @@
                         <element type="UIElement" name="MovesSectionBlackText6" anchor="Stretch" fontSize="24">
                           <components>
                             <component type="UITextComponent" text="{movePanelBlack6}" textColor="236,238,244,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
-                          </components>
-                        </element>
-                      </children>
-                    </element>
-                  </children>
-                </element>
-                <element type="UIStack" name="MovesSectionRow7" height="56" direction="Horizontal" spacing="4" crossAlign="Stretch" visible="false">
-                  <children>
-                    <element type="UIElement" name="MovesSectionNumber7" width="56" fontSize="22">
-                      <components>
-                        <component type="UITextComponent" text="{movePanelNumber7}" textColor="165,172,190,255" align="Right" verticalAlign="Center" overflow="Clip" wrap="false"/>
-                      </components>
-                    </element>
-                    <element type="UIElement" name="MovesSectionWhite7" flex="1">
-                      <components>
-                        <component type="UIInputClicker" action="ChessShowMove" value="white7"/>
-                      </components>
-                      <children>
-                        <element type="UIElement" name="MovesSectionWhiteMark7" anchor="Stretch" color="245,205,50,150" visible="false"/>
-                        <element type="UIElement" name="MovesSectionWhiteText7" anchor="Stretch" fontSize="24">
-                          <components>
-                            <component type="UITextComponent" text="{movePanelWhite7}" textColor="236,238,244,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
-                          </components>
-                        </element>
-                      </children>
-                    </element>
-                    <element type="UIElement" name="MovesSectionBlack7" flex="1">
-                      <components>
-                        <component type="UIInputClicker" action="ChessShowMove" value="black7"/>
-                      </components>
-                      <children>
-                        <element type="UIElement" name="MovesSectionBlackMark7" anchor="Stretch" color="245,205,50,150" visible="false"/>
-                        <element type="UIElement" name="MovesSectionBlackText7" anchor="Stretch" fontSize="24">
-                          <components>
-                            <component type="UITextComponent" text="{movePanelBlack7}" textColor="236,238,244,255" align="Center" verticalAlign="Center" overflow="Clip" wrap="false"/>
                           </components>
                         </element>
                       </children>
