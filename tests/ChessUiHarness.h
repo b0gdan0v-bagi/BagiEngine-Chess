@@ -1133,6 +1133,27 @@ namespace BECore::Chess::Tests {
             return ClickPanel("OpponentClose").Both() && Panel() && !Panel()->_visible && MenuList() && !MenuList()->_visible;
         }
 
+        /// The canvas of the menu section "Game": the node `GameSection`
+        IntrusivePtr<UICanvasComponent> GameSection() const {
+            return CanvasOf("GameSection");
+        }
+
+        /// A click on a control of the Game section, by name
+        Taken ClickGameSection(const char* name) {
+            return ClickControl(ElementOf("GameSection", name));
+        }
+
+        /// The Menu button of the HUD and then the Resign / Draw button of the list, clicked where they are drawn; whether the section is shown afterwards
+        bool OpenTheGameSection() {
+            if (!ClickButton(kMenuColor)) {
+                return false;
+            }
+            if (!MenuList() || !MenuList()->_visible || !ClickMenuList("MenuSectionGame").Both()) {
+                return false;
+            }
+            return GameSection() && GameSection()->_visible;
+        }
+
         /// The canvas of the promotion panel: the node `PromotionPanel`
         IntrusivePtr<UICanvasComponent> Promotion() const {
             return CanvasOf("PromotionPanel");
