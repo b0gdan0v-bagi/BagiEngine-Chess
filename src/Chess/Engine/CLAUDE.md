@@ -11,6 +11,7 @@ Part of the Chess documentation (overview, control API and rules are in the root
 ├── UciProtocol.*, UciProcess.*, UciEngine.*   the UCI text (pure), a child process talked to in lines (a stub where CHESS_HAS_UCI_PROCESS is 0), the engine over them; FindStockfish(path)
 ├── EngineOpponent.*, OpponentController.*, OpponentChoice.*   the opponent of a game, its seats, the choice as the panel makes it
 ├── MoveRating.*, MoveRater.*, AnalysisEngineFactory.h, PositionAnalyst.*   the pure rule of a rating, the background rater, the background analysis
+├── DrawOffer.*, DrawOfferJudge.*   the pure rule of a draw offer (who may offer, when the program accepts) and the background judge that asks the own engine
 ├── OpponentSettings.*, OpponentEngines.*, OpponentLevels.*, BlunderEngine.*, OpponentText.*   the Stockfish path, the engine pick (Stockfish, Own), the four strengths (easy, medium, hard, max), the handicap, the HUD words (the HUD words are pure, `Game/` must not know the engine, and the single source of the panel's words)
 └── Evaluation.*, Search.*, TranspositionTable.*, OwnEngine.*   the engine of our own
 ```
