@@ -739,6 +739,51 @@ def run_analysis_scenario(client: BagiControlClient, headless: bool) -> None:
     client.call("perform_action", move(last_move))  # a move for the evaluation to follow, so the game quits with a search under way
 
 
+def run_analysis_buttons_scenario(client: BagiControlClient, headless: bool) -> None:
+    """The Hint button and the evaluation cell of the move panel, clicked by name in the Wide view of the headless window: the cell switches the evaluation on and off, the button asks for
+    the hint of the position (and the board shows it, seen as a picture of the squares), and on the program's turn it changes nothing. What the analysis says is the scenario above's."""
+    manual = client.call("status")["manualClock"]
+    if manual:
+        client.call("step")  # the scene registers its pieces in the first frame
+    client.call("reset")
+    client.call("set_state", {"opponent": {"engine": "own", "plays": None}})
+    let_frames_pass(client, 2)  # the panel greys and ungreys its buttons in its draw
+    check(get_analysis(client)["evaluationOn"] is False, "the evaluation is on at the start")
+
+    clicked = client.call("ui_click", {"name": "MovePanelEval"})
+    check(clicked["consumed"] and clicked["action"] == "ChessSetEvaluation" and clicked["value"] == "true", f"the click on the evaluation cell was answered with {clicked}")
+    check(get_analysis(client)["evaluationOn"] is True, "the evaluation cell did not switch the evaluation on")
+    wait_for_the_analysis(client, lambda a: a["evaluation"] is not None, "the evaluation of the opening")
+    clicked = client.call("ui_click", {"name": "MovePanelEval"})
+    check(clicked["consumed"] and clicked["action"] == "ChessSetEvaluation" and clicked["value"] == "false", f"the second click on the evaluation cell was answered with {clicked}")
+    check(get_analysis(client)["evaluationOn"] is False, "the second click on the evaluation cell did not switch the evaluation off")
+
+    without_hint = None
+    if headless:
+        let_frames_pass(client, 2)
+        without_hint = board_squares_band(take_screenshot(client))
+    clicked = client.call("ui_click", {"name": "MovePanelHint"})
+    check(clicked["consumed"] and clicked["action"] == "ChessHint", f"the click on the Hint button was answered with {clicked}")
+    check(get_analysis(client)["hintRequested"] is True, "the Hint button did not ask for a hint")
+    analysis = wait_for_the_analysis(client, lambda a: a["hint"] is not None, "the hint of the opening")
+    check({"type": "move", "uci": analysis["hint"]["move"]} in client.call("list_actions")["actions"], f"the hint {analysis['hint']} is not one of the listed actions")
+    if headless:
+        let_frames_pass(client, 2)
+        check(board_squares_band(take_screenshot(client)) != without_hint, "the board looks the same with the hint on it")
+
+    # On the program's turn the button does nothing. Only the manual clock has no frame between the move and the click, so the program is surely still to answer
+    if manual:
+        client.call("reset")
+        client.call("set_state", {"opponent": {"engine": "own", "plays": "black", "level": "max"}})
+        client.call("perform_action", move("e2e4"))
+        version = client.call("get_state")["version"]
+        client.call("ui_click", {"name": "MovePanelHint"})
+        check(get_analysis(client)["hintRequested"] is False and client.call("get_state")["version"] == version, "the Hint button asked on the program's turn")
+        wait_until_the_program_played(client, lambda moves: len(moves) == 2, "two moves")
+    client.call("set_state", {"opponent": {"plays": None}})
+    client.call("reset")
+
+
 # The scene is 840 x 800 units (1120 x 800, its Wide view, from the aspect 1.4 up), the board 640 x 640 at y 80..720; the window fits the view by the smaller scale and centers it
 VIEW_WIDTH, WIDE_VIEW_WIDTH, VIEW_HEIGHT = 840, 1120, 800
 BOARD_TOP, BOARD_BOTTOM = 80, 720
@@ -1201,6 +1246,8 @@ BASE_SCENARIOS = [
     ("watch, manual clock", ["--manual-clock"], run_watch_scenario),
     ("analysis, real clock", [], run_analysis_scenario),
     ("analysis, manual clock", ["--manual-clock"], run_analysis_scenario),
+    ("analysis buttons, real clock", [], run_analysis_buttons_scenario),
+    ("analysis buttons, manual clock", ["--manual-clock"], run_analysis_buttons_scenario),
     ("without Stockfish, real clock", [], run_without_stockfish_scenario),
     ("without Stockfish, manual clock", ["--manual-clock"], run_without_stockfish_scenario),
     ("opponent panel, real clock", [], run_opponent_panel_scenario),
