@@ -761,4 +761,44 @@ namespace BECore::Chess::Tests {
         ExpectHidden(taken);
     }
 
+    TEST_F(ChessPieceAnimationTest, ViewingAnEarlierPositionPlacesThePiecesAtOnceAndTheGameComesBackAtOnce) {
+        Settle();
+        const auto taker = NodeAt("e2");
+        ASSERT_TRUE(Play(Model(), "e2e4"));
+        ASSERT_TRUE(Play(Model(), "d7d5"));
+        const auto taken = NodeAt("d5");
+        ASSERT_TRUE(Play(Model(), "e4d5"));
+        Frames(kStepsToEnd + 1);
+        ExpectHidden(taken);
+
+        // A view jumps over moves, here back over the capture: nothing slides there or back
+        ASSERT_TRUE(Model().ShowMoves(1));
+        Frame();
+        ExpectOn(taker, "e4", "the pawn stands where the first move left it");
+        ExpectOn(taken, "d7", "the taken pawn is back on its square");
+        ASSERT_TRUE(Model().EndViewing());
+        Frame();
+        ExpectOn(taker, "d5", "back in the game at once");
+        ExpectHidden(taken);
+    }
+
+    TEST_F(ChessPieceAnimationTest, AMoveThatEndsAViewIsPlacedAtOnceAndThePromotedPieceKeepsItsSprite) {
+        Settle();
+        StartFrom(kPromotionFen);
+        const auto pawn = PlayAndShow("a7", "a7a8q");
+        Frames(kStepsToEnd);
+        ASSERT_EQ(SpriteOf(pawn), PoolString::Intern("WhiteQueen"));
+
+        ASSERT_TRUE(Model().ShowMoves(0));
+        Frame();
+        ExpectOn(pawn, "a7");
+        EXPECT_EQ(SpriteOf(pawn), PoolString::Intern("WhitePawn")) << "a pawn before it promoted";
+
+        // One more move and one more version than the last frame saw, but the view in between jumped: the pieces snap to the game
+        ASSERT_TRUE(Play(Model(), "h8g7"));
+        Frame();
+        ExpectOn(pawn, "a8", "not slid from a7");
+        EXPECT_EQ(SpriteOf(pawn), PoolString::Intern("WhiteQueen"));
+    }
+
 }  // namespace BECore::Chess::Tests

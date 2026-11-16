@@ -54,6 +54,9 @@ namespace BECore::Chess {
      * ChessGame::GetAnalyst().Update() (the one place that does either). The opponent plays into the model, so neither can run in OnDraw(). The result of a game is logged once, whoever
      * ended it; a click on the board after the game has ended starts the next one.
      *
+     * The squares, the marks and the pieces are of ChessGameModel::GetShownPosition(): while an earlier position is viewed the board marks its move and check and draws no hint or
+     * premove, and a press on the board only returns to the game.
+     *
      * The board is drawn from Black's side (turned by 180 degrees) exactly when the program plays White, read live (GetBottomColor()); the model and the control API do not turn.
      */
     class ChessBoardComponent : public IComponent {

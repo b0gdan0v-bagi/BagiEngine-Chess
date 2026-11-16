@@ -10,7 +10,7 @@ namespace BECore::Chess {
      * The bar is white when White won, black when Black won and gray for a draw. The renderer has no text, so the colors are the message; the reason (checkmate, stalemate, ...) is logged
      * by ChessBoardComponent when the game ends.
      *
-     * Draws nothing while the game is on. Owns no state: it reads the model and the board geometry.
+     * Draws nothing while the game is on or an earlier position is viewed. Owns no state: it reads the model and the board geometry.
      */
     class ChessResultComponent : public IComponent {
         BE_CLASS(ChessResultComponent)

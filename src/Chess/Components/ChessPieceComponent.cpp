@@ -54,7 +54,7 @@ namespace BECore::Chess {
             return;
         }
 
-        const Square cur = model->GetSquareOf(this);
+        const Square cur = model->GetShownSquareOf(this);
         Observe(*model, cur, event.deltaTime);
 
         // The piece the person holds is under the pointer, over the others, and nothing slides it
@@ -100,7 +100,7 @@ namespace BECore::Chess {
 
         // A promotion shows when the slide ends, not while the pawn is still on its way.
         if (!IsSliding() && cur.IsInside()) {
-            ShowPieceType(model->GetPieceOf(this));
+            ShowPieceType(model->GetShownPieceOf(this));
         }
     }
 
@@ -108,8 +108,9 @@ namespace BECore::Chess {
         const size_t moves = model.GetMoves().size();
         const bool sameGame = _seen && model.GetStartFen() == _seenStartFen;
         const bool unchanged = sameGame && moves == _seenMoves && current == _lastSquare;
-        // One move is one more of both numbers: a reset adds a version too, so a reset and moves between two frames are not taken for one move.
-        const bool played = sameGame && moves == _seenMoves + 1 && model.GetVersion() == _seenVersion + 1;
+        // One move is one more of both numbers: a reset adds a version too, so a reset and moves between two frames are not taken for one move. A view that begins or ends
+        // jumps over any number of moves, so a move seen across one is placed at once
+        const bool played = sameGame && !_seenViewing && !model.IsViewing() && moves == _seenMoves + 1 && model.GetVersion() == _seenVersion + 1;
 
         // A move of another piece (played, this piece on its square) leaves a slide of this one under way alone.
         if (!unchanged && !(played && current == _lastSquare)) {
@@ -126,6 +127,7 @@ namespace BECore::Chess {
         _lastSquare = current;
         _seenMoves = moves;
         _seenVersion = model.GetVersion();
+        _seenViewing = model.IsViewing();
         if (!sameGame) {
             _seenStartFen = model.GetStartFen();
         }
