@@ -21,6 +21,13 @@ game.
 | Path | What | Licence | Licence file | In a game |
 |------|------|---------|--------------|-----------|
 | `assets/chess_test.png` | the piece atlas, 700x381, six pieces in two colors (`config/TextureLibrary.xml`) | Beerware, by the owner's decision of 2026-11-15 | `LICENSE` | ships (desktop and web) |
+| `assets/sounds/capture.wav` | the sound of a capture (a harder knock with a click), synthesized by `tools/make_sounds.py` | Beerware | `LICENSE` | ships (desktop and web) |
+| `assets/sounds/castle.wav` | the sound of castling (two knocks), synthesized by `tools/make_sounds.py` | Beerware | `LICENSE` | ships (desktop and web) |
+| `assets/sounds/check.wav` | the sound of a check (two rising tones), synthesized by `tools/make_sounds.py` | Beerware | `LICENSE` | ships (desktop and web) |
+| `assets/sounds/click.wav` | the sound of a button (a short dry tick), synthesized by `tools/make_sounds.py` | Beerware | `LICENSE` | ships (desktop and web) |
+| `assets/sounds/game_end.wav` | the sound of the end of a game (a falling chord), synthesized by `tools/make_sounds.py` | Beerware | `LICENSE` | ships (desktop and web) |
+| `assets/sounds/move.wav` | the sound of a move (a wooden knock), synthesized by `tools/make_sounds.py` | Beerware | `LICENSE` | ships (desktop and web) |
+| `assets/sounds/promotion.wav` | the sound of a promotion (four rising notes), synthesized by `tools/make_sounds.py` | Beerware | `LICENSE` | ships (desktop and web) |
 
 ## Stockfish
 
@@ -40,7 +47,7 @@ owner's reading of the licence, not legal advice.
 
 ## The web package
 
-What `cmake/ChessWeb.cmake` lets into the browser package from the game is `config/` (four XML files) and `assets/chess_test.png`; the
+What `cmake/ChessWeb.cmake` lets into the browser package from the game is `config/` (four XML files) and `assets/chess_test.png` with the seven `assets/sounds/*.wav`; the
 `.md` files, `*.local.xml` (a Stockfish path), `imgui.ini` and `.py` files stay out (`BagiChessWebPackageCheck` holds the list).
 Beside them the engine's `config/`, `assets/` (its fonts with their licence texts) and the `web/config` overlay are packaged, and the wasm module
 contains the engine's libraries: their notices are in `engine/THIRD_PARTY_NOTICES.md`. Stockfish, the own UCI program and the control

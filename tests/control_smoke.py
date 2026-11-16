@@ -145,6 +145,87 @@ def check_screenshots(client: BagiControlClient) -> None:
     check(promoted.rows != before_promotion.rows, "the screenshot did not change after a promotion")
 
 
+# One short line of play that gives three cues: the pawn moves are quiet, the next two take a piece, the bishop checks
+BOARD_SOUNDS = [("e2e4", "move"), ("d7d5", "move"), ("e4d5", "capture"), ("d8d5", "capture"), ("f1b5", "check")]
+SOUND_FRAMES = 2  # the frame after a move plays its cue; one more for margin
+
+
+def audio_state(client: BagiControlClient) -> dict:
+    return client.call("audio_state")
+
+
+def check_the_board_sounds(client: BagiControlClient) -> None:
+    """Every played move asks the audio manager for the clip of its cue on the sfx bus, one request per move; a new game and a takeback ask for nothing.
+
+    `played` is not checked: the backend of a headless run is SDL's dummy driver, and a machine with no audio device plays nothing at all, which is as right."""
+    client.call("reset")
+    let_frames_pass(client, SOUND_FRAMES)
+    quiet = audio_state(client)["requested"]
+    for uci, cue in BOARD_SOUNDS:
+        before = audio_state(client)["requested"]
+        client.call("perform_action", move(uci))
+        let_frames_pass(client, SOUND_FRAMES)
+        after = audio_state(client)
+        check(after["requested"] == before + 1, f"{uci} asked for {after['requested'] - before} sounds, not one")
+        last = after["recent"][-1]
+        check(last["clip"] == f"assets/sounds/{cue}.wav" and last["bus"] == "sfx", f"{uci} should sound as a {cue}, the request is {last}")
+    check(audio_state(client)["requested"] == quiet + len(BOARD_SOUNDS), "the line asked for a sound it should not have")
+
+    before = audio_state(client)["requested"]
+    client.call("set_state", {"takeBack": {"plies": 1}})
+    let_frames_pass(client, SOUND_FRAMES)
+    client.call("reset")
+    let_frames_pass(client, SOUND_FRAMES)
+    check(audio_state(client)["requested"] == before, "a takeback or a reset asked for a sound")
+
+    check_the_buttons_click(client)
+    check_the_levels(client)
+
+
+CLICK_CLIP = "assets/sounds/click.wav"
+
+
+def master_level(client: BagiControlClient) -> dict:
+    return audio_state(client)["levels"]["master"]
+
+
+def check_the_buttons_click(client: BagiControlClient) -> None:
+    """A click on a button asks for the click clip on the ui bus, one request per click (the menu button opens the list, Close shuts it)."""
+    for name, action in (("Menu", "ChessOpenMenu"), ("MenuClose", "ChessCloseMenu")):
+        before = audio_state(client)["requested"]
+        clicked = client.call("ui_click", {"name": name})
+        check(clicked["consumed"] and clicked["action"] == action, f"the click on {name} was answered with {clicked}")
+        let_frames_pass(client, SOUND_FRAMES)
+        after = audio_state(client)
+        check(after["requested"] == before + 1, f"the click on {name} asked for {after['requested'] - before} sounds, not one")
+        last = after["recent"][-1]
+        check(last["clip"] == CLICK_CLIP and last["bus"] == "ui", f"the click on {name} should sound as the click on the ui bus, the request is {last}")
+    check_the_menu_list_is_hidden(client.call("ui_tree"))
+
+
+def check_the_levels(client: BagiControlClient) -> None:
+    """A level set over the control API shows in the state; the request of a sound is recorded at any level (the gain is the backend's). Ends with the defaults put back."""
+    client.call("reset")
+    let_frames_pass(client, SOUND_FRAMES)
+    try:
+        levels = client.call("audio_set", {"bus": "master", "volume": 0})
+        check(levels["master"]["volume"] == 0, f"audio_set did not set the master volume: {levels}")
+        before = audio_state(client)["requested"]
+        client.call("perform_action", move("e2e4"))
+        let_frames_pass(client, SOUND_FRAMES)
+        after = audio_state(client)
+        check(after["requested"] == before + 1 and after["recent"][-1]["bus"] == "sfx", f"a move at volume 0 did not ask for one sfx sound: {after['recent'][-1]}")
+        check(after["levels"]["master"]["volume"] == 0, f"the master volume moved by itself: {after['levels']}")
+
+        levels = client.call("audio_set", {"bus": "master", "muted": True})
+        check(levels["master"]["muted"] is True and levels["master"]["volume"] == 0, f"the mute did not show or lost the volume: {levels}")
+    finally:
+        client.call("audio_set", {"bus": "master", "volume": 1, "muted": False})
+    check(master_level(client) == {"volume": 1, "muted": False}, f"the defaults were not put back: {master_level(client)}")
+    client.call("reset")
+    let_frames_pass(client, SOUND_FRAMES)
+
+
 def run_chess_scenario(client: BagiControlClient, headless: bool) -> None:
     status = client.call("status")
     games = client.call("list_games")
@@ -166,6 +247,8 @@ def run_chess_scenario(client: BagiControlClient, headless: bool) -> None:
 
     if headless:
         check_screenshots(client)
+
+    check_the_board_sounds(client)
 
 
 def without_squares(image, squares: list, turned: bool = False) -> list:
@@ -668,7 +751,7 @@ def run_analysis_scenario(client: BagiControlClient, headless: bool) -> None:
     opening_band = None
     if headless:
         let_frames_pass(client, 2)
-        opening_band = board_band(take_screenshot(client))  # the opening with no hint, to compare with after the hint has come and gone
+        opening_band = board_squares_band(take_screenshot(client))  # the opening with no hint, to compare with after the hint has come and gone
     switched = client.call("set_state", {"analysis": {"evaluation": True}})
     check(switched["version"] > version, "switching the evaluation on did not move the state version")
     check(get_analysis(client)["evaluationOn"] is True, f"the evaluation is not on: {get_analysis(client)}")
@@ -690,7 +773,7 @@ def run_analysis_scenario(client: BagiControlClient, headless: bool) -> None:
     plain_band = None
     if headless:
         let_frames_pass(client, 2)
-        plain_band = board_band(take_screenshot(client))  # the mate in one with the evaluation but no hint
+        plain_band = board_squares_band(take_screenshot(client))  # the mate in one with the evaluation but no hint
 
     before = client.call("get_state")["version"]
     client.call("set_state", {"analysis": {"hint": True}})
@@ -701,16 +784,16 @@ def run_analysis_scenario(client: BagiControlClient, headless: bool) -> None:
     check({"type": "move", "uci": "a1a8"} in client.call("list_actions")["actions"], "the hinted move is not one of the listed actions")
     if headless:
         let_frames_pass(client, 2)
-        hinted_band = board_band(take_screenshot(client))
+        hinted_band = board_squares_band(take_screenshot(client))
         check(hinted_band != plain_band, "the board looks the same with the hint on it: the two squares of a1a8 are not filled")
         # Taking it back is the position without a hint again; asked for once more it is the same picture as the first time (the answer is deterministic)
         client.call("set_state", {"analysis": {"hint": False}})
         let_frames_pass(client, 2)
-        check(board_band(take_screenshot(client)) == plain_band, "the board still shows the hint after it was taken back")
+        check(board_squares_band(take_screenshot(client)) == plain_band, "the board still shows the hint after it was taken back")
         client.call("set_state", {"analysis": {"hint": True}})
         wait_for_the_analysis(client, lambda a: a["hint"] is not None, "the hint again")
         let_frames_pass(client, 2)
-        check(board_band(take_screenshot(client)) == hinted_band, "the hint is not drawn the same way twice")
+        check(board_squares_band(take_screenshot(client)) == hinted_band, "the hint is not drawn the same way twice")
 
     # A move drops the hint at once and the evaluation follows the new position later (it is Black's turn now: still White's view)
     client.call("perform_action", move("g1h1"))
@@ -732,17 +815,63 @@ def run_analysis_scenario(client: BagiControlClient, headless: bool) -> None:
         client.call("reset")
         check(get_analysis(client)["hint"] is None, "the hint outlived a reset")
         let_frames_pass(client, 2)
-        check(board_band(take_screenshot(client)) == opening_band, "the opening after a reset is not drawn as it was before the hint")
+        check(board_squares_band(take_screenshot(client)) == opening_band, "the opening after a reset is not drawn as it was before the hint")
         last_move = "e2e4"  # the opening is back
     else:
         last_move = "g8h8"  # Black is to move in the mate in one after g1h1
     client.call("perform_action", move(last_move))  # a move for the evaluation to follow, so the game quits with a search under way
 
 
+def run_analysis_buttons_scenario(client: BagiControlClient, headless: bool) -> None:
+    """The Hint button and the evaluation cell of the move panel, clicked by name in the Wide view of the headless window: the cell switches the evaluation on and off, the button asks for
+    the hint of the position (and the board shows it, seen as a picture of the squares), and on the program's turn it changes nothing. What the analysis says is the scenario above's."""
+    manual = client.call("status")["manualClock"]
+    if manual:
+        client.call("step")  # the scene registers its pieces in the first frame
+    client.call("reset")
+    client.call("set_state", {"opponent": {"engine": "own", "plays": None}})
+    let_frames_pass(client, 2)  # the panel greys and ungreys its buttons in its draw
+    check(get_analysis(client)["evaluationOn"] is False, "the evaluation is on at the start")
+
+    clicked = client.call("ui_click", {"name": "MovePanelEval"})
+    check(clicked["consumed"] and clicked["action"] == "ChessSetEvaluation" and clicked["value"] == "true", f"the click on the evaluation cell was answered with {clicked}")
+    check(get_analysis(client)["evaluationOn"] is True, "the evaluation cell did not switch the evaluation on")
+    wait_for_the_analysis(client, lambda a: a["evaluation"] is not None, "the evaluation of the opening")
+    clicked = client.call("ui_click", {"name": "MovePanelEval"})
+    check(clicked["consumed"] and clicked["action"] == "ChessSetEvaluation" and clicked["value"] == "false", f"the second click on the evaluation cell was answered with {clicked}")
+    check(get_analysis(client)["evaluationOn"] is False, "the second click on the evaluation cell did not switch the evaluation off")
+
+    without_hint = None
+    if headless:
+        let_frames_pass(client, 2)
+        without_hint = board_squares_band(take_screenshot(client))
+    clicked = client.call("ui_click", {"name": "MovePanelHint"})
+    check(clicked["consumed"] and clicked["action"] == "ChessHint", f"the click on the Hint button was answered with {clicked}")
+    check(get_analysis(client)["hintRequested"] is True, "the Hint button did not ask for a hint")
+    analysis = wait_for_the_analysis(client, lambda a: a["hint"] is not None, "the hint of the opening")
+    check({"type": "move", "uci": analysis["hint"]["move"]} in client.call("list_actions")["actions"], f"the hint {analysis['hint']} is not one of the listed actions")
+    if headless:
+        let_frames_pass(client, 2)
+        check(board_squares_band(take_screenshot(client)) != without_hint, "the board looks the same with the hint on it")
+
+    # On the program's turn the button does nothing. Only the manual clock has no frame between the move and the click, so the program is surely still to answer
+    if manual:
+        client.call("reset")
+        client.call("set_state", {"opponent": {"engine": "own", "plays": "black", "level": "max"}})
+        client.call("perform_action", move("e2e4"))
+        version = client.call("get_state")["version"]
+        client.call("ui_click", {"name": "MovePanelHint"})
+        check(get_analysis(client)["hintRequested"] is False and client.call("get_state")["version"] == version, "the Hint button asked on the program's turn")
+        wait_until_the_program_played(client, lambda moves: len(moves) == 2, "two moves")
+    client.call("set_state", {"opponent": {"plays": None}})
+    client.call("reset")
+
+
 # The scene is 840 x 800 units (1120 x 800, its Wide view, from the aspect 1.4 up), the board 640 x 640 at y 80..720; the window fits the view by the smaller scale and centers it
 VIEW_WIDTH, WIDE_VIEW_WIDTH, VIEW_HEIGHT = 840, 1120, 800
 BOARD_TOP, BOARD_BOTTOM = 80, 720
 BOARD_LEFT, SQUARE_SIZE = 100, 80  # the left edge of the board and the side of a square, in view units
+BOARD_SIZE = 8 * SQUARE_SIZE
 PANEL_LEFT, PANEL_TOP, PANEL_RIGHT, PANEL_BOTTOM = 760, 80, 1080, 720  # the box of the move panel in the Wide view (Game/MovePanel.h), in view units
 BOARD_BAND_INSET = 2  # rows kept away from the edge of the board, against rounding
 PANEL_INSET = 2  # rows and columns kept away from the edges of the panel, against rounding
@@ -786,6 +915,15 @@ def board_band(image) -> list:
     """The rows of a screenshot that only the board covers: the HUD sits in the margins above and below it, and its words (the turn, the status) change with the game."""
     first, last = board_rows(image)
     return image.rows[first:last]
+
+
+def board_squares_band(image) -> list:
+    """The squares of the board and nothing else: `board_band` cut to the columns of the board, so the move panel beside it (its evaluation cell and its Hint button change with the analysis) and the margins stay out."""
+    scale, left, _ = view_in_picture(image)
+    first_column = int(left + BOARD_LEFT * scale) + BOARD_BAND_INSET
+    last_column = int(left + (BOARD_LEFT + BOARD_SIZE) * scale) - BOARD_BAND_INSET
+    check(0 <= first_column < last_column <= image.width, f"the board columns {first_column}..{last_column} are outside a picture {image.width}x{image.height}")
+    return [row[first_column * image.channels : last_column * image.channels] for row in board_band(image)]
 
 
 def check_the_board_turns_with_the_program(client: BagiControlClient) -> None:
@@ -840,7 +978,7 @@ def check_the_board_turns_with_the_program(client: BagiControlClient) -> None:
 MARGIN_WIDTH = 100
 MARGIN_INSET = 2  # columns and rows kept away from the edges of the margin, against rounding
 # The band of the move panel under its list, where Material draws what the color at the bottom of the board has taken while the panel is shown (ChessMaterial.xml), in view units
-LOWER_GROUP_TOP, LOWER_GROUP_BOTTOM = 600, 656
+LOWER_GROUP_TOP, LOWER_GROUP_BOTTOM = 540, 596
 CAPTURE_MOVES = ["e2e4", "d7d5", "e4d5"]  # White takes a pawn of Black
 CHIP_COLOR = (232, 210, 170)  # the fill of a row of the display
 
@@ -1035,7 +1173,7 @@ def check_the_menu_buttons(tree: dict) -> None:
 
     for element in find_ui_canvas(tree, "MenuPanel")["elements"]:
         collect(element)
-    check(sorted(names) == ["MenuClose", "MenuDim", "MenuSectionGame", "MenuSectionMoves", "MenuSectionOpponent"], f"the buttons of the list: {names}")
+    check(sorted(names) == ["MenuClose", "MenuDim", "MenuSectionGame", "MenuSectionMoves", "MenuSectionOpponent", "MenuSectionSound"], f"the buttons of the list: {names}")
     dim = find_ui_element({"canvases": [find_ui_canvas(tree, "MenuPanel")]}, "MenuDim")
     check(dim["action"] == "ChessCloseMenu", f"the dim of the list: {dim}")
     found = find_ui_element({"canvases": [find_ui_canvas(tree, "MenuPanel")]}, "MenuSectionOpponent")
@@ -1215,6 +1353,8 @@ BASE_SCENARIOS = [
     ("watch, manual clock", ["--manual-clock"], run_watch_scenario),
     ("analysis, real clock", [], run_analysis_scenario),
     ("analysis, manual clock", ["--manual-clock"], run_analysis_scenario),
+    ("analysis buttons, real clock", [], run_analysis_buttons_scenario),
+    ("analysis buttons, manual clock", ["--manual-clock"], run_analysis_buttons_scenario),
     ("without Stockfish, real clock", [], run_without_stockfish_scenario),
     ("without Stockfish, manual clock", ["--manual-clock"], run_without_stockfish_scenario),
     ("opponent panel, real clock", [], run_opponent_panel_scenario),
@@ -1232,6 +1372,8 @@ OPPONENT_SCENARIOS = [
 
 
 SAVED_CHOICE = {"engine": "own", "plays": "black", "level": "easy"}
+SAVED_VOLUME = 0.4
+VOLUME_TOLERANCE = 1e-6  # the level is a float32, the wire a double
 
 
 class RestartPhase:
@@ -1266,13 +1408,16 @@ class RestartPhase:
         play_against_the_own_engine(client)
         self.before = self.read(client)
         check(len(self.before["moves"]) == 2, f"unexpected game {self.before}")
-        # quit (by play()) goes through ChessGame::Stop(), which writes the game
+        client.call("audio_set", {"bus": "master", "volume": SAVED_VOLUME})
+        # quit (by play()) goes through ChessGame::Stop(), which writes the game and the levels
 
     def come_back(self, client: BagiControlClient, headless: bool) -> None:
         if client.call("status")["manualClock"]:
             client.call("step")
         after = self.read(client)
         check(after == self.before, f"the game did not come back after a restart: {self.before} then {after}")
+        check(abs(master_level(client)["volume"] - SAVED_VOLUME) < VOLUME_TOLERANCE, f"the master volume did not come back after a restart: {master_level(client)}")
+        client.call("audio_set", {"bus": "master", "volume": 1})  # the exit writes the levels: the next start finds the defaults
         client.call("reset")  # the exit writes the new game
 
     def keep_the_fresh_game(self, client: BagiControlClient, headless: bool) -> None:
@@ -1293,6 +1438,7 @@ def run_without_a_save_folder(client: BagiControlClient, headless: bool) -> None
     check_start_position(client)
     opponent = get_opponent(client)
     check(opponent["plays"] is None and opponent["error"] is None, f"a game started with no save folder has an opponent: {opponent}")
+    check(master_level(client) == {"volume": 1.0, "muted": False}, f"a game started with no save folder read the levels of a save: {master_level(client)}")
 
 
 def main() -> int:

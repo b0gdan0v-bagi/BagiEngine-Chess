@@ -16,7 +16,7 @@
      mirror and swap with the turn of the board as before. Their box, (40, 92) to (376, 832), is the Portrait one of Game/MaterialLayout.h (the rows show while it lies inside the safe area).
      A balance is a 48 x 40 box at x 384, beside the end of its list, never hidden.
      The MaterialPanel* elements are a second set of the same two groups for the Wide view, drawn in the bands of the move panel (ChessMovePanel.xml, the box (760, 80) to (1080, 720)): the upper
-     group at y 88 in MovePanelBandTopPlayer (80 to 136), the lower one at y 608 in MovePanelBandBottomPlayer (600 to 656), each a horizontal list of five chips of 52 x 40 from x 768 (the inner
+     group at y 88 in MovePanelBandTopPlayer (80 to 136), the lower one at y 548 in MovePanelBandBottomPlayer (540 to 596), each a horizontal list of five chips of 52 x 40 from x 768 (the inner
      edge of the box) and its balance in a 32 x 40 box ending at 1072. They bind the same variables and their icons get the same sprites. ChessMaterialComponent shows exactly one set: this
      one while the move panel is shown (MovePanelFits, the rule of the panel itself, so the material never goes with a hidden panel), the margin set otherwise; the hidden set's lists and
      balances are hidden whole. The longest row (eight pawns, two knights, bishops and rooks, the queen, "+39") fits the 304 inner units at the smallest Wide scale. -->
@@ -262,7 +262,7 @@
             <component type="UITextComponent" text="{materialTopBalance}" textColor="236,238,244,255" align="Center" verticalAlign="Center" overflow="AutoFit" wrap="false" minFontSize="12"/>
           </components>
         </element>
-        <element type="UIStack" name="MaterialPanelBottomList" x="768" y="608" width="268" height="40" direction="Horizontal" spacing="2" crossAlign="Stretch" visible="false">
+        <element type="UIStack" name="MaterialPanelBottomList" x="768" y="548" width="268" height="40" direction="Horizontal" spacing="2" crossAlign="Stretch" visible="false">
           <children>
             <element type="UIStack" name="MaterialPanelBottomQueenRow" width="52" direction="Horizontal" spacing="2" padding="2" crossAlign="Stretch" color="232,210,170,255" visible="false">
               <children>
@@ -336,7 +336,7 @@
             </element>
           </children>
         </element>
-        <element type="UIElement" name="MaterialPanelBottomBalance" x="1040" y="608" width="32" height="40" fontSize="20" visible="false">
+        <element type="UIElement" name="MaterialPanelBottomBalance" x="1040" y="548" width="32" height="40" fontSize="20" visible="false">
           <components>
             <component type="UITextComponent" text="{materialBottomBalance}" textColor="236,238,244,255" align="Center" verticalAlign="Center" overflow="AutoFit" wrap="false" minFontSize="12"/>
           </components>

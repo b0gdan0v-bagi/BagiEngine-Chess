@@ -1,5 +1,6 @@
 #pragma once
 
+#include <BECore/Audio/AudioManager.h>
 #include <BECore/Control/Json.h>
 #include <BECore/GameManager/CoreManager.h>
 #include <BECore/Reflection/XmlDeserializer.h>
@@ -569,16 +570,17 @@ namespace BECore::Chess::Tests {
         constexpr const char* kMaterialPanelSet = "Panel";  // MaterialPanel<Group>... the set in the bands of the move panel
         constexpr const char* kMaterialSets[] = {kMaterialMarginSet, kMaterialPanelSet};
         constexpr float kMaterialPanelRowWidth = 52.0f;  // a chip of the panel set is at least this wide (and kMaterialRowHeight high)
-        // The bands of the move panel the panel set lies in (ChessMovePanel.xml): the top one, and the one under the list of 8 rows
+        // The bands of the move panel the panel set lies in (ChessMovePanel.xml): the top one, and the one under the list of its rows
+        constexpr float kPanelBandGap = 6.0f;  // the spacing of MovePanelBox
         const Rect kPanelTopBand{kMovePanelLeft, kMovePanelTop, kMovePanelRight - kMovePanelLeft, 56.0f};
-        const Rect kPanelBottomBand{kMovePanelLeft, kMovePanelTop + 56.0f + 8.0f + static_cast<float>(kMovePanelRows) * 56.0f + 8.0f, kMovePanelRight - kMovePanelLeft, 56.0f};
+        const Rect kPanelBottomBand{kMovePanelLeft, kMovePanelTop + 56.0f + kPanelBandGap + static_cast<float>(kMovePanelRows) * 56.0f + kPanelBandGap, kMovePanelRight - kMovePanelLeft, 56.0f};
 
         // The longest words of the move list (the move panel and the menu section "Moves" bind the same variables)
         constexpr const char* kLongestMoves[] = {"Qh4xe1+", "exd8=Q#", "O-O-O"};  // the longest move of each kind of text the list can hold
         constexpr const char* kLongestNumber = "100.";
         constexpr size_t kMovePanelWordRounds = std::size(kLongestMoves);
 
-        /// Sets the 24 variables of the rows to round @p round: the three longest moves and the longest number go round the 16 cells, so each one stands in a White and in a Black cell
+        /// Sets the variables of the rows to round @p round: the three longest moves and the longest number go round the cells, so each one stands in a White and in a Black cell
         void PublishMovePanelRound(size_t round) {
             UIVars& vars = CoreManager::GetUIVars();
             for (size_t row = 0; row < kMovePanelRows; ++row) {
@@ -1460,6 +1462,24 @@ namespace BECore::Chess::Tests {
         [[nodiscard]] Pair<Rect, Rect> LastMoveRects() const {
             const Move last = Model().GetMoves().back();
             return {SquareRect(last.From()), SquareRect(last.To())};
+        }
+
+        /// How many sounds the game has asked the audio manager for so far, played or not (ChessTests has no backend); read it before a step to see what the step asked for
+        static uint64_t AudioRequests() {
+            return CoreManager::GetAudio().GetRequestCount();
+        }
+
+        /// The sounds asked for after the count @p before was read, oldest first
+        static Vector<AudioPlayRecord> AudioRequestsSince(uint64_t before) {
+            Vector<AudioPlayRecord> recent;
+            CoreManager::GetAudio().GetRecentPlays(recent);
+            Vector<AudioPlayRecord> found;
+            for (const AudioPlayRecord& record : recent) {
+                if (record.index > before) {
+                    found.push_back(record);
+                }
+            }
+            return found;
         }
 
         /// Frames in which nothing is meant to happen

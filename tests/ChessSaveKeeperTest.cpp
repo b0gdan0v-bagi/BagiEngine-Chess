@@ -1,13 +1,18 @@
+#include <BECore/Audio/AudioManager.h>
+#include <BECore/Audio/AudioPreferences.h>
 #include <BECore/Control/ControlSettings.h>
 #include <BECore/GameManager/CoreManager.h>
+#include <BECore/Logger/LogEvent.h>
 #include <BECore/Save/SaveStorage.h>
 #include <Chess/Engine/OpponentSettings.h>
 #include <Chess/Save/ChessSaveKeeper.h>
 #include <Chess/Save/ChessSaveState.h>
 #include <Chess/Save/SaveSettings.h>
 #include <Common/EngineEnvironment.h>
+#include <Common/LogRecorder.h>
 #include <Common/TempPath.h>
 #include <iterator>
+#include <tests/ChessTestUtil.h>
 #include <tests/TestEngines.h>
 
 /// The settings of the memory of the game, the policy that decides whether a run saves (the gate) and the keeper that restores at the start and writes when the game changes. The clock is
@@ -263,6 +268,40 @@ namespace BECore::Chess::Tests {
             return state;
         }
 
+        std::filesystem::path AudioFile() const {
+            return _saves / "audio.save";
+        }
+
+        /// The levels the audio file holds; nothing when there is none or it cannot be read
+        Optional<AudioPreferences> SavedLevels() const {
+            FileSystem fileSystem;
+            SaveGameService service(fileSystem);
+            if (!service.Initialize(_saves)) {
+                return std::nullopt;
+            }
+            AudioPreferences levels;
+            if (!service.Load(kAudioPreferencesSlot, kAudioPreferencesSchema, levels)) {
+                return std::nullopt;
+            }
+            return levels;
+        }
+
+        /// An audio file as an earlier run left it; the manager is left at the same levels
+        void MakeAudioFile(float volume, bool muted) {
+            AudioManager& audio = CoreManager::GetAudio();
+            audio.SetMasterVolume(volume);
+            audio.SetMasterMuted(muted);
+            FileSystem fileSystem;
+            SaveGameService service(fileSystem);
+            ASSERT_TRUE(service.Initialize(_saves));
+            ASSERT_TRUE(SaveAudioPreferences(service, audio).has_value());
+        }
+
+        static void SetDefaultLevels() {
+            CoreManager::GetAudio().SetMasterVolume(1.0f);
+            CoreManager::GetAudio().SetMasterMuted(false);
+        }
+
         /// A frame is clamped to Time::kMaxFrameTime, so the debounce takes several of them
         static void AdvancePastTheDebounce() {
             double advanced = 0.0;
@@ -272,6 +311,7 @@ namespace BECore::Chess::Tests {
             }
         }
 
+        ScopedAudioLevels _levels;
         Vector<String> _savedArguments;
         std::filesystem::path _directory;
         std::filesystem::path _saves;
@@ -546,6 +586,176 @@ namespace BECore::Chess::Tests {
         again.Flush();  // a reset is a change: the new game is what the file holds now
         ASSERT_TRUE(Saved().has_value());
         EXPECT_TRUE(Saved()->moves.empty());
+    }
+
+    // ---- The player's levels ----
+
+    TEST_F(ChessSaveKeeperTest, TheLevelsComeBackAfterAStopAndAStartAndAreNotWrittenBack) {
+        SetCommandLine({});
+        {
+            KeptGame first;
+            first.Start();
+            CoreManager::GetAudio().SetMasterVolume(0.4f);
+            CoreManager::GetAudio().SetMasterMuted(true);
+            first.Update();
+            first.Flush();
+        }
+        ASSERT_TRUE(SavedLevels().has_value());
+        SetDefaultLevels();
+        KeptGame second;
+
+        second.Start();
+
+        EXPECT_FLOAT_EQ(CoreManager::GetAudio().GetSettings()._master._volume, 0.4f);
+        EXPECT_TRUE(CoreManager::GetAudio().GetSettings()._master._muted);
+        std::filesystem::remove(AudioFile());
+        for (int frame = 0; frame < 3; ++frame) {
+            AdvancePastTheDebounce();
+            second.Update();
+        }
+        second.Flush();
+        EXPECT_FALSE(std::filesystem::exists(AudioFile())) << "the restored levels were written back";
+    }
+
+    TEST_F(ChessSaveKeeperTest, AStartWithNoAudioFileKeepsTheLevelsAndWritesNothing) {
+        SetCommandLine({});
+        CoreManager::GetAudio().SetMasterVolume(0.6f);
+        KeptGame game;
+
+        game.Start();
+        for (int frame = 0; frame < 3; ++frame) {
+            AdvancePastTheDebounce();
+            game.Update();
+        }
+        game.Flush();
+
+        EXPECT_FLOAT_EQ(CoreManager::GetAudio().GetSettings()._master._volume, 0.6f);
+        EXPECT_FALSE(std::filesystem::exists(AudioFile()));
+    }
+
+    TEST_F(ChessSaveKeeperTest, ARefusedAudioFileLeavesTheLevelsOneWarningAndTheFileAloneWhileTheGameStillComesBack) {
+        SetCommandLine({});
+        {
+            KeptGame first;
+            first.Start();
+            PlayLine(first.model, kOpening);
+            first.Flush();
+        }
+        WriteBytes(AudioFile(), "these are not levels");
+        const Vector<uint8_t> before = BytesOfFile(AudioFile());
+        SetDefaultLevels();
+        const ::BECore::Tests::LogRecorder recorder;
+        KeptGame game;
+
+        game.Start();
+        for (int frame = 0; frame < 3; ++frame) {
+            AdvancePastTheDebounce();
+            game.Update();
+        }
+        game.Flush();
+        LogEvent::Flush();
+
+        EXPECT_EQ(game.model.GetMoves().size(), 2u);
+        EXPECT_FLOAT_EQ(CoreManager::GetAudio().GetSettings()._master._volume, 1.0f);
+        EXPECT_FALSE(CoreManager::GetAudio().GetSettings()._master._muted);
+        EXPECT_EQ(recorder.Count(LogLevel::Warning, {"slot 'audio'"}), 1u);
+        EXPECT_EQ(recorder.Count(LogLevel::Warning, {"slot 'game'"}), 0u);
+        EXPECT_EQ(BytesOfFile(AudioFile()), before);
+    }
+
+    TEST_F(ChessSaveKeeperTest, ARunThatSavesNothingNeitherReadsNorWritesTheLevels) {
+        SetCommandLine({}, false);  // no flag and no folder: config/ is not mounted, so rememberGame is false
+        std::filesystem::create_directories(_saves);
+        MakeAudioFile(0.9f, true);
+        const Vector<uint8_t> before = BytesOfFile(AudioFile());
+        SetDefaultLevels();
+        KeptGame game;
+
+        game.Start();
+        EXPECT_FLOAT_EQ(CoreManager::GetAudio().GetSettings()._master._volume, 1.0f);
+        CoreManager::GetAudio().SetMasterVolume(0.2f);
+        AdvancePastTheDebounce();
+        game.Update();
+        game.Flush();
+
+        EXPECT_FALSE(game.keeper.IsOn());
+        EXPECT_FLOAT_EQ(CoreManager::GetAudio().GetSettings()._master._volume, 0.2f);
+        EXPECT_EQ(BytesOfFile(AudioFile()), before);
+    }
+
+    TEST_F(ChessSaveKeeperTest, NoSaveReadsAndWritesNeitherSlotEvenWithASaveDir) {
+        SetCommandLine({"--no-save"});
+        std::filesystem::create_directories(_saves);
+        MakeAudioFile(0.9f, true);
+        const Vector<uint8_t> before = BytesOfFile(AudioFile());
+        SetDefaultLevels();
+        KeptGame game;
+
+        game.Start();
+        EXPECT_FLOAT_EQ(CoreManager::GetAudio().GetSettings()._master._volume, 1.0f);
+        CoreManager::GetAudio().SetMasterVolume(0.2f);
+        AdvancePastTheDebounce();
+        game.Update();
+        game.Flush();
+
+        EXPECT_EQ(BytesOfFile(AudioFile()), before);
+        EXPECT_FALSE(std::filesystem::exists(SaveFile()));
+    }
+
+    TEST_F(ChessSaveKeeperTest, TwoLevelChangesInsideTheDebounceMakeOneWrite) {
+        SetCommandLine({});
+        KeptGame game;
+        game.Start();
+
+        CoreManager::GetAudio().SetMasterVolume(0.8f);
+        game.Update();  // the first write of a run waits for nothing
+        ASSERT_TRUE(SavedLevels().has_value());
+        EXPECT_FLOAT_EQ(SavedLevels()->_master._volume, 0.8f);
+
+        CoreManager::GetAudio().SetMasterVolume(0.5f);
+        CoreManager::GetTime().Advance(1.0 / 32);
+        game.Update();
+        CoreManager::GetAudio().SetMasterVolume(0.3f);
+        CoreManager::GetTime().Advance(1.0 / 32);
+        game.Update();
+        EXPECT_FLOAT_EQ(SavedLevels()->_master._volume, 0.8f) << "written inside the debounce";
+
+        AdvancePastTheDebounce();
+        game.Update();
+        EXPECT_FLOAT_EQ(SavedLevels()->_master._volume, 0.3f) << "the file never held 0.5";
+    }
+
+    TEST_F(ChessSaveKeeperTest, TheLevelsDebounceAndTheGamesDebounceAreNotOne) {
+        SetCommandLine({});
+        KeptGame game;
+        game.Start();
+        PlayLine(game.model, "e2e4");
+        game.Update();
+        ASSERT_TRUE(Saved().has_value());
+
+        CoreManager::GetAudio().SetMasterVolume(0.7f);
+        CoreManager::GetTime().Advance(1.0 / 32);
+        game.Update();
+
+        ASSERT_TRUE(SavedLevels().has_value()) << "the game's write delayed the levels";
+        EXPECT_FLOAT_EQ(SavedLevels()->_master._volume, 0.7f);
+    }
+
+    TEST_F(ChessSaveKeeperTest, AFlushWritesALevelThatChangedInTheLastFrame) {
+        SetCommandLine({});
+        KeptGame game;
+        game.Start();
+        CoreManager::GetAudio().SetMasterVolume(0.8f);
+        game.Update();
+        CoreManager::GetAudio().SetMasterMuted(true);
+        CoreManager::GetTime().Advance(1.0 / 32);
+        game.Update();
+        ASSERT_TRUE(SavedLevels().has_value());
+        EXPECT_FALSE(SavedLevels()->_master._muted);
+
+        game.Flush();
+
+        EXPECT_TRUE(SavedLevels()->_master._muted);
     }
 
 }  // namespace BECore::Chess::Tests

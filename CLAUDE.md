@@ -16,6 +16,7 @@ src/Chess/
 ├── Game/                     the rules, plain C++: board, moves, FEN, legal moves, status, ChessGameModel, pure UI helpers
 ├── Engine/                   the opponent: IChessEngine, Stockfish over UCI, the own engine, levels, controller, analyst, MoveRater
 ├── Save/                     the game and the opponent choice kept between runs
+├── Sound/                    the sounds of the board and the buttons, the Sound section
 ├── Uci/                      the own engine as the UCI program BagiChessUci
 └── Components/               scene glue: board, pieces, result, material, move panel, HUD, panels
 cmake/ChessWeb.cmake          what of config/ and assets/ stays out of the web package
@@ -35,11 +36,14 @@ State lives in `ChessGameModel`; components keep none. Each folder above (and `t
 - `set_state {"draw": {}}` (alone) is the person's offer: two people agree at once; against the program the call answers ok and the own engine (depth 5, a background task like the analysis) judges, so the verdict comes with the frames: `drawOffer` is `{"state": "pending"}`, then `status` `draw_agreed` or `{"state": "declined"}` until the version moves. The program accepts at 50 centipawns or less in its favour. Two programs or the program's turn is `invalid_params`.
 - `material` is derived from the position at every `get_state`. `analysis` is the picked engine, never handicapped, in a process of its own; evaluation and ratings are off at every game start; a hint belongs to its position, is for the person only and is never played; scores are from White's view, `hint.text` from the side to move's. Ratings always use the own engine (the same game rates the same twice).
 - `opponent.seed` (an integer, `set_state {"opponent": {"seed": n}}`, a valid pick alone) varies the own engine among near-equal moves and every handicap's blunder choice and move; 0 is no variety (the old answers). A new game (`Reset`, a start) and a takeback (the button, `set_state {takeBack}`) draw a new one, `set_state {fen}` keeps it, it is not saved; Stockfish's own picks are not seeded. A client that compares answers across resets or takebacks sets the seed after each.
+- A headless run plays to SDL's dummy driver (and a machine with no device plays nothing), so the engine's `audio_state` is where a control client sees what the game asked for: the clip and the bus of each move's and each button's sound (`src/Chess/Sound/CLAUDE.md`); `audio_set` sets a level, and the saved level is read and written only when the run saves (the gate of `--save-dir`).
 - The state version is the sum of the model's, the controller's and the analyst's revisions: it grows on every change of the state, not on a selection or `thinking`, and never goes back.
 
 ## The web build
 
 Emscripten presets `web-release` / `web-debug` (`README.md`, "Browser build"); checked only on the desktop with a web-like build (`tests/CLAUDE.md`), never yet with emsdk or in a browser.
+
+The seven sound clips are in the preload package; Web Audio starts after the first click (not checked).
 
 - **Off there:** Stockfish (`CHESS_NO_STOCKFISH`, forced ON for the web, usable on the desktop: the game starts with the own engine), `BagiChessUci`, the control API, the editor, the tests.
 - **Config:** the engine's `web/` overlay replaces files of the same name whole. Chess ships no web config of its own (`ChessWebConfigTest`); to differ in the browser the engine has to learn a game overlay.
