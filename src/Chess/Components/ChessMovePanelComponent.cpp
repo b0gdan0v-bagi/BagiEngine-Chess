@@ -6,9 +6,33 @@
 #include <Chess/ChessGame.h>
 #include <Chess/Components/ChessBoardComponent.h>
 #include <Chess/Game/ChessGameModel.h>
+#include <Events/InputEvents.h>
 #include <Generated/ChessMovePanelComponent.gen.hpp>
 
 namespace BECore::Chess {
+
+    void ChessMovePanelComponent::OnAttached() {
+        SubscribeInScene<InputEvents::ActionEvent, &ChessMovePanelComponent::OnAction>(this);
+    }
+
+    void ChessMovePanelComponent::OnAction(const InputEvents::ActionEvent& event) {
+        if (event.action != "ChessShowMove"_intern) {
+            return;
+        }
+        ChessGameModel* model = ChessGame::GetActiveModel();
+        if (!model) {
+            return;
+        }
+        const Optional<MoveListPress> press = ParseMoveListPress(event.value.ToStringView());
+        if (!press) {
+            LOG_WARNING("ChessShowMove ignored: '{}' is not a press of the move list"_format(event.value.ToStringView()));
+            return;
+        }
+        // The rows of the press are the ones on the screen: the words were published from the same model in the last draw
+        if (const Optional<size_t> shown = ShownMovesAfter(*press, CurrentMovePanelRows(model), model->GetShownMoveCount(), model->GetMoves().size())) {
+            model->ShowMoves(*shown);
+        }
+    }
 
     void ChessMovePanelComponent::Publish(const ChessGameModel* model) {
         const Vector<MovePanelRow> rows = CurrentMovePanelRows(model);

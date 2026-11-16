@@ -1,12 +1,15 @@
 #include <tests/ChessUiHarness.h>
 
-/// Viewing an earlier position of the game on the board (ChessGameModel::ShowMoves()): what the board draws and what a press on it does. The rows and buttons that start a view are
-/// ChessUiMovePanelTest's and ChessUiMovesSectionTest's. The scene, the helpers and the fixture ChessUiTest are tests/ChessUiHarness.h.
+/// Viewing an earlier position of the game (ChessGameModel::ShowMoves()): what the board and the rows draw, real clicks on the cells and the step buttons of the move panel and the
+/// menu section "Moves", and what a press on the board does. The layout of the panels is ChessUiMovePanelTest's and ChessUiMovesSectionTest's. The scene, the helpers and the fixture
+/// ChessUiTest are tests/ChessUiHarness.h.
 namespace BECore::Chess::Tests {
 
     namespace {
 
         const Color kMateColor{150, 20, 20, 240};  // the king's square once mated (ChessBoardComponent.cpp)
+        const Color kStepColor{58, 74, 84, 255};   // the step buttons of the move list (ChessMovePanel.xml, ChessMovesSection.xml)
+        const Color kMovePanelPlateColor{32, 44, 50, 255};
 
     }  // namespace
 
@@ -142,6 +145,137 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(ShownText(MovePanelElement("MovePanelNumber0")), "1.");
         EXPECT_FALSE(MovePanelElement("MovePanelRow4").active.visible) << "the first page holds the four rows left";
         EXPECT_TRUE(MovePanelElement("MovePanelWhiteMark1").active.visible);
+    }
+
+    TEST_F(ChessUiTest, AClickOnACellOfTheMovePanelShowsThatPositionAndAClickOnTheLastMoveReturns) {
+        ASSERT_TRUE(PlayAll(Model(), {"e2e4", "e7e5", "g1f3"}));
+        Settle();
+        const uint64_t version = Model().GetVersion();
+        ASSERT_TRUE(ClickControl(MovePanelElement("MovePanelWhite0")).Both());
+        EXPECT_TRUE(Model().IsViewing());
+        EXPECT_EQ(Model().GetShownMoveCount(), 1u);
+        EXPECT_EQ(ShownMovePanelRows(), "1. [e4] e5 | 2. Nf3");
+        EXPECT_EQ(Model().GetVersion(), version);
+
+        ASSERT_TRUE(ClickControl(MovePanelElement("MovePanelBlack1")).Both()) << "the empty cell of Black in the last row";
+        EXPECT_EQ(Model().GetShownMoveCount(), 1u) << "has no move to show";
+        ASSERT_TRUE(ClickControl(MovePanelElement("MovePanelWhite1")).Both());
+        EXPECT_FALSE(Model().IsViewing()) << "the last move is the game itself";
+        EXPECT_EQ(ShownMovePanelRows(), "1. e4 e5 | 2. [Nf3]");
+    }
+
+    TEST_F(ChessUiTest, TheStepButtonsOfTheMovePanelWalkTheGameAndItsPagesAndLatestReturns) {
+        ASSERT_TRUE(PlayAQuietGame(Model(), 40)) << "twenty rows: the pages 13..20, 5..12 and 1..4";
+        Settle();
+        ASSERT_TRUE(ClickControl(MovePanelElement("MovePanelStepForward")).Both());
+        EXPECT_FALSE(Model().IsViewing()) << "nothing after the game";
+        for (size_t step = 1; step <= 16; ++step) {
+            ASSERT_TRUE(ClickControl(MovePanelElement("MovePanelStepBack")).Both()) << step;
+            EXPECT_EQ(Model().GetShownMoveCount(), 40u - step);
+        }
+        Draw();
+        EXPECT_EQ(ShownText(MovePanelElement("MovePanelNumber0")), "5.") << "ply 23 is in row 12, on the page before the last";
+        EXPECT_TRUE(MovePanelElement("MovePanelBlackMark7").active.visible);
+        ASSERT_TRUE(ClickControl(MovePanelElement("MovePanelStepForward")).Both());
+        EXPECT_EQ(Model().GetShownMoveCount(), 25u);
+        Draw();
+        EXPECT_EQ(ShownText(MovePanelElement("MovePanelNumber0")), "13.") << "ply 24 opens row 13, the last page";
+        EXPECT_TRUE(MovePanelElement("MovePanelWhiteMark0").active.visible);
+
+        ASSERT_TRUE(ClickControl(MovePanelElement("MovePanelLatest")).Both());
+        EXPECT_FALSE(Model().IsViewing());
+        Draw();
+        EXPECT_TRUE(MovePanelElement("MovePanelBlackMark7").active.visible);
+    }
+
+    TEST_F(ChessUiTest, AClickOnACellOfTheTallPanelViewsTheMoveOfItsColumn) {
+        ASSERT_TRUE(PlayAQuietGame(Model(), 9));
+        ResizeWithoutInsets(kNarrowestWidth, kNarrowestTallHeight);
+        ASSERT_EQ(GetScene().GetActiveView().name, PoolString::Intern(kTallViewName));
+        ASSERT_TRUE(MovePanelElement("MovePanelBox").active.visible);
+        ASSERT_TRUE(ClickControl(MovePanelElement("MovePanelBlack3")).Both()) << "the last row of the left column";
+        EXPECT_EQ(Model().GetShownMoveCount(), 8u);
+        ASSERT_TRUE(ClickControl(MovePanelElement("MovePanelStepBack")).Both());
+        EXPECT_EQ(Model().GetShownMoveCount(), 7u);
+        ASSERT_TRUE(ClickControl(MovePanelElement("MovePanelLatest")).Both());
+        EXPECT_FALSE(Model().IsViewing());
+    }
+
+    TEST_F(ChessUiTest, TheMovesSectionViewsAndStepsWithTheSameRowsAndStaysOpen) {
+        ASSERT_TRUE(PlayAll(Model(), {"e2e4", "e7e5", "g1f3"}));
+        ResizeWithoutInsets(1024.0f, 768.0f);
+        ASSERT_FALSE(MovePanelElement("MovePanelBox").active.visible) << "a window with no panel: the section is where the list is";
+        ASSERT_TRUE(ClickButton(kMenuColor));
+        ASSERT_TRUE(ClickMenuList("MenuSectionMoves").Both());
+        const auto section = CanvasOf("MovesSection");
+        ASSERT_TRUE(section);
+
+        ASSERT_TRUE(ClickControl(ElementOf("MovesSection", "MovesSectionBlack0")).Both());
+        EXPECT_EQ(Model().GetShownMoveCount(), 2u);
+        EXPECT_EQ(ShownMoveRows("MovesSection"), "1. e4 [e5] | 2. Nf3");
+        EXPECT_TRUE(section->_visible) << "the section stays open, the board shows the position under its dim";
+        ASSERT_TRUE(ClickControl(ElementOf("MovesSection", "MovesSectionStepBack")).Both());
+        EXPECT_EQ(Model().GetShownMoveCount(), 1u);
+        ASSERT_TRUE(ClickControl(ElementOf("MovesSection", "MovesSectionStepForward")).Both());
+        EXPECT_EQ(Model().GetShownMoveCount(), 2u);
+        ASSERT_TRUE(ClickControl(ElementOf("MovesSection", "MovesSectionLatest")).Both());
+        EXPECT_FALSE(Model().IsViewing());
+        EXPECT_EQ(ShownMoveRows("MovesSection"), "1. e4 e5 | 2. [Nf3]");
+
+        ASSERT_TRUE(ClickControl(ElementOf("MovesSection", "MovesSectionWhite0")).Both());
+        ASSERT_TRUE(ClickControl(ElementOf("MovesSection", "MovesSectionClose")).Both());
+        EXPECT_TRUE(Model().IsViewing()) << "closing the section keeps the view; the board or a move ends it";
+        Click("a2");
+        EXPECT_FALSE(Model().IsViewing());
+    }
+
+    TEST_F(ChessUiTest, AMoveOfTheProgramEndsAViewInTheFrameItIsPlayed) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        StartFrom(kBlackCanTakeAPawn);
+        ASSERT_TRUE(PlayAll(Model(), {"d5e4", "g1f3"}));
+        Settle();
+        const auto take = MoveGenerator::ParseUci(Model().GetPosition(), "b8c6");
+        ASSERT_TRUE(take.has_value());
+        const auto engine = New<GatedEngine>(true, *take);
+        CountingFactory factory({engine});
+        Opponent().SetEngineFactory(factory.AsFactory());
+        ASSERT_TRUE(Opponent().SetSide(PieceColor::Black).has_value());
+        ASSERT_TRUE(ClickControl(MovePanelElement("MovePanelBlack0")).Both());
+        ASSERT_TRUE(Model().IsViewing());
+        engine->Open();
+        ASSERT_TRUE(FramesUntil([&] { return Model().GetMoves().size() == 3; }));
+        EXPECT_FALSE(Model().IsViewing()) << "a new move is never hidden behind a view";
+        EXPECT_EQ(ShownMovePanelRows(), "2. ... dxe4 | 3. Nf3 [Nc6]");
+    }
+
+    TEST_F(ChessUiTest, TheStepButtonsAreDrawnOnThePlateOfTheListAndUnderTheHud) {
+        ASSERT_TRUE(PlayAll(Model(), {"e2e4"}));
+        Settle();
+        Draw();
+        const auto& calls = _renderer->calls;
+        long plate = -1;
+        long firstStep = -1;
+        long reset = -1;
+        for (size_t i = 0; i < calls.size(); ++i) {
+            const DrawCall& call = calls[i];
+            if (call.kind != DrawKind::Rect) {
+                continue;
+            }
+            const long at = static_cast<long>(i);
+            if (SameColor(call.color, kMovePanelPlateColor)) {
+                plate = at;
+            } else if (SameColor(call.color, kStepColor) && firstStep < 0) {
+                firstStep = at;
+            } else if (SameColor(call.color, kResetColor)) {
+                reset = at;
+            }
+        }
+        ASSERT_GE(plate, 0);
+        ASSERT_GE(firstStep, 0) << "the buttons are drawn";
+        ASSERT_GE(reset, 0);
+        EXPECT_LT(plate, firstStep);
+        EXPECT_LT(firstStep, reset);
+        EXPECT_EQ(RectCalls(kStepColor).size(), 3u) << "the three of the panel; the section is closed";
     }
 
 }  // namespace BECore::Chess::Tests

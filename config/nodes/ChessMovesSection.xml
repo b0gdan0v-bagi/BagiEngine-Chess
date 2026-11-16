@@ -6,7 +6,8 @@
      The rows are those of the move panel (ChessMovePanel.xml): the same 8 rows of 56 units, a number cell of 56 and White's and Black's cells, the gold Mark of the last move under its
      text, bound to the same variables movePanelNumber<i>, movePanelWhite<i> and movePanelBlack<i>; ChessMovesSectionComponent (listed before the canvas, so the words are there in the
      frame it shows) writes them like the panel's component and shows the rows and marks of this canvas (a hidden row takes no room: the rows pack at the top). Under the list a band of
-     56 units is kept for the takeback buttons of a later stage. The plate is 94% of the safe area up to 640 units, centered: 16 + 44 (title) + 448 (the list) + 56 (the band) + 56 (Back
+     56 units holds the step buttons of the panel (‹ › », ChessShowMove, answered by ChessMovePanelComponent; the rest is kept for the takeback), and the cells take the same
+     clicks as the panel's. The plate is 94% of the safe area up to 640 units, centered: 16 + 44 (title) + 448 (the list) + 56 (the band) + 56 (Back
      and Close) + 3 x 12 (spacing) + 16 = 672 units high, which the safe area of every view has (about 741 in the narrowest default window under a notch). Every name starts with MovesSection
      because elements are found by name in every canvas of the scene. -->
 <node name="MovesSection" layer="20" contentVersion="5">
@@ -36,6 +37,9 @@
                       </components>
                     </element>
                     <element type="UIElement" name="MovesSectionWhite0" flex="1">
+                      <components>
+                        <component type="UIInputClicker" action="ChessShowMove" value="white0"/>
+                      </components>
                       <children>
                         <element type="UIElement" name="MovesSectionWhiteMark0" anchor="Stretch" color="245,205,50,150" visible="false"/>
                         <element type="UIElement" name="MovesSectionWhiteText0" anchor="Stretch" fontSize="24">
@@ -46,6 +50,9 @@
                       </children>
                     </element>
                     <element type="UIElement" name="MovesSectionBlack0" flex="1">
+                      <components>
+                        <component type="UIInputClicker" action="ChessShowMove" value="black0"/>
+                      </components>
                       <children>
                         <element type="UIElement" name="MovesSectionBlackMark0" anchor="Stretch" color="245,205,50,150" visible="false"/>
                         <element type="UIElement" name="MovesSectionBlackText0" anchor="Stretch" fontSize="24">
@@ -65,6 +72,9 @@
                       </components>
                     </element>
                     <element type="UIElement" name="MovesSectionWhite1" flex="1">
+                      <components>
+                        <component type="UIInputClicker" action="ChessShowMove" value="white1"/>
+                      </components>
                       <children>
                         <element type="UIElement" name="MovesSectionWhiteMark1" anchor="Stretch" color="245,205,50,150" visible="false"/>
                         <element type="UIElement" name="MovesSectionWhiteText1" anchor="Stretch" fontSize="24">
@@ -75,6 +85,9 @@
                       </children>
                     </element>
                     <element type="UIElement" name="MovesSectionBlack1" flex="1">
+                      <components>
+                        <component type="UIInputClicker" action="ChessShowMove" value="black1"/>
+                      </components>
                       <children>
                         <element type="UIElement" name="MovesSectionBlackMark1" anchor="Stretch" color="245,205,50,150" visible="false"/>
                         <element type="UIElement" name="MovesSectionBlackText1" anchor="Stretch" fontSize="24">
@@ -94,6 +107,9 @@
                       </components>
                     </element>
                     <element type="UIElement" name="MovesSectionWhite2" flex="1">
+                      <components>
+                        <component type="UIInputClicker" action="ChessShowMove" value="white2"/>
+                      </components>
                       <children>
                         <element type="UIElement" name="MovesSectionWhiteMark2" anchor="Stretch" color="245,205,50,150" visible="false"/>
                         <element type="UIElement" name="MovesSectionWhiteText2" anchor="Stretch" fontSize="24">
@@ -104,6 +120,9 @@
                       </children>
                     </element>
                     <element type="UIElement" name="MovesSectionBlack2" flex="1">
+                      <components>
+                        <component type="UIInputClicker" action="ChessShowMove" value="black2"/>
+                      </components>
                       <children>
                         <element type="UIElement" name="MovesSectionBlackMark2" anchor="Stretch" color="245,205,50,150" visible="false"/>
                         <element type="UIElement" name="MovesSectionBlackText2" anchor="Stretch" fontSize="24">
@@ -123,6 +142,9 @@
                       </components>
                     </element>
                     <element type="UIElement" name="MovesSectionWhite3" flex="1">
+                      <components>
+                        <component type="UIInputClicker" action="ChessShowMove" value="white3"/>
+                      </components>
                       <children>
                         <element type="UIElement" name="MovesSectionWhiteMark3" anchor="Stretch" color="245,205,50,150" visible="false"/>
                         <element type="UIElement" name="MovesSectionWhiteText3" anchor="Stretch" fontSize="24">
@@ -133,6 +155,9 @@
                       </children>
                     </element>
                     <element type="UIElement" name="MovesSectionBlack3" flex="1">
+                      <components>
+                        <component type="UIInputClicker" action="ChessShowMove" value="black3"/>
+                      </components>
                       <children>
                         <element type="UIElement" name="MovesSectionBlackMark3" anchor="Stretch" color="245,205,50,150" visible="false"/>
                         <element type="UIElement" name="MovesSectionBlackText3" anchor="Stretch" fontSize="24">
@@ -152,6 +177,9 @@
                       </components>
                     </element>
                     <element type="UIElement" name="MovesSectionWhite4" flex="1">
+                      <components>
+                        <component type="UIInputClicker" action="ChessShowMove" value="white4"/>
+                      </components>
                       <children>
                         <element type="UIElement" name="MovesSectionWhiteMark4" anchor="Stretch" color="245,205,50,150" visible="false"/>
                         <element type="UIElement" name="MovesSectionWhiteText4" anchor="Stretch" fontSize="24">
@@ -162,6 +190,9 @@
                       </children>
                     </element>
                     <element type="UIElement" name="MovesSectionBlack4" flex="1">
+                      <components>
+                        <component type="UIInputClicker" action="ChessShowMove" value="black4"/>
+                      </components>
                       <children>
                         <element type="UIElement" name="MovesSectionBlackMark4" anchor="Stretch" color="245,205,50,150" visible="false"/>
                         <element type="UIElement" name="MovesSectionBlackText4" anchor="Stretch" fontSize="24">
@@ -181,6 +212,9 @@
                       </components>
                     </element>
                     <element type="UIElement" name="MovesSectionWhite5" flex="1">
+                      <components>
+                        <component type="UIInputClicker" action="ChessShowMove" value="white5"/>
+                      </components>
                       <children>
                         <element type="UIElement" name="MovesSectionWhiteMark5" anchor="Stretch" color="245,205,50,150" visible="false"/>
                         <element type="UIElement" name="MovesSectionWhiteText5" anchor="Stretch" fontSize="24">
@@ -191,6 +225,9 @@
                       </children>
                     </element>
                     <element type="UIElement" name="MovesSectionBlack5" flex="1">
+                      <components>
+                        <component type="UIInputClicker" action="ChessShowMove" value="black5"/>
+                      </components>
                       <children>
                         <element type="UIElement" name="MovesSectionBlackMark5" anchor="Stretch" color="245,205,50,150" visible="false"/>
                         <element type="UIElement" name="MovesSectionBlackText5" anchor="Stretch" fontSize="24">
@@ -210,6 +247,9 @@
                       </components>
                     </element>
                     <element type="UIElement" name="MovesSectionWhite6" flex="1">
+                      <components>
+                        <component type="UIInputClicker" action="ChessShowMove" value="white6"/>
+                      </components>
                       <children>
                         <element type="UIElement" name="MovesSectionWhiteMark6" anchor="Stretch" color="245,205,50,150" visible="false"/>
                         <element type="UIElement" name="MovesSectionWhiteText6" anchor="Stretch" fontSize="24">
@@ -220,6 +260,9 @@
                       </children>
                     </element>
                     <element type="UIElement" name="MovesSectionBlack6" flex="1">
+                      <components>
+                        <component type="UIInputClicker" action="ChessShowMove" value="black6"/>
+                      </components>
                       <children>
                         <element type="UIElement" name="MovesSectionBlackMark6" anchor="Stretch" color="245,205,50,150" visible="false"/>
                         <element type="UIElement" name="MovesSectionBlackText6" anchor="Stretch" fontSize="24">
@@ -239,6 +282,9 @@
                       </components>
                     </element>
                     <element type="UIElement" name="MovesSectionWhite7" flex="1">
+                      <components>
+                        <component type="UIInputClicker" action="ChessShowMove" value="white7"/>
+                      </components>
                       <children>
                         <element type="UIElement" name="MovesSectionWhiteMark7" anchor="Stretch" color="245,205,50,150" visible="false"/>
                         <element type="UIElement" name="MovesSectionWhiteText7" anchor="Stretch" fontSize="24">
@@ -249,6 +295,9 @@
                       </children>
                     </element>
                     <element type="UIElement" name="MovesSectionBlack7" flex="1">
+                      <components>
+                        <component type="UIInputClicker" action="ChessShowMove" value="black7"/>
+                      </components>
                       <children>
                         <element type="UIElement" name="MovesSectionBlackMark7" anchor="Stretch" color="245,205,50,150" visible="false"/>
                         <element type="UIElement" name="MovesSectionBlackText7" anchor="Stretch" fontSize="24">
@@ -262,7 +311,28 @@
                 </element>
               </children>
             </element>
-            <element type="UIElement" name="MovesSectionBandButtons" height="56"/>
+            <element type="UIStack" name="MovesSectionBandButtons" height="56" direction="Horizontal" spacing="8" crossAlign="Stretch">
+              <children>
+                <element type="UIElement" name="MovesSectionStepBack" width="56" fontSize="32" color="58,74,84,255">
+                  <components>
+                    <component type="UITextComponent" text="&#x2039;" align="Center" verticalAlign="Center" wrap="false"/>
+                    <component type="UIInputClicker" action="ChessShowMove" value="back"/>
+                  </components>
+                </element>
+                <element type="UIElement" name="MovesSectionStepForward" width="56" fontSize="32" color="58,74,84,255">
+                  <components>
+                    <component type="UITextComponent" text="&#x203A;" align="Center" verticalAlign="Center" wrap="false"/>
+                    <component type="UIInputClicker" action="ChessShowMove" value="forward"/>
+                  </components>
+                </element>
+                <element type="UIElement" name="MovesSectionLatest" width="56" fontSize="32" color="58,74,84,255">
+                  <components>
+                    <component type="UITextComponent" text="&#xBB;" align="Center" verticalAlign="Center" wrap="false"/>
+                    <component type="UIInputClicker" action="ChessShowMove" value="latest"/>
+                  </components>
+                </element>
+              </children>
+            </element>
             <element type="UIStack" name="MovesSectionButtons" height="56" direction="Horizontal" spacing="8" crossAlign="Stretch">
               <children>
                 <element type="UIElement" name="MovesSectionBack" flex="1" height="56" fontSize="26" color="50,115,85,255">

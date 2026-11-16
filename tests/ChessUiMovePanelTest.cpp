@@ -357,26 +357,35 @@ namespace BECore::Chess::Tests {
         EXPECT_LT(lastMark, plateOfThePanel) << "and under the panels";
     }
 
-    TEST_F(ChessUiTest, TheMovePanelTakesNoClickAndTheBoardAndResetStillGetTheirOwn) {
+    TEST_F(ChessUiTest, OnlyTheCellsAndTheStepButtonsOfTheMovePanelTakeAClickAndTheBoardAndResetStillGetTheirOwn) {
         ASSERT_TRUE(PlayAll(Model(), {"e2e4", "e7e5"}));
         Settle();
         const auto canvas = MovePanel();
         ASSERT_TRUE(canvas);
         ASSERT_TRUE(MovePanelElement("MovePanelBox").active.visible);
+        // The cells of the moves and the three buttons of the band are buttons of ChessShowMove; nothing else blocks or takes the pointer
+        Vector<String> clickable;
         for (const UIElement* element : AllElements(canvas->GetRoot())) {
             EXPECT_FALSE(element->blocksInput) << element->name.CStr();
-            EXPECT_FALSE(element->IsInteractive()) << element->name.CStr();
+            if (!element->IsInteractive()) {
+                continue;
+            }
+            clickable.push_back(String(element->name.ToStringView()));
+            const UIInputClicker* clicker = ClickerOf(*element);
+            ASSERT_NE(clicker, nullptr) << element->name.CStr();
+            EXPECT_EQ(clicker->action, PoolString::Intern("ChessShowMove")) << element->name.CStr();
+            EXPECT_TRUE(ParseMoveListPress(clicker->value.ToStringView()).has_value()) << element->name.CStr();
         }
-        // a hit test of the canvas finds nothing at the middle of any element, and a press on the box, a band and the rows is not taken by the UI
-        for (const UIElement* element : AllElements(canvas->GetRoot())) {
-            const Rect& rect = element->rect;
-            EXPECT_EQ(canvas->GetLayout().HitTest(rect.x + rect.w * 0.5f, rect.y + rect.h * 0.5f), nullptr) << element->name.CStr();
+        EXPECT_EQ(clickable.size(), 2 * kMovePanelRows + 3);
+        for (const char* name : {"MovePanelStepBack", "MovePanelStepForward", "MovePanelLatest", "MovePanelWhite7", "MovePanelBlack0"}) {
+            EXPECT_NE(eastl::find(clickable.begin(), clickable.end(), String(name)), clickable.end()) << name;
         }
-        for (const char* name : {"MovePanelBox", "MovePanelBandTopPlayer", "MovePanelRow0", "MovePanelWhite0", "MovePanelBlack0"}) {
+        for (const char* name : {"MovePanelBox", "MovePanelBandTopPlayer", "MovePanelBandBottomPlayer", "MovePanelNumber0"}) {
             const auto [x, y] = ScreenCenter(MovePanelElement(name));
             EXPECT_FALSE(CoreManager::GetUIInput().DispatchMouseButtonDown(Button(x, y, true))) << name;
             EXPECT_FALSE(CoreManager::GetUIInput().DispatchMouseButtonUp(Button(x, y, false))) << name;
         }
+        EXPECT_FALSE(Model().IsViewing());
 
         // the board right next to the box takes a press, and Reset above it takes a click
         EXPECT_FALSE(Model().HasSelection());
