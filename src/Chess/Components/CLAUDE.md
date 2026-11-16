@@ -86,3 +86,7 @@ Node `OpponentPanel` (`ChessOpponentPanel.xml`, layer 20, modal, `visible="false
 ## Draw order
 
 By layer, not by place among the references of `SceneConfig.xml` (`engine/src/Modules/BECore/Scene/CLAUDE.md`, "Draw order"); the same layer draws in scene order. `Board` and then `BoardCoordinates` -1, pieces 0, `Result` 1, `Material` and `MovePanel` 5, a dragged piece 6, `Hud` 10, the panels and the menu 20. A test reads the draw calls of one frame.
+
+## Allocations
+
+A steady frame of the scene allocates nothing on the main thread in any state a game sits in; `ChessUiAllocTest` pins it in a profile build (`ENGINE_PROFILER_ALLOC`), and a frame that changes something (a move, the start of a search) does allocate.
