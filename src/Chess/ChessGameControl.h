@@ -9,7 +9,7 @@ namespace BECore::Chess {
 
     /// Error codes of Chess besides the shared ones (GameControlErrors, ControlErrors)
     namespace ChessControlErrors {
-        /// The game is finished (checkmate, stalemate or a draw): it takes no move until reset or set_state
+        /// The game is finished (checkmate, stalemate, a draw or a resignation): it takes no move and no resignation until reset or set_state
         inline constexpr StringView kGameOver = "game_over";
         /// The move is a pawn move onto the last rank and does not say what to promote to: "e7e8" instead of "e7e8q"
         inline constexpr StringView kPromotionRequired = "promotion_required";
@@ -26,8 +26,8 @@ namespace BECore::Chess {
      * State: {"fen", "board", "turn", "status", "winner", "inCheck", "legalMoveCount", "startFen", "moves", "sanMoves", "takeBackPlies", "opponent", "material", "analysis"}.
      * board is 8 strings, rank 8 first, file a first: white pieces are upper case (PNBRQK), black ones lower case, '.' is an
      * empty square. turn and winner are "white" or "black" (winner is null until a side has won). status is one of
-     * "ongoing", "checkmate", "stalemate", "draw_insufficient_material", "draw_threefold", "draw_fifty_moves"; everything but
-     * "ongoing" ends the game. startFen is the position the game began from and moves the UCI moves played since, so the pair
+     * "ongoing", "checkmate", "stalemate", "draw_insufficient_material", "draw_threefold", "draw_fifty_moves", "resigned", "draw_agreed"; everything but
+     * "ongoing" ends the game. After a resignation winner is the other color; an agreed draw has none. startFen is the position the game began from and moves the UCI moves played since, so the pair
      * rebuilds the game (and its repetitions); sanMoves is the same moves in standard algebraic notation ("e4", "Nf3", "O-O", "e8=Q#"), one per entry of moves, as the move list
      * shows them. takeBackPlies is how many moves {"takeBack": {}} (and the button of the move list) would take back now, 0 when nothing can be (see SetState). What the move list
      * of the screen views (an earlier position) is not in the state: like the selection it is the person's look, not the game, and it moves no version.
@@ -79,7 +79,7 @@ namespace BECore::Chess {
      * SetState takes {"fen": ".."} (any position that Position::FromFen() accepts, which may be a finished game), {"opponent": {"plays": .., "level": ..,
      * "engine": .., "white": {"engine": .., "level": ..}, "black": {..}, "seed": n}} (inside it a missing member means unchanged, per seat; plays is "white", "black", "both" or null;
      * seed is an integer 0..4294967295, anything else is invalid_params, and it is a valid pick alone; a seed that equals the current one changes nothing;
-     * level and engine an id, "stockfish" or "own" for the engine, exactly as written) or both; none of fen, opponent, analysis is invalid_params. level and engine set BOTH
+     * level and engine an id, "stockfish" or "own" for the engine, exactly as written) or both; none of fen, opponent, analysis, takeBack, resign is invalid_params. level and engine set BOTH
      * seats; the seat objects "white" and "black" (members optional, nothing else allowed in them) then override one seat; plays says who plays and a missing
      * plays keeps the sides as they are. "both" starts a game of two programs, each with an engine object of its own; "plays": "white" while both play is a takeover (the person
      * has Black, White's program and its search stay), null ends it. Everything is checked before anything changes, so a refused call (invalid_params) changes nothing.
@@ -100,6 +100,11 @@ namespace BECore::Chess {
      * changes nothing. A takeback is a change of the game: the version moves, a finished game is on again, a running search of the program and a standing opponent error go at the next frame,
      * and the program answers again when it is its turn; the hint goes and the kept moves are rated again. A new seed is drawn as at a reset, so the own engine may answer otherwise among
      * near-equal moves (a client that compares answers across a takeback sets the seed after it).
+     *
+     * SetState also takes {"resign": {"color": "white"|"black"}} **alone** (combined with another member it is invalid_params): the color ends the game as "resigned" and the other one wins. color
+     * is optional when it follows from the opponent: against the program (it plays one color) the person's color, whoever is to move; with two people the side to move; with two programs there
+     * is no such color and a missing one is invalid_params. A color that is not "white" or "black", another member inside resign or a resign that is not an object is invalid_params and changes
+     * nothing; a finished game is game_over. The version moves once; takeBack puts the game on again (a resignation is not in the moves), list_actions is empty after it, as after a mate.
      *
      * The state version is the version of the game (a changed seed moves it) plus the revision of the opponent (a pick, an error that appears or goes) plus the revision of the analyst (a switch of
      * the evaluation or the ratings, a hint asked or dropped, an answer or a rating that arrives or is dropped, an error that appears or goes, also the rater's, which is not in get_state), so a push
@@ -127,6 +132,7 @@ namespace BECore::Chess {
         [[nodiscard]] Json AnalysisJson() const;
         std::expected<void, ControlError> SetAnalysis(const Json& analysis);
         std::expected<void, ControlError> SetTakeBack(const Json& takeBack);
+        std::expected<void, ControlError> SetResign(const Json& resign);
 
         ChessGameModel& _model;
         OpponentController& _opponent;

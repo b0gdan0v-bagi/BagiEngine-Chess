@@ -3,6 +3,7 @@
 #include <BECore/Control/Json.h>
 #include <Chess/Engine/OpponentChoice.h>
 #include <Chess/Game/CapturedMaterial.h>
+#include <Chess/Game/GameEnding.h>
 #include <Chess/Game/MoveList.h>
 #include <Chess/Game/TakeBack.h>
 
@@ -184,6 +185,9 @@ namespace BECore::Chess {
             }
             return pick;
         }
+
+        constexpr const char* kResignUsage =
+            "'resign' has to be an object like {} (the person's color, or the side to move with two people) or {\"color\": \"white\"} (the member is optional, \"white\" or \"black\")";
 
         constexpr const char* kTakeBackUsage = "'takeBack' has to be an object like {} (the button's rule) or {\"plies\": 2} (the member is an optional integer from 1 to the moves played)";
 
@@ -467,15 +471,24 @@ namespace BECore::Chess {
         const Json* opponentMember = FindJsonMember(state, "opponent");
         const Json* analysisMember = FindJsonMember(state, "analysis");
         const Json* takeBackMember = FindJsonMember(state, "takeBack");
-        if (!fenMember && !opponentMember && !analysisMember && !takeBackMember) {
-            return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, "'fen' (a FEN string), 'opponent' ({\"plays\", \"level\", \"engine\", \"white\", \"black\", \"seed\"}), both, or "
-                                                                                   "'analysis' ({\"evaluation\", \"hint\", \"ratings\"}) or 'takeBack' ({\"plies\"}) alone are needed"));
+        const Json* resignMember = FindJsonMember(state, "resign");
+        if (!fenMember && !opponentMember && !analysisMember && !takeBackMember && !resignMember) {
+            return std::unexpected(MakeControlError(ControlErrors::kInvalidParams,
+                                                    "'fen' (a FEN string), 'opponent' ({\"plays\", \"level\", \"engine\", \"white\", \"black\", \"seed\"}), both, or "
+                                                    "'analysis' ({\"evaluation\", \"hint\", \"ratings\"}), 'takeBack' ({\"plies\"}) or 'resign' ({\"color\"}) alone are needed"));
         }
         if (takeBackMember) {
-            if (fenMember || opponentMember || analysisMember) {
+            if (fenMember || opponentMember || analysisMember || resignMember) {
                 return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, "'takeBack' cannot be combined with another member: what it takes back depends on the game they change"));
             }
             return SetTakeBack(*takeBackMember);
+        }
+        if (resignMember) {
+            if (fenMember || opponentMember || analysisMember) {
+                return std::unexpected(
+                    MakeControlError(ControlErrors::kInvalidParams, "'resign' cannot be combined with another member: who resigns depends on the game and the opponent they change"));
+            }
+            return SetResign(*resignMember);
         }
         if (analysisMember && (fenMember || opponentMember)) {
             return std::unexpected(MakeControlError(ControlErrors::kInvalidParams,
@@ -581,6 +594,36 @@ namespace BECore::Chess {
             return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, played == 0 ? "there is no move to take back" : "the only move is the program's: the person has none to take back"));
         }
         _model.TakeBack(plies);
+        return {};
+    }
+
+    std::expected<void, ControlError> ChessGameControl::SetResign(const Json& resign) {
+        if (!resign.is_object()) {
+            return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, kResignUsage));
+        }
+        for (const auto& member : resign.items()) {
+            if (member.key() != "color") {
+                return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, kResignUsage));
+            }
+        }
+        Optional<PieceColor> named;
+        if (FindJsonMember(resign, "color")) {
+            const auto text = GetJsonString(resign, "color");
+            named = text ? ParseColor(StringView(text->data(), text->size())) : std::nullopt;
+            if (!named) {
+                return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, kResignUsage));
+            }
+        }
+        if (_model.IsGameOver()) {
+            return std::unexpected(MakeControlError(ChessControlErrors::kGameOver, Format("the game is over ({}): there is nobody to resign", StatusName(_model.GetStatus()))));
+        }
+        const ProgramSides sides = _opponent.GetSides();
+        const Optional<PieceColor> color = named ? named : ResigningColor(_model.GetTurn(), _opponent.GetPlays(), sides.white && sides.black);
+        if (!color) {
+            return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, "two programs play: name the color that resigns, {\"color\": \"white\"} or {\"color\": \"black\"}"));
+        }
+        const auto resigned = _model.Resign(*color);
+        EXPECT(resigned.has_value(), "ChessGameControl: a game that is not over refuses to resign");
         return {};
     }
 

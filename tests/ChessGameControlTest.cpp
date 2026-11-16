@@ -2722,6 +2722,143 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(MoveCount(), 1u);
     }
 
+    // ---- Resigning (set_state {"resign"}) ----
+
+    namespace {
+
+        /// {"resign": {}}, or {"resign": {"color": ..}} when @p color is not null
+        Json ResignRequest(const Json& color = Json()) {
+            Json resign = Json::object();
+            if (!color.is_null()) {
+                resign["color"] = color;
+            }
+            Json request = Json::object();
+            request["resign"] = std::move(resign);
+            return request;
+        }
+
+    }  // namespace
+
+    TEST_F(ChessGameControlTest, AColorNamedByTheClientResignsAndTheOtherColorWins) {
+        for (const char* color : {"white", "black"}) {
+            SCOPED_TRACE(color);
+            ASSERT_TRUE(control.Reset(Json::object()).has_value());
+            Perform("e2e4");
+            const uint64_t version = control.GetStateVersion();
+
+            ASSERT_TRUE(control.SetState(ResignRequest(Json(color))).has_value());
+
+            const Json state = State();
+            EXPECT_EQ(StringMember(state, "status"), "resigned");
+            EXPECT_EQ(StringMember(state, "winner"), String(color) == "white" ? "black" : "white");
+            EXPECT_EQ(control.GetStateVersion(), version + 1);
+            EXPECT_TRUE(Actions().empty()) << "list_actions is empty after a resignation, as after a mate";
+            EXPECT_EQ(model.GetResigned(), String(color) == "white" ? PieceColor::White : PieceColor::Black);
+        }
+    }
+
+    TEST_F(ChessGameControlTest, WithTwoPeopleTheSideToMoveResignsWhenNoColorIsNamed) {
+        ASSERT_TRUE(control.SetState(ResignRequest()).has_value());
+        EXPECT_EQ(StringMember(State(), "winner"), "black") << "White is to move";
+
+        ASSERT_TRUE(control.Reset(Json::object()).has_value());
+        Perform("e2e4");
+        ASSERT_TRUE(control.SetState(ResignRequest()).has_value());
+        EXPECT_EQ(StringMember(State(), "winner"), "white") << "Black is to move";
+    }
+
+    TEST_F(ChessGameControlTest, AgainstTheProgramThePersonResignsWhoeverIsToMove) {
+        CountingFactory factory({New<InstantEngine>()});
+        opponent.SetEngineFactory(factory.AsFactory());
+        SetOpponent(OpponentRequest("black"));  // the person has White
+        Perform("e2e4");                        // the program's turn: no frame runs, so it has not answered
+        ASSERT_TRUE(control.SetState(ResignRequest()).has_value());
+
+        EXPECT_EQ(StringMember(State(), "status"), "resigned");
+        EXPECT_EQ(StringMember(State(), "winner"), "black") << "the person's color gave up, though Black was to move";
+    }
+
+    TEST_F(ChessGameControlTest, WithTwoProgramsAColorIsNeeded) {
+        CountingFactory factory({New<InstantEngine>(), New<InstantEngine>()});
+        opponent.SetEngineFactory(factory.AsFactory());
+        SetOpponent(OpponentRequest("both"));
+        const uint64_t version = control.GetStateVersion();
+
+        EXPECT_EQ(SetStateError(ResignRequest()), "invalid_params");
+        EXPECT_EQ(control.GetStateVersion(), version);
+        EXPECT_EQ(StringMember(State(), "status"), "ongoing");
+
+        ASSERT_TRUE(control.SetState(ResignRequest(Json("black"))).has_value());
+        EXPECT_EQ(StringMember(State(), "winner"), "white");
+    }
+
+    TEST_F(ChessGameControlTest, ABadResignIsInvalidParamsAndChangesNothing) {
+        Perform("e2e4");
+        const uint64_t version = control.GetStateVersion();
+        for (const Json& color : {Json("red"), Json("White"), Json(""), Json(1), Json(true)}) {
+            EXPECT_EQ(SetStateError(ResignRequest(color)), "invalid_params") << DumpJson(color).c_str();
+        }
+        Json other = ResignRequest();
+        other["resign"]["reason"] = "tired";
+        EXPECT_EQ(SetStateError(other), "invalid_params");
+        Json nullColor = ResignRequest();
+        nullColor["resign"]["color"] = Json();
+        EXPECT_EQ(SetStateError(nullColor), "invalid_params") << "a null color is not a name";
+        Json notAnObject = Json::object();
+        notAnObject["resign"] = "white";
+        EXPECT_EQ(SetStateError(notAnObject), "invalid_params");
+
+        Json withFen = ResignRequest();
+        withFen["fen"] = MakeJsonString(kMateInOneFen);
+        EXPECT_EQ(SetStateError(withFen), "invalid_params");
+        Json withOpponent = ResignRequest();
+        withOpponent["opponent"] = Json::object();
+        EXPECT_EQ(SetStateError(withOpponent), "invalid_params");
+        Json withAnalysis = ResignRequest();
+        withAnalysis["analysis"] = Json::object();
+        EXPECT_EQ(SetStateError(withAnalysis), "invalid_params");
+        Json withTakeBack = ResignRequest();
+        withTakeBack["takeBack"] = Json::object();
+        EXPECT_EQ(SetStateError(withTakeBack), "invalid_params");
+
+        EXPECT_EQ(StringMember(State(), "status"), "ongoing");
+        EXPECT_EQ(MoveCount(), 1u);
+        EXPECT_EQ(control.GetStateVersion(), version);
+    }
+
+    TEST_F(ChessGameControlTest, ResigningAFinishedGameIsGameOver) {
+        ASSERT_TRUE(control.SetState(ResignRequest(Json("white"))).has_value());
+        const uint64_t version = control.GetStateVersion();
+
+        EXPECT_EQ(SetStateError(ResignRequest(Json("black"))), "game_over");
+        EXPECT_EQ(SetStateError(ResignRequest()), "game_over");
+        EXPECT_EQ(StringMember(State(), "winner"), "black") << "the first resignation stands";
+        EXPECT_EQ(control.GetStateVersion(), version);
+
+        SetFen(kMateInOneFen);
+        Perform("a1a8");
+        EXPECT_EQ(SetStateError(ResignRequest()), "game_over") << "a mate is over as well";
+    }
+
+    TEST_F(ChessGameControlTest, AMoveAfterAResignationIsGameOverAndATakebackPutsTheGameOnAgain) {
+        Perform("e2e4");
+        Perform("e7e5");
+        ASSERT_TRUE(control.SetState(ResignRequest()).has_value());
+
+        const auto refused = control.PerformAction(MoveAction("g1f3"));
+        ASSERT_FALSE(refused.has_value());
+        EXPECT_EQ(ErrorCodeOf(refused.error()), "game_over");
+        EXPECT_EQ(MoveCount(), 2u);
+
+        ASSERT_TRUE(control.SetState(TakeBackRequest()).has_value());
+        const Json state = State();
+        EXPECT_EQ(StringMember(state, "status"), "ongoing");
+        EXPECT_TRUE(state["winner"].is_null());
+        EXPECT_FALSE(model.GetResigned().has_value());
+        EXPECT_FALSE(Actions().empty());
+        Perform("b8c6");  // Black is to move again: the takeback took e7e5
+    }
+
 #if CHESS_NO_STOCKFISH
 
     // ---- Without Stockfish (CHESS_NO_STOCKFISH): the default factory of a real controller ----
