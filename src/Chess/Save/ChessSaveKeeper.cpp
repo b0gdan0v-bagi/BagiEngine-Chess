@@ -1,5 +1,7 @@
 #include "ChessSaveKeeper.h"
 
+#include <BECore/Audio/AudioManager.h>
+#include <BECore/Audio/AudioPreferences.h>
 #include <BECore/GameManager/CoreManager.h>
 #include <Chess/Save/ChessSaveState.h>
 #include <Chess/Save/SaveSettings.h>
@@ -18,6 +20,7 @@ namespace BECore::Chess {
         _attemptFailed = false;
         _hasWritten = false;
         _failureLogged = false;
+        _audio = AudioWrite{};
 
         const Optional<std::filesystem::path> directory = ResolveSaveDirectory(CoreManager::GetCommandLine(), SaveSettings::Load().rememberGame);
         if (!directory) {
@@ -42,7 +45,14 @@ namespace BECore::Chess {
             LOG_WARNING("Save: slot '{}' was not restored, the game starts new: {}"_format(kChessSaveSlot, loaded.error().detail));
         }
 
+        AudioManager& audio = CoreManager::GetAudio();
+        const std::expected<SaveInfo, SaveError> levels = LoadAudioPreferences(*service, audio);
+        if (!levels && levels.error().kind != SaveErrorKind::NotFound) {
+            LOG_WARNING("Save: slot '{}' was not restored, the levels stay as they are: {}"_format(kAudioPreferencesSlot, levels.error().detail));
+        }
+
         _written = KeyOf(model, controller, choice);
+        _audio.written = audio.GetLevelsRevision();
         _service = std::move(service);
     }
 
@@ -50,6 +60,7 @@ namespace BECore::Chess {
         if (!_service) {
             return;
         }
+        UpdateAudio();
         const Key key = KeyOf(model, controller, choice);
         if (key == _written || (_attemptFailed && key == _attempted)) {
             return;
@@ -64,9 +75,46 @@ namespace BECore::Chess {
         if (!_service) {
             return;
         }
+        FlushAudio();
         const Key key = KeyOf(model, controller, choice);
         if (key != _written) {
             Write(model, controller, choice, key);
+        }
+    }
+
+    void ChessSaveKeeper::UpdateAudio() {
+        const uint64_t revision = CoreManager::GetAudio().GetLevelsRevision();
+        if (revision == _audio.written || (_audio.attemptFailed && revision == _audio.attempted)) {
+            return;
+        }
+        if (_audio.hasWritten && CoreManager::GetTime().GetTotalTime() - _audio.lastTime < kSaveDebounceSeconds) {
+            return;
+        }
+        WriteAudio(revision);
+    }
+
+    void ChessSaveKeeper::FlushAudio() {
+        const uint64_t revision = CoreManager::GetAudio().GetLevelsRevision();
+        if (revision != _audio.written) {
+            WriteAudio(revision);
+        }
+    }
+
+    void ChessSaveKeeper::WriteAudio(uint64_t revision) {
+        _audio.hasWritten = true;
+        _audio.lastTime = CoreManager::GetTime().GetTotalTime();
+        const std::expected<void, SaveError> saved = SaveAudioPreferences(*_service, CoreManager::GetAudio());
+        if (saved) {
+            _audio.written = revision;
+            _audio.attemptFailed = false;
+            _audio.failureLogged = false;
+            return;
+        }
+        _audio.attempted = revision;
+        _audio.attemptFailed = true;
+        if (!_audio.failureLogged) {
+            _audio.failureLogged = true;
+            LOG_WARNING("Save: slot '{}' was not written: {}"_format(kAudioPreferencesSlot, saved.error().detail));
         }
     }
 

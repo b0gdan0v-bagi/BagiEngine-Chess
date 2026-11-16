@@ -7,7 +7,8 @@
 namespace BECore::Chess {
 
     /**
-     * @brief Keeps the game between runs: reads the save once in Start(), writes it when the game changes and always when the game stops. Owned by ChessGame. Main thread only. Not copyable.
+     * @brief Keeps the game and the player's levels between runs: reads the save once in Start(), writes it when it changes and always when the game stops. Owned by ChessGame. Main thread only. Not
+     * copyable.
      *
      * Start() asks ResolveSaveDirectory() (SaveSettings.h); with no folder, or one that cannot be made (one warning), the keeper is off: every call does nothing and touches no file. A save is loaded
      * into a temporary (ChessSaveState), checked completely and only then applied, so a refused file changes nothing. A file that is not there is silent (the first run); any other refusal is one
@@ -19,6 +20,9 @@ namespace BECore::Chess {
      * Update() writes when the key moved, no sooner than kSaveDebounceSeconds of game time (CoreManager::GetTime()) after the last write; the first write of a run waits for nothing. Flush() writes
      * now when the key moved since the last write (ChessGame::Stop() calls it; a browser tab that closes does not, which is why the debounced write exists). A failed write is logged once and tried
      * again at the next change; Flush() tries it even without one.
+     *
+     * The player's audio levels (the engine's `audio` slot, AudioPreferences.h) go through the same folder and gate: Start() reads them into the audio manager, Update() writes them when
+     * GetLevelsRevision() moved, with a debounce of their own that neither delays nor is delayed by the game's, and Flush() writes them too. A refused `audio` file is one warning and is left alone.
      *
      * Not saved: see ChessSaveState.
      */
@@ -59,6 +63,20 @@ namespace BECore::Chess {
         [[nodiscard]] static Key KeyOf(const ChessGameModel& model, const OpponentController& controller, const OpponentChoice& choice);
         void Write(const ChessGameModel& model, const OpponentController& controller, const OpponentChoice& choice, const Key& key);
 
+        /// The write state of the audio levels: the game's, with the audio manager's GetLevelsRevision() in place of a Key
+        struct AudioWrite {
+            uint64_t written = 0;    ///< the revision the file holds (or Start() found)
+            uint64_t attempted = 0;  ///< the revision of the last write that failed; not retried until it moves
+            bool attemptFailed = false;
+            bool hasWritten = false;
+            double lastTime = 0.0;  ///< game time of the last write, meaningful when hasWritten
+            bool failureLogged = false;
+        };
+
+        void UpdateAudio();
+        void FlushAudio();
+        void WriteAudio(uint64_t revision);
+
         UniquePtr<SaveGameService> _service;  ///< null when this run saves nothing
         Key _written;                         ///< the game as the file holds it (or as Start() found it)
         Key _attempted;                       ///< the key of the last write that failed; it is not retried until the key moves
@@ -66,6 +84,7 @@ namespace BECore::Chess {
         bool _hasWritten = false;
         double _lastWriteTime = 0.0;  ///< game time of the last write, meaningful when _hasWritten
         bool _failureLogged = false;
+        AudioWrite _audio;
     };
 
 }  // namespace BECore::Chess
