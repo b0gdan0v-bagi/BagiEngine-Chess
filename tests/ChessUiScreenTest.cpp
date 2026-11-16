@@ -326,7 +326,11 @@ namespace BECore::Chess::Tests {
         EXPECT_NEAR(HudElement("Turn")->rect.x, kEdge, kPixelTolerance);
         EXPECT_NEAR(HudElement("Reset")->rect.x + HudElement("Reset")->rect.w, kWideViewWidth - kEdge, kPixelTolerance);
         EXPECT_NEAR(HudElement("Status")->rect.x + HudElement("Status")->rect.w, kWideViewWidth - kEdge, kPixelTolerance);
-        EXPECT_NEAR(HudElement("Status")->rect.y + HudElement("Status")->rect.h, kViewHeight - kEdge, kPixelTolerance);
+        // Status stands on the bottom edge of the safe area and is lower than elsewhere, so that the home bar of side insets (a share of the height, which a Wide view fits) lifts it
+        // no closer to the box of the move panel than the gap of the HUD
+        const float homeBar = UIPreview::kBottomInsetShare * kViewHeight;
+        EXPECT_NEAR(HudElement("Status")->rect.y + HudElement("Status")->rect.h, kViewHeight, kPixelTolerance);
+        EXPECT_GE(HudElement("Status")->rect.y - homeBar, kMovePanelBottom + kMinGap - kPixelTolerance);
         for (const char* name : {"Menu", "Reset"}) {
             EXPECT_LE(HudElement(name)->rect.y + HudElement(name)->rect.h, kBoardTop) << name << " is above the row of the panel";
         }

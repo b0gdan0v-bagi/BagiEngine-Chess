@@ -24,8 +24,8 @@ namespace BECore::Tests {
         constexpr float kViewHeight = 800.0f;  ///< viewHeight of ChessScene
 
         // The HUD of Chess in HTML + CSS (the engine's web front-end, UIWebCompiler); the test below checks that it lays out like the HUD of config/SceneConfig.xml. The twin is the HUD of the
-        // default view (840 x 800, the context of every case here): the scene's HUD has a variant for its Portrait view (720 x 960: Status is wider there), which the twin does not follow, so
-        // there is no portrait twin.
+        // default view (840 x 800, the context of every case here): the scene's HUD has a variant for its Portrait view (720 x 960: Status is wider there) and one for its Wide view (Status
+        // is lower there), which the twin does not follow, so there is no portrait or wide twin.
         constexpr const char* kChessHudHtml = R"(
 <span id="Turn">{turn}</span>
 <button id="Menu" data-action="ChessOpenMenu">Menu</button>

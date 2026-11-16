@@ -10,7 +10,7 @@
      Wide scale 0.6) and two bands of 56, with 8 units between them: 56 + 8 + 448 + 8 + 56 + 8 + 56 = 640. The bands are empty here: the captured material of
      the player at the top of the board is drawn by the canvas of Material over MovePanelBandTopPlayer, the other player's over MovePanelBandBottomPlayer (ChessMaterial.xml has to agree with
      these places), and MovePanelBandButtons, the lowest, holds the step buttons (56 x 56 at its left) and Take back in the rest of it (112 units wide here, at a font of 22 that fits the word at the smallest scale). The box has no title, the top band being the material's. A notch pushes Menu and Reset onto the top
-     band; the side insets of a phone held sideways push Status onto the lowest band, never onto the one under the list, which is why the material is there. A row is a number cell of 56 units
+     band; Status stays under the box also when the side insets of a phone held sideways lift it (a Wide variant of ChessHud.xml). A row is a number cell of 56 units
      and two cells (White's and Black's, half of the rest each); the cell of the last move shows its Mark, a fill in the gold of the board's last-move squares (245, 205, 50) under the text. The
      component writes movePanelNumber<i>, movePanelWhite<i> and movePanelBlack<i> of the 8 rows and shows only the rows the game has (a hidden row takes no room, so the rows pack at the top); the list shows the page of the move the board shows (Game/MovePanel.h). The text of a move is at most 7 characters
      ("Qh4xe1+", "exd8=Q#") in a cell of 120 units, the number "100." in 56: a font of 24 and 22 units fits both at the smallest Wide scale, ChessUiTest lays the longest words out on the size matrix.

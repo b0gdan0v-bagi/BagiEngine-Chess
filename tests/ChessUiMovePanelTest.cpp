@@ -457,8 +457,8 @@ namespace BECore::Chess::Tests {
             if (tall ? box->rect.y < kMaterialPortraitListBottom + kMinGap : box->rect.x < kBoardLeft + kBoardUnits) {
                 report += Format("{}: the box reaches the board or the material\n", matrixCase.label.c_str());
             }
-            // The insets move the HUD, not the box: a notch pushes the top row (Menu, Reset) down onto the top band, the home bar of the side insets pushes Status up onto the band of the
-            // buttons. The 8 rows are clear of the HUD in every case
+            // The insets move the HUD, not the box: a notch pushes the top row (Menu, Reset) down onto the top band. The home bar of the side insets lifts Status, which the Wide view
+            // keeps low enough to stay clear of the band of the buttons. The 8 rows are clear of the HUD in every case
             const UIElement* list = layout.root->FindByName(PoolString::Intern("MovePanelList"));
             ASSERT_NE(list, nullptr);
             String touching;
@@ -474,14 +474,13 @@ namespace BECore::Chess::Tests {
                 }
             }
             const bool notch = matrixCase.label.find("notch") != String::npos;
-            const bool sideInsets = matrixCase.label.find("side insets") != String::npos;
             // A notch moves only the top row, far above the box of the Tall view, and side insets hide that box
-            const char* expected = tall ? "" : notch ? " Menu Reset" : sideInsets ? " Status" : "";
+            const char* expected = !tall && notch ? " Menu Reset" : "";
             if (touching != expected) {
                 report += Format("{}: the HUD controls closer to the box than {:.0f} units are '{}', not '{}'\n", matrixCase.label.c_str(), kMinGap, touching.c_str(), expected);
             }
-            // Per band: a notch reaches the top band only, the home bar of side insets the band of the buttons only; the band of the other player's material is clear in every window
-            const char* expectedPerBand[] = {notch ? " Menu Reset" : "", "", sideInsets && !tall ? " Status" : ""};
+            // Per band: a notch reaches the top band only; the band of the other player's material and the band of the buttons are clear in every window
+            const char* expectedPerBand[] = {notch ? " Menu Reset" : "", "", ""};
             for (size_t band = 0; band < std::size(kPanelBands); ++band) {
                 const UIElement* element = layout.root->FindByName(PoolString::Intern(kPanelBands[band]));
                 ASSERT_NE(element, nullptr);
@@ -499,13 +498,11 @@ namespace BECore::Chess::Tests {
                         Format("{}: the HUD controls closer to {} than {:.0f} units are '{}', not '{}'\n", matrixCase.label.c_str(), kPanelBands[band], kMinGap, near.c_str(), expectedPerBand[band]);
                 }
             }
-            // Status, pushed onto the band of the buttons, centres its text under the middle of its box: the word of Take back, in the middle of the button, stays clear of that text
-            const UIElement* takeBack = layout.root->FindByName(PoolString::Intern("MovePanelTakeBack"));
+            // Not one unit of Status over the box, in any window: the line of a view is read beside the buttons that step it
             const UIElement* status = hud->GetLayout().root->FindByName(PoolString::Intern("Status"));
-            ASSERT_NE(takeBack, nullptr);
             ASSERT_NE(status, nullptr);
-            if (Touch(takeBack->rect, status->rect, 0.0f) && status->rect.y < takeBack->rect.y + takeBack->rect.h * 0.5f) {
-                report += Format("{}: Status reaches the middle of Take back, where its word is\n", matrixCase.label.c_str());
+            if (Touch(box->rect, status->rect, 0.0f)) {
+                report += Format("{}: Status overlaps the box of the move panel\n", matrixCase.label.c_str());
             }
         }
         panel->SetElementVisible(PoolString::Intern("MovePanelBox"), false);
