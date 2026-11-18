@@ -13,6 +13,8 @@ namespace BECore::ClipboardEvents {
 
 namespace BECore::Chess {
 
+    class ChessGame;
+
     /**
      * @brief The menu section "Position", on the node `PositionSection` before its canvas: answers `ChessEditBegin` (`value` `current`, `empty` or `start`), `ChessEditSide` (`white` or `black`),
      * `ChessEditCastle` (`+K`, `-K`, `+Q`, ...: the letter of a FEN's right, the sign the state the person asks for), `ChessEditPlay` and `ChessEditCancel` (the editor bar presses the same two),
@@ -37,7 +39,7 @@ namespace BECore::Chess {
         void OnPaste(const ClipboardEvents::PasteEvent& event);
 
         bool _published = false;
-        const void* _publishedGame = nullptr;
+        const ChessGame* _publishedGame = nullptr;
         bool _publishedEditing = false;
         uint64_t _publishedRevision = 0;
         String _publishedMessage;

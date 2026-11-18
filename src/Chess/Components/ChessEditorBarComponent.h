@@ -17,6 +17,8 @@ namespace BECore {
 
 namespace BECore::Chess {
 
+    class ChessGame;
+
     /**
      * @brief The tool bar of the position editor, on the node `EditorBar` before its canvas: shows the canvas exactly while `ChessGame::IsEditing()` and answers `ChessEditPick` (the id of
      * Game/PositionEditor.h's tool table in `value`) and `ChessEditColor` (the other color for the pieces that are put).
@@ -42,7 +44,7 @@ namespace BECore::Chess {
         void Sync();
 
         bool _shown = false;  // the canvas starts hidden
-        const void* _syncedGame = nullptr;
+        const ChessGame* _syncedGame = nullptr;
         bool _synced = false;
         EditorTool _syncedTool;
     };

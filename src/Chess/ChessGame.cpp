@@ -1,6 +1,7 @@
 #include "ChessGame.h"
 
 #include <BECore/GameManager/CoreManager.h>
+#include <BECore/UI/UIWebText.h>
 #include <Chess/Game/EditorText.h>
 #include <Chess/Game/GameEnding.h>
 #include <Games/GameManager.h>
@@ -179,13 +180,7 @@ namespace BECore::Chess {
     }
 
     bool ChessGame::PasteFen(StringView text) {
-        const auto isSpace = [](char c) { return c == ' ' || c == '\t' || c == '\r' || c == '\n'; };
-        while (!text.empty() && isSpace(text.front())) {
-            text.remove_prefix(1);
-        }
-        while (!text.empty() && isSpace(text.back())) {
-            text.remove_suffix(1);
-        }
+        text = UIWebText::TrimSpace(text);
         // LoadFen() leaves the draft as it was on an error; with no editor open nothing is shown either way
         if (const auto result = _editor.LoadFen(text); !result) {
             _editorMessage = String(EditorText::Refusal(result.error()));

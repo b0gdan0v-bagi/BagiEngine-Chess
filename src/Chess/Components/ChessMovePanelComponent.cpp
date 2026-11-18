@@ -51,6 +51,10 @@ namespace BECore::Chess {
             }
             return;
         }
+        // A shown draft is the editor's: ending it by a view would be a change of the state with no step of the version
+        if (model->IsDrafting()) {
+            return;
+        }
         const Optional<MoveListPress> press = ParseMoveListPress(event.value.ToStringView());
         if (!press) {
             LOG_WARNING("ChessShowMove ignored: '{}' is not a press of the move list"_format(event.value.ToStringView()));

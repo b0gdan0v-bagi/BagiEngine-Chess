@@ -89,16 +89,16 @@ namespace BECore::Chess {
         // A position that is edited has no turn, status or opening of the game: the Turn line is the editor's, and the bottom margin is the editor bar's
         const String turn = editing ? StatusText::Editing(game->GetEditor(), editorMessage) : StatusText::Turn(model, thinking);
         String status;
-        if (editing) {
-            status.clear();
-        } else if (shown) {
-            status = StatusText::Status(model);
-        } else if (error) {
-            status = OpponentText::Error(*error);
-        } else if (offer == DrawOfferState::Declined) {
-            status = StatusText::DrawDeclined();
-        } else {
-            status = StatusText::Status(model);
+        if (!editing) {
+            if (shown) {
+                status = StatusText::Status(model);
+            } else if (error) {
+                status = OpponentText::Error(*error);
+            } else if (offer == DrawOfferState::Declined) {
+                status = StatusText::DrawDeclined();
+            } else {
+                status = StatusText::Status(model);
+            }
         }
         const String opponentError = error ? OpponentText::Error(*error) : String();
         // The name of the position the board shows: a view names the viewed one, as the board does

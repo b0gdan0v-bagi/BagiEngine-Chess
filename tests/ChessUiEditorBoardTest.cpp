@@ -1,3 +1,4 @@
+#include <Chess/Components/AnalysisRows.h>
 #include <Chess/Game/EditorText.h>
 #include <tests/ChessUiHarness.h>
 #include <tests/ShippedOpenings.h>
@@ -287,6 +288,38 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(Model().GetMoves().size(), 1u);
         _manager->UpdateAll();
         ExpectPiecesAtTheCellsOf(false);
+    }
+
+    TEST_F(ChessUiEditorBoardTest, APressOnTheMoveListOrTheHintWhileEditingLeavesTheDraftAndTheVersionAlone) {
+        ASSERT_TRUE(Play(Model(), "e2e4"));
+        ASSERT_TRUE(Play(Model(), "e7e5"));
+        BeginOn(EditStart::Current);
+        RightClick("a2");  // a full side takes no further piece, so the draft changes by taking one off
+        _manager->UpdateAll();
+        Draw();  // the rows of the move list are the words of this frame
+        const uint64_t version = Model().GetVersion();
+        const uint64_t revision = Editor().GetRevision();
+        ASSERT_TRUE(Editor().GetPieceAt(Sq("a2")).IsEmpty());
+
+        // The cells of the Moves section (reachable from the menu while editing) emit the same action as the panel's
+        PressWith("ChessShowMove", "white0");
+        PressWith("ChessShowMove", "back");
+        PressWith("ChessShowMove", "latest");
+        Press("ChessHint");
+        _manager->UpdateAll();
+
+        EXPECT_TRUE(Game().IsEditing()) << "the contract: a draft ends with a step of the version or by Cancel and Play";
+        EXPECT_TRUE(Model().IsDrafting());
+        EXPECT_EQ(Model().GetVersion(), version);
+        EXPECT_EQ(Editor().GetRevision(), revision);
+        EXPECT_TRUE(Editor().GetPieceAt(Sq("a2")).IsEmpty());
+        EXPECT_FALSE(Model().IsViewing());
+        EXPECT_EQ(Model().GetMoves().size(), 2u);
+        EXPECT_FALSE(HintAllowedNow(&Model())) << "the button is grey while a position is edited";
+
+        Game().CancelEditing();
+        _manager->UpdateAll();
+        EXPECT_TRUE(HintAllowedNow(&Model()));
     }
 
 }  // namespace BECore::Chess::Tests
