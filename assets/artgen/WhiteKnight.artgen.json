@@ -1,0 +1,103 @@
+{
+  "accepted": {
+    "crop": {
+      "h": 1024,
+      "w": 974,
+      "x": 50,
+      "y": 0
+    },
+    "frame": "set",
+    "processing": {
+      "maxSize": 256,
+      "padding": 3,
+      "trim": true
+    },
+    "scale": 0.25051334702258726,
+    "seed": 3645578529,
+    "size": [
+      244,
+      256
+    ],
+    "source": "D:/AHobbyProjects/BagiEngine-Chess.workers/w3/artgen/out/chess_beer/WhiteKnight/WhiteKnight_3645578529.png",
+    "sprite": "WhiteKnight"
+  },
+  "checks": {
+    "failed": [],
+    "metrics": {
+      "cover": 0.6582,
+      "edgeRun": 0.0,
+      "fill": 0.3679,
+      "halo": 0.0193,
+      "offset": 0.0125,
+      "pieces": 1
+    },
+    "passed": true,
+    "thresholds": {
+      "cut": 128,
+      "maxEdgeRun": 0.01,
+      "maxFill": 0.85,
+      "maxHalo": 0.1,
+      "maxOffset": 0.25,
+      "maxPieces": 1,
+      "minCover": 0.1,
+      "minPieceArea": 0.01
+    }
+  },
+  "date": "2026-11-18T23:03:56+00:00",
+  "generator": {
+    "name": "comfyui",
+    "url": "http://127.0.0.1:8188",
+    "version": "0.45.0"
+  },
+  "generatorFile": "artgen_WhiteKnight_00009_.png",
+  "kind": "image",
+  "models": {
+    "bg_removal_name": [
+      "birefnet.safetensors"
+    ],
+    "ckpt_name": [
+      "sd_xl_base_1.0.safetensors"
+    ],
+    "vae_name": [
+      "sdxl.vae.safetensors"
+    ]
+  },
+  "negative": "text, letters, label, logo, brand, watermark, chess board, hands, people, several objects, cropped, blurry, low quality",
+  "params": {
+    "cfg": 7.0,
+    "steps": 28
+  },
+  "preset": "chess_piece",
+  "presetData": {
+    "accept": {
+      "maxSize": 256,
+      "padding": 3,
+      "trim": true
+    },
+    "negative": "text, letters, label, logo, brand, watermark, chess board, hands, people, several objects, cropped, blurry, low quality",
+    "params": {
+      "cfg": 7.0,
+      "steps": 28
+    },
+    "preset": 1,
+    "prompt": "{subject}, a single chess piece made of beer glassware, stylized 3D game asset, glossy glass and polished wood, warm tavern light, centered, full view, plain light grey background",
+    "size": [
+      1024,
+      1024
+    ],
+    "title": "Chess piece: a beer-glass chess set",
+    "workflow": "sdxl_cutout"
+  },
+  "presetHash": "64a92fc05136db1a538a3bab99f38bd34e83bacf3d3bc8b0e41c32201a7b0069",
+  "presetSource": "game",
+  "prompt": "a curved viking drinking horn standing upright, an animal horn tapering to a point, brass rim, filled with light golden beer, white foam, a single chess piece made of beer glassware, stylized 3D game asset, glossy glass and polished wood, warm tavern light, centered, full view, plain light grey background",
+  "provenance": 1,
+  "seed": 3645578529,
+  "size": [
+    1024,
+    1024
+  ],
+  "subject": "a curved viking drinking horn standing upright, an animal horn tapering to a point, brass rim, filled with light golden beer, white foam",
+  "workflow": "sdxl_cutout",
+  "workflowHash": "7afad3cd68b10eef102eb2103b5bdfb2130e2cfc7f69d2698344b3357b673b6a"
+}

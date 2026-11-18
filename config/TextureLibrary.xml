@@ -7,42 +7,42 @@
 -->
 <root>
   <sprites>
-    <sprite name="WhiteKing" texturePath="assets/chess_test.png">
-      <srcRect x="0" y="0" w="116.67" h="190.5" />
+    <sprite name="WhiteKing" texturePath="assets/artgen/WhiteKing.png">
+      <srcRect x="0" y="0" w="244" h="256" />
     </sprite>
-    <sprite name="WhiteQueen" texturePath="assets/chess_test.png">
-      <srcRect x="116.67" y="0" w="116.67" h="190.5" />
+    <sprite name="WhiteQueen" texturePath="assets/artgen/WhiteQueen.png">
+      <srcRect x="0" y="0" w="244" h="256" />
     </sprite>
-    <sprite name="WhiteRook" texturePath="assets/chess_test.png">
-      <srcRect x="233.33" y="0" w="116.67" h="190.5" />
+    <sprite name="WhiteRook" texturePath="assets/artgen/WhiteRook.png">
+      <srcRect x="0" y="0" w="244" h="256" />
     </sprite>
-    <sprite name="WhiteBishop" texturePath="assets/chess_test.png">
-      <srcRect x="350" y="0" w="116.67" h="190.5" />
+    <sprite name="WhiteBishop" texturePath="assets/artgen/WhiteBishop.png">
+      <srcRect x="0" y="0" w="244" h="256" />
     </sprite>
-    <sprite name="WhiteKnight" texturePath="assets/chess_test.png">
-      <srcRect x="466.67" y="0" w="116.67" h="190.5" />
+    <sprite name="WhiteKnight" texturePath="assets/artgen/WhiteKnight.png">
+      <srcRect x="0" y="0" w="244" h="256" />
     </sprite>
-    <sprite name="WhitePawn" texturePath="assets/chess_test.png">
-      <srcRect x="583.33" y="0" w="116.67" h="190.5" />
+    <sprite name="WhitePawn" texturePath="assets/artgen/WhitePawn.png">
+      <srcRect x="0" y="0" w="244" h="256" />
     </sprite>
 
-    <sprite name="BlackKing" texturePath="assets/chess_test.png">
-      <srcRect x="0" y="190.5" w="116.67" h="190.5" />
+    <sprite name="BlackKing" texturePath="assets/artgen/BlackKing.png">
+      <srcRect x="0" y="0" w="244" h="256" />
     </sprite>
-    <sprite name="BlackQueen" texturePath="assets/chess_test.png">
-      <srcRect x="116.67" y="190.5" w="116.67" h="190.5" />
+    <sprite name="BlackQueen" texturePath="assets/artgen/BlackQueen.png">
+      <srcRect x="0" y="0" w="244" h="256" />
     </sprite>
-    <sprite name="BlackRook" texturePath="assets/chess_test.png">
-      <srcRect x="233.33" y="190.5" w="116.67" h="190.5" />
+    <sprite name="BlackRook" texturePath="assets/artgen/BlackRook.png">
+      <srcRect x="0" y="0" w="244" h="256" />
     </sprite>
-    <sprite name="BlackBishop" texturePath="assets/chess_test.png">
-      <srcRect x="350" y="190.5" w="116.67" h="190.5" />
+    <sprite name="BlackBishop" texturePath="assets/artgen/BlackBishop.png">
+      <srcRect x="0" y="0" w="244" h="256" />
     </sprite>
-    <sprite name="BlackKnight" texturePath="assets/chess_test.png">
-      <srcRect x="466.67" y="190.5" w="116.67" h="190.5" />
+    <sprite name="BlackKnight" texturePath="assets/artgen/BlackKnight.png">
+      <srcRect x="0" y="0" w="244" h="256" />
     </sprite>
-    <sprite name="BlackPawn" texturePath="assets/chess_test.png">
-      <srcRect x="583.33" y="190.5" w="116.67" h="190.5" />
+    <sprite name="BlackPawn" texturePath="assets/artgen/BlackPawn.png">
+      <srcRect x="0" y="0" w="244" h="256" />
     </sprite>
   </sprites>
 </root>
