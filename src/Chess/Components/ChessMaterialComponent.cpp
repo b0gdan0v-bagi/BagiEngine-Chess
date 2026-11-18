@@ -7,6 +7,7 @@
 #include <BECore/UI/UIImageComponent.h>
 #include <Chess/ChessGame.h>
 #include <Chess/Components/ChessBoardComponent.h>
+#include <Chess/Components/PieceSprite.h>
 #include <Chess/Game/BoardOrientation.h>
 #include <Chess/Game/CapturedMaterial.h>
 #include <Chess/Game/MovePanel.h>
@@ -98,7 +99,7 @@ namespace BECore::Chess {
                 const String word = count > 0 ? Format("x{}", count) : String();
                 vars.Set(names.vars[row], StringView(word));
                 if (iconsToo && canvas) {
-                    const PoolString sprite = PoolString::Intern(Format("{}{}", EnumUtils<PieceColor>::ToString(taken), EnumUtils<PieceType>::ToString(types[index])).c_str());
+                    const PoolString sprite = PieceSpriteId(Piece{types[index], taken});
                     for (size_t set = 0; set < kMaterialSetCount; ++set) {
                         if (UIElement* element = canvas->GetRoot().FindByName(names.icons[set][row])) {
                             if (UIImageComponent* icon = element->GetComponent<UIImageComponent>()) {
@@ -129,9 +130,12 @@ namespace BECore::Chess {
             inPanel = MovePanelFits(safe.x, safe.y, safe.x + safe.w, safe.y + safe.h, MovePanelView::Wide);
             marginFits = MaterialListFits(safe.x, safe.y, safe.x + safe.w, safe.y + safe.h, ActiveMaterialView(GetScene()));
         }
+        // A draft has no captured pieces to count
+        const ChessGameModel* model = ChessGame::GetActiveModel();
+        const bool editing = model && model->IsDrafting();
         const MaterialNames& names = GetNames();
         for (size_t set = 0; set < kMaterialSetCount; ++set) {
-            const bool setWanted = (set == kMaterialPanelSet) == inPanel;
+            const bool setWanted = !editing && (set == kMaterialPanelSet) == inPanel;
             if (setWanted != _setShown[set]) {
                 _setShown[set] = setWanted;
                 for (const PoolString& root : names.roots[set]) {

@@ -51,10 +51,11 @@ namespace BECore::Chess {
 
     void ChessGameModel::SetPosition(const Position& position) {
         BeginGame(position);
-        DealPieces(_pieces, _position);
+        DealPieces(_pieces, [this](int sq) { return _position.PieceAt(sq); });
     }
 
-    void ChessGameModel::DealPieces(PieceTracks& pieces, const Position& position) {
+    template <typename PieceAtFn>
+    void ChessGameModel::DealPieces(PieceTracks& pieces, PieceAtFn pieceAt) {
         for (const PieceColor color : {PieceColor::White, PieceColor::Black}) {
             // The map has no order of its own; the order of the start squares makes the deal the same on every run.
             Vector<PieceTrack*> tracks;
@@ -67,7 +68,7 @@ namespace BECore::Chess {
 
             size_t next = 0;
             for (int sq = 0; sq < kSquareCount && next < tracks.size(); ++sq) {
-                const Piece piece = position.PieceAt(sq);
+                const Piece piece = pieceAt(sq);
                 if (piece.IsEmpty() || piece.color != color) {
                     continue;
                 }
@@ -236,7 +237,7 @@ namespace BECore::Chess {
         if (_startFen == Position::kStartFen) {
             PlaceHandlesAtStart(tracks);
         } else if (const auto start = Position::FromFen(_startFen)) {
-            DealPieces(tracks, *start);
+            DealPieces(tracks, [&start](int sq) { return start->PieceAt(sq); });
         } else {
             return;  // the model only stores FENs of its own positions, so this is not reached
         }
@@ -246,9 +247,10 @@ namespace BECore::Chess {
     }
 
     bool ChessGameModel::ShowMoves(size_t count) {
+        const bool wasDrafting = EndDraft();
         if (count >= _moves.size()) {
             if (!_viewing) {
-                return false;
+                return wasDrafting;
             }
             DropView();
             return true;
@@ -278,19 +280,40 @@ namespace BECore::Chess {
         ReplayPieces(_viewPieces, _viewMoveCount);
     }
 
+    void ChessGameModel::ShowDraft(const DraftSquares& squares) {
+        DropView();
+        ClearSelection();
+        _draftSquares = squares;
+        _drafting = true;
+        BuildDraft();
+    }
+
+    bool ChessGameModel::EndDraft() {
+        const bool was = _drafting;
+        _drafting = false;
+        _draftPieces.clear();
+        return was;
+    }
+
+    void ChessGameModel::BuildDraft() {
+        _draftPieces = _pieces;
+        DealPieces(_draftPieces, [this](int sq) { return _draftSquares[static_cast<size_t>(sq)]; });
+    }
+
     void ChessGameModel::DropView() {
         _viewing = false;
         _viewMoveCount = 0;
         _viewPieces.clear();
+        EndDraft();
     }
 
     Square ChessGameModel::GetShownSquareOf(PieceHandle handle) const {
-        const PieceTrack* track = FindActive(_viewing ? _viewPieces : _pieces, handle);
+        const PieceTrack* track = FindActive(ShownTracks(), handle);
         return track ? track->current : kOffBoard;
     }
 
     Piece ChessGameModel::GetShownPieceOf(PieceHandle handle) const {
-        const PieceTrack* track = FindActive(_viewing ? _viewPieces : _pieces, handle);
+        const PieceTrack* track = FindActive(ShownTracks(), handle);
         return track ? track->piece : Piece{};
     }
 
@@ -310,16 +333,20 @@ namespace BECore::Chess {
         // The scene registers its pieces in its first frame, which a client that acts at once (the control API on the manual
         // clock) can precede: a game that has moved on, or began from another position, is dealt again with this piece in it.
         if (!_moves.empty() || _startFen != Position::kStartFen) {
-            DealPieces(_pieces, _position);
+            DealPieces(_pieces, [this](int sq) { return _position.PieceAt(sq); });
         }
         if (_viewing) {
             BuildView();
+        }
+        if (_drafting) {
+            BuildDraft();
         }
     }
 
     void ChessGameModel::UnregisterPiece(PieceHandle handle) {
         _pieces.erase(handle);
         _viewPieces.erase(handle);
+        _draftPieces.erase(handle);
     }
 
     Square ChessGameModel::GetSquareOf(PieceHandle handle) const {

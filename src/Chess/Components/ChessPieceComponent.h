@@ -22,8 +22,8 @@ namespace BECore::Chess {
      * Owns nothing visual: pair it on a SceneNode with a SpriteRendererComponent (the artwork) and a TransformComponent, which it drives from the model on every SceneUpdateEvent.
      * OnAttached registers it with the active ChessGameModel at its starting (file, rank).
      *
-     * The piece stands where the board's shown position has it (ChessGameModel::GetShownSquareOf(): an earlier one while it is viewed). A move that the game plays (one more move and
-     * one more version than the component saw, the same start position, no view before or after, a frame with time in it) is slid from the old square to the new one
+     * The piece stands where the board's shown position has it (ChessGameModel::GetShownSquareOf(): an earlier one while it is viewed, the editor's draft while one is shown). A move that the game
+     * plays (one more move and one more version than the component saw, the same start position, no view or draft before or after, a frame with time in it) is slid from the old square to the new one
      * over _slideDuration with QuadOut. Every other change (the first sighting, a reset, a new position, a frame with no time, the model gone) places the piece at once and ends a slide
      * under way. A captured piece stays on its square while the slide of the capturing move runs, then goes off-screen. When the model reports another piece type (a promotion, or the reset
      * that undoes it) the sprite switches to that piece, after the slide.
@@ -85,8 +85,8 @@ namespace BECore::Chess {
         bool _seen = false;
         Square _lastSquare = kOffBoard;  ///< Outside the board when captured
         size_t _seenMoves = 0;
-        uint64_t _seenVersion = 0;  ///< A played move is exactly one more
-        bool _seenViewing = false;  ///< An earlier position was shown (ChessGameModel::IsViewing())
+        uint64_t _seenVersion = 0;        ///< A played move is exactly one more
+        bool _seenOtherPosition = false;  ///< An earlier position or a draft was shown (ChessGameModel::IsViewing(), IsDrafting())
         String _seenStartFen;
     };
 

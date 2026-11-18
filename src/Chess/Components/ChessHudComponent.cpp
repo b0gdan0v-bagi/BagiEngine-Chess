@@ -63,8 +63,13 @@ namespace BECore::Chess {
         const bool thinking = opponent.IsThinking() || offer == DrawOfferState::Pending;
         // A view starts, steps and ends without a version step of the game
         const Optional<size_t> shown = model.IsViewing() ? Optional<size_t>(model.GetShownMoveCount()) : std::nullopt;
+        // The Turn line of an edited position changes with no step of the game's version (an edit, a refused edit, a refused "Play from here")
+        const bool editing = game->IsEditing();
+        const Optional<EditRefusal> refusal = editing ? game->GetEditor().GetLastRefusal() : std::nullopt;
+        const StringView editorMessage = game->GetEditorMessage();
         const bool opponentChanged = &model != _publishedModel || opponent.GetRevision() != _publishedRevision || judge.GetRevision() != _publishedJudgeRevision;
-        if (!opponentChanged && model.GetVersion() == _publishedVersion && thinking == _publishedThinking && personColor == _publishedColor && shown == _publishedShown) {
+        if (!opponentChanged && model.GetVersion() == _publishedVersion && thinking == _publishedThinking && personColor == _publishedColor && shown == _publishedShown &&
+            editing == _publishedEditing && refusal == _publishedRefusal && editorMessage == StringView(_publishedEditorMessage)) {
             return;
         }
         _publishedModel = &model;
@@ -74,24 +79,30 @@ namespace BECore::Chess {
         _publishedThinking = thinking;
         _publishedColor = personColor;
         _publishedShown = shown;
+        _publishedEditing = editing;
+        _publishedRefusal = refusal;
+        _publishedEditorMessage = String(editorMessage);
 
         // While an error of the opponent stands the game is stalled by it, so its sentence wins over the others; a refused draw offer wins over the game's own status ("Check"); a view
         // wins over all: the board shows another position and the line says how to get back to the game (the panel keeps the error, and the line has it again when the view ends)
         const Optional<EngineError>& error = opponent.GetError();
-        const String turn = StatusText::Turn(model, thinking);
+        // A position that is edited has no turn, status or opening of the game: the Turn line is the editor's, and the bottom margin is the editor bar's
+        const String turn = editing ? StatusText::Editing(game->GetEditor(), editorMessage) : StatusText::Turn(model, thinking);
         String status;
-        if (shown) {
-            status = StatusText::Status(model);
-        } else if (error) {
-            status = OpponentText::Error(*error);
-        } else if (offer == DrawOfferState::Declined) {
-            status = StatusText::DrawDeclined();
-        } else {
-            status = StatusText::Status(model);
+        if (!editing) {
+            if (shown) {
+                status = StatusText::Status(model);
+            } else if (error) {
+                status = OpponentText::Error(*error);
+            } else if (offer == DrawOfferState::Declined) {
+                status = StatusText::DrawDeclined();
+            } else {
+                status = StatusText::Status(model);
+            }
         }
         const String opponentError = error ? OpponentText::Error(*error) : String();
         // The name of the position the board shows: a view names the viewed one, as the board does
-        const Optional<OpeningEntry> opening = OpeningOf(game->GetOpenings(), model.GetStartFen(), model.GetMoves(), model.GetShownMoveCount());
+        const Optional<OpeningEntry> opening = editing ? std::nullopt : OpeningOf(game->GetOpenings(), model.GetStartFen(), model.GetMoves(), model.GetShownMoveCount());
         const String openingText = opening ? OpeningDisplayName(opening->name, kOpeningMaxChars) : String();
         UIVars& vars = CoreManager::GetUIVars();
         vars.Set(Ids::turn, StringView(turn));

@@ -20,6 +20,12 @@ namespace BECore::Chess {
     /// Value of Position::EnPassantSquare() when no en passant capture is available.
     constexpr int kNoSquare = -1;
 
+    /// What FromFen() allows a side: promotion changes a piece, never adds one.
+    constexpr int kMaxPiecesPerSide = 16;
+
+    /// The letter of a piece in a FEN: upper case for White, lower case for Black.
+    [[nodiscard]] char FenPieceLetter(Piece piece) noexcept;
+
     /**
      * @brief A chess position: where every piece stands plus everything the rules need besides that.
      *

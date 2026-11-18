@@ -13,9 +13,9 @@ namespace BECore::Chess::Tests {
 
     }  // namespace
 
-    TEST(MenuSectionsTest, HoldsTheOpponentTheMovesTheGameAndTheSoundSectionsAndNothingElse) {
+    TEST(MenuSectionsTest, HoldsTheOpponentTheMovesTheGameTheSoundAndThePositionSectionsAndNothingElse) {
         const auto sections = MenuSections();
-        ASSERT_EQ(sections.size(), 4u);
+        ASSERT_EQ(sections.size(), 5u);
         EXPECT_EQ(Text(sections[0].id), "opponent");
         EXPECT_EQ(Text(sections[0].node), "OpponentPanel");
         EXPECT_EQ(Text(sections[0].label), "Opponent");
@@ -28,6 +28,9 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(Text(sections[3].id), "sound");
         EXPECT_EQ(Text(sections[3].node), "SoundPanel");
         EXPECT_EQ(Text(sections[3].label), "Sound");
+        EXPECT_EQ(Text(sections[4].id), "position");
+        EXPECT_EQ(Text(sections[4].node), "PositionSection");
+        EXPECT_EQ(Text(sections[4].label), "Position");
     }
 
     TEST(MenuSectionsTest, IdsAreLowerCaseAndUnique) {

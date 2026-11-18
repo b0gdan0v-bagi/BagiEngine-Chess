@@ -37,6 +37,9 @@ namespace BECore::Chess {
      * Viewing (ShowMoves()) shows an earlier position of the game on the board while the game stays where it is: a second set
      * of the handles and a copy of the position, read through the GetShown...() calls. It is no change of the game either.
      *
+     * A draft (ShowDraft()) shows an arbitrary array of pieces on the board in a third set of the handles, for the position editor: it is **not a view** (the shown Position stays the
+     * game's, which a draft may not be a legal one), and it is no change of the game either. It ends with every change of the game, like a view, and with ShowMoves() and the click handlers.
+     *
      * Visual pieces are tracked through opaque handles, so the scene can render moves and captures without re-deriving
      * identity from piece type and color. A handle is bound at registration to its starting square and follows its piece
      * through captures, castling, en passant and promotion (it then reports the promoted type); Reset() sends it back.
@@ -207,8 +210,29 @@ namespace BECore::Chess {
          */
         bool ShowMoves(size_t count);
 
-        /// Shows the game's own position again: ShowMoves(GetMoves().size())
+        /// Shows the game's own position again: ShowMoves(GetMoves().size()). A shown draft ends too (true then).
         bool EndViewing();
+
+        /// The 64 squares of a draft, a1 = index 0 (the layout of Position::PieceAt()).
+        using DraftSquares = Array<Piece, kSquareCount>;
+
+        /**
+         * @brief Shows @p squares on the board while the game stays where it is: GetShownSquareOf() and GetShownPieceOf() answer from them, nothing else of the game changes
+         * (GetShownPosition() and GetShownMoveCount() stay the game's, the version stays).
+         *
+         * The handles are dealt as SetPosition() deals them (for each color in the order of their start squares, to the pieces of that color in the order of the squares), so
+         * a color shows as many pieces as it has handles (kMaxPiecesPerSide, the most a draft allows). Ends a view, drops the selection and a pending promotion; the premove queue stays.
+         * Calling it again replaces the draft.
+         */
+        void ShowDraft(const DraftSquares& squares);
+
+        /// The shown pieces go back to the game's; whether a draft was shown
+        bool EndDraft();
+
+        /// A draft is shown (ShowDraft()). Not IsViewing(): GetShownPosition() is the game's position then, so a reader that draws it has to check this too.
+        [[nodiscard]] bool IsDrafting() const noexcept {
+            return _drafting;
+        }
 
         [[nodiscard]] bool IsViewing() const noexcept {
             return _viewing;
@@ -221,7 +245,7 @@ namespace BECore::Chess {
         [[nodiscard]] const Position& GetShownPosition() const noexcept {
             return _viewing ? _viewPosition : _position;
         }
-        /// GetSquareOf() in the shown position
+        /// GetSquareOf() in the shown position (the draft's while drafting)
         [[nodiscard]] Square GetShownSquareOf(PieceHandle handle) const;
         /// GetPieceOf() in the shown position (a pawn that promotes later is still a pawn there)
         [[nodiscard]] Piece GetShownPieceOf(PieceHandle handle) const;
@@ -308,8 +332,14 @@ namespace BECore::Chess {
 
         static void PlaceHandlesAtStart(PieceTracks& tracks);
 
-        /// Hands the pieces of @p position out to the handles of @p pieces; the handles left over go off the board
-        static void DealPieces(PieceTracks& pieces, const Position& position);
+        /// Hands the pieces out to the handles of @p pieces; the handles left over go off the board. @p pieceAt maps a square index (0..63) to its Piece
+        template <typename PieceAtFn>
+        static void DealPieces(PieceTracks& pieces, PieceAtFn pieceAt);
+
+        /// The tracks the GetShown...() calls read: the draft's, the view's or the game's
+        [[nodiscard]] const PieceTracks& ShownTracks() const noexcept {
+            return _drafting ? _draftPieces : _viewing ? _viewPieces : _pieces;
+        }
 
         /// Puts the handles of @p tracks where the game has them after its first @p moveCount moves: dealt to the position it began from, then moved by each of those moves
         void ReplayPieces(PieceTracks& tracks, size_t moveCount) const;
@@ -317,7 +347,10 @@ namespace BECore::Chess {
         /// Builds the shown position and its handles for _viewMoveCount
         void BuildView();
 
-        /// Ends viewing without a word: the game is about to change
+        /// Builds the handles of the shown draft from _draftSquares
+        void BuildDraft();
+
+        /// Ends viewing and a shown draft without a word: the game is about to change
         void DropView();
 
         /// The body of Resign() and AgreeDraw(): ends the game with @p status (@p resigned is who gave up, for Resigned)
@@ -346,6 +379,10 @@ namespace BECore::Chess {
         size_t _viewMoveCount = 0;
         Position _viewPosition = Position::Start();
         PieceTracks _viewPieces;
+
+        bool _drafting = false;
+        DraftSquares _draftSquares{};
+        PieceTracks _draftPieces;
     };
 
 }  // namespace BECore::Chess

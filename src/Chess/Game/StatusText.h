@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Chess/Game/ChessGameModel.h>
+#include <Chess/Game/PositionEditor.h>
 
 namespace BECore::Chess {
 
@@ -25,6 +26,10 @@ namespace BECore::Chess {
         /// "At move 12 - tap board" (the score-sheet number of the last shown move, the same for White's and Black's) or "At the start - tap board"; "" when nothing earlier is viewed.
         /// Short on purpose: a longer line, "Viewing move 12" with the whole hint, does not fit the Status of the narrowest window
         [[nodiscard]] String Viewing(const ChessGameModel& model);
+
+        /// The HUD's Turn line while a position is edited: @p message (the reason a "Play from here" was refused) when there is one, else the reason the editor last refused an edit, else "Editing".
+        /// Never longer than EditorText::kMaxRefusalChars
+        [[nodiscard]] String Editing(const PositionEditor& editor, StringView message);
 
     }  // namespace StatusText
 

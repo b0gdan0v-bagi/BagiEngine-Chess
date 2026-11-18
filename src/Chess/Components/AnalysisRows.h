@@ -45,7 +45,8 @@ namespace BECore::Chess {
         bool _disabled = true;
     };
 
-    /// Whether the game of @p model may be asked for a hint now (HintRefusalFor() with the seats the active opponent plays); false with no game
+    /// Whether the game of @p model may be asked for a hint now (HintRefusalFor() with the seats the active opponent plays); false with no game and while a position is edited (the hint would end the
+    /// draft)
     [[nodiscard]] bool HintAllowedNow(const ChessGameModel* model);
 
 }  // namespace BECore::Chess

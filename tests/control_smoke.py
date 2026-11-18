@@ -25,7 +25,7 @@ the person's own save folder is never named.
 
 What a recorded scenario can state lives in `tests/scenarios/*.jsonl` (ctest `BagiChessScenario.<file>`, the manual clock, played
 by the engine's bagi_play.py): the refusals, the mate and the game over, the reset, promotion, the numbers of the captured
-material, the clicks of the opponent panel and the takeback. What stays here needs a wait for the program, a picture, the real clock or an
+material, the clicks of the opponent panel, the takeback and the position editor's clicks. What stays here needs a wait for the program, a picture, the real clock or an
 answer that depends on the build.
 
 Exit code: 0 passed, 1 failed, 77 skipped (the executable does not exist).
@@ -68,6 +68,8 @@ OPENING = ["e2e4", "e7e5", "g1f3", "b8c6"]
 OPENING_NAME = {"eco": "C44", "name": "King's Knight Opening: Normal Variation"}
 MATE_IN_ONE_FEN = "6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1"  # Ra8#
 PROMOTION_FEN = "8/P6k/8/8/8/8/8/K7 w - - 0 1"
+EDITOR_FEN = "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1"  # kings and rooks: nothing a draft would change
+EDITOR_PASTED_FEN = "4k3/8/8/8/8/8/4P3/4K2R b K - 0 1"
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FAKE_ENGINE = Path(__file__).resolve().with_name("fake_uci_engine.py")
@@ -1132,6 +1134,93 @@ def check_a_draw_ends_the_game_and_a_takeback_reopens_it(client: BagiControlClie
     let_the_pieces_settle(client)
 
 
+def click_named(client: BagiControlClient, name: str, action: str, value: str = "") -> None:
+    """A real click on the element `name`: it must be taken by this action with this value, and two frames pass (a panel opens, a bar appears)."""
+    clicked = client.call("ui_click", {"name": name})
+    check(clicked["consumed"] and clicked["action"] == action and clicked["value"] == value, f"the click on {name} was answered with {clicked}, not {action} {value!r}")
+    let_frames_pass(client, 2)
+
+
+def begin_editing_by_clicks(client: BagiControlClient, start: str) -> None:
+    """Menu, Position, then one of the three starts of the editor (`current`, `empty`, `start`): the way a person opens it; the click on the start closes the menu."""
+    click_named(client, "Menu", "ChessOpenMenu")
+    click_named(client, "MenuSectionPosition", "ChessOpenSection", "position")
+    click_named(client, "PositionSection" + start.capitalize(), "ChessEditBegin", start)
+    let_the_pieces_settle(client)
+
+
+def get_editor(client: BagiControlClient) -> dict | None:
+    return client.call("get_state")["state"]["editor"]
+
+
+def run_editor_scenario(client: BagiControlClient, headless: bool) -> None:
+    """The position editor in the real window: the board while a draft is shown looks like the game in the same position (no marks, no slide), the draft is not the game, and a FEN
+    comes in and goes out over the clipboard. The clicks and the numbers of the state are `tests/scenarios/position_editor.jsonl`; the pieces are put on squares by the gtests (a
+    square has no name to click on).
+
+    The pictures are taken before the next click: a click leaves the pointer over its button, and its hover look would change the band."""
+    if client.call("status")["manualClock"]:
+        client.call("step")  # the scene registers its pieces in the first frame
+    client.call("reset")
+    client.call("set_state", {"opponent": {"plays": None}})
+    let_frames_pass(client, 2)
+    check(get_editor(client) is None, "the editor is open in a new game")
+    client.call("clipboard_set", {"text": EDITOR_PASTED_FEN})
+    client.call("clipboard_paste")
+    let_frames_pass(client, 2)
+    check(get_editor(client) is None, "a paste in a plain game opened the editor")
+
+    # A draft of the game's own position is drawn as the game draws it
+    client.call("set_state", {"fen": EDITOR_FEN})
+    let_the_pieces_settle(client)
+    by_the_game = take_screenshot(client) if headless else None
+    begin_editing_by_clicks(client, "current")
+    editor = get_editor(client)
+    check(editor is not None and editor["fen"] == EDITOR_FEN and editor["error"] is None, f"the draft of {EDITOR_FEN} reads {editor}")
+    if headless:
+        check(board_squares_band(take_screenshot(client)) == board_squares_band(by_the_game), "the draft of a position does not look like the game in it")
+
+    # A game with moves played shows the opening position as a draft, the pieces back on their squares at once
+    client.call("reset")
+    let_the_pieces_settle(client)
+    at_the_start = take_screenshot(client) if headless else None
+    for uci in OPENING[:2]:
+        client.call("perform_action", move(uci))
+    let_the_pieces_settle(client)
+    moves = client.call("get_state")["state"]["moves"]
+    begin_editing_by_clicks(client, "start")
+    state = client.call("get_state")["state"]
+    check(state["editor"]["fen"] == START_FEN and state["moves"] == moves, f"the start draft reads {state['editor']} over the moves {state['moves']}")
+    if headless:
+        check(board_squares_band(take_screenshot(client)) == board_squares_band(at_the_start), "the draft of the opening position does not look like the opening position")
+
+    # A FEN from the clipboard becomes the draft, and the draft goes back to it
+    client.call("clipboard_set", {"text": " " + EDITOR_PASTED_FEN + "\n"})
+    client.call("clipboard_paste")
+    let_the_pieces_settle(client)
+    check(get_editor(client)["fen"] == EDITOR_PASTED_FEN, f"a paste gave the draft {get_editor(client)}")
+    draft = take_screenshot(client) if headless else None
+    click_named(client, "EditorBarOptions", "ChessOpenSection", "position")
+    click_named(client, "PositionSectionCopy", "ChessEditCopy")
+    copied = client.call("clipboard_get")
+    check(copied["status"] == "ok" and copied["text"] == EDITOR_PASTED_FEN, f"Copy FEN left {copied} on the clipboard")
+    client.call("clipboard_set", {"text": "not a position"})
+    client.call("clipboard_paste")
+    let_frames_pass(client, 2)
+    check(get_editor(client)["fen"] == EDITOR_PASTED_FEN, "a text that is no FEN changed the draft")
+
+    # Play from here: the game starts from the draft, which looks as the draft did
+    click_named(client, "PositionSectionBack", "ChessOpenMenu")
+    click_named(client, "MenuClose", "ChessCloseMenu")
+    click_named(client, "EditorBarPlay", "ChessEditPlay")
+    let_the_pieces_settle(client)
+    state = client.call("get_state")["state"]
+    check(get_editor(client) is None and state["fen"] == EDITOR_PASTED_FEN and state["startFen"] == EDITOR_PASTED_FEN and state["moves"] == [], f"Play from here left {state}")
+    check("e8d8" in [action["uci"] for action in client.call("list_actions")["actions"]], "the game from the draft has no move of its king")
+    if headless:
+        check(board_squares_band(take_screenshot(client)) == board_squares_band(draft), "the game from a draft does not look like the draft")
+
+
 def find_ui_canvas(tree: dict, node: str) -> dict:
     """The canvas of the node of that name in a `ui_tree` answer."""
     for canvas in tree["canvases"]:
@@ -1189,7 +1278,7 @@ def check_the_menu_buttons(tree: dict) -> None:
 
     for element in find_ui_canvas(tree, "MenuPanel")["elements"]:
         collect(element)
-    check(sorted(names) == ["MenuClose", "MenuDim", "MenuSectionGame", "MenuSectionMoves", "MenuSectionOpponent", "MenuSectionSound"], f"the buttons of the list: {names}")
+    check(sorted(names) == ["MenuClose", "MenuDim", "MenuSectionGame", "MenuSectionMoves", "MenuSectionOpponent", "MenuSectionPosition", "MenuSectionSound"], f"the buttons of the list: {names}")
     dim = find_ui_element({"canvases": [find_ui_canvas(tree, "MenuPanel")]}, "MenuDim")
     check(dim["action"] == "ChessCloseMenu", f"the dim of the list: {dim}")
     found = find_ui_element({"canvases": [find_ui_canvas(tree, "MenuPanel")]}, "MenuSectionOpponent")
@@ -1379,6 +1468,8 @@ BASE_SCENARIOS = [
     ("captured material, manual clock", ["--manual-clock"], run_material_scenario),
     ("takeback, real clock", [], run_takeback_scenario),
     ("takeback, manual clock", ["--manual-clock"], run_takeback_scenario),
+    ("position editor, real clock", [], run_editor_scenario),
+    ("position editor, manual clock", ["--manual-clock"], run_editor_scenario),
 ]
 
 OPPONENT_SCENARIOS = [

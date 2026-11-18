@@ -3,6 +3,7 @@
 #include <BECore/Control/Json.h>
 #include <Chess/Engine/OpponentChoice.h>
 #include <Chess/Game/CapturedMaterial.h>
+#include <Chess/Game/EditorText.h>
 #include <Chess/Game/GameEnding.h>
 #include <Chess/Game/MoveList.h>
 #include <Chess/Game/TakeBack.h>
@@ -306,8 +307,9 @@ namespace BECore::Chess {
 
     }  // namespace
 
-    ChessGameControl::ChessGameControl(ChessGameModel& model, OpponentController& opponent, PositionAnalyst& analyst, DrawOfferJudge& drawJudge, const OpeningBook& openings)
-        : _model(model), _opponent(opponent), _analyst(analyst), _drawJudge(drawJudge), _openings(openings) {}
+    ChessGameControl::ChessGameControl(ChessGameModel& model, OpponentController& opponent, PositionAnalyst& analyst, DrawOfferJudge& drawJudge, const OpeningBook& openings,
+                                       const PositionEditor& editor)
+        : _model(model), _opponent(opponent), _analyst(analyst), _drawJudge(drawJudge), _openings(openings), _editor(editor) {}
 
     MoveList ChessGameControl::LegalMoves() const {
         return _model.IsGameOver() ? MoveList() : MoveGenerator::GenerateLegal(_model.GetPosition());
@@ -344,7 +346,25 @@ namespace BECore::Chess {
         state["material"] = MaterialJson(_model.GetPosition());
         state["analysis"] = AnalysisJson();
         state["drawOffer"] = DrawOfferJson();
+        state["editor"] = EditorJson();
         return state;
+    }
+
+    Json ChessGameControl::EditorJson() const {
+        if (!_model.IsDrafting()) {
+            return Json();
+        }
+        const auto built = _editor.Build();
+        const EditorTool tool = _editor.GetTool();
+
+        Json described = Json::object();
+        described["fen"] = TextJson(_editor.ToFen());
+        described["error"] = built ? Json() : MakeJsonString(EditorText::Refusal(built.error()));
+        Json picked = Json::object();
+        picked["piece"] = MakeJsonString(EditorToolId(tool.type));
+        picked["color"] = tool.IsEraser() ? Json() : MakeJsonString(PieceColorId(tool.color));
+        described["tool"] = std::move(picked);
+        return described;
     }
 
     Json ChessGameControl::OpponentJson() const {
@@ -681,7 +701,7 @@ namespace BECore::Chess {
     }
 
     uint64_t ChessGameControl::GetStateVersion() const {
-        return _model.GetVersion() + _opponent.GetRevision() + _analyst.GetRevision() + _drawJudge.GetRevision();
+        return _model.GetVersion() + _opponent.GetRevision() + _analyst.GetRevision() + _drawJudge.GetRevision() + _editor.GetRevision();
     }
 
 }  // namespace BECore::Chess

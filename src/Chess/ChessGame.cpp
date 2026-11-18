@@ -1,6 +1,8 @@
 #include "ChessGame.h"
 
 #include <BECore/GameManager/CoreManager.h>
+#include <BECore/UI/UIWebText.h>
+#include <Chess/Game/EditorText.h>
 #include <Chess/Game/GameEnding.h>
 #include <Games/GameManager.h>
 #include <Generated/ChessGame.gen.hpp>
@@ -65,7 +67,12 @@ namespace BECore::Chess {
         return chess ? &chess->GetOpenings() : nullptr;
     }
 
-    ChessGame::ChessGame() : _opponent(_model), _choice(_opponent), _control(_model, _opponent, _analyst, _drawJudge, _openings) {
+    PositionEditor* ChessGame::GetActiveEditor() {
+        ChessGame* chess = GetActive();
+        return chess ? &chess->GetEditor() : nullptr;
+    }
+
+    ChessGame::ChessGame() : _opponent(_model), _choice(_opponent), _control(_model, _opponent, _analyst, _drawJudge, _openings, _editor) {
         // A new game draws a new seed; a device per draw because the source has to be copyable and a Reset is rare
         _model.SetSeedSource([]() -> uint32_t {
             //-NoStd: the operating system's randomness is the real boundary of the seed
@@ -132,6 +139,68 @@ namespace BECore::Chess {
         }
         const ProgramSides sides = _opponent.GetSides();
         return ResigningColor(_model.GetTurn(), _opponent.GetPlays(), sides.white && sides.black);
+    }
+
+    void ChessGame::BeginEditing(EditStart start) {
+        switch (start) {
+            case EditStart::Current:
+                _editor.Load(_model.GetPosition());
+                break;
+            case EditStart::Empty:
+                _editor.Clear();
+                break;
+            case EditStart::Start:
+                _editor.SetStart();
+                break;
+        }
+        _editorMessage.clear();
+        _model.ShowDraft(_editor.GetSquares());
+    }
+
+    void ChessGame::EditChanged() {
+        if (!IsEditing()) {
+            return;
+        }
+        _editorMessage.clear();
+        _model.ShowDraft(_editor.GetSquares());
+    }
+
+    bool ChessGame::PlayFromHere() {
+        if (!IsEditing()) {
+            return false;
+        }
+        const auto position = _editor.Build();
+        if (!position) {
+            _editorMessage = String(EditorText::Refusal(position.error()));
+            return false;
+        }
+        _editorMessage.clear();
+        _model.SetPosition(*position);
+        return true;
+    }
+
+    bool ChessGame::PasteFen(StringView text) {
+        text = UIWebText::TrimSpace(text);
+        // LoadFen() leaves the draft as it was on an error; with no editor open nothing is shown either way
+        if (const auto result = _editor.LoadFen(text); !result) {
+            _editorMessage = String(EditorText::Refusal(result.error()));
+            return false;
+        }
+        _editorMessage.clear();
+        _model.ShowDraft(_editor.GetSquares());
+        return true;
+    }
+
+    void ChessGame::SetEditorMessage(StringView message) {
+        _editorMessage = String(message);
+    }
+
+    void ChessGame::CancelEditing() {
+        if (IsEditing()) {
+            _editor.MarkClosed();  // the game's version does not move, and the control state loses its "editor"
+        }
+        _editorMessage.clear();
+        _model.EndDraft();
     }
 
     void ChessGame::Reset() {

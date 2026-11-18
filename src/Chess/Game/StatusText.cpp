@@ -1,5 +1,7 @@
 #include "StatusText.h"
 
+#include <Chess/Game/EditorText.h>
+
 namespace BECore::Chess {
 
     namespace StatusText {
@@ -73,6 +75,16 @@ namespace BECore::Chess {
             const Position& shown = model.GetShownPosition();
             const int number = shown.SideToMove() == PieceColor::White ? shown.FullmoveNumber() - 1 : shown.FullmoveNumber();
             return Format("At move {} - tap board", number);
+        }
+
+        String Editing(const PositionEditor& editor, StringView message) {
+            if (!message.empty()) {
+                return String(message);
+            }
+            if (const Optional<EditRefusal> refusal = editor.GetLastRefusal()) {
+                return String(EditorText::Refusal(*refusal));
+            }
+            return "Editing";
         }
 
     }  // namespace StatusText
