@@ -57,6 +57,41 @@ namespace BECore::Chess::Tests {
         EXPECT_TRUE(SameColor(*fillOf(SquareRect("h1")), kLightSquareColor));
     }
 
+    TEST_F(ChessUiTest, ASwitchOfTheThemeRecoloursTheBoardAtTheNextDraw) {
+        UIThemes& themes = CoreManager::GetUIThemes();
+        const PoolString slate = "slate"_intern;
+        const PoolString classic = "classic"_intern;
+        ASSERT_TRUE(themes.SetTheme(slate));
+        const Color slateLight = *themes.Find("boardLight");
+        const Color slateDark = *themes.Find("boardDark");
+        const Color slateSelected = *themes.Find("boardSelected");
+        ASSERT_TRUE(themes.SetTheme(classic));
+
+        Click("e2");
+        ASSERT_TRUE(Model().HasSelection());
+        Draw();
+        EXPECT_EQ(RectCalls(kLightSquareColor).size(), 32u);
+        EXPECT_EQ(RectCalls(kDarkSquareColor).size(), 32u);
+        EXPECT_EQ(RectCalls(kSelectedColor).size(), 1u);
+        EXPECT_TRUE(RectCalls(slateLight).empty());
+
+        ASSERT_TRUE(themes.SetTheme(slate));
+        Draw();
+        EXPECT_EQ(RectCalls(slateLight).size(), 32u) << "the 64 squares in the two colors of slate";
+        EXPECT_EQ(RectCalls(slateDark).size(), 32u);
+        EXPECT_TRUE(RectCalls(kLightSquareColor).empty()) << "and in none of classic";
+        EXPECT_TRUE(RectCalls(kDarkSquareColor).empty());
+        EXPECT_EQ(RectCalls(slateSelected).size(), 1u) << "the selection is drawn in the selection color of slate";
+        EXPECT_TRUE(RectCalls(kSelectedColor).empty());
+
+        ASSERT_TRUE(themes.SetTheme(classic));
+        Draw();
+        EXPECT_EQ(RectCalls(kLightSquareColor).size(), 32u) << "the way back brings the old colors";
+        EXPECT_EQ(RectCalls(kDarkSquareColor).size(), 32u);
+        EXPECT_EQ(RectCalls(kSelectedColor).size(), 1u);
+        EXPECT_TRUE(RectCalls(slateLight).empty());
+    }
+
     TEST_F(ChessUiTest, AClickOnTheDrawnSquareSelectsThatSquareInTheTurnedBoard) {
         CountingFactory factory({New<InstantEngine>()});
         Opponent().SetEngineFactory(factory.AsFactory());
