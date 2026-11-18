@@ -2,6 +2,7 @@
 
 #include <BECore/Scene/Scene.h>
 #include <BECore/UI/UICanvasComponent.h>
+#include <Chess/Components/EscapeKey.h>
 #include <Chess/Components/MenuActions.h>
 #include <Events/InputEvents.h>
 #include <Generated/ChessMenuComponent.gen.hpp>
@@ -18,6 +19,30 @@ namespace BECore::Chess {
 
     void ChessMenuComponent::OnAttached() {
         SubscribeInScene<InputEvents::ActionEvent, &ChessMenuComponent::OnAction>(this);
+        SubscribeInScene<SDLEvents::KeyDownEvent, &ChessMenuComponent::OnKeyDown>(this);
+    }
+
+    bool ChessMenuComponent::IsMenuShown() const {
+        for (const auto& node : GetScene().GetRootNode().GetChildren()) {
+            const PoolString name = node->GetName();
+            bool isMenuNode = name == Ids::menuPanel;
+            for (const MenuSection& section : MenuSections()) {
+                isMenuNode = isMenuNode || name == PoolString::Intern(section.node);
+            }
+            if (!isMenuNode) {
+                continue;
+            }
+            if (const auto canvas = node->GetComponent<UICanvasComponent>(); canvas && canvas->_visible) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    void ChessMenuComponent::OnKeyDown(const SDLEvents::KeyDownEvent& event) {
+        if (IsEscapePress(event) && IsMenuShown()) {
+            InputEvents::ActionEvent::Emit(MenuActions::closeMenu);
+        }
     }
 
     void ChessMenuComponent::ShowMenuSection(Optional<MenuSection> shown) {

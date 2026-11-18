@@ -12,6 +12,10 @@ namespace BECore {
         struct SceneUpdateEvent;
     }
 
+    namespace SDLEvents {
+        struct KeyDownEvent;
+    }
+
 }  // namespace BECore
 
 namespace BECore::Chess {
@@ -22,6 +26,8 @@ namespace BECore::Chess {
      *
      * It compares on every update and draw, so a reset, a set_state or someone's move closes a stale picker. The board calls SyncActive() right after a click or a drop, so the picker
      * is shown before anything else reads the scene: the order in which two components get one event is not defined.
+     *
+     * Escape, while a promotion is pending, emits `ChessCancelPromotion` as the Cancel button does; with none pending it does nothing.
      */
     class ChessPromotionPanelComponent : public IComponent {
         BE_CLASS(ChessPromotionPanelComponent)
@@ -38,6 +44,7 @@ namespace BECore::Chess {
     private:
         void OnAction(const InputEvents::ActionEvent& event);
         void OnUpdate(const SceneEvents::SceneUpdateEvent&);
+        void OnKeyDown(const SDLEvents::KeyDownEvent& event);
 
         /// Shows the canvas of the node while the active model has a promotion pending and hides it otherwise (only when that differs from what was set last)
         void Sync();

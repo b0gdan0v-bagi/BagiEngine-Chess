@@ -3,6 +3,7 @@
 #include <BECore/Scene/Scene.h>
 #include <BECore/UI/UICanvasComponent.h>
 #include <Chess/ChessGame.h>
+#include <Chess/Components/EscapeKey.h>
 #include <Chess/Game/PromotionChoices.h>
 #include <Events/InputEvents.h>
 #include <Events/SceneEvents.h>
@@ -32,11 +33,19 @@ namespace BECore::Chess {
         s_active = this;
         SubscribeInScene<InputEvents::ActionEvent, &ChessPromotionPanelComponent::OnAction>(this);
         SubscribeInScene<SceneEvents::SceneUpdateEvent, &ChessPromotionPanelComponent::OnUpdate>(this);
+        SubscribeInScene<SDLEvents::KeyDownEvent, &ChessPromotionPanelComponent::OnKeyDown>(this);
     }
 
     void ChessPromotionPanelComponent::SyncActive() {
         if (s_active) {
             s_active->Sync();
+        }
+    }
+
+    void ChessPromotionPanelComponent::OnKeyDown(const SDLEvents::KeyDownEvent& event) {
+        const ChessGameModel* model = ChessGame::GetActiveModel();
+        if (IsEscapePress(event) && model && model->HasPendingPromotion()) {
+            InputEvents::ActionEvent::Emit(Ids::chessCancelPromotion);
         }
     }
 
