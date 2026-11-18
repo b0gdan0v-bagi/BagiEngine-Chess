@@ -5,6 +5,7 @@
 #include <BECore/Scene/SceneLoader.h>
 #include <BECore/Scene/SceneManager.h>
 #include <BECore/Scene/SceneNodeFiles.h>
+#include <BECore/UI/UIThemes.h>
 #include <filesystem>
 #include <gtest/gtest.h>
 #include <pugixml.hpp>
@@ -45,6 +46,21 @@ namespace BECore::Chess::Tests {
             return {};
         }
         return LoadSceneManager(XmlNode{raw.document_element()}, MakeDirectoryNodeLoader(ShippedConfigFolder()));
+    }
+
+    /// Adds the themes of the shipped `config/UIThemes.xml` to @p themes; the test fails, and false comes back, when the file does not parse or LoadFromXml finds a problem in it
+    inline bool LoadShippedThemes(UIThemes& themes) {
+        pugi::xml_document document;
+        const std::filesystem::path file = ShippedConfigFolder() / "UIThemes.xml";
+        if (!document.load_file(file.c_str())) {
+            ADD_FAILURE() << "the shipped themes do not parse: " << FromStdString(file.generic_string()).c_str();
+            return false;
+        }
+        const Vector<String> problems = themes.LoadFromXml(XmlNode{document.document_element()});
+        for (const String& problem : problems) {
+            ADD_FAILURE() << "the shipped themes: " << problem.c_str();
+        }
+        return problems.empty();
     }
 
 }  // namespace BECore::Chess::Tests

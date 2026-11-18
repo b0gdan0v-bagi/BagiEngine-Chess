@@ -17,22 +17,6 @@ namespace BECore::Chess {
 
     namespace {
 
-        constexpr Color kLightSquare{240, 217, 181, 255};
-        constexpr Color kDarkSquare{181, 136, 99, 255};
-        constexpr Color kSelectedSquare{120, 200, 120, 200};
-        constexpr Color kLegalMoveSquare{120, 200, 120, 120};
-        constexpr Color kLegalCaptureSquare{220, 90, 90, 160};
-        constexpr Color kCheckSquare{230, 60, 60, 210};
-        constexpr Color kMateSquare{150, 20, 20, 240};
-        // The hint, the last move and the premoves each have a hue of their own, apart from the green of the selection and the red of check; the colors are not yet judged on screen.
-        // The hint (the best move the engine found): the square the piece leaves lighter, the square it goes to stronger
-        constexpr Color kHintFromSquare{60, 130, 230, 110};
-        constexpr Color kHintToSquare{60, 130, 230, 200};
-        // The last move (both squares, one color): the alpha is chosen so that it reads on both the light and the dark squares
-        constexpr Color kLastMoveSquare{245, 205, 50, 140};
-        // The queued premoves (the from and the to square of each, one color)
-        constexpr Color kPremoveSquare{150, 90, 200, 150};
-
         // How far, in scene units, the pointer must go from the press before the piece is lifted: a click with a shaky hand never lifts one. It decides only the picture, not the move
         constexpr float kDragThreshold = 6.0f;
 
@@ -143,6 +127,7 @@ namespace BECore::Chess {
     }
 
     void ChessBoardComponent::OnDraw() {
+        _palette.Refresh(CoreManager::GetUIThemes());  // a theme switch shows at this draw; an unchanged table costs a compare
         auto& renderer = *CoreManager::GetRenderer();
         const float squareSize = GetSquareSize();    // once per draw, as the orientation
         const PieceColor bottom = GetBottomColor();  // once per draw: every square of this frame is placed for the same orientation
@@ -154,7 +139,7 @@ namespace BECore::Chess {
                 float py = 0.0f;
                 SquareToPixel(file, rank, bottom, px, py);
                 const bool isLight = IsLightSquare(file, rank);
-                renderer.DrawFilledRect(px, py, squareSize, squareSize, isLight ? kLightSquare : kDarkSquare);
+                renderer.DrawFilledRect(px, py, squareSize, squareSize, isLight ? _palette.LightSquare() : _palette.DarkSquare());
             }
         }
 
@@ -173,9 +158,9 @@ namespace BECore::Chess {
             float mx = 0.0f;
             float my = 0.0f;
             SquareToPixel(last.From().file, last.From().rank, bottom, mx, my);
-            renderer.DrawFilledRect(mx, my, squareSize, squareSize, kLastMoveSquare);
+            renderer.DrawFilledRect(mx, my, squareSize, squareSize, _palette.LastMove());
             SquareToPixel(last.To().file, last.To().rank, bottom, mx, my);
-            renderer.DrawFilledRect(mx, my, squareSize, squareSize, kLastMoveSquare);
+            renderer.DrawFilledRect(mx, my, squareSize, squareSize, _palette.LastMove());
         }
 
         if (shown.IsInCheck()) {
@@ -184,7 +169,7 @@ namespace BECore::Chess {
             float ky = 0.0f;
             SquareToPixel(king.file, king.rank, bottom, kx, ky);
             // Only a mate looks like one: a game resigned or agreed drawn while in check ends with the king merely in check
-            renderer.DrawFilledRect(kx, ky, squareSize, squareSize, !viewing && model->GetStatus() == GameStatus::Checkmate ? kMateSquare : kCheckSquare);
+            renderer.DrawFilledRect(kx, ky, squareSize, squareSize, !viewing && model->GetStatus() == GameStatus::Checkmate ? _palette.Mate() : _palette.Check());
         }
 
         // The hint, under the selection, once the engine has answered for this very position: the analyst gives nothing for another version, so any change of the position takes it off at the next
@@ -194,9 +179,9 @@ namespace BECore::Chess {
                 float hx = 0.0f;
                 float hy = 0.0f;
                 SquareToPixel(hint->move.From().file, hint->move.From().rank, bottom, hx, hy);
-                renderer.DrawFilledRect(hx, hy, squareSize, squareSize, kHintFromSquare);
+                renderer.DrawFilledRect(hx, hy, squareSize, squareSize, _palette.HintFrom());
                 SquareToPixel(hint->move.To().file, hint->move.To().rank, bottom, hx, hy);
-                renderer.DrawFilledRect(hx, hy, squareSize, squareSize, kHintToSquare);
+                renderer.DrawFilledRect(hx, hy, squareSize, squareSize, _palette.HintTo());
             }
         }
 
@@ -208,9 +193,9 @@ namespace BECore::Chess {
             float qx = 0.0f;
             float qy = 0.0f;
             SquareToPixel(premove.from.file, premove.from.rank, bottom, qx, qy);
-            renderer.DrawFilledRect(qx, qy, squareSize, squareSize, kPremoveSquare);
+            renderer.DrawFilledRect(qx, qy, squareSize, squareSize, _palette.Premove());
             SquareToPixel(premove.to.file, premove.to.rank, bottom, qx, qy);
-            renderer.DrawFilledRect(qx, qy, squareSize, squareSize, kPremoveSquare);
+            renderer.DrawFilledRect(qx, qy, squareSize, squareSize, _palette.Premove());
         }
 
         if (model->HasSelection()) {
@@ -218,12 +203,12 @@ namespace BECore::Chess {
             float px = 0.0f;
             float py = 0.0f;
             SquareToPixel(sel.file, sel.rank, bottom, px, py);
-            renderer.DrawFilledRect(px, py, squareSize, squareSize, kSelectedSquare);
+            renderer.DrawFilledRect(px, py, squareSize, squareSize, _palette.Selected());
 
             for (const auto target : model->GetLegalMoves()) {
                 SquareToPixel(target.file, target.rank, bottom, px, py);
                 const bool isCapture = !model->GetPieceAt(target).IsEmpty();
-                renderer.DrawFilledRect(px, py, squareSize, squareSize, isCapture ? kLegalCaptureSquare : kLegalMoveSquare);
+                renderer.DrawFilledRect(px, py, squareSize, squareSize, isCapture ? _palette.LegalCapture() : _palette.LegalMove());
             }
         }
     }

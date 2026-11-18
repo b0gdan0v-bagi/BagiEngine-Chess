@@ -95,7 +95,7 @@ namespace BECore::Chess::Tests {
         constexpr float kWideMinAspect = kWideViewWidth / kViewHeight;
         constexpr float kWideNarrowestWidth = 700.0f;  // 700 x 480 is the narrowest Wide window with side insets (672 x 480 is the aspect 1.4 itself, a knife edge), at the scale 0.6
 
-        // The colors the board fills a full square with (ChessBoardComponent.cpp)
+        // The colors the board fills a full square with: the tokens of the theme `classic` of config/UIThemes.xml, the one the fixture leaves current
         const Color kSelectedColor{120, 200, 120, 200};
         const Color kLegalMoveColor{120, 200, 120, 120};
         const Color kCheckColor{230, 60, 60, 210};
@@ -430,7 +430,7 @@ namespace BECore::Chess::Tests {
             return segments;
         }
 
-        // The squares of the board (ChessBoardComponent.cpp)
+        // The squares of the board in `classic`
         const Color kLightSquareColor{240, 217, 181, 255};
         const Color kDarkSquareColor{181, 136, 99, 255};
 
@@ -518,7 +518,7 @@ namespace BECore::Chess::Tests {
 
         /// What is wrong with the labels of the board as they are laid out, one problem to a line, nothing when it is right: a glyph the box cuts (the validator does not see it for a label
         /// that clips), a box that is not in the corner of its edge cell (the top left, left of the piece, for a rank; the bottom right, right of it, for a file) and a text color that does not
-        /// read on the cell
+        /// read on the cell (the tokens resolved in the current theme, which the fixture keeps `classic`)
         String BoardLabelProblems(const UICanvasLayout& layout) {
             String problems;
             const float scale = layout.GetResolved().scale;
@@ -527,11 +527,12 @@ namespace BECore::Chess::Tests {
             const float boardLeft = portrait ? kPortraitBoardLeft : kBoardLeft;
             const float boardTop = portrait ? kPortraitBoardTop : kBoardTop;
             for (const BoardLabel& spec : ExpectedBoardLabels()) {
-                const UIElement* element = layout.root->FindByName(PoolString::Intern(spec.name));
+                UIElement* element = layout.root->FindByName(PoolString::Intern(spec.name));
                 if (element == nullptr) {
                     problems += Format("{} is missing\n", spec.name.c_str());
                     continue;
                 }
+                element->ResolveTheme(CoreManager::GetUIThemes());  // a copy of the canvas is never drawn: its tokens are still unresolved
                 const Rect& rect = element->rect;
                 if (rect.IsEmpty()) {
                     problems += Format("{} has an empty rect\n", spec.name.c_str());
@@ -893,6 +894,7 @@ namespace BECore::Chess::Tests {
 
             CoreManager::GetFontAtlasLibrary().Clear();
             CoreManager::GetUIVars().Clear();
+            ASSERT_TRUE(LoadShippedThemes(CoreManager::GetUIThemes()));  // the board and its labels draw tokens
             _renderer = New<RecordingRenderer>();
             _renderer->width = 1280.0f;
             _renderer->height = 720.0f;
@@ -913,6 +915,7 @@ namespace BECore::Chess::Tests {
             _manager.Reset();
             CoreManager::GetUIEnvironment().SetSafeAreaOverride(std::nullopt);  // a test that simulated insets leaves the shared environment as it was
             CoreManager::GetUIVars().Clear();
+            CoreManager::GetUIThemes().Clear();
             CoreManager::GetRendererManager().SetRenderer({});
             CoreManager::GetFontAtlasLibrary().Clear();
             _stockfishEnvironment.reset();

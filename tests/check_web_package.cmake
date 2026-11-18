@@ -44,6 +44,7 @@ set(expected
     config/ChessSettings.xml
     config/SceneConfig.xml
     config/TextureLibrary.xml
+    config/UIThemes.xml
     config/nodes/ChessBoard.xml
     config/nodes/ChessBoardCoordinates.xml
     config/nodes/ChessGameSection.xml

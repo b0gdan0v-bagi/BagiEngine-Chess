@@ -1,6 +1,7 @@
 #pragma once
 
 #include <BECore/Scene/IComponent.h>
+#include <Chess/Components/BoardPalette.h>
 #include <Chess/Game/ChessTypes.h>
 
 namespace BECore {
@@ -145,6 +146,8 @@ namespace BECore::Chess {
         void PublishCoordinates(PieceColor bottom);
 
         Optional<PieceColor> _publishedBottom;
+
+        BoardPalette _palette;
 
         uint64_t _loggedVersion = 0;
         const void* _loggedModel = nullptr;
