@@ -1,9 +1,8 @@
 <?xml version="1.0"?>
 <!--
-  Chess piece sprite atlas (assets/chess_test.png is 700x381, laid out as a
-  6x2 uniform grid: columns King, Queen, Rook, Bishop, Knight, Pawn;
-  top row White, bottom row Black). Cell width ≈ 116.67, cell height ≈ 190.5.
-  The background is transparent (alpha 0), so the square under a piece shows through.
+  The 12 piece sprites: one PNG each in assets/artgen/, written by Accept of the Generate panel from artgen/presets/chess_piece.json, with its
+  <Name>.artgen.json beside it. The background is transparent (alpha 0), so the square under a piece shows through.
+  The entries are the Accept's own lines; only this comment is edited by hand.
 -->
 <root>
   <sprites>

@@ -219,7 +219,7 @@ The game and its own art are under the Beerware licence (`LICENSE`). `THIRD_PART
 | `src/Chess/` | the game: rules (`Game/`), scene components, the control adapter. `CLAUDE.md` describes it |
 | `uci/` | `main.cpp` of `BagiChessUci`, the own engine as a UCI program (the server is `src/Chess/Uci/`) |
 | `dev.json` | what the `bagi-dev` panel of VS Code and `engine/tools/dev/dev.py` build and run: the game, `BagiChessUci`, the tests and the browser page, and the tools (the Stockfish bridge, the match, the screenshots, format, the docs budget). The browser page is the threaded build, packaged into `dist/` (see "Browser build") |
-| `config/`, `assets/` | scene, texture library, application config, piece atlas |
+| `config/`, `assets/` | scene, texture library, application config, piece sprites |
 | `LICENSE`, `THIRD_PARTY_NOTICES.md` | the licence of the game and the notices of what it carries (see "Licence") |
 | `cmake/` | `ChessWeb.cmake`: the files of the browser package (see "Browser build") |
 | `tests/` | gtest cases, `control_smoke.py`, the recorded control scenarios `scenarios/*.jsonl`, `uci_smoke.py` and `match_smoke.py` |

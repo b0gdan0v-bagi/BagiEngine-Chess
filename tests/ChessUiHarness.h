@@ -105,8 +105,7 @@ namespace BECore::Chess::Tests {
         const Color kLastMoveColor{245, 205, 50, 140};  // the two squares of the last move, one color for both
         const Color kPremoveColor{150, 90, 200, 150};   // the two squares of each queued premove, one color for all
 
-        // The tall cell of a pawn in the piece atlas (TextureLibrary.xml, assets/chess_test.png is 700 x 381).
-        // The library is empty in the test environment, so the test gives a sprite its cell.
+        // A tall cell standing in for a piece sprite: the library is empty in the test environment, so a test that needs a sprite's size gives it this cell.
         constexpr uint32_t kAtlasWidth = 700;
         constexpr uint32_t kAtlasHeight = 381;
         constexpr float kCellX = 583.33f;
