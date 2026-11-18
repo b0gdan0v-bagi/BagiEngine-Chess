@@ -20,4 +20,16 @@ namespace BECore::Chess {
     /// The same text for a caller that has the legal moves of @p before already (MoveGenerator::GenerateLegal(before)), so they are not generated again
     [[nodiscard]] String SanOf(const Position& before, Move move, const MoveList& legal);
 
+    /**
+     * @brief The inverse of SanOf(): the one legal move of the side to move in @p position that @p san names, or nothing.
+     *
+     * Reads what a score sheet or an opening table writes: "e4", "Nf3", "exd5" (also en passant), "Nbd2", "R1e2", "Qh4xe1", "O-O", "O-O-O", "e8=Q",
+     * "bxa8=N+". A trailing "+", "#", "!" or "?" is ignored and "0-0" / "0-0-0" is castling. Nothing for no legal match, an ambiguous text, a
+     * promotion letter on a move that does not promote, garbage and the empty text: it reads data, so it never asserts.
+     */
+    [[nodiscard]] Optional<Move> ParseSan(const Position& position, StringView san);
+
+    /// The same for a caller that has the legal moves of @p position already (MoveGenerator::GenerateLegal(position)), so they are not generated again
+    [[nodiscard]] Optional<Move> ParseSan(const Position& position, StringView san, const MoveList& legal);
+
 }  // namespace BECore::Chess

@@ -31,6 +31,7 @@ namespace BECore::Tests {
 <button id="Resign" data-action="ChessResign">Resign</button>
 <button id="Menu" data-action="ChessOpenMenu">Menu</button>
 <button id="Reset" data-action="ChessReset">Reset</button>
+<span id="Opening">{opening}</span>
 <span id="Status">{status}</span>)";
 
         constexpr const char* kChessHudCss = R"(
@@ -38,6 +39,7 @@ namespace BECore::Tests {
 #Resign { anchor: top-right; right: 256px; top: 12px; width: 110px; height: 56px; font-size: 26px; background: rgb(120, 52, 52); }
 #Menu   { anchor: top-right; right: 134px; top: 12px; width: 110px; height: 56px; font-size: 24px; background: rgb(45, 75, 120); }
 #Reset  { anchor: top-right; right: 12px; top: 12px; width: 110px; height: 56px; font-size: 26px; background: rgb(40, 90, 60); }
+#Opening { anchor: bottom-left; left: 80px; bottom: 12px; width: 36%; height: 56px; font-size: 22px; vertical-align: middle; }
 #Status { anchor: bottom-right; right: 12px; bottom: 12px; width: 48%; height: 56px; font-size: 28px; text-align: right; vertical-align: middle; }
 )";
 
@@ -309,7 +311,7 @@ namespace BECore::Tests {
         for (const auto& [width, height] : {Pair<float, float>{1280.0f, 720.0f}, {480.0f, 480.0f}, {720.0f, 1280.0f}, {2560.0f, 1080.0f}}) {
             web.At(width, height);
             xml.At(width, height);
-            for (const char* name : {"Turn", "Resign", "Menu", "Reset", "Status"}) {
+            for (const char* name : {"Turn", "Resign", "Menu", "Reset", "Opening", "Status"}) {
                 SCOPED_TRACE(Format("{} at {}x{}", name, width, height).c_str());
                 ExpectSameRect(xml.Find(name), web.Find(name), name);
             }

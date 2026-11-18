@@ -1,6 +1,8 @@
 #pragma once
 
 #include <BECore/GameManager/CoreManager.h>
+#include <BECore/Text/Utf8.h>
+#include <Chess/Components/ChessHudComponent.h>
 #include <Chess/Engine/OpponentText.h>
 #include <Chess/Game/ChessGameModel.h>
 #include <Chess/Game/MoveGenerator.h>
@@ -8,6 +10,7 @@
 #include <EASTL/algorithm.h>
 #include <gtest/gtest.h>
 #include <tests/ChessTestUtil.h>
+#include <tests/ShippedOpenings.h>
 
 /// Every word the HUD of Chess can show, taken from the code that makes them (StatusText, OpponentText and its tables), never typed again here: a new word, level or kind
 /// of error reaches the tests of the layout by itself. The font is proportional, so the longest word by characters is not always the widest: the layout tests walk all of them
@@ -16,19 +19,21 @@ namespace BECore::Chess::Tests {
     struct HudWords {
         Vector<String> turn;           ///< `{turn}`: whose move it is, who won, "Computer is thinking"
         Vector<String> status;         ///< `{status}`: the status of the game ("" included), the line of a view and every sentence of an engine error
+        Vector<String> opening;        ///< `{opening}`: "" and the longest display names of the shipped book
         Vector<String> opponentError;  ///< `{opponentError}` of the opponent panel: "" and every sentence of an engine error
 
         /// How many rounds cover every word: round i takes the word i of each list (the shorter lists wrap round). The elements of the HUD lay out independently of one another,
         /// so a word needs a round with some word of the others, not with each of them
         [[nodiscard]] size_t Rounds() const {
-            return std::max({turn.size(), status.size(), opponentError.size()});
+            return std::max({turn.size(), status.size(), opening.size(), opponentError.size()});
         }
 
-        /// Sets `turn`, `status` and `opponentError` to the words of round @p round
+        /// Sets `turn`, `status`, `opening` and `opponentError` to the words of round @p round
         void Publish(size_t round) const {
             UIVars& vars = CoreManager::GetUIVars();
             vars.Set("turn"_intern, View(turn, round));
             vars.Set("status"_intern, View(status, round));
+            vars.Set("opening"_intern, View(opening, round));
             vars.Set("opponentError"_intern, View(opponentError, round));
         }
 
@@ -40,6 +45,8 @@ namespace BECore::Chess::Tests {
     };
 
     namespace HudWordsDetail {
+
+        constexpr size_t kLongestOpenings = 24;  ///< how many display names of the book the layout tests lay out
 
         inline void Add(Vector<String>& words, String word) {
             if (eastl::find(words.begin(), words.end(), word) == words.end()) {
@@ -59,6 +66,50 @@ namespace BECore::Chess::Tests {
             }
             Add(words.turn, StatusText::Turn(model, false));
             Add(words.status, StatusText::Status(model));
+        }
+
+        inline size_t CodePoints(const String& text) {
+            return Utf8::CountCodePoints(StringView(text.data(), text.size()));
+        }
+
+        /// The names of the shipped table (second column), the distinct display names of them in the order of the file
+        inline Vector<String> ShippedDisplayNames() {
+            const String& table = ShippedOpeningsTable();
+            Vector<String> names;
+            HashSet<String> seen;
+            size_t lineStart = table.find('\n') + 1;  // the header line
+            while (lineStart < table.size()) {
+                size_t lineEnd = table.find('\n', lineStart);
+                if (lineEnd == String::npos) {
+                    lineEnd = table.size();
+                }
+                const size_t firstTab = table.find('\t', lineStart);
+                const size_t secondTab = firstTab < lineEnd ? table.find('\t', firstTab + 1) : String::npos;
+                if (secondTab < lineEnd) {
+                    String display = OpeningDisplayName(StringView(table.data() + firstTab + 1, secondTab - firstTab - 1), kOpeningMaxChars);
+                    if (seen.insert(display).second) {
+                        names.push_back(std::move(display));
+                    }
+                }
+                lineStart = lineEnd + 1;
+            }
+            return names;
+        }
+
+        /// A spanning set of the display names: "" and the @p count longest by characters (ties by the order of the file), so the rounds of the layout tests stay few
+        inline void AddLongestOpenings(Vector<String>& words, size_t count) {
+            Add(words, {});
+            Vector<String> names = ShippedDisplayNames();
+            for (size_t taken = 0; taken < count && !names.empty(); ++taken) {
+                size_t best = 0;
+                for (size_t i = 1; i < names.size(); ++i) {
+                    if (CodePoints(names[i]) > CodePoints(names[best])) {
+                        best = i;
+                    }
+                }
+                Add(words, std::move(names[best]));
+                names.erase(names.begin() + static_cast<ptrdiff_t>(best));
+            }
         }
 
     }  // namespace HudWordsDetail
@@ -130,6 +181,7 @@ namespace BECore::Chess::Tests {
         for (const EngineErrorKind kind : EnumUtils<EngineErrorKind>::Values()) {
             Add(words.status, OpponentText::Error(EngineError{kind, {}}));
         }
+        AddLongestOpenings(words.opening, kLongestOpenings);
         Add(words.opponentError, {});
         for (const EngineErrorKind kind : EnumUtils<EngineErrorKind>::Values()) {
             Add(words.opponentError, OpponentText::Error(EngineError{kind, {}}));

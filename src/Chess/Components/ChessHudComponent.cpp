@@ -6,6 +6,7 @@
 #include <BECore/UI/UIInputClicker.h>
 #include <Chess/ChessGame.h>
 #include <Chess/Engine/OpponentText.h>
+#include <Chess/Game/OpeningBook.h>
 #include <Chess/Game/StatusText.h>
 #include <Events/InputEvents.h>
 #include <Generated/ChessHudComponent.gen.hpp>
@@ -16,6 +17,7 @@ namespace BECore::Chess {
 
         struct Ids {
             static constexpr auto chessReset = "ChessReset"_intern;
+            static constexpr auto opening = "opening"_intern;
             static constexpr auto opponentColor = "opponentColor"_intern;
             static constexpr auto opponentEngine = "opponentEngine"_intern;
             static constexpr auto opponentError = "opponentError"_intern;
@@ -88,9 +90,13 @@ namespace BECore::Chess {
             status = StatusText::Status(model);
         }
         const String opponentError = error ? OpponentText::Error(*error) : String();
+        // The name of the position the board shows: a view names the viewed one, as the board does
+        const Optional<OpeningEntry> opening = OpeningOf(game->GetOpenings(), model.GetStartFen(), model.GetMoves(), model.GetShownMoveCount());
+        const String openingText = opening ? OpeningDisplayName(opening->name, kOpeningMaxChars) : String();
         UIVars& vars = CoreManager::GetUIVars();
         vars.Set(Ids::turn, StringView(turn));
         vars.Set(Ids::status, StringView(status));
+        vars.Set(Ids::opening, StringView(openingText));
         // The ids of the opponent panel, those of the control API (the person's color, not the program's)
         vars.Set(Ids::opponentMode, choice.ModeId());
         vars.Set(Ids::opponentColor, choice.ColorId());
