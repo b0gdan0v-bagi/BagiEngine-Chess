@@ -22,8 +22,8 @@ namespace BECore::Chess::Tests {
 
         /// The nodes before the pieces, in the order of the scene
         constexpr UiNode kUiNodes[] = {
-            {"Board", -1},        {"BoardCoordinates", -1}, {"Material", 5},    {"MovePanel", 4},       {"Hud", 10},   {"MenuPanel", 20}, {"OpponentPanel", 20},
-            {"MovesSection", 20}, {"GameSection", 20},      {"SoundPanel", 20}, {"PromotionPanel", 20}, {"Result", 1}, {"Sound", 0},
+            {"Board", -1},       {"BoardCoordinates", -1}, {"Material", 5},         {"MovePanel", 4},       {"Hud", 10},   {"MenuPanel", 20}, {"OpponentPanel", 20}, {"MovesSection", 20},
+            {"GameSection", 20}, {"SoundPanel", 20},       {"PositionSection", 20}, {"PromotionPanel", 20}, {"Result", 1}, {"Sound", 0},
         };
         constexpr size_t kUiCount = std::size(kUiNodes);
 
