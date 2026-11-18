@@ -42,7 +42,7 @@ Order inside the board's `OnDraw()`: squares, the last move (castling marks the 
 
 - A piece node is a reference of the prefab `config/nodes/ChessPiece.xml` (`config/CLAUDE.md`): the piece component, a sprite and a transform; the node is the whole square, the sprite `fit="Contain"`.
 - A piece stands on `GetShownSquareOf()`: the viewed position's square while viewing; a view that begins or ends places them at once.
-- **A played move slides** (`ScopedTween`, `_slideDuration`, reflected, not set in the scene). Only a change of exactly one move and one version with time in the frame slides; everything else snaps (first sighting, reset, `set_state`, several moves, a frame with `deltaTime` 0). A captured piece leaves when the slide ends.
+- **A played move slides**. Only a change of exactly one move and one version with time in the frame slides; everything else snaps (first sighting, reset, `set_state`, several moves, a frame with `deltaTime` 0). A captured piece leaves when the slide ends.
 
 ## The premove
 
@@ -50,7 +50,7 @@ While the program thinks and the person has the other color, `OnMouseDown` hands
 
 ## The drag
 
-`ChessBoardComponent` only; the model knows nothing. The press acts at once (a click); a left press on the selected square, with the game on and no promotion pending, arms a drag, lifted past `kDragThreshold`. A release over a legal target calls `OnSquareClicked(target)`; anywhere else the piece stays selected (a release on another own piece does not select it, the owner's decision). `IsDragValid` drops the drag silently when the model moves under it. While lifted the piece is on `kDragLayer` (over pieces, result and material, under HUD and panels).
+`ChessBoardComponent` only; the model knows nothing. The press acts at once (a click); a left press on the selected square, with the game on and no promotion pending, arms a drag, lifted past `kDragThreshold`. A release over a legal target calls `OnSquareClicked(target)`; anywhere else the piece stays selected (a release on another own piece does not select it, the owner's decision). A drag the model moves under is dropped silently (`IsDragValid`); a lifted piece is on `kDragLayer`.
 
 ## The promotion picker
 
@@ -61,7 +61,7 @@ A click on a promotion target leaves it pending in the model; the node `Promotio
 Node `Material` (`ChessMaterial.xml`, layer 5): `ChessMaterialComponent`, then a `SceneView` canvas (no safe area, not modal). Two groups mirrored about the board's middle (in Portrait two rows, above and below the board), `MaterialTop*` and `MaterialBottom*`, each a balance label and five rows (icon + count `{material<Top|Bottom><Type>}`). The variables are written only when the model, its version or the bottom color changed.
 
 - The lower group is what the color at the bottom has taken (its icons are the other color's); the groups swap when the board turns. The balance (`BalanceText`, "+N" for the side ahead) is the difference on the board (`Game/CapturedMaterial.h`).
-- A row shows when its count is above 0 and `MaterialListFits` (`Game/MaterialLayout.h`: the active view's box inside the canvas's `safeBounds`); nothing shows before the first layout. With side insets the lists hide and the balance stays (the owner's decision).
+- A row shows when its count is above 0 and `MaterialListFits` (`Game/MaterialLayout.h`: the active view's box inside the canvas's `safeBounds`); With side insets the lists hide and the balance stays (the owner's decision).
 - **In the move panel** (the owner's decision): a second set, `MaterialPanel*` (horizontal lists of 52-unit chips and a balance), over the panel's player bands, on the same variables and sprites. The component shows **exactly one set**, whole: the panel set while `MovePanelFits` holds for the Wide box, the margin set otherwise and before the first layout.
 - **Known limits** (moving a group breaks the mirror: the owner's call): a "+39" beside a rank "8" may read as one number; a top notch lets `Turn` cover the upper group (Portrait 3:4), and in the panel `Menu` and `Reset` cover its right.
 
@@ -78,11 +78,11 @@ Node `MovePanel` (`ChessMovePanel.xml`, layer 4, under `Material`, which draws o
 
 ## The HUD
 
-`SceneView` canvas on `Hud` (`ChessHud.xml`, layer 10), controls 56 units high in the margins: `Turn` (`{turn}`), `Resign`, `Menu` (a fixed word, `ChessOpenMenu`), `Reset` (`ChessReset`), `Opening` (`{opening}`, bottom left: `OpeningDisplayName` of the shown position), `Status` (`{status}`; wider in Portrait). The anchors keep the top row above the board and `Status` under it in every view. The widest sentences only just fit the narrowest window: a longer one needs a reword; an error says what went wrong, never what to do.
+`SceneView` canvas on `Hud` (`ChessHud.xml`, layer 10), controls 56 units high in the margins: `Turn` (`{turn}`), `Resign`, `Menu` (a fixed word, `ChessOpenMenu`), `Reset` (`ChessReset`), `Opening` (`{opening}`, bottom left: `OpeningDisplayName` of the shown position), `Status` (`{status}`; wider in Portrait). The widest sentences only just fit the narrowest window: a longer one needs a reword; an error says what went wrong, never what to do.
 
 **`Resign`** (in Wide left of the panel's box) emits the section's `ChessResign` (one rule, `ChessGame::ResigningNow()`, also greys it); the section shows only its plate `GameSectionConfirm` (Yes / No; No returns to the game). Hidden in Portrait and Tall (no room).
 
-`ChessHudComponent` republishes the variables only on a change: `turn` (`StatusText::Turn`, "Computer is thinking", also while a draw offer is judged), `status` (while viewing `StatusText::Viewing`, over all; else a standing error of the opponent, over "Check"; else "Draw declined" until the version moves; else the game status), `opening`, `opponentError`, and the panel bindings `opponentMode`, `opponentColor` (**the person's** color), `opponentEngine`, `opponentLevel`.
+`ChessHudComponent` republishes the variables only on a change: `turn` (`StatusText::Turn`, "Computer is thinking", also while a draw offer is judged; `PuzzleTurn` while a puzzle is on), `status` (while viewing `StatusText::Viewing`, over all; while a puzzle is on "Wrong move", else the game status (the opponent is parked: no error, no offer); else a standing error of the opponent, over "Check"; else "Draw declined" until the version moves; else the game status), `opening`, `opponentError`, and the panel bindings `opponentMode`, `opponentColor` (**the person's** color), `opponentEngine`, `opponentLevel`.
 
 ## The menu
 

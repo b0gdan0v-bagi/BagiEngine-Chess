@@ -67,9 +67,14 @@ namespace BECore::Chess {
         const bool editing = game->IsEditing();
         const Optional<EditRefusal> refusal = editing ? game->GetEditor().GetLastRefusal() : std::nullopt;
         const StringView editorMessage = game->GetEditorMessage();
+        // A puzzle starts, ends and is judged without a step of the opponent's revision; its verdicts and its reply also move the model, but the start and the end of one may not
+        const PuzzleSession& puzzle = game->GetPuzzle();
+        const bool puzzleOn = game->IsPuzzleOn();
+        const uint64_t puzzleRevision = puzzle.GetRevision();
         const bool opponentChanged = &model != _publishedModel || opponent.GetRevision() != _publishedRevision || judge.GetRevision() != _publishedJudgeRevision;
         if (!opponentChanged && model.GetVersion() == _publishedVersion && thinking == _publishedThinking && personColor == _publishedColor && shown == _publishedShown &&
-            editing == _publishedEditing && refusal == _publishedRefusal && editorMessage == StringView(_publishedEditorMessage)) {
+            editing == _publishedEditing && refusal == _publishedRefusal && editorMessage == StringView(_publishedEditorMessage) && puzzleOn == _publishedPuzzleOn &&
+            puzzleRevision == _publishedPuzzleRevision) {
             return;
         }
         _publishedModel = &model;
@@ -82,16 +87,31 @@ namespace BECore::Chess {
         _publishedEditing = editing;
         _publishedRefusal = refusal;
         _publishedEditorMessage = String(editorMessage);
+        _publishedPuzzleOn = puzzleOn;
+        _publishedPuzzleRevision = puzzleRevision;
 
         // While an error of the opponent stands the game is stalled by it, so its sentence wins over the others; a refused draw offer wins over the game's own status ("Check"); a view
-        // wins over all: the board shows another position and the line says how to get back to the game (the panel keeps the error, and the line has it again when the view ends)
+        // wins over all: the board shows another position and the line says how to get back to the game (the panel keeps the error, and the line has it again when the view ends).
+        // A puzzle parks the opponent, so its error and draw offers say nothing on the board: the Turn line is the puzzle's, and a wrong move stands over the game's status
         const Optional<EngineError>& error = opponent.GetError();
         // A position that is edited has no turn, status or opening of the game: the Turn line is the editor's, and the bottom margin is the editor bar's
-        const String turn = editing ? StatusText::Editing(game->GetEditor(), editorMessage) : StatusText::Turn(model, thinking);
+        String turn;
+        if (editing) {
+            turn = StatusText::Editing(game->GetEditor(), editorMessage);
+        } else if (puzzleOn) {
+            turn = StatusText::PuzzleTurn(puzzle.GetPhase(model));
+        } else {
+            turn = StatusText::Turn(model, thinking);
+        }
         String status;
         if (!editing) {
             if (shown) {
                 status = StatusText::Status(model);
+            } else if (puzzleOn) {
+                status = StatusText::PuzzleStatus(puzzle.WasWrong());
+                if (status.empty()) {
+                    status = StatusText::Status(model);
+                }
             } else if (error) {
                 status = OpponentText::Error(*error);
             } else if (offer == DrawOfferState::Declined) {

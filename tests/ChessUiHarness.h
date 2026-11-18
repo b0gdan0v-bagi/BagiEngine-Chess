@@ -1842,6 +1842,12 @@ namespace BECore::Chess::Tests {
             Draw();
         }
 
+        /// One update of every scene after @p seconds of game time, which a puzzle's reply waits for (kPuzzleReplySeconds); the draw is the caller's
+        void FrameOfGameTime(double seconds = 0.25) {
+            CoreManager::GetTime().Advance(seconds);
+            _manager->UpdateAll();
+        }
+
         /// A window of @p width x @p height pixels with the safe area of a phone held sideways (SafeAreaSimulation::SideInsets), drawn twice so the rule of the lists has seen it
         void ResizeWithSideInsets(float width, float height) {
             _renderer->width = width;
