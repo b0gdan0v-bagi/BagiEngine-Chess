@@ -5,6 +5,7 @@
 #include <Chess/Engine/PositionAnalyst.h>
 #include <Chess/Game/ChessGameModel.h>
 #include <Chess/Game/OpeningBook.h>
+#include <Chess/Game/PositionEditor.h>
 #include <Games/IControllableGame.h>
 
 namespace BECore::Chess {
@@ -25,10 +26,9 @@ namespace BECore::Chess {
     /**
      * @brief The external control API of Chess: the position, the legal moves, a way to play one, to load a position and to pick the computer opponent.
      *
-     * State: {"fen", "board", "turn", "status", "winner", "inCheck", "legalMoveCount", "startFen", "moves", "sanMoves", "opening", "takeBackPlies", "opponent", "material", "analysis", "drawOffer"}.
-     * board is 8 strings, rank 8 first, file a first: white pieces are upper case (PNBRQK), black ones lower case, '.' is an
-     * empty square. turn and winner are "white" or "black" (winner is null until a side has won). status is one of
-     * "ongoing", "checkmate", "stalemate", "draw_insufficient_material", "draw_threefold", "draw_fifty_moves", "resigned", "draw_agreed"; everything but
+     * State: {"fen", "board", "turn", "status", "winner", "inCheck", "legalMoveCount", "startFen", "moves", "sanMoves", "opening", "takeBackPlies", "opponent", "material", "analysis", "drawOffer",
+     * "editor"}. board is 8 strings, rank 8 first, file a first: white pieces are upper case (PNBRQK), black ones lower case, '.' is an empty square. turn and winner are "white" or "black" (winner is
+     * null until a side has won). status is one of "ongoing", "checkmate", "stalemate", "draw_insufficient_material", "draw_threefold", "draw_fifty_moves", "resigned", "draw_agreed"; everything but
      * "ongoing" ends the game. After a resignation winner is the other color; an agreed draw has none. startFen is the position the game began from and moves the UCI moves played since, so the pair
      * rebuilds the game (and its repetitions); sanMoves is the same moves in standard algebraic notation ("e4", "Nf3", "O-O", "e8=Q#"), one per entry of moves, as the move list
      * shows them. takeBackPlies is how many moves {"takeBack": {}} (and the button of the move list) would take back now, 0 when nothing can be (see SetState). What the move list
@@ -121,16 +121,22 @@ namespace BECore::Chess {
      * programs, and while the program is to move (the offer is the person's, made on their turn), draw is invalid_params; a finished game is game_over. drawOffer is null when there is no offer
      * for the position now on the board.
      *
+     * editor is null unless the person is editing a position in the window (Menu, Position), else {"fen", "error", "tool"}: fen the draft's text (en passant "-", clocks "0 1"; a position the rules
+     * refuse included), error null or the short reason "Play from here" would give (EditorText), tool {"piece": "king"|"queen"|"rook"|"bishop"|"knight"|"pawn"|"erase", "color": "white"|"black"|null}
+     * (null for the eraser). The draft is not the game: fen, board, moves, turn and the rest above stay the game's, a draft moves no version of the game, and the game is played from it only by
+     * "Play from here". A client edits it with ui_click; there is no set_state for it, and a set_state fen, a reset, a move or a takeback ends it (editor null again).
+     *
      * The state version is the version of the game (a changed seed moves it) plus the revision of the opponent (a pick, an error that appears or goes) plus the revision of the analyst (a switch of
      * the evaluation or the ratings, a hint asked or dropped, an answer or a rating that arrives or is dropped, an error that appears or goes, also the rater's, which is not in get_state) plus
-     * that of the draw offer (an offer, its verdict, a drop), so a push reports a change of the opponent, a hint, a rating or a verdict that came as well; it never goes back.
+     * that of the draw offer (an offer, its verdict, a drop) plus the editor's count of changes (every change of a draft, its tool, its start and its cancelling; a count of all the drafts of the
+     * run, so it does not fall when a draft ends), so a push reports a change of the opponent, a hint, a rating, a verdict or a draft that came as well; it never goes back.
      *
      * The analyst is told of a changed engine pick by SetState at once, so a get_state right after never shows the old engine's answer.
      */
     class ChessGameControl : public IControllableGame {
     public:
-        /// All five must outlive the adapter (ChessGame declares them before it)
-        ChessGameControl(ChessGameModel& model, OpponentController& opponent, PositionAnalyst& analyst, DrawOfferJudge& drawJudge, const OpeningBook& openings);
+        /// All six must outlive the adapter (ChessGame declares them before it); the editor is read only, and is a draft the model shows (ChessGameModel::IsDrafting()) or not
+        ChessGameControl(ChessGameModel& model, OpponentController& opponent, PositionAnalyst& analyst, DrawOfferJudge& drawJudge, const OpeningBook& openings, const PositionEditor& editor);
 
         [[nodiscard]] std::expected<Json, ControlError> GetState() const override;
         [[nodiscard]] std::expected<Json, ControlError> GetActions() const override;
@@ -146,6 +152,7 @@ namespace BECore::Chess {
         [[nodiscard]] Json OpponentJson() const;
         [[nodiscard]] Json AnalysisJson() const;
         [[nodiscard]] Json DrawOfferJson() const;
+        [[nodiscard]] Json EditorJson() const;
         std::expected<void, ControlError> SetAnalysis(const Json& analysis);
         std::expected<void, ControlError> SetTakeBack(const Json& takeBack);
         std::expected<void, ControlError> SetResign(const Json& resign);
@@ -156,6 +163,7 @@ namespace BECore::Chess {
         PositionAnalyst& _analyst;
         DrawOfferJudge& _drawJudge;
         const OpeningBook& _openings;
+        const PositionEditor& _editor;
     };
 
 }  // namespace BECore::Chess

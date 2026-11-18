@@ -92,9 +92,15 @@ namespace BECore::Chess {
         [[nodiscard]] String ToFen() const;
         [[nodiscard]] std::expected<Position, FenError> Build() const;
 
-        /// Grows with every change of the draft or the tool, and with Clear, SetStart and Load even when they change nothing; never goes back.
+        /// Grows with every change of the draft or the tool, with Clear, SetStart and Load even when they change nothing, and with MarkClosed(); never goes back, also when the draft ends,
+        /// so a sum that holds it never goes back either.
         [[nodiscard]] uint64_t GetRevision() const noexcept {
             return _revision;
+        }
+
+        /// For an owner that ends the draft without changing the game (a control client sees the draft go): counts as one change
+        void MarkClosed() noexcept {
+            ++_revision;
         }
 
     private:

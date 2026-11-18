@@ -71,7 +71,7 @@ namespace BECore::Chess {
         return chess ? &chess->GetEditor() : nullptr;
     }
 
-    ChessGame::ChessGame() : _opponent(_model), _choice(_opponent), _control(_model, _opponent, _analyst, _drawJudge, _openings) {
+    ChessGame::ChessGame() : _opponent(_model), _choice(_opponent), _control(_model, _opponent, _analyst, _drawJudge, _openings, _editor) {
         // A new game draws a new seed; a device per draw because the source has to be copyable and a Reset is rare
         _model.SetSeedSource([]() -> uint32_t {
             //-NoStd: the operating system's randomness is the real boundary of the seed
@@ -201,6 +201,9 @@ namespace BECore::Chess {
     }
 
     void ChessGame::CancelEditing() {
+        if (IsEditing()) {
+            _editor.MarkClosed();  // the game's version does not move, and the control state loses its "editor"
+        }
         _editorMessage.clear();
         _model.EndDraft();
     }
