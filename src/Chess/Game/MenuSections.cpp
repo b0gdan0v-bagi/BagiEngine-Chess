@@ -4,12 +4,13 @@ namespace BECore::Chess {
 
     namespace {
 
-        constexpr Array<MenuSection, 5> kSections{{
+        constexpr Array<MenuSection, 6> kSections{{
             {kOpponentSectionId, "OpponentPanel", "Opponent"},
             {"moves", "MovesSection", "Moves"},
             {"game", "GameSection", "Resign / Draw"},
             {"sound", "SoundPanel", "Sound"},
             {"position", "PositionSection", "Position"},
+            {"puzzles", "PuzzleSection", "Puzzles"},
         }};
 
     }  // namespace

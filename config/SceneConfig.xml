@@ -38,6 +38,7 @@
         <node ref="nodes/ChessGameSection" />
         <node ref="nodes/ChessSoundPanel" />
         <node ref="nodes/ChessPositionSection" />
+        <node ref="nodes/ChessPuzzleSection" />
         <node ref="nodes/ChessPromotionPanel" />
         <node ref="nodes/ChessResult" />
         <node ref="nodes/ChessSound" />

@@ -110,7 +110,7 @@ namespace BECore::Chess::Tests {
             EXPECT_LE(plate.rect.y + plate.rect.h, ViewHeight() + kPixelTolerance);
             EXPECT_NEAR(plate.rect.x + plate.rect.w * 0.5f, ViewWidth() * 0.5f, 0.5f) << "the plate is centered in the view";
             EXPECT_LE(plate.rect.w, 640.0f + kPixelTolerance);
-            EXPECT_NEAR(plate.rect.h, MenuPlateHeight(), kPixelTolerance) << "16 + 44 + 56 per section + 56 + 12 per gap + 16: 496 with five sections";
+            EXPECT_NEAR(plate.rect.h, MenuPlateHeight(), kPixelTolerance) << "16 + 44 + 56 per section + 56 + 12 per gap + 16: 564 with six sections";
 
             // The title, then the sections in the order of the table, then Close: one column, 12 units apart, 16 inside the plate
             const UIElement* above = &ElementOf("MenuPanel", "MenuTitle");
@@ -234,9 +234,10 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(log.Total(), 0u) << "the title is no button, and the press did not reach the dim";
         EXPECT_TRUE(MenuList()->_visible);
 
-        // The dim over the board (a1, h8), over the Reset button and over the Menu button of the HUD: each press closes the list and nothing else gets it
+        // The dim over the board (a1 and a8: the plate of the list reaches h8 in the Wide view), over the Reset button and over the Menu button of the HUD: each press closes the list and nothing else
+        // gets it
         const UIElement& plate = ElementOf("MenuPanel", "MenuPlate");
-        const Pair<float, float> points[] = {SquareCenter("a1"), SquareCenter("h8"), ScreenCenter(*HudElement("Reset")), ScreenCenter(*HudElement("Menu"))};
+        const Pair<float, float> points[] = {SquareCenter("a1"), SquareCenter("a8"), ScreenCenter(*HudElement("Reset")), ScreenCenter(*HudElement("Menu"))};
         for (const auto& point : points) {
             SCOPED_TRACE(Format("{},{}", point.first, point.second).c_str());
             ASSERT_FALSE(Covers(plate, point)) << "a point of the dim, not of the plate";
@@ -296,7 +297,7 @@ namespace BECore::Chess::Tests {
     TEST_F(ChessUiTest, AnUnknownSectionChangesNothingAndAKnownOneIsTheTablesWord) {
         ASSERT_TRUE(ClickButton(kMenuColor));
         ASSERT_TRUE(MenuList()->_visible);
-        for (const char* id : {"puzzles", "", "Opponent", "OPPONENT"}) {
+        for (const char* id : {"puzzle", "", "Opponent", "OPPONENT"}) {
             SCOPED_TRACE(id);
             PressWith("ChessOpenSection", id);
             EXPECT_TRUE(MenuList()->_visible) << "the list stays";
@@ -309,7 +310,7 @@ namespace BECore::Chess::Tests {
         PressWith("ChessOpenSection", "opponent");
         EXPECT_FALSE(MenuList()->_visible);
         EXPECT_TRUE(Panel()->_visible);
-        PressWith("ChessOpenSection", "puzzles");
+        PressWith("ChessOpenSection", "puzzle");
         EXPECT_TRUE(Panel()->_visible) << "an unknown id does not close the shown section either";
     }
 
@@ -355,7 +356,7 @@ namespace BECore::Chess::Tests {
     TEST_F(ChessUiTest, AMenuPlateTooLowForItsButtonsIsCaught) {
         // A fixed-height plate does not grow: with a section button more than the height was written for, Close sticks out of it
         String xml = ShippedElementsXml("MenuPanel");
-        ASSERT_NO_FATAL_FAILURE(Replace(xml, R"(height="496")", R"(height="150")"));
+        ASSERT_NO_FATAL_FAILURE(Replace(xml, R"(height="564")", R"(height="150")"));
         CanvasCopy copy(xml);
         LayOutInTheNarrowestWindow(copy.layout);
         const String problems = PanelProblems(copy.layout, kMenuPlate);

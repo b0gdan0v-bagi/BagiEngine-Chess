@@ -539,6 +539,7 @@ namespace BECore::Chess::Tests {
                                                        {"GameSection", "TheGameSectionPassesTheSizeMatrixWithEveryWord"},
                                                        {"SoundPanel", "TheSoundPanelPassesTheSizeMatrix"},
                                                        {"PositionSection", "ThePositionSectionPassesTheSizeMatrixWithEveryWord"},
+                                                       {"PuzzleSection", "ThePuzzleSectionPassesTheSizeMatrixWithEveryWord"},
                                                        {"PromotionPanel", "ThePromotionPanelPassesTheSizeMatrix"}};
 
         /// The canvases among @p canvases (node names) that no row of kCanvasMatrixTests covers
