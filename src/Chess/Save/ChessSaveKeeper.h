@@ -24,7 +24,7 @@ namespace BECore::Chess {
      * The player's audio levels (the engine's `audio` slot, AudioPreferences.h) go through the same folder and gate: Start() reads them into the audio manager, Update() writes them when
      * GetLevelsRevision() moved, with a debounce of their own that neither delays nor is delayed by the game's, and Flush() writes them too. A refused `audio` file is one warning and is left alone.
      *
-     * Not saved: see ChessSaveState.
+     * While a puzzle is on nothing of the game is written, so a restart brings back the game from before it. Not saved: see ChessSaveState.
      */
     class ChessSaveKeeper {
     public:
@@ -39,11 +39,12 @@ namespace BECore::Chess {
         /// Decides whether this run saves, and restores a good save into the three. Call it last in the start of the game, with the game fresh (nobody plays); calling it again starts over
         void Start(ChessGameModel& model, OpponentController& controller, OpponentChoice& choice);
 
-        /// Once per frame, on the main thread, never from a draw: writes the game when it changed and the debounce has passed
-        void Update(const ChessGameModel& model, const OpponentController& controller, const OpponentChoice& choice);
+        /// Once per frame, on the main thread, never from a draw: writes the game when it changed and the debounce has passed. @p puzzleOn: a puzzle is the game on the board, which is
+        /// not the person's game, so the game is not written (the levels still are); the key is not marked as written, so the first frame after the puzzle writes what the game became
+        void Update(const ChessGameModel& model, const OpponentController& controller, const OpponentChoice& choice, bool puzzleOn);
 
-        /// Writes the game now when it changed since the last write; the end of the game goes through it
-        void Flush(const ChessGameModel& model, const OpponentController& controller, const OpponentChoice& choice);
+        /// Writes the game now when it changed since the last write, unless @p puzzleOn as above; the end of the game goes through it
+        void Flush(const ChessGameModel& model, const OpponentController& controller, const OpponentChoice& choice, bool puzzleOn);
 
         /// Whether this run reads and writes a save
         [[nodiscard]] bool IsOn() const noexcept {

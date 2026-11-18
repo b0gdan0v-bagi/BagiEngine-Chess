@@ -1945,10 +1945,11 @@ namespace BECore::Chess::Tests {
             Draw();
         }
 
-        /// The color at the bottom of the board as the opponent says it: Black exactly when the program plays White (taken from the controller, as the board does)
+        /// The color at the bottom of the board as the game says it (ChessGame::BoardBottomColor(), as the board does): Black when the program plays White, or when a puzzle is on that
+        /// Black solves
         bool BlackIsAtTheBottom() const {
-            const OpponentController* opponent = ChessGame::GetActiveOpponent();
-            return opponent != nullptr && opponent->GetPlays() == Optional<PieceColor>(PieceColor::White);
+            const ChessGame* game = ChessGame::GetActive();
+            return game != nullptr && game->BoardBottomColor() == PieceColor::Black;
         }
 
         /// The top left corner of a cell of the board in view units: @p column from the left, @p rowFromTop from the top

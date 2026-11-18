@@ -99,8 +99,9 @@ namespace BECore::Chess {
     }
 
     size_t TakeBackPliesNow(const ChessGameModel* model) {
-        if (!model) {
-            return 0;
+        const ChessGame* game = ChessGame::GetActive();
+        if (!model || (game && game->IsPuzzleOn())) {
+            return 0;  // a takeback would break the line; the judge takes back a wrong move by itself
         }
         const OpponentController* opponent = ChessGame::GetActiveOpponent();
         return TakeBackPlies(model->GetMoves().size(), model->GetTurn(), opponent ? opponent->GetPlays() : std::nullopt);

@@ -696,6 +696,8 @@ namespace BECore::Chess {
                 return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, "the program plays the side to move: a draw is offered on the person's turn"));
             case DrawOfferRefusal::NoPerson:
                 return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, "two programs play: nobody is there to offer a draw"));
+            case DrawOfferRefusal::Puzzle:
+                return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, "a puzzle is on: there is no draw to offer in it"));
         }
         return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, kDrawUsage));
     }
