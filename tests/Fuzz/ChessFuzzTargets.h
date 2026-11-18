@@ -41,4 +41,8 @@ namespace BECore::Chess::Fuzzing {
     void FuzzFen(const uint8_t* data, size_t size);
     bool FenIsAccepted(const uint8_t* data, size_t size);
 
+    /// MoveGenerator::ParseUci over the position of a FEN; the input is the FEN, a newline and the move text (no newline: the start position, and the whole input is the move text)
+    void FuzzUciMove(const uint8_t* data, size_t size);
+    bool UciMoveIsAccepted(const uint8_t* data, size_t size);
+
 }  // namespace BECore::Chess::Fuzzing
