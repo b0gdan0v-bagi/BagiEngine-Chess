@@ -136,7 +136,7 @@ namespace BECore::Chess::Tests {
             const String name = MenuSectionButton(section);
             const UIElement& button = MenuButton(name.c_str());
             EXPECT_EQ(ShownText(button), String(section.label)) << "the word on the button is the one of the table";
-            EXPECT_EQ(ClickerOf(button)->action, PoolString::Intern("ChessOpenSection"));
+            EXPECT_EQ(ClickerOf(button)->action, "ChessOpenSection"_intern);
             EXPECT_EQ(ClickerOf(button)->value, PoolString::Intern(section.id)) << "the id of the table is the value";
 
             const auto canvas = CanvasOf(String(section.node).c_str());
@@ -164,13 +164,13 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheCloseAndBackButtonsEmitTheActionsOfTheMenu) {
-        EXPECT_EQ(ClickerOf(MenuButton(kMenuClose))->action, PoolString::Intern("ChessCloseMenu"));
+        EXPECT_EQ(ClickerOf(MenuButton(kMenuClose))->action, "ChessCloseMenu"_intern);
         EXPECT_EQ(ShownText(MenuButton(kMenuClose)), "Close");
-        EXPECT_EQ(ClickerOf(PanelButton("OpponentBack"))->action, PoolString::Intern("ChessOpenMenu"));
+        EXPECT_EQ(ClickerOf(PanelButton("OpponentBack"))->action, "ChessOpenMenu"_intern);
         EXPECT_EQ(ShownText(PanelButton("OpponentBack")), "Back");
-        EXPECT_EQ(Panel()->GetRoot().FindByName(PoolString::Intern("OpponentClose")), nullptr) << "Back is the one button of the section: its dim closes all";
-        EXPECT_EQ(ClickerOf(PanelElement("Dim"))->action, PoolString::Intern("ChessCloseMenu"));
-        EXPECT_EQ(ClickerOf(*HudElement("Menu"))->action, PoolString::Intern("ChessOpenMenu"));
+        EXPECT_EQ(Panel()->GetRoot().FindByName("OpponentClose"_intern), nullptr) << "Back is the one button of the section: its dim closes all";
+        EXPECT_EQ(ClickerOf(PanelElement("Dim"))->action, "ChessCloseMenu"_intern);
+        EXPECT_EQ(ClickerOf(*HudElement("Menu"))->action, "ChessOpenMenu"_intern);
     }
 
     TEST_F(ChessUiTest, TheNamesOfTheMenuPanelAreItsOwnAndTheHudMenuButtonIsNotInIt) {
@@ -181,7 +181,7 @@ namespace BECore::Chess::Tests {
             EXPECT_TRUE(names[i].ToStringView().starts_with("Menu")) << names[i].CStr() << ": elements are found by name in every canvas, so the list keeps the prefix";
             EXPECT_EQ(eastl::count(names.begin(), names.end(), names[i]), 1) << names[i].CStr() << " is twice in the list";
         }
-        EXPECT_EQ(MenuList()->GetRoot().FindByName(PoolString::Intern("Menu")), nullptr) << "the name Menu is the HUD's alone";
+        EXPECT_EQ(MenuList()->GetRoot().FindByName("Menu"_intern), nullptr) << "the name Menu is the HUD's alone";
         EXPECT_NE(HudElement("Menu"), nullptr);
         for (const char* node : {"Hud", "BoardCoordinates", "Material", "OpponentPanel", "PromotionPanel"}) {
             const auto canvas = CanvasOf(node);
@@ -217,7 +217,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(ClickMenuList("MenuClose").Both());
         EXPECT_FALSE(MenuList()->_visible);
         EXPECT_FALSE(Panel()->_visible);
-        EXPECT_EQ(log.LastAction(), PoolString::Intern("ChessCloseMenu"));
+        EXPECT_EQ(log.LastAction(), "ChessCloseMenu"_intern);
     }
 
     TEST_F(ChessUiTest, WhileTheListIsShownThePlateTakesAPressAndTheDimClosesItAndNothingUnderTheDimSeesOne) {
@@ -243,7 +243,7 @@ namespace BECore::Chess::Tests {
             const size_t before = log.Total();
             EXPECT_TRUE(ClickAtPixel(point.first, point.second).Both());
             EXPECT_EQ(log.Total(), before + 1) << "one action: the dim's";
-            EXPECT_EQ(log.LastAction(), PoolString::Intern("ChessCloseMenu"));
+            EXPECT_EQ(log.LastAction(), "ChessCloseMenu"_intern);
             EXPECT_FALSE(MenuList()->_visible);
             EXPECT_FALSE(Panel()->_visible);
             EXPECT_FALSE(Model().HasSelection()) << "no click reached the board";
@@ -268,7 +268,7 @@ namespace BECore::Chess::Tests {
         ASSERT_FALSE(Covers(ElementOf("MenuPanel", "MenuPlate"), menuDim));
         EXPECT_TRUE(ClickAtPixel(menuDim.first, menuDim.second).Both());
         EXPECT_EQ(log.Total(), before + 1);
-        EXPECT_EQ(log.LastAction(), PoolString::Intern("ChessCloseMenu"));
+        EXPECT_EQ(log.LastAction(), "ChessCloseMenu"_intern);
         EXPECT_FALSE(MenuList()->_visible);
         EXPECT_FALSE(Panel()->_visible);
 
@@ -288,7 +288,7 @@ namespace BECore::Chess::Tests {
         ASSERT_FALSE(Covers(PanelElement("Plate"), panelDim));
         EXPECT_TRUE(ClickAtPixel(panelDim.first, panelDim.second).Both());
         EXPECT_EQ(log.Total(), opened + 1);
-        EXPECT_EQ(log.LastAction(), PoolString::Intern("ChessCloseMenu"));
+        EXPECT_EQ(log.LastAction(), "ChessCloseMenu"_intern);
         EXPECT_FALSE(Panel()->_visible);
         EXPECT_FALSE(MenuList()->_visible) << "the list is not shown behind it";
     }

@@ -11,6 +11,12 @@ namespace BECore::Chess {
 
     namespace {
 
+        struct Ids {
+            static constexpr auto analysisBar = "analysisBar"_intern;
+            static constexpr auto analysisEvaluationOn = "analysisEvaluationOn"_intern;
+            static constexpr auto analysisText = "analysisText"_intern;
+        };
+
         constexpr double kEmptyBar = 0.0;
 
     }  // namespace
@@ -48,9 +54,9 @@ namespace BECore::Chess {
         }
 
         UIVars& vars = CoreManager::GetUIVars();
-        vars.Set(PoolString::Intern("analysisText"), StringView(AnalysisText::Evaluation(lineForWhite, on, gameOver, failed)));
-        vars.Set(PoolString::Intern("analysisBar"), StringView(Format("{:.3f}", bar)));
-        vars.Set(PoolString::Intern("analysisEvaluationOn"), on ? "true" : "false");
+        vars.Set(Ids::analysisText, StringView(AnalysisText::Evaluation(lineForWhite, on, gameOver, failed)));
+        vars.Set(Ids::analysisBar, StringView(Format("{:.3f}", bar)));
+        vars.Set(Ids::analysisEvaluationOn, on ? "true" : "false");
     }
 
     bool HintAllowedNow(const ChessGameModel* model) {

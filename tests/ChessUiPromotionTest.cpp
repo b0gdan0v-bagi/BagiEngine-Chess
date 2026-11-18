@@ -100,7 +100,7 @@ namespace BECore::Chess::Tests {
 
         EXPECT_TRUE(ClickPromotion("PromotionCancel").Both());
 
-        EXPECT_EQ(log.LastAction(), PoolString::Intern("ChessCancelPromotion"));
+        EXPECT_EQ(log.LastAction(), "ChessCancelPromotion"_intern);
         EXPECT_FALSE(PromotionShown());
         EXPECT_FALSE(Model().HasPendingPromotion());
         EXPECT_EQ(Model().GetVersion(), version);
@@ -139,7 +139,7 @@ namespace BECore::Chess::Tests {
             const size_t before = log.Total();
             EXPECT_TRUE(ClickAtPixel(point.first, point.second).Both());
             EXPECT_EQ(log.Total(), before + 1) << "one action: the dim's";
-            EXPECT_EQ(log.LastAction(), PoolString::Intern("ChessCancelPromotion"));
+            EXPECT_EQ(log.LastAction(), "ChessCancelPromotion"_intern);
             EXPECT_FALSE(PromotionShown());
             EXPECT_FALSE(Model().HasPendingPromotion());
             EXPECT_EQ(Model().GetVersion(), version) << "Reset under the dim was not pressed";
@@ -185,7 +185,7 @@ namespace BECore::Chess::Tests {
         ASSERT_FALSE(Covers(plate, dim));
         EXPECT_TRUE(ClickAtPixel(dim.first, dim.second).Both());
         EXPECT_EQ(log.Total(), 1u);
-        EXPECT_EQ(log.LastAction(), PoolString::Intern("ChessCancelPromotion"));
+        EXPECT_EQ(log.LastAction(), "ChessCancelPromotion"_intern);
         EXPECT_FALSE(PromotionShown());
         EXPECT_FALSE(Model().HasPendingPromotion());
         EXPECT_EQ(Model().GetVersion(), version);
@@ -422,7 +422,7 @@ namespace BECore::Chess::Tests {
 
         const auto sprite = node->GetNode().GetComponent<SpriteRendererComponent>();
         ASSERT_TRUE(sprite);
-        EXPECT_EQ(sprite->_spriteId, PoolString::Intern("WhiteBishop"));
+        EXPECT_EQ(sprite->_spriteId, "WhiteBishop"_intern);
     }
 
     // ---- the promotion panel: the layout ---------------------------------------------------------------------------------------------

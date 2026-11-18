@@ -127,20 +127,20 @@ namespace BECore::Chess::Tests {
         void ExpectAnalysisControls(const UIElement& hint, const UIElement& eval, const UIElement& bar) {
             const UIInputClicker* clicker = ClickerOf(hint);
             ASSERT_NE(clicker, nullptr) << hint.name.CStr();
-            EXPECT_EQ(clicker->action, PoolString::Intern("ChessHint")) << hint.name.CStr();
+            EXPECT_EQ(clicker->action, "ChessHint"_intern) << hint.name.CStr();
             EXPECT_FALSE(clicker->disabled) << hint.name.CStr() << ": two people at the start, the person is to move";
             EXPECT_EQ(TextOf(hint)->GetDisplayText(hint), "Hint");
 
             const UIToggleComponent* toggle = eval.GetComponent<UIToggleComponent>();
             ASSERT_NE(toggle, nullptr) << eval.name.CStr();
-            EXPECT_EQ(toggle->bind, PoolString::Intern("analysisEvaluationOn")) << eval.name.CStr();
-            EXPECT_EQ(toggle->action, PoolString::Intern("ChessSetEvaluation")) << eval.name.CStr();
+            EXPECT_EQ(toggle->bind, "analysisEvaluationOn"_intern) << eval.name.CStr();
+            EXPECT_EQ(toggle->action, "ChessSetEvaluation"_intern) << eval.name.CStr();
             ASSERT_NE(ClickerOf(eval), nullptr) << eval.name.CStr();
             EXPECT_TRUE(ClickerOf(eval)->action.Empty()) << "the toggle decides what a click emits";
 
             const UIProgressBar* progress = bar.Cast<UIProgressBar>();
             ASSERT_NE(progress, nullptr) << bar.name.CStr();
-            EXPECT_EQ(progress->bind, PoolString::Intern("analysisBar")) << bar.name.CStr();
+            EXPECT_EQ(progress->bind, "analysisBar"_intern) << bar.name.CStr();
             EXPECT_FLOAT_EQ(progress->minValue, 0.0f);
             EXPECT_FLOAT_EQ(progress->maxValue, 1.0f);
             EXPECT_FALSE(bar.IsInteractive()) << "a press on the bar goes to the cell under it";
@@ -155,7 +155,7 @@ namespace BECore::Chess::Tests {
         canvas->UpdateLayout(1280.0f, 720.0f);  // the reflected fields of the component reach the layout on its first update
 
         UICanvasLayout& layout = canvas->GetLayout();
-        const PoolString boxName = PoolString::Intern("MovePanelBox");
+        const PoolString boxName = "MovePanelBox"_intern;
         UILayoutValidatorOptions options;
         options.minTouchSize = CoreManager::GetUIEnvironment().GetSettings().minTouchSize;
         UIVars& vars = CoreManager::GetUIVars();
@@ -163,8 +163,8 @@ namespace BECore::Chess::Tests {
         size_t reported = 0;
         size_t laidOut = 0;
         for (size_t round = 0; round < std::size(kEvaluationWords); ++round) {
-            vars.Set(PoolString::Intern("analysisText"), kEvaluationWords[round]);
-            vars.Set(PoolString::Intern("analysisBar"), kShares[round]);
+            vars.Set("analysisText"_intern, kEvaluationWords[round]);
+            vars.Set("analysisBar"_intern, kShares[round]);
             for (const UIMatrixCase& matrixCase : UILayoutMatrix()) {
                 const UILayoutContext context = ContextOf(matrixCase, true);
                 canvas->SetElementVisible(boxName, true);
@@ -201,8 +201,8 @@ namespace BECore::Chess::Tests {
         ExpectAnalysisControls(MovePanelElement(kWideNames.hint), MovePanelElement(kWideNames.eval), MovePanelElement(kWideNames.bar));
         ExpectAnalysisControls(MovePanelElement(kTallNames.hint), MovePanelElement(kTallNames.eval), MovePanelElement(kTallNames.bar));
 
-        CoreManager::GetUIVars().Set(PoolString::Intern("analysisText"), "+0.35");
-        CoreManager::GetUIVars().Set(PoolString::Intern("analysisBar"), "0.25");
+        CoreManager::GetUIVars().Set("analysisText"_intern, "+0.35");
+        CoreManager::GetUIVars().Set("analysisBar"_intern, "0.25");
         Draw();
         EXPECT_EQ(ShownText(MovePanelElement(kWideNames.text)), "+0.35");
         EXPECT_EQ(ShownText(MovePanelElement(kTallNames.text)), "+0.35");

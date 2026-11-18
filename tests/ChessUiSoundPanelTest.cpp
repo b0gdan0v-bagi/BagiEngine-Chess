@@ -84,10 +84,10 @@ namespace BECore::Chess::Tests {
                 EXPECT_EQ(otherCanvas->GetRoot().FindByName(name), nullptr) << name.CStr() << " is also in " << other;
             }
         }
-        EXPECT_EQ(ClickerOf(ElementOf(kSoundNode, "SoundPanelBack"))->action, PoolString::Intern("ChessOpenMenu"));
-        EXPECT_EQ(canvas->GetRoot().FindByName(PoolString::Intern("SoundPanelClose")), nullptr) << "Back is the one button: the dim closes all";
-        EXPECT_EQ(ClickerOf(ElementOf(kSoundNode, "SoundPanelDim"))->action, PoolString::Intern("ChessCloseMenu"));
-        EXPECT_EQ(canvas->GetRoot().children.front()->name, PoolString::Intern("SoundPanelDim")) << "the first child, so a click on the plate never reaches it";
+        EXPECT_EQ(ClickerOf(ElementOf(kSoundNode, "SoundPanelBack"))->action, "ChessOpenMenu"_intern);
+        EXPECT_EQ(canvas->GetRoot().FindByName("SoundPanelClose"_intern), nullptr) << "Back is the one button: the dim closes all";
+        EXPECT_EQ(ClickerOf(ElementOf(kSoundNode, "SoundPanelDim"))->action, "ChessCloseMenu"_intern);
+        EXPECT_EQ(canvas->GetRoot().children.front()->name, "SoundPanelDim"_intern) << "the first child, so a click on the plate never reaches it";
     }
 
     TEST_F(ChessUiTest, TheMenuOpensTheSoundSectionAndBackAndTheDimLeaveIt) {

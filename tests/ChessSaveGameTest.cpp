@@ -245,7 +245,7 @@ namespace BECore::Chess::Tests {
 
         Vector<IntrusivePtr<SceneNode>> PieceNodes() const {
             Vector<IntrusivePtr<SceneNode>> nodes;
-            for (const auto& node : _manager->GetSceneByName(PoolString::Intern("ChessScene"))->GetRootNode().GetChildren()) {
+            for (const auto& node : _manager->GetSceneByName("ChessScene"_intern)->GetRootNode().GetChildren()) {
                 if (node->GetComponent<ChessPieceComponent>()) {
                     nodes.push_back(node);
                 }

@@ -132,7 +132,7 @@ namespace BECore::Chess::Tests {
         _renderer->height = kViewShapes[0].output.second;
         StartFrom(kWhiteTookAPawn);
         Draw();
-        EXPECT_EQ(CoreManager::GetUIVars().Get(PoolString::Intern("materialBottomPawn")), "x1") << "the words are there at once";
+        EXPECT_EQ(CoreManager::GetUIVars().Get("materialBottomPawn"_intern), "x1") << "the words are there at once";
         EXPECT_EQ(ShownMaterialRows(), "") << "the rows are not";
         Draw();
         EXPECT_EQ(ShownMaterialRows(), "BottomPawn") << "the next frame has the safe area";
@@ -462,7 +462,7 @@ namespace BECore::Chess::Tests {
         const float scale = canvas->GetLayout().GetResolved().scale;
         EXPECT_EQ(TextOf(balance)->overflow, TextOverflow::AutoFit);
         for (const char* lead : {"+1", "+39", "+99"}) {
-            CoreManager::GetUIVars().Set(PoolString::Intern("materialBottomBalance"), lead);
+            CoreManager::GetUIVars().Set("materialBottomBalance"_intern, lead);
             Draw();
             const UIContentFit fit = balance.CheckContent(balance.rect.w, balance.rect.h, scale);
             EXPECT_TRUE(fit.hasContent) << lead;

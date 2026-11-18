@@ -987,7 +987,7 @@ namespace BECore::Chess::Tests {
                 lowestTopRow = std::max(lowestTopRow, element->rect.y + element->rect.h);
                 pushedDown += element->rect.y > 12.0f + kPixelTolerance ? 1 : 0;
             }
-            const UIElement* status = hud->GetRoot().FindByName(PoolString::Intern("Status"));
+            const UIElement* status = hud->GetRoot().FindByName("Status"_intern);
             ASSERT_NE(status, nullptr);
             ASSERT_FALSE(status->rect.IsEmpty());
             EXPECT_GE(status->rect.y, kMaterialPortraitListBottom + kMinGap) << "Status is under the lower row of the material, whatever the inset at the bottom";
@@ -1270,7 +1270,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(FramesUntil([&] { return engine->Calls() == 1; }));
         ASSERT_TRUE(Opponent().IsThinking());
 
-        InputEvents::ActionEvent::Emit(PoolString::Intern("ChessReset"));  // the Reset button
+        InputEvents::ActionEvent::Emit("ChessReset"_intern);  // the Reset button
         _manager->UpdateAll();
 
         EXPECT_FALSE(Opponent().IsThinking()) << "the version moved: the search is not wanted any more";
@@ -1327,7 +1327,7 @@ namespace BECore::Chess::Tests {
         CountingFactory factory({engine});
         ASSERT_NO_FATAL_FAILURE(ProvokeAnEngineError(factory));
 
-        InputEvents::ActionEvent::Emit(PoolString::Intern("ChessReset"));
+        InputEvents::ActionEvent::Emit("ChessReset"_intern);
         _manager->UpdateAll();
 
         EXPECT_FALSE(Opponent().GetError().has_value());

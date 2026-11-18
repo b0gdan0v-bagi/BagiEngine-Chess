@@ -106,11 +106,11 @@ namespace BECore::Chess::Tests {
             SCOPED_TRACE(String(EnumUtils<SoundCue>::ToString(cue)).c_str());
             EXPECT_EQ(CueBus(cue), cue == SoundCue::Click ? AudioBus::Ui : AudioBus::Sfx);
         }
-        EXPECT_EQ(ClipPath(SoundCue::Click), PoolString::Intern("assets/sounds/click.wav"));
+        EXPECT_EQ(ClipPath(SoundCue::Click), "assets/sounds/click.wav"_intern);
     }
 
     TEST(SoundCueTest, EveryActionClicksButTheVolumeSlidersOne) {
-        EXPECT_FALSE(ActionClicks(PoolString::Intern("ChessSetVolume")));
+        EXPECT_FALSE(ActionClicks("ChessSetVolume"_intern));
         for (const char* action : {"ChessOpenMenu", "ChessReset", "ChessSetLevel", "ChessSetMute", "NoSuchAction", ""}) {
             SCOPED_TRACE(action);
             EXPECT_TRUE(ActionClicks(PoolString::Intern(action)));
@@ -128,7 +128,7 @@ namespace BECore::Chess::Tests {
             EXPECT_GT(CueVolume(cue), 0.0f);
             EXPECT_LE(CueVolume(cue), 1.0f);
         }
-        EXPECT_EQ(ClipPath(SoundCue::GameEnd), PoolString::Intern("assets/sounds/game_end.wav"));
+        EXPECT_EQ(ClipPath(SoundCue::GameEnd), "assets/sounds/game_end.wav"_intern);
     }
 
 }  // namespace BECore::Chess::Tests

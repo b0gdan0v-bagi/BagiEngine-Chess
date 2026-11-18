@@ -12,12 +12,28 @@
 
 namespace BECore::Chess {
 
+    namespace {
+
+        struct Ids {
+            static constexpr auto chessReset = "ChessReset"_intern;
+            static constexpr auto opponentColor = "opponentColor"_intern;
+            static constexpr auto opponentEngine = "opponentEngine"_intern;
+            static constexpr auto opponentError = "opponentError"_intern;
+            static constexpr auto opponentLevel = "opponentLevel"_intern;
+            static constexpr auto opponentMode = "opponentMode"_intern;
+            static constexpr auto resign = "Resign"_intern;
+            static constexpr auto status = "status"_intern;
+            static constexpr auto turn = "turn"_intern;
+        };
+
+    }  // namespace
+
     void ChessHudComponent::OnAttached() {
         SubscribeInScene<InputEvents::ActionEvent, &ChessHudComponent::OnAction>(this);
     }
 
     void ChessHudComponent::OnAction(const InputEvents::ActionEvent& event) {
-        if (event.action != "ChessReset"_intern) {
+        if (event.action != Ids::chessReset) {
             return;
         }
         if (ChessGameModel* model = ChessGame::GetActiveModel()) {
@@ -73,20 +89,20 @@ namespace BECore::Chess {
         }
         const String opponentError = error ? OpponentText::Error(*error) : String();
         UIVars& vars = CoreManager::GetUIVars();
-        vars.Set("turn"_intern, StringView(turn));
-        vars.Set("status"_intern, StringView(status));
+        vars.Set(Ids::turn, StringView(turn));
+        vars.Set(Ids::status, StringView(status));
         // The ids of the opponent panel, those of the control API (the person's color, not the program's)
-        vars.Set("opponentMode"_intern, choice.ModeId());
-        vars.Set("opponentColor"_intern, choice.ColorId());
-        vars.Set("opponentEngine"_intern, choice.EngineId());
-        vars.Set("opponentLevel"_intern, choice.LevelId());
-        vars.Set("opponentError"_intern, StringView(opponentError));
+        vars.Set(Ids::opponentMode, choice.ModeId());
+        vars.Set(Ids::opponentColor, choice.ColorId());
+        vars.Set(Ids::opponentEngine, choice.EngineId());
+        vars.Set(Ids::opponentLevel, choice.LevelId());
+        vars.Set(Ids::opponentError, StringView(opponentError));
 
         const bool resignDisabled = !game->ResigningNow();
         if (resignDisabled != _resignDisabled) {
             _resignDisabled = resignDisabled;
             const auto canvas = GetNode().GetComponent<UICanvasComponent>();
-            UIElement* button = canvas ? canvas->GetRoot().FindByName("Resign"_intern) : nullptr;
+            UIElement* button = canvas ? canvas->GetRoot().FindByName(Ids::resign) : nullptr;
             if (UIInputClicker* clicker = button ? button->GetComponent<UIInputClicker>() : nullptr) {
                 clicker->disabled = resignDisabled;
             }

@@ -22,7 +22,7 @@ namespace BECore::Chess::Tests {
 
         /// Shows the box, every row and its marks (the component shows only what the game has), so the layout holds the panel at its full size
         void ShowEveryMovePanelRow(UICanvasComponent& canvas) {
-            EXPECT_TRUE(canvas.SetElementVisible(PoolString::Intern("MovePanelBox"), true));
+            EXPECT_TRUE(canvas.SetElementVisible("MovePanelBox"_intern, true));
             for (size_t row = 0; row < kMovePanelRows; ++row) {
                 EXPECT_TRUE(canvas.SetElementVisible(PoolString::Intern(Format("MovePanelRow{}", row).c_str()), true)) << row;
                 for (const char* side : kSides) {
@@ -70,7 +70,7 @@ namespace BECore::Chess::Tests {
                 }
             }
 
-            const UIElement* box = layout.root->FindByName(PoolString::Intern("MovePanelBox"));
+            const UIElement* box = layout.root->FindByName("MovePanelBox"_intern);
             if (box == nullptr || box->rect.IsEmpty()) {
                 return problems + "MovePanelBox is missing or has an empty rect\n";
             }
@@ -195,7 +195,7 @@ namespace BECore::Chess::Tests {
 
         /// Lays the canvas out in @p context the way the component leaves it: the box shown exactly where MovePanelFits says, every row shown; whether the box is shown
         bool LayOutAsTheComponentShowsIt(UICanvasComponent& canvas, const UILayoutContext& context) {
-            const PoolString boxName = PoolString::Intern("MovePanelBox");
+            const PoolString boxName = "MovePanelBox"_intern;
             UICanvasLayout& layout = canvas.GetLayout();
             canvas.SetElementVisible(boxName, true);
             layout.Invalidate();
@@ -227,7 +227,7 @@ namespace BECore::Chess::Tests {
         ShowEveryMovePanelRow(*canvas);
 
         UICanvasLayout& layout = canvas->GetLayout();
-        const PoolString boxName = PoolString::Intern("MovePanelBox");
+        const PoolString boxName = "MovePanelBox"_intern;
         UILayoutValidatorOptions options;
         options.minTouchSize = CoreManager::GetUIEnvironment().GetSettings().minTouchSize;
         String report;
@@ -380,9 +380,9 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(MovePanelElement("MovePanelBox").active.visible);
         // The cells of the moves and the three step buttons of the band are buttons of ChessShowMove, Take back of ChessTakeBack, Hint of ChessHint and the evaluation cell a toggle
         // of ChessSetEvaluation; nothing else blocks or takes the pointer
-        const PoolString takeBack = PoolString::Intern("MovePanelTakeBack");
-        const PoolString hintNames[] = {PoolString::Intern("MovePanelHint"), PoolString::Intern("MovePanelTallHint")};
-        const PoolString evalNames[] = {PoolString::Intern("MovePanelEval"), PoolString::Intern("MovePanelTallEval")};
+        const PoolString takeBack = "MovePanelTakeBack"_intern;
+        const PoolString hintNames[] = {"MovePanelHint"_intern, "MovePanelTallHint"_intern};
+        const PoolString evalNames[] = {"MovePanelEval"_intern, "MovePanelTallEval"_intern};
         Vector<String> clickable;
         for (const UIElement* element : AllElements(canvas->GetRoot())) {
             EXPECT_FALSE(element->blocksInput) << element->name.CStr();
@@ -393,21 +393,21 @@ namespace BECore::Chess::Tests {
             const UIInputClicker* clicker = ClickerOf(*element);
             ASSERT_NE(clicker, nullptr) << element->name.CStr();
             if (element->name == takeBack) {
-                EXPECT_EQ(clicker->action, PoolString::Intern("ChessTakeBack"));
+                EXPECT_EQ(clicker->action, "ChessTakeBack"_intern);
                 continue;
             }
             if (eastl::find(eastl::begin(hintNames), eastl::end(hintNames), element->name) != eastl::end(hintNames)) {
-                EXPECT_EQ(clicker->action, PoolString::Intern("ChessHint"));
+                EXPECT_EQ(clicker->action, "ChessHint"_intern);
                 continue;
             }
             if (eastl::find(eastl::begin(evalNames), eastl::end(evalNames), element->name) != eastl::end(evalNames)) {
                 const UIToggleComponent* toggle = element->GetComponent<UIToggleComponent>();
                 ASSERT_NE(toggle, nullptr) << element->name.CStr();
-                EXPECT_EQ(toggle->action, PoolString::Intern("ChessSetEvaluation"));
-                EXPECT_EQ(toggle->bind, PoolString::Intern("analysisEvaluationOn"));
+                EXPECT_EQ(toggle->action, "ChessSetEvaluation"_intern);
+                EXPECT_EQ(toggle->bind, "analysisEvaluationOn"_intern);
                 continue;
             }
-            EXPECT_EQ(clicker->action, PoolString::Intern("ChessShowMove")) << element->name.CStr();
+            EXPECT_EQ(clicker->action, "ChessShowMove"_intern) << element->name.CStr();
             EXPECT_TRUE(ParseMoveListPress(clicker->value.ToStringView()).has_value()) << element->name.CStr();
         }
         EXPECT_EQ(clickable.size(), 2 * kMovePanelRows + 4 + 2 * std::size(hintNames)) << "the cells, the four buttons, and Hint and the evaluation cell of the Wide band and of the Tall twins";
@@ -452,7 +452,7 @@ namespace BECore::Chess::Tests {
             const bool isShown = LayOutAsTheComponentShowsIt(*panel, context);
             hud->GetLayout().Update(context);
             const UICanvasLayout& layout = panel->GetLayout();
-            const UIElement* box = layout.root->FindByName(PoolString::Intern("MovePanelBox"));
+            const UIElement* box = layout.root->FindByName("MovePanelBox"_intern);
             ASSERT_NE(box, nullptr);
             if (!isShown) {
                 ++hidden;
@@ -474,7 +474,7 @@ namespace BECore::Chess::Tests {
             }
             // The insets move the HUD, not the box: a notch pushes the top row (Menu, Reset) down onto the top band. The home bar of the side insets lifts Status, which the Wide view
             // keeps low enough to stay clear of the band of the buttons. The rows are clear of the HUD in every case
-            const UIElement* list = layout.root->FindByName(PoolString::Intern("MovePanelList"));
+            const UIElement* list = layout.root->FindByName("MovePanelList"_intern);
             ASSERT_NE(list, nullptr);
             String touching;
             for (const UIElement* control : AllElements(*hud->GetLayout().root)) {
@@ -514,13 +514,13 @@ namespace BECore::Chess::Tests {
                 }
             }
             // Not one unit of Status over the box, in any window: the line of a view is read beside the buttons that step it
-            const UIElement* status = hud->GetLayout().root->FindByName(PoolString::Intern("Status"));
+            const UIElement* status = hud->GetLayout().root->FindByName("Status"_intern);
             ASSERT_NE(status, nullptr);
             if (Touch(box->rect, status->rect, 0.0f)) {
                 report += Format("{}: Status overlaps the box of the move panel\n", matrixCase.label.c_str());
             }
         }
-        panel->SetElementVisible(PoolString::Intern("MovePanelBox"), false);
+        panel->SetElementVisible("MovePanelBox"_intern, false);
         panel->GetLayout().Invalidate();
         hud->GetLayout().Invalidate();
         EXPECT_TRUE(report.empty()) << report.c_str();

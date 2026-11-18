@@ -173,9 +173,9 @@ namespace BECore::Chess::Tests {
             const auto panelHas = Panel()->GetRoot().FindByName(PoolString::Intern(name)) != nullptr;
             EXPECT_FALSE(hudHas && panelHas) << name << " is in both canvases";
         }
-        EXPECT_EQ(Panel()->GetRoot().FindByName(PoolString::Intern("Level")), nullptr);
-        EXPECT_EQ(Panel()->GetRoot().FindByName(PoolString::Intern("Engine")), nullptr);
-        EXPECT_EQ(Panel()->GetRoot().FindByName(PoolString::Intern("Mode")), nullptr);
+        EXPECT_EQ(Panel()->GetRoot().FindByName("Level"_intern), nullptr);
+        EXPECT_EQ(Panel()->GetRoot().FindByName("Engine"_intern), nullptr);
+        EXPECT_EQ(Panel()->GetRoot().FindByName("Mode"_intern), nullptr);
     }
 
     TEST_F(ChessUiTest, EveryActionOfThePanelIsOneTheBoardAnswers) {
@@ -202,9 +202,9 @@ namespace BECore::Chess::Tests {
                                action == PoolString::Intern(kSetLevelAction);
             EXPECT_TRUE(known) << segment.name.c_str() << " emits " << action.CStr() << ", which ChessOpponentPanelComponent does not answer";
         }
-        EXPECT_EQ(ClickerOf(PanelButton("OpponentBack"))->action, PoolString::Intern("ChessOpenMenu"));
-        EXPECT_EQ(Panel()->GetRoot().FindByName(PoolString::Intern("OpponentClose")), nullptr) << "Back is the one button: the dim closes all";
-        EXPECT_EQ(ClickerOf(*HudElement("Menu"))->action, PoolString::Intern("ChessOpenMenu"));
+        EXPECT_EQ(ClickerOf(PanelButton("OpponentBack"))->action, "ChessOpenMenu"_intern);
+        EXPECT_EQ(Panel()->GetRoot().FindByName("OpponentClose"_intern), nullptr) << "Back is the one button: the dim closes all";
+        EXPECT_EQ(ClickerOf(*HudElement("Menu"))->action, "ChessOpenMenu"_intern);
     }
 
     // ---- the opponent panel: broken copies, so that the checks can fail --------------------------------------------------------------
@@ -253,7 +253,7 @@ namespace BECore::Chess::Tests {
         ASSERT_NO_FATAL_FAILURE(Replace(xml, R"(name="LevelHard" flex="1" height="56")", R"(name="LevelHard" flex="1")"));
         CanvasCopy copy(xml);
         LayOutInTheNarrowestWindow(copy.layout);
-        const UIElement* hard = copy.layout.root->FindByName(PoolString::Intern("LevelHard"));
+        const UIElement* hard = copy.layout.root->FindByName("LevelHard"_intern);
         ASSERT_NE(hard, nullptr);
         EXPECT_NEAR(hard->rect.h, 0.0f, kPixelTolerance);
         const String problems = PanelProblems(copy.layout);
@@ -372,11 +372,11 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessUiTest, TheBoardDoesNotPublishASideVariable) {
         Draw();
-        EXPECT_TRUE(CoreManager::GetUIVars().Has(PoolString::Intern("opponentMode"))) << "the HUD publishes its variables: the check below is not about a missing frame";
-        EXPECT_FALSE(CoreManager::GetUIVars().Has(PoolString::Intern("side")));
+        EXPECT_TRUE(CoreManager::GetUIVars().Has("opponentMode"_intern)) << "the HUD publishes its variables: the check below is not about a missing frame";
+        EXPECT_FALSE(CoreManager::GetUIVars().Has("side"_intern));
         PressWith("ChessSetLevel", "hard");  // a pick that needs no engine while nobody plays
         Draw();
-        EXPECT_FALSE(CoreManager::GetUIVars().Has(PoolString::Intern("side")));
+        EXPECT_FALSE(CoreManager::GetUIVars().Has("side"_intern));
     }
 
     TEST_F(ChessUiTest, ModeAndColorThroughThePanelPickTheSideTheProgramPlays) {
@@ -1023,7 +1023,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(ShownText(*HudElement("Menu")), "Menu");
         EXPECT_FALSE(MenuList()->_visible);
         ASSERT_TRUE(ClickButton(kMenuColor));
-        EXPECT_EQ(log.LastAction(), PoolString::Intern("ChessOpenMenu"));
+        EXPECT_EQ(log.LastAction(), "ChessOpenMenu"_intern);
         ASSERT_TRUE(MenuList()->_visible);
         EXPECT_FALSE(Panel()->_visible) << "the list shows no section";
         Draw();
@@ -1035,23 +1035,23 @@ namespace BECore::Chess::Tests {
         const Taken second = ClickAtPixel(button.first, button.second);
         EXPECT_TRUE(second.Both()) << "the modal canvas takes it";
         EXPECT_EQ(log.Total(), actions + 1);
-        EXPECT_EQ(log.LastAction(), PoolString::Intern("ChessCloseMenu"));
+        EXPECT_EQ(log.LastAction(), "ChessCloseMenu"_intern);
         EXPECT_FALSE(MenuList()->_visible);
         ASSERT_TRUE(ClickButton(kMenuColor));
         ASSERT_TRUE(MenuList()->_visible);
 
         // The section replaces the list, Back brings the list back, the dim hides both
         ASSERT_TRUE(ClickMenuList("MenuSectionOpponent").Both());
-        EXPECT_EQ(log.LastAction(), PoolString::Intern("ChessOpenSection"));
+        EXPECT_EQ(log.LastAction(), "ChessOpenSection"_intern);
         EXPECT_TRUE(Panel()->_visible);
         EXPECT_FALSE(MenuList()->_visible);
         ASSERT_TRUE(ClickPanel("OpponentBack").Both());
-        EXPECT_EQ(log.LastAction(), PoolString::Intern("ChessOpenMenu"));
+        EXPECT_EQ(log.LastAction(), "ChessOpenMenu"_intern);
         EXPECT_TRUE(MenuList()->_visible);
         EXPECT_FALSE(Panel()->_visible);
         ASSERT_TRUE(ClickMenuList("MenuSectionOpponent").Both());
         ASSERT_TRUE(CloseThePanel());
-        EXPECT_EQ(log.LastAction(), PoolString::Intern("ChessCloseMenu"));
+        EXPECT_EQ(log.LastAction(), "ChessCloseMenu"_intern);
         Draw();
         EXPECT_TRUE(RectCalls(kPlateColor).empty());
 
@@ -1060,10 +1060,10 @@ namespace BECore::Chess::Tests {
         EXPECT_FALSE(CoreManager::GetUIInput().DispatchMouseButtonDown(Button(e2.first, e2.second, true)));
         EXPECT_TRUE(Model().HasSelection());
         ASSERT_TRUE(ClickButton(kMenuColor));
-        EXPECT_EQ(log.LastAction(), PoolString::Intern("ChessOpenMenu"));
+        EXPECT_EQ(log.LastAction(), "ChessOpenMenu"_intern);
         EXPECT_TRUE(MenuList()->_visible);
         ASSERT_TRUE(ClickMenuList("MenuClose").Both());
-        EXPECT_EQ(log.LastAction(), PoolString::Intern("ChessCloseMenu"));
+        EXPECT_EQ(log.LastAction(), "ChessCloseMenu"_intern);
         EXPECT_FALSE(MenuList()->_visible);
         EXPECT_FALSE(Panel()->_visible);
     }
@@ -1097,7 +1097,7 @@ namespace BECore::Chess::Tests {
             const size_t before = log.Total();
             EXPECT_TRUE(ClickAtPixel(point.first, point.second).Both());
             EXPECT_EQ(log.Total(), before + 1) << "one action: the dim's";
-            EXPECT_EQ(log.LastAction(), PoolString::Intern("ChessCloseMenu"));
+            EXPECT_EQ(log.LastAction(), "ChessCloseMenu"_intern);
             EXPECT_FALSE(Panel()->_visible);
             EXPECT_FALSE(MenuList()->_visible);
             EXPECT_FALSE(Model().HasSelection()) << "no click reached the board";
@@ -1414,7 +1414,7 @@ namespace BECore::Chess::Tests {
         auto panel = Panel();
         ASSERT_TRUE(panel);
         panel->UpdateLayout(1280.0f, 720.0f);
-        ASSERT_TRUE(panel->SetElementVisible(PoolString::Intern("EngineStockfish"), false));
+        ASSERT_TRUE(panel->SetElementVisible("EngineStockfish"_intern, false));
         UICanvasLayout& layout = panel->GetLayout();
 
         const auto failures = ValidateWithWords(layout);

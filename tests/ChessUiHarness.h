@@ -956,7 +956,7 @@ namespace BECore::Chess::Tests {
             ActionLog log;
             ASSERT_TRUE(ClickPanel("EngineOwn").Both()) << "the one segment takes its click";
             EXPECT_EQ(log.Total(), 1u);
-            EXPECT_EQ(log.LastValue(), PoolString::Intern("own"));
+            EXPECT_EQ(log.LastValue(), "own"_intern);
         }
 
         ChessGameModel& Model() const {
@@ -966,12 +966,12 @@ namespace BECore::Chess::Tests {
         }
 
         Scene& GetScene() const {
-            return *_manager->GetSceneByName(PoolString::Intern("ChessScene"));
+            return *_manager->GetSceneByName("ChessScene"_intern);
         }
 
         IntrusivePtr<UICanvasComponent> Hud() const {
             for (const auto& node : GetScene().GetRootNode().GetChildren()) {
-                if (node->GetName() == PoolString::Intern("Hud")) {
+                if (node->GetName() == "Hud"_intern) {
                     return node->GetComponent<UICanvasComponent>();
                 }
             }

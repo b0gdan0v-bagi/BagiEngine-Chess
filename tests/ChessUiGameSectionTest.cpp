@@ -226,8 +226,8 @@ namespace BECore::Chess::Tests {
         for (const auto& [name, action] : buttons) {
             EXPECT_EQ(ClickerOf(ElementOf(kSectionNode, name))->action, PoolString::Intern(action)) << name;
         }
-        EXPECT_EQ(canvas->GetRoot().children.front()->name, PoolString::Intern("GameSectionDim")) << "the first child, so a click on the plate never reaches it";
-        EXPECT_EQ(canvas->GetRoot().FindByName(PoolString::Intern("GameSectionClose")), nullptr) << "Back is the one button: the dim closes all";
+        EXPECT_EQ(canvas->GetRoot().children.front()->name, "GameSectionDim"_intern) << "the first child, so a click on the plate never reaches it";
+        EXPECT_EQ(canvas->GetRoot().FindByName("GameSectionClose"_intern), nullptr) << "Back is the one button: the dim closes all";
     }
 
     TEST_F(ChessUiTest, NoWordOfTheGameSectionIsCutInTheNarrowestWindowOfEachViewAndEveryButtonIsATouchTarget) {
@@ -505,7 +505,7 @@ namespace BECore::Chess::Tests {
         ASSERT_NE(resign, nullptr);
         ASSERT_TRUE(IsButton(*resign) && TextOf(*resign) != nullptr);
         EXPECT_EQ(TextOf(*resign)->text, "Resign") << "a literal: not bound to a variable";
-        EXPECT_EQ(ClickerOf(*resign)->action, PoolString::Intern("ChessResign")) << "the action of the section's Resign: one confirmation, one rule";
+        EXPECT_EQ(ClickerOf(*resign)->action, "ChessResign"_intern) << "the action of the section's Resign: one confirmation, one rule";
 
         ASSERT_TRUE(ClickControl(*resign).Both());
         Draw();

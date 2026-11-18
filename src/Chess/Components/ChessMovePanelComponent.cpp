@@ -11,21 +11,33 @@
 
 namespace BECore::Chess {
 
+    namespace {
+
+        struct Ids {
+            static constexpr auto chessHint = "ChessHint"_intern;
+            static constexpr auto chessSetEvaluation = "ChessSetEvaluation"_intern;
+            static constexpr auto chessShowMove = "ChessShowMove"_intern;
+            static constexpr auto chessTakeBack = "ChessTakeBack"_intern;
+            static constexpr auto movePanelBox = "MovePanelBox"_intern;
+        };
+
+    }  // namespace
+
     void ChessMovePanelComponent::OnAttached() {
         SubscribeInScene<InputEvents::ActionEvent, &ChessMovePanelComponent::OnAction>(this);
     }
 
     void ChessMovePanelComponent::OnAction(const InputEvents::ActionEvent& event) {
-        if (event.action == "ChessHint"_intern) {
+        if (event.action == Ids::chessHint) {
             AskForHint();
             return;
         }
-        if (event.action == "ChessSetEvaluation"_intern) {
+        if (event.action == Ids::chessSetEvaluation) {
             SetEvaluation(event.value.ToStringView());
             return;
         }
-        const bool takeBack = event.action == "ChessTakeBack"_intern;
-        if (!takeBack && event.action != "ChessShowMove"_intern) {
+        const bool takeBack = event.action == Ids::chessTakeBack;
+        if (!takeBack && event.action != Ids::chessShowMove) {
             return;
         }
         ChessGameModel* model = ChessGame::GetActiveModel();
@@ -104,8 +116,7 @@ namespace BECore::Chess {
         }
         if (fits != _boxShown) {
             _boxShown = fits;
-            static const PoolString box = PoolString::Intern("MovePanelBox");
-            canvas->SetElementVisible(box, fits);
+            canvas->SetElementVisible(Ids::movePanelBox, fits);
         }
     }
 

@@ -8,6 +8,7 @@ Read this before changing `config/SceneConfig.xml` or a file of `config/nodes/` 
 ChessBoardComponent     the board: squares, highlights and coordinates, clicks and drags, the frame (the opponent's, the analyst's and the draw judge's Update() every SceneUpdateEvent, the keeper, the result log)
 ChessHudComponent       on Hud, before its canvas: publishes the UIVars of the HUD and the opponent panel in its draw, greys Resign, answers ChessReset
 ChessMenuComponent      on MenuPanel: ChessOpenMenu, ChessOpenSection, ChessCloseMenu
+MenuActions             the names of the menu's actions that several panels answer
 ChessOpponentPanelComponent  on OpponentPanel, before its canvas: ChessSet*, the Stockfish segment
 ChessPromotionPanelComponent on PromotionPanel, before its canvas: shown while a promotion is pending, ChessPromote, ChessCancelPromotion
 ChessMaterialComponent  on the node Material, before its canvas: icons, the material... variables, which set (margin or move panel) and which rows are shown

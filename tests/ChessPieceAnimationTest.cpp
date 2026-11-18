@@ -110,7 +110,7 @@ namespace BECore::Chess::Tests {
         }
 
         Scene& GetScene() const {
-            return *_manager->GetSceneByName(PoolString::Intern("ChessScene"));
+            return *_manager->GetSceneByName("ChessScene"_intern);
         }
 
         /// One frame of the game loop, in its order: the clock, the tweens (they step before the scenes read the transforms), the scenes
@@ -406,7 +406,7 @@ namespace BECore::Chess::Tests {
         _renderer->width = kUprightWidth;
         _renderer->height = kUprightHeight;
         _manager->DrawAll();
-        ASSERT_EQ(GetScene().GetActiveView().name, PoolString::Intern("Portrait"));
+        ASSERT_EQ(GetScene().GetActiveView().name, "Portrait"_intern);
         Frame();
         ExpectSliding(pawn, "e2", "e4", kThreeQuarters);
         EXPECT_NEAR(PixelOf("e2").first, kPortraitBoardLeft + 4.0f * kSquare, kPixelTolerance) << "the geometry is the Portrait one";
@@ -471,8 +471,8 @@ namespace BECore::Chess::Tests {
         Settle();
         StartFrom(kPromotionFen);
         const auto pawn = PlayAndShow("a7", "a7a8q");
-        const PoolString pawnSprite = PoolString::Intern("WhitePawn");
-        const PoolString queenSprite = PoolString::Intern("WhiteQueen");
+        const PoolString pawnSprite = "WhitePawn"_intern;
+        const PoolString queenSprite = "WhiteQueen"_intern;
         EXPECT_EQ(SpriteOf(pawn), pawnSprite);
 
         Frames(kStepsToEnd - 1);
@@ -787,18 +787,18 @@ namespace BECore::Chess::Tests {
         StartFrom(kPromotionFen);
         const auto pawn = PlayAndShow("a7", "a7a8q");
         Frames(kStepsToEnd);
-        ASSERT_EQ(SpriteOf(pawn), PoolString::Intern("WhiteQueen"));
+        ASSERT_EQ(SpriteOf(pawn), "WhiteQueen"_intern);
 
         ASSERT_TRUE(Model().ShowMoves(0));
         Frame();
         ExpectOn(pawn, "a7");
-        EXPECT_EQ(SpriteOf(pawn), PoolString::Intern("WhitePawn")) << "a pawn before it promoted";
+        EXPECT_EQ(SpriteOf(pawn), "WhitePawn"_intern) << "a pawn before it promoted";
 
         // One more move and one more version than the last frame saw, but the view in between jumped: the pieces snap to the game
         ASSERT_TRUE(Play(Model(), "h8g7"));
         Frame();
         ExpectOn(pawn, "a8", "not slid from a7");
-        EXPECT_EQ(SpriteOf(pawn), PoolString::Intern("WhiteQueen"));
+        EXPECT_EQ(SpriteOf(pawn), "WhiteQueen"_intern);
     }
 
 }  // namespace BECore::Chess::Tests

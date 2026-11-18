@@ -10,6 +10,16 @@
 
 namespace BECore::Chess {
 
+    namespace {
+
+        struct Ids {
+            static constexpr auto chessCancelPromotion = "ChessCancelPromotion"_intern;
+            static constexpr auto chessPromote = "ChessPromote"_intern;
+            static constexpr auto promotionPanel = "PromotionPanel"_intern;
+        };
+
+    }  // namespace
+
     ChessPromotionPanelComponent* ChessPromotionPanelComponent::s_active = nullptr;
 
     ChessPromotionPanelComponent::~ChessPromotionPanelComponent() {
@@ -45,12 +55,12 @@ namespace BECore::Chess {
             return;
         }
         _shown = wanted;
-        UICanvasComponent::SetVisibleByName(GetScene(), "PromotionPanel"_intern, wanted);
+        UICanvasComponent::SetVisibleByName(GetScene(), Ids::promotionPanel, wanted);
     }
 
     void ChessPromotionPanelComponent::OnAction(const InputEvents::ActionEvent& event) {
-        const bool promote = event.action == "ChessPromote"_intern;
-        if (!promote && event.action != "ChessCancelPromotion"_intern) {
+        const bool promote = event.action == Ids::chessPromote;
+        if (!promote && event.action != Ids::chessCancelPromotion) {
             return;
         }
         ChessGameModel* model = ChessGame::GetActiveModel();

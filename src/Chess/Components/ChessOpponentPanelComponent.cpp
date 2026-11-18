@@ -3,6 +3,7 @@
 #include <BECore/Scene/Scene.h>
 #include <BECore/UI/UICanvasComponent.h>
 #include <Chess/ChessGame.h>
+#include <Chess/Components/MenuActions.h>
 #include <Chess/Engine/OpponentEngines.h>
 #include <Chess/Game/MenuSections.h>
 #include <Events/InputEvents.h>
@@ -10,6 +11,18 @@
 #include <Generated/ChessOpponentPanelComponent.gen.hpp>
 
 namespace BECore::Chess {
+
+    namespace {
+
+        struct Ids {
+            static constexpr auto chessSetColor = "ChessSetColor"_intern;
+            static constexpr auto chessSetEngine = "ChessSetEngine"_intern;
+            static constexpr auto chessSetLevel = "ChessSetLevel"_intern;
+            static constexpr auto chessSetMode = "ChessSetMode"_intern;
+            static constexpr auto engineStockfish = "EngineStockfish"_intern;
+        };
+
+    }  // namespace
 
     void ChessOpponentPanelComponent::OnAttached() {
         SubscribeInScene<InputEvents::ActionEvent, &ChessOpponentPanelComponent::OnAction>(this);
@@ -31,11 +44,11 @@ namespace BECore::Chess {
             return;
         }
         _stockfishShown = offered;
-        UICanvasComponent::SetElementVisibleByName(GetScene(), "EngineStockfish"_intern, offered);
+        UICanvasComponent::SetElementVisibleByName(GetScene(), Ids::engineStockfish, offered);
     }
 
     void ChessOpponentPanelComponent::OnAction(const InputEvents::ActionEvent& event) {
-        if (event.action == "ChessOpenSection"_intern) {
+        if (event.action == MenuActions::openSection) {
             const Optional<MenuSection> section = FindMenuSection(event.value.ToStringView());
             if (section && section->id == kOpponentSectionId) {
                 // The only look for a Stockfish installed since the game started; the panel is drawn from the same frame on
@@ -52,13 +65,13 @@ namespace BECore::Chess {
         }
         const StringView value = event.value.ToStringView();
         std::expected<void, ChoiceError> picked;
-        if (event.action == "ChessSetMode"_intern) {
+        if (event.action == Ids::chessSetMode) {
             picked = choice->SetMode(value);
-        } else if (event.action == "ChessSetColor"_intern) {
+        } else if (event.action == Ids::chessSetColor) {
             picked = choice->SetColor(value);
-        } else if (event.action == "ChessSetEngine"_intern) {
+        } else if (event.action == Ids::chessSetEngine) {
             picked = choice->SetEngine(value);
-        } else if (event.action == "ChessSetLevel"_intern) {
+        } else if (event.action == Ids::chessSetLevel) {
             picked = choice->SetLevel(value);
         } else {
             return;

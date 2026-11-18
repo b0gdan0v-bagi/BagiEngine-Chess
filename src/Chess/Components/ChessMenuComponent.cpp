@@ -2,10 +2,19 @@
 
 #include <BECore/Scene/Scene.h>
 #include <BECore/UI/UICanvasComponent.h>
+#include <Chess/Components/MenuActions.h>
 #include <Events/InputEvents.h>
 #include <Generated/ChessMenuComponent.gen.hpp>
 
 namespace BECore::Chess {
+
+    namespace {
+
+        struct Ids {
+            static constexpr auto menuPanel = "MenuPanel"_intern;
+        };
+
+    }  // namespace
 
     void ChessMenuComponent::OnAttached() {
         SubscribeInScene<InputEvents::ActionEvent, &ChessMenuComponent::OnAction>(this);
@@ -19,14 +28,14 @@ namespace BECore::Chess {
     }
 
     void ChessMenuComponent::OnAction(const InputEvents::ActionEvent& event) {
-        const PoolString menuNode = "MenuPanel"_intern;
-        if (event.action == "ChessOpenMenu"_intern) {
+        const PoolString menuNode = Ids::menuPanel;
+        if (event.action == MenuActions::openMenu) {
             ShowMenuSection(std::nullopt);
             UICanvasComponent::SetVisibleByName(GetScene(), menuNode, true);
-        } else if (event.action == "ChessCloseMenu"_intern) {
+        } else if (event.action == MenuActions::closeMenu) {
             ShowMenuSection(std::nullopt);
             UICanvasComponent::SetVisibleByName(GetScene(), menuNode, false);
-        } else if (event.action == "ChessOpenSection"_intern) {
+        } else if (event.action == MenuActions::openSection) {
             const Optional<MenuSection> section = FindMenuSection(event.value.ToStringView());
             if (!section) {
                 LOG_WARNING("ChessOpenSection ignored: '{}' is not a section of the menu"_format(event.value.ToStringView()));

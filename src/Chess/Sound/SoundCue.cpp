@@ -1,5 +1,7 @@
 #include "SoundCue.h"
 
+#include <Chess/Sound/SoundActions.h>
+
 namespace BECore::Chess {
 
     namespace {
@@ -69,8 +71,7 @@ namespace BECore::Chess {
     }
 
     bool ActionClicks(PoolString action) {
-        static const PoolString silent = PoolString::Intern("ChessSetVolume");
-        return action != silent;
+        return action != SoundActions::setVolume;
     }
 
 }  // namespace BECore::Chess

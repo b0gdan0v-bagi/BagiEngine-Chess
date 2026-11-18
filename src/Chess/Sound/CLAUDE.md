@@ -6,6 +6,7 @@ The sound of the board (one clip per played move) and of the buttons, and the me
 Sound/
 ├── SoundCue.*                   pure: SoundCue (CORE_ENUM), MoveOutcome, CueOfMove, ClipPath, CueVolume, CueBus, ActionClicks; no scene, no audio manager
 ├── ChessSoundComponent.*        scene glue on the node Sound (config/nodes/ChessSound.xml): plays the cue of a move that was just played and the click of a button
+├── SoundActions.h               the name of the action ChessSetVolume, shared by SoundCue and the panel
 ├── SoundLevels.*                pure: the slider's step, ParseVolume, ParseMuted, VolumeVarText, VolumePercentText
 └── ChessSoundPanelComponent.*   scene glue on the node SoundPanel (config/nodes/ChessSoundPanel.xml): the section's answers and variables
 ```

@@ -23,7 +23,7 @@ namespace BECore::Chess::Tests {
             Draw();
             return Model().GetMoves().size() == 2;
         })) << "the program answers";
-        const StringView turn = CoreManager::GetUIVars().Get(PoolString::Intern("turn"));
+        const StringView turn = CoreManager::GetUIVars().Get("turn"_intern);
         EXPECT_EQ(String(turn.data(), turn.size()), StatusText::Turn(Model(), false)) << "read without another frame";
     }
 
@@ -54,7 +54,7 @@ namespace BECore::Chess::Tests {
                 ASSERT_NE(element, nullptr) << name;
                 EXPECT_FALSE(element->rect.IsEmpty()) << name << " is shown";
             }
-            const UIElement* resign = layout.root->FindByName(PoolString::Intern("Resign"));
+            const UIElement* resign = layout.root->FindByName("Resign"_intern);
             ASSERT_NE(resign, nullptr);
             EXPECT_EQ(resign->rect.IsEmpty(), LaidOutForPortrait(layout)) << "Resign is shown exactly where the top row has room for it";
         }
@@ -69,11 +69,11 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(IsButton(*menu) && TextOf(*menu) != nullptr) << "the Menu button is a button: a text and a clicker";
         EXPECT_EQ(TextOf(*menu)->text, "Menu") << "a literal: not bound to a variable";
         EXPECT_EQ(ShownText(*menu), "Menu");
-        EXPECT_EQ(ClickerOf(*menu)->action, PoolString::Intern("ChessOpenMenu"));
+        EXPECT_EQ(ClickerOf(*menu)->action, "ChessOpenMenu"_intern);
         EXPECT_NEAR(menu->rect.w, 110.0f, 0.5f) << "as wide as Reset";
         EXPECT_NEAR(menu->rect.h, 56.0f, 0.5f);
         EXPECT_EQ(HudElement("Opponent"), nullptr) << "the button was called Opponent when it showed the state; the name is not used any more";
-        EXPECT_EQ(Panel()->GetRoot().FindByName(PoolString::Intern("Menu")), nullptr) << "the name Menu is the HUD's alone";
+        EXPECT_EQ(Panel()->GetRoot().FindByName("Menu"_intern), nullptr) << "the name Menu is the HUD's alone";
     }
 
     TEST_F(ChessUiTest, TheHudStaysOutsideTheBoardWithoutInsets) {
@@ -96,7 +96,7 @@ namespace BECore::Chess::Tests {
                 ASSERT_FALSE(element->rect.IsEmpty()) << name << " is shown at " << size.first << "x" << size.second;
                 EXPECT_LE(element->rect.y + element->rect.h, boardTop + 0.01f) << name << " at " << size.first << "x" << size.second;
             }
-            const UIElement* status = canvas->GetRoot().FindByName(PoolString::Intern("Status"));
+            const UIElement* status = canvas->GetRoot().FindByName("Status"_intern);
             ASSERT_NE(status, nullptr);
             ASSERT_FALSE(status->rect.IsEmpty()) << "Status is shown at " << size.first << "x" << size.second;
             EXPECT_GE(status->rect.y, boardBottom - 0.01f) << "Status at " << size.first << "x" << size.second;
@@ -479,7 +479,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(Play(Model(), "e2e4"));
         const uint64_t before = Model().GetVersion();
 
-        InputEvents::ActionEvent::Emit(PoolString::Intern("ChessReset"));
+        InputEvents::ActionEvent::Emit("ChessReset"_intern);
 
         EXPECT_EQ(Model().GetPosition().ToFen(), String(Position::kStartFen));
         EXPECT_GT(Model().GetVersion(), before);

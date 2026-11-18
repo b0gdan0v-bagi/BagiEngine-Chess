@@ -6,6 +6,7 @@
 #include <BECore/UI/UICanvasComponent.h>
 #include <BECore/UI/UIInputClicker.h>
 #include <Chess/ChessGame.h>
+#include <Chess/Components/MenuActions.h>
 #include <Chess/Engine/DrawOffer.h>
 #include <Chess/Game/StatusText.h>
 #include <Events/InputEvents.h>
@@ -14,6 +15,20 @@
 namespace BECore::Chess {
 
     namespace {
+
+        struct Ids {
+            static constexpr auto chessDraw = "ChessDraw"_intern;
+            static constexpr auto chessGameNo = "ChessGameNo"_intern;
+            static constexpr auto chessGameYes = "ChessGameYes"_intern;
+            static constexpr auto chessResign = "ChessResign"_intern;
+            static constexpr auto gameQuestion = "gameQuestion"_intern;
+            static constexpr auto gameSectionAnswers = "GameSectionAnswers"_intern;
+            static constexpr auto gameSectionConfirm = "GameSectionConfirm"_intern;
+            static constexpr auto gameSectionDraw = "GameSectionDraw"_intern;
+            static constexpr auto gameSectionPlate = "GameSectionPlate"_intern;
+            static constexpr auto gameSectionQuestion = "GameSectionQuestion"_intern;
+            static constexpr auto gameSectionResign = "GameSectionResign"_intern;
+        };
 
         bool CanOfferDraw(const ChessGame& game) {
             return !DrawOfferRefusalFor(game.GetModel(), game.GetOpponent().GetSides()).has_value();
@@ -25,7 +40,7 @@ namespace BECore::Chess {
         }
 
         void CloseTheMenu() {
-            InputEvents::ActionEvent::Emit("ChessCloseMenu"_intern);
+            InputEvents::ActionEvent::Emit(MenuActions::closeMenu);
         }
 
         void SetClickerDisabled(UICanvasComponent& canvas, PoolString name, bool disabled) {
@@ -67,17 +82,17 @@ namespace BECore::Chess {
 
     void ChessGameSectionComponent::OnAction(const InputEvents::ActionEvent& event) {
         const PoolString action = event.action;
-        if (action == "ChessGameNo"_intern && _asking != GameQuestion::None && _fromHud) {
+        if (action == Ids::chessGameNo && _asking != GameQuestion::None && _fromHud) {
             ShowCanvas(false);
         }
-        if (action == "ChessOpenMenu"_intern || action == "ChessCloseMenu"_intern || action == "ChessOpenSection"_intern || action == "ChessGameNo"_intern) {
+        if (action == MenuActions::openMenu || action == MenuActions::closeMenu || action == MenuActions::openSection || action == Ids::chessGameNo) {
             _asking = GameQuestion::None;
             _fromHud = false;
             return;
         }
-        const bool resign = action == "ChessResign"_intern;
-        const bool draw = action == "ChessDraw"_intern;
-        const bool yes = action == "ChessGameYes"_intern;
+        const bool resign = action == Ids::chessResign;
+        const bool draw = action == Ids::chessDraw;
+        const bool yes = action == Ids::chessGameYes;
         ChessGame* game = (resign || draw || yes) ? ChessGame::GetActive() : nullptr;
         if (!game) {
             return;
@@ -129,17 +144,17 @@ namespace BECore::Chess {
         if (_asking != _shownAsking || _fromHud != _shownFromHud) {
             const bool asking = _asking != GameQuestion::None;
             const bool confirmOnly = asking && _fromHud;
-            canvas->SetElementVisible("GameSectionPlate"_intern, !confirmOnly);
-            canvas->SetElementVisible("GameSectionConfirm"_intern, confirmOnly);
+            canvas->SetElementVisible(Ids::gameSectionPlate, !confirmOnly);
+            canvas->SetElementVisible(Ids::gameSectionConfirm, confirmOnly);
             _shownFromHud = _fromHud;
             if (asking) {
                 const String question = _asking == GameQuestion::Resign ? StatusText::ResignQuestion() : StatusText::DrawQuestion();
-                CoreManager::GetUIVars().Set("gameQuestion"_intern, StringView(question));
+                CoreManager::GetUIVars().Set(Ids::gameQuestion, StringView(question));
             }
-            canvas->SetElementVisible("GameSectionQuestion"_intern, asking);
-            canvas->SetElementVisible("GameSectionAnswers"_intern, asking);
-            canvas->SetElementVisible("GameSectionResign"_intern, !asking);
-            canvas->SetElementVisible("GameSectionDraw"_intern, !asking);
+            canvas->SetElementVisible(Ids::gameSectionQuestion, asking);
+            canvas->SetElementVisible(Ids::gameSectionAnswers, asking);
+            canvas->SetElementVisible(Ids::gameSectionResign, !asking);
+            canvas->SetElementVisible(Ids::gameSectionDraw, !asking);
             _shownAsking = _asking;
         }
 
@@ -154,11 +169,11 @@ namespace BECore::Chess {
         const bool drawDisabled = !game || !CanOfferDraw(*game);
         if (resignDisabled != _resignDisabled) {
             _resignDisabled = resignDisabled;
-            SetClickerDisabled(*canvas, "GameSectionResign"_intern, resignDisabled);
+            SetClickerDisabled(*canvas, Ids::gameSectionResign, resignDisabled);
         }
         if (drawDisabled != _drawDisabled) {
             _drawDisabled = drawDisabled;
-            SetClickerDisabled(*canvas, "GameSectionDraw"_intern, drawDisabled);
+            SetClickerDisabled(*canvas, Ids::gameSectionDraw, drawDisabled);
         }
     }
 
