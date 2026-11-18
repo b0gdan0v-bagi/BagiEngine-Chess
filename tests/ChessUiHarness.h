@@ -1161,6 +1161,27 @@ namespace BECore::Chess::Tests {
             return GameSection() && GameSection()->_visible;
         }
 
+        /// The canvas of the menu section "Puzzles": the node `PuzzleSection`
+        IntrusivePtr<UICanvasComponent> PuzzleSection() const {
+            return CanvasOf("PuzzleSection");
+        }
+
+        /// A click on a control of the Puzzles section, by name
+        Taken ClickPuzzleSection(const char* name) {
+            return ClickControl(ElementOf("PuzzleSection", name));
+        }
+
+        /// The Menu button of the HUD and then the Puzzles button of the list, clicked where they are drawn; whether the section is shown afterwards
+        bool OpenThePuzzleSection() {
+            if (!ClickButton(kMenuColor)) {
+                return false;
+            }
+            if (!MenuList() || !MenuList()->_visible || !ClickMenuList("MenuSectionPuzzles").Both()) {
+                return false;
+            }
+            return PuzzleSection() && PuzzleSection()->_visible;
+        }
+
         /// The canvas of the promotion panel: the node `PromotionPanel`
         IntrusivePtr<UICanvasComponent> Promotion() const {
             return CanvasOf("PromotionPanel");
