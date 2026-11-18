@@ -1,0 +1,7 @@
+info score cp abc
+info score cp 1x
+info score mate -
+info score cp 99999999999999999999
+info score foo 12
+info score cp --5
+info score cp 3.5

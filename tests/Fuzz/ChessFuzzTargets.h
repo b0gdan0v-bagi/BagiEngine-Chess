@@ -49,4 +49,8 @@ namespace BECore::Chess::Fuzzing {
     void FuzzUciCommand(const uint8_t* data, size_t size);
     bool UciCommandIsAccepted(const uint8_t* data, size_t size);
 
+    /// The lines of a foreign engine (the input split at newlines): UciProtocol::TrimLine, ParseInfo, ParseBestMove and a LineCollector over all of them
+    void FuzzUciOutput(const uint8_t* data, size_t size);
+    bool UciOutputIsAccepted(const uint8_t* data, size_t size);
+
 }  // namespace BECore::Chess::Fuzzing

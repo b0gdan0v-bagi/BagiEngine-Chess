@@ -10,6 +10,7 @@ namespace BECore::Chess::Fuzzing {
             {"Fen", &FuzzFen, &FenIsAccepted, "fen", 1},
             {"UciMove", &FuzzUciMove, &UciMoveIsAccepted, "uci_move", 2},
             {"UciCommand", &FuzzUciCommand, &UciCommandIsAccepted, "uci_command", 6},
+            {"UciOutput", &FuzzUciOutput, &UciOutputIsAccepted, "uci_output", 48},
         };
         return targets;
     }

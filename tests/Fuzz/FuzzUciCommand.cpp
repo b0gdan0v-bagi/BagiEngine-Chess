@@ -3,6 +3,7 @@
 #include <Chess/Game/Position.h>
 #include <Chess/Uci/UciCommand.h>
 #include <tests/Fuzz/ChessFuzzTargets.h>
+#include <tests/Fuzz/ChessFuzzText.h>
 
 namespace BECore::Chess::Fuzzing {
 
@@ -12,81 +13,19 @@ namespace BECore::Chess::Fuzzing {
         using Uci::UciCommand;
         using Uci::UciCommandKind;
 
-        using Words = Vector<StringView>;
+        using Text::ReadInt;
+        using Text::ViewOf;
+        using Text::WithoutEdges;
+        using Text::Words;
 
         /// A `position` command with more moves than this replays only the first ones, so a line of many tokens stays cheap
         constexpr size_t kMostReplayedMoves = 64;
-
-        constexpr int64_t kIntMagnitudeLimit = int64_t{std::numeric_limits<int>::max()} + 1;
 
         constexpr StringView kFirstWordsOfKinds[] = {"uci", "isready", "ucinewgame", "setoption", "position", "go", "stop", "ponderhit", "quit"};
         constexpr UciCommandKind kKindsOfFirstWords[] = {UciCommandKind::Uci, UciCommandKind::IsReady, UciCommandKind::NewGame,   UciCommandKind::SetOption, UciCommandKind::Position,
                                                          UciCommandKind::Go,  UciCommandKind::Stop,    UciCommandKind::PonderHit, UciCommandKind::Quit};
 
         constexpr StringView kGoKeywords[] = {"depth", "movetime", "wtime", "btime", "winc", "binc", "movestogo"};
-
-        StringView ViewOf(const uint8_t* data, size_t size) {
-            return StringView(reinterpret_cast<const char*>(data), size);
-        }
-
-        StringView ViewOf(const String& text) {
-            return StringView(text.data(), text.size());
-        }
-
-        /// The ends of a line a GUI may leave on it: spaces, and the `\r` (or `\n`) of the line break
-        bool IsLineEdge(char symbol) {
-            return symbol == ' ' || symbol == '\r' || symbol == '\n';
-        }
-
-        StringView WithoutEdges(StringView line) {
-            while (!line.empty() && IsLineEdge(line.front())) {
-                line.remove_prefix(1);
-            }
-            while (!line.empty() && IsLineEdge(line.back())) {
-                line.remove_suffix(1);
-            }
-            return line;
-        }
-
-        /// The words of a trimmed line, split at spaces and tabs
-        Words WordsOf(StringView line) {
-            Words words;
-            size_t begin = 0;
-            for (size_t index = 0; index <= line.size(); ++index) {
-                const bool boundary = index == line.size() || line[index] == ' ' || line[index] == '\t';
-                if (!boundary) {
-                    continue;
-                }
-                if (index > begin) {
-                    words.push_back(line.substr(begin, index - begin));
-                }
-                begin = index + 1;
-            }
-            return words;
-        }
-
-        /// ParseInt written from its header: an optional '-', then digits only, and the value is an int
-        Optional<int> ReadInt(StringView text) {
-            const bool negative = !text.empty() && text.front() == '-';
-            const StringView digits = negative ? text.substr(1) : text;
-            if (digits.empty()) {
-                return std::nullopt;
-            }
-            int64_t magnitude = 0;
-            for (const char symbol : digits) {
-                if (symbol < '0' || symbol > '9') {
-                    return std::nullopt;
-                }
-                magnitude = magnitude * 10 + (symbol - '0');
-                if (magnitude > kIntMagnitudeLimit) {
-                    return std::nullopt;
-                }
-            }
-            if (!negative && magnitude == kIntMagnitudeLimit) {
-                return std::nullopt;
-            }
-            return static_cast<int>(negative ? -magnitude : magnitude);
-        }
 
         bool SameGo(const GoParams& a, const GoParams& b) {
             return a.depth == b.depth && a.moveTime == b.moveTime && a.wTime == b.wTime && a.bTime == b.bTime && a.wInc == b.wInc && a.bInc == b.bInc && a.movesToGo == b.movesToGo &&
@@ -248,7 +187,7 @@ namespace BECore::Chess::Fuzzing {
 
         const UciCommand command = Uci::ParseCommand(line);
         CHESS_FUZZ_CHECK(SameCommand(command, Uci::ParseCommand(line)));
-        CHESS_FUZZ_CHECK(SameCommand(command, ExpectedCommand(WordsOf(WithoutEdges(line)))));
+        CHESS_FUZZ_CHECK(SameCommand(command, ExpectedCommand(Text::WordsOf(WithoutEdges(line), " 	"))));
 
         // The tolerance of the header: spaces at both ends and a `\r` change nothing. A tab is no edge for the trimming, so it goes around the trimmed line only
         String padded = "  ";
