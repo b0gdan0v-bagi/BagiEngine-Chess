@@ -1,6 +1,7 @@
 #include "ChessGame.h"
 
 #include <BECore/GameManager/CoreManager.h>
+#include <Chess/Game/EditorText.h>
 #include <Chess/Game/GameEnding.h>
 #include <Games/GameManager.h>
 #include <Generated/ChessGame.gen.hpp>
@@ -63,6 +64,11 @@ namespace BECore::Chess {
     const OpeningBook* ChessGame::GetActiveOpenings() {
         ChessGame* chess = GetActive();
         return chess ? &chess->GetOpenings() : nullptr;
+    }
+
+    PositionEditor* ChessGame::GetActiveEditor() {
+        ChessGame* chess = GetActive();
+        return chess ? &chess->GetEditor() : nullptr;
     }
 
     ChessGame::ChessGame() : _opponent(_model), _choice(_opponent), _control(_model, _opponent, _analyst, _drawJudge, _openings) {
@@ -132,6 +138,49 @@ namespace BECore::Chess {
         }
         const ProgramSides sides = _opponent.GetSides();
         return ResigningColor(_model.GetTurn(), _opponent.GetPlays(), sides.white && sides.black);
+    }
+
+    void ChessGame::BeginEditing(EditStart start) {
+        switch (start) {
+            case EditStart::Current:
+                _editor.Load(_model.GetPosition());
+                break;
+            case EditStart::Empty:
+                _editor.Clear();
+                break;
+            case EditStart::Start:
+                _editor.SetStart();
+                break;
+        }
+        _editorMessage.clear();
+        _model.ShowDraft(_editor.GetSquares());
+    }
+
+    void ChessGame::EditChanged() {
+        if (!IsEditing()) {
+            return;
+        }
+        _editorMessage.clear();
+        _model.ShowDraft(_editor.GetSquares());
+    }
+
+    bool ChessGame::PlayFromHere() {
+        if (!IsEditing()) {
+            return false;
+        }
+        const auto position = _editor.Build();
+        if (!position) {
+            _editorMessage = String(EditorText::Refusal(position.error()));
+            return false;
+        }
+        _editorMessage.clear();
+        _model.SetPosition(*position);
+        return true;
+    }
+
+    void ChessGame::CancelEditing() {
+        _editorMessage.clear();
+        _model.EndDraft();
     }
 
     void ChessGame::Reset() {

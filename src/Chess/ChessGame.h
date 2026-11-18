@@ -7,10 +7,14 @@
 #include <Chess/Engine/PositionAnalyst.h>
 #include <Chess/Game/ChessGameModel.h>
 #include <Chess/Game/OpeningBook.h>
+#include <Chess/Game/PositionEditor.h>
 #include <Chess/Save/ChessSaveKeeper.h>
 #include <Games/IGame.h>
 
 namespace BECore::Chess {
+
+    /// Where BeginEditing() takes the draft from: the game's position, an empty board or the opening position.
+    CORE_ENUM(EditStart, uint8_t, Current, Empty, Start)
 
     /**
      * @brief Concrete IGame for chess; its scene is "ChessScene".
@@ -19,6 +23,11 @@ namespace BECore::Chess {
      * opponent panel makes over it (OpponentChoice: it remembers the person's color while nobody plays), the analysis of the position (PositionAnalyst, with the default factory over the settings the
      * controller holds), the judge of the person's draw offers (DrawOfferJudge, which makes its engine through the analyst's factory, so a factory given to the analyst reaches it too), the
      * save keeper and the adapter of the control API (ChessGameControl). A game starts with nobody as the opponent (it is made when a side is picked) and the analysis off.
+     *
+     * Owns the PositionEditor, the draft of a position the person builds on the board. The game is edited without being changed: BeginEditing() has the model show the draft
+     * (ChessGameModel::ShowDraft(), IsEditing() is its IsDrafting()), CancelEditing() puts the game back as it was, and PlayFromHere() starts a new game from the draft through
+     * ChessGameModel::SetPosition(), so the opponent, the analyst and the keeper see an ordinary game from a FEN. Whatever else changes the game (Reset(), a control client's set_state, a loaded save)
+     * ends the draft by the model's own rule.
      *
      * Start() loads the opening names (OpeningBook) from kOpeningsPath; a file that is missing or cannot be read leaves the book empty (one warning), so the game plays and no position has a name.
      *
@@ -107,6 +116,39 @@ namespace BECore::Chess {
         /// nothing
         void UpdateKeeper();
 
+        PositionEditor& GetEditor() noexcept {
+            return _editor;
+        }
+        const PositionEditor& GetEditor() const noexcept {
+            return _editor;
+        }
+
+        /// A draft is shown (ChessGameModel::IsDrafting()); the editor's state means something only then
+        [[nodiscard]] bool IsEditing() const noexcept {
+            return _model.IsDrafting();
+        }
+
+        /// Starts a draft from @p start (Current: the game's position, a finished game and a viewed one too) and shows it; a draft that is open is begun again. Drops the message.
+        void BeginEditing(EditStart start);
+
+        /// To call after every change of the editor by a person's action (never per frame): shows the draft again and drops the message. Does nothing while not editing.
+        void EditChanged();
+
+        /**
+         * @brief Starts a new game from the draft (Build(), then ChessGameModel::SetPosition()), which ends the draft.
+         *
+         * @return false when not editing, or when the rules refuse the draft (FromFen's): the draft stays and GetEditorMessage() says why.
+         */
+        bool PlayFromHere();
+
+        /// Ends the draft and leaves the game exactly as it was (position, moves, status and version)
+        void CancelEditing();
+
+        /// The reason the last PlayFromHere() refused, until the next change of the draft; empty when not editing
+        [[nodiscard]] StringView GetEditorMessage() const noexcept {
+            return IsEditing() ? StringView(_editorMessage) : StringView();
+        }
+
         /// The active game, or nullptr when no game is active or the active game is not Chess (the same for the GetActive*() below)
         static ChessGame* GetActive();
 
@@ -128,6 +170,9 @@ namespace BECore::Chess {
         /// The opening names of the active game
         static const OpeningBook* GetActiveOpenings();
 
+        /// The position editor of the active game
+        static PositionEditor* GetActiveEditor();
+
     private:
         ChessGameModel _model;
         OpponentController _opponent;  ///< after the model (it holds a reference to it) and before the adapter
@@ -135,7 +180,9 @@ namespace BECore::Chess {
         PositionAnalyst _analyst;      ///< after the controller (its factory reads the controller's settings) and before the adapter
         DrawOfferJudge _drawJudge;     ///< after the analyst (its factory asks it) and before the adapter
         OpeningBook _openings;         ///< before the adapter, which reads it
-        ChessSaveKeeper _keeper;       ///< after everything it reads (it is handed the model, the controller and the choice in each call, and destroyed first)
+        PositionEditor _editor;
+        String _editorMessage;
+        ChessSaveKeeper _keeper;  ///< after everything it reads (it is handed the model, the controller and the choice in each call, and destroyed first)
         ChessGameControl _control;
         bool _stopped = false;  ///< between Stop() and the next Start(): UpdateKeeper() writes nothing
     };

@@ -480,6 +480,26 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(Game().GetModel().GetMoves().size(), 1u);
     }
 
+    TEST_F(ChessSaveGameTest, AGameBegunByPlayFromHereReturnsWithTheFenOfTheDraft) {
+        SetCommandLine({}, true);
+        StartManager();
+        ASSERT_TRUE(Play(Game().GetModel(), "e2e4"));
+        Game().BeginEditing(EditStart::Current);
+        ASSERT_TRUE(Game().GetEditor().Apply(Sq("h2")));
+        Game().EditChanged();
+        const String draftFen = Game().GetEditor().ToFen();
+        ASSERT_TRUE(Game().PlayFromHere());
+        Frames(2);
+
+        Restart();
+
+        const Json state = State();
+        EXPECT_EQ(Member(state, "startFen"), draftFen);
+        EXPECT_EQ(Member(state, "fen"), draftFen);
+        EXPECT_TRUE(Game().GetModel().GetMoves().empty());
+        EXPECT_FALSE(Game().IsEditing());
+    }
+
     TEST_F(ChessSaveGameTest, AFinishedGameIsNotRestoredButTheChoiceIs) {
         SetCommandLine({}, true);
         StartManager();

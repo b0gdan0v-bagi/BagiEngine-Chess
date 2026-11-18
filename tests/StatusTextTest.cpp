@@ -1,4 +1,5 @@
 #include <Chess/Game/ChessGameModel.h>
+#include <Chess/Game/EditorText.h>
 #include <Chess/Game/MoveGenerator.h>
 #include <Chess/Game/StatusText.h>
 #include <tests/ChessTestUtil.h>
@@ -178,6 +179,29 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(StatusText::Status(model), "At the start - tap board") << "the start of a game from a FEN is its position, whatever its number";
         ASSERT_TRUE(model.EndViewing());
         EXPECT_EQ(StatusText::Status(model), "Checkmate");
+    }
+
+    TEST(StatusTextTest, TheEditorsLineIsTheMessageThenTheLastRefusalThenEditing) {
+        PositionEditor editor;
+        EXPECT_EQ(StatusText::Editing(editor, ""), "Editing");
+
+        EXPECT_EQ(StatusText::Editing(editor, "Needs one king each"), "Needs one king each") << "the reason of a refused Play wins";
+
+        editor.SetStart();
+        ASSERT_FALSE(editor.Put(Sq("e3"), Piece{PieceType::Pawn, PieceColor::White}).has_value()) << "the 17th piece of a color";
+        ASSERT_TRUE(editor.GetLastRefusal().has_value());
+        EXPECT_EQ(StatusText::Editing(editor, ""), EditorText::Refusal(EditRefusal::TooManyPieces));
+
+        editor.Clear();
+        EXPECT_EQ(StatusText::Editing(editor, ""), "Editing") << "the next edit that works takes the refusal away";
+    }
+
+    TEST(StatusTextTest, EveryEditorLineFitsTheHud) {
+        PositionEditor editor;
+        EXPECT_LE(StatusText::Editing(editor, "").size(), EditorText::kMaxRefusalChars);
+        for (const FenError error : EnumUtils<FenError>::Values()) {
+            EXPECT_LE(StatusText::Editing(editor, EditorText::Refusal(error)).size(), EditorText::kMaxRefusalChars);
+        }
     }
 
 }  // namespace BECore::Chess::Tests
