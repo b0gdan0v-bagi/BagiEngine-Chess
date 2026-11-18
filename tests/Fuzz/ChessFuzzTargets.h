@@ -45,4 +45,8 @@ namespace BECore::Chess::Fuzzing {
     void FuzzUciMove(const uint8_t* data, size_t size);
     bool UciMoveIsAccepted(const uint8_t* data, size_t size);
 
+    /// Uci::ParseCommand and Uci::ParseInt over one line (any byte), and the game of a `position` command through SearchRequest::FinalPosition
+    void FuzzUciCommand(const uint8_t* data, size_t size);
+    bool UciCommandIsAccepted(const uint8_t* data, size_t size);
+
 }  // namespace BECore::Chess::Fuzzing

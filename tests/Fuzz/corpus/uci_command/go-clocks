@@ -1,0 +1,1 @@
+go wtime 60000 btime 60000 winc 1000 binc 1000 movestogo 20
