@@ -1,0 +1,2 @@
+info depth 5 score mate 3 nodes 10 pv e2e4
+info depth 4 score mate -2 pv a1a2

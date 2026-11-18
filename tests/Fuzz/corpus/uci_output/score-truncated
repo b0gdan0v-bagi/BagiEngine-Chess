@@ -1,0 +1,4 @@
+info depth 3 score
+info depth 3 score cp
+info score mate
+info score cp lowerbound pv e2e4

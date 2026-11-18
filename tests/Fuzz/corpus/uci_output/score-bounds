@@ -1,0 +1,3 @@
+info depth 12 score cp 80 lowerbound nodes 5 pv e2e4
+info depth 12 score cp -10 upperbound pv e2e4
+info depth 13 score cp 25 pv e2e4
