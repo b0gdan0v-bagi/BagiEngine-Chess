@@ -155,6 +155,10 @@ if(ENGINE_BUILD_TESTS)
         add_test(NAME BagiChessCommentToolTests COMMAND ${Python3_EXECUTABLE} -m unittest discover -s ${CMAKE_CURRENT_SOURCE_DIR}/tools/tests -p "test_check_comment_only.py" WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
         set_tests_properties(BagiChessCommentToolTests PROPERTIES TIMEOUT 120)
 
+        # The unit tests of tools/fetch_puzzles.py: the selection and the written format of assets/puzzles/puzzles.tsv (standard library unittest, no network)
+        add_test(NAME BagiChessPuzzleToolTests COMMAND ${Python3_EXECUTABLE} -m unittest discover -s ${CMAKE_CURRENT_SOURCE_DIR}/tools/tests -p "test_fetch_puzzles.py" WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+        set_tests_properties(BagiChessPuzzleToolTests PROPERTIES TIMEOUT 120)
+
         # The game formats through the engine's layer (BECore::Format), not fmt:: (tests/check_fmt_layer.py runs the engine's codemod over src, tests and uci); skipped (77) without the engine's tool
         add_test(NAME BagiChessFmtLayerCheck COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_fmt_layer.py)
         set_tests_properties(BagiChessFmtLayerCheck PROPERTIES
