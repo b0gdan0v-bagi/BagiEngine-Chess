@@ -1,6 +1,7 @@
 #pragma once
 
 #include <BECore/GameManager/CoreManager.h>
+#include <BECore/Text/Utf8.h>
 #include <Chess/Components/ChessHudComponent.h>
 #include <Chess/Engine/OpponentText.h>
 #include <Chess/Game/ChessGameModel.h>
@@ -68,7 +69,7 @@ namespace BECore::Chess::Tests {
         }
 
         inline size_t CodePoints(const String& text) {
-            return static_cast<size_t>(eastl::count_if(text.begin(), text.end(), [](char c) { return (static_cast<unsigned char>(c) & 0xC0) != 0x80; }));
+            return Utf8::CountCodePoints(StringView(text.data(), text.size()));
         }
 
         /// The names of the shipped table (second column), the distinct display names of them in the order of the file

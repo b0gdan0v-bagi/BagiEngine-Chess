@@ -1,5 +1,6 @@
 #include "OpeningBook.h"
 
+#include <BECore/Text/Utf8.h>
 #include <Chess/Game/MoveNotation.h>
 #include <Chess/Game/Position.h>
 
@@ -25,14 +26,6 @@ namespace BECore::Chess {
 
         bool IsContinuationByte(char c) {
             return (static_cast<unsigned char>(c) & 0xC0U) == 0x80U;
-        }
-
-        size_t CharCount(StringView text) {
-            size_t count = 0;
-            for (const char c : text) {
-                count += IsContinuationByte(c) ? 0 : 1;
-            }
-            return count;
         }
 
         /// The byte offset of the code point number @p chars (the size of @p text when it has no more)
@@ -235,15 +228,15 @@ namespace BECore::Chess {
 
     String OpeningDisplayName(StringView name, size_t maxChars) {
         StringView text = Trimmed(name);
-        if (CharCount(text) <= maxChars) {
+        if (Utf8::CountCodePoints(text) <= maxChars) {
             return String(text.data(), text.size());
         }
         text = BeforeMark(text, ':');
-        if (CharCount(text) <= maxChars) {
+        if (Utf8::CountCodePoints(text) <= maxChars) {
             return String(text.data(), text.size());
         }
         text = BeforeMark(text, ',');
-        if (CharCount(text) <= maxChars) {
+        if (Utf8::CountCodePoints(text) <= maxChars) {
             return String(text.data(), text.size());
         }
         return CutAtWord(text, maxChars);

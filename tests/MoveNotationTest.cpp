@@ -379,7 +379,7 @@ namespace BECore::Chess::Tests {
 
     TEST(MoveNotationTest, ParseSanRejectsMovesOfAnotherPosition) {
         EXPECT_EQ(Parsed(kStartFen, "Nf6"), "-") << "Black's move";
-        EXPECT_EQ(Parsed(kStartFen, "e5"), "-") << "a pawn cannot go two files up";
+        EXPECT_EQ(Parsed(kStartFen, "e5"), "-") << "no pawn reaches e5 in one move";
         EXPECT_EQ(Parsed(kStartFen, "Nxf3"), "g1f3") << "the capture mark is not checked against the board";
         EXPECT_EQ(Parsed(kStartFen, "d5"), "-");
         EXPECT_EQ(Parsed(kStartFen, "Ke2"), "-");

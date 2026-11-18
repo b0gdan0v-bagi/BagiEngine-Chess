@@ -15,12 +15,12 @@ namespace BECore::Chess {
             return {};
         }
         std::ifstream stream(file, std::ios::binary);  //-NoStd: engine-file-layer: a text file of the content, read whole
-        std::ostringstream content;                    //-NoStd: engine-file-layer: see above
-        content << stream.rdbuf();
-        if (!stream && !stream.eof()) {
+        if (!stream.is_open()) {
             LOG_WARNING("Opening names: '{}' cannot be read, no opening is named"_format(virtualPath));
             return {};
         }
+        std::ostringstream content;  //-NoStd: engine-file-layer: see above
+        content << stream.rdbuf();
         const std::string text = content.str();  //-NoStd: engine-file-layer: see above
         Vector<String> problems;
         OpeningBook book = OpeningBook::Parse(StringView(text.data(), text.size()), &problems);
