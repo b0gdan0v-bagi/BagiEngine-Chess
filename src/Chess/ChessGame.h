@@ -144,10 +144,20 @@ namespace BECore::Chess {
         /// Ends the draft and leaves the game exactly as it was (position, moves, status and version)
         void CancelEditing();
 
-        /// The reason the last PlayFromHere() refused, until the next change of the draft; empty when not editing
+        /**
+         * @brief Loads the FEN a person pasted (surrounding whitespace dropped) as the draft, beginning the editor when none is open.
+         *
+         * @return false when the text is no position the rules take: nothing changes (an editor is not even begun) and GetEditorMessage() says why.
+         */
+        bool PasteFen(StringView text);
+
+        /// What the last PlayFromHere() or PasteFen() refused, or the clipboard said, until the next change of the draft; also while no editor is open (the section "Position" shows it then)
         [[nodiscard]] StringView GetEditorMessage() const noexcept {
-            return IsEditing() ? StringView(_editorMessage) : StringView();
+            return _editorMessage;
         }
+
+        /// Replaces the message; an empty one takes it away. The words are EditorText's
+        void SetEditorMessage(StringView message);
 
         /// The active game, or nullptr when no game is active or the active game is not Chess (the same for the GetActive*() below)
         static ChessGame* GetActive();

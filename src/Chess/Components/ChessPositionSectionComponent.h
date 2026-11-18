@@ -7,11 +7,16 @@ namespace BECore::InputEvents {
     struct ActionEvent;
 }
 
+namespace BECore::ClipboardEvents {
+    struct PasteEvent;
+}
+
 namespace BECore::Chess {
 
     /**
      * @brief The menu section "Position", on the node `PositionSection` before its canvas: answers `ChessEditBegin` (`value` `current`, `empty` or `start`), `ChessEditSide` (`white` or `black`),
-     * `ChessEditCastle` (`+K`, `-K`, `+Q`, ...: the letter of a FEN's right, the sign the state the person asks for), `ChessEditPlay` and `ChessEditCancel` (the editor bar presses the same two).
+     * `ChessEditCastle` (`+K`, `-K`, `+Q`, ...: the letter of a FEN's right, the sign the state the person asks for), `ChessEditPlay` and `ChessEditCancel` (the editor bar presses the same two),
+     * `ChessEditCopy` and `ChessEditPaste` (the clipboard; what it answers is in `{editorMessage}`), and a `PasteEvent` (Ctrl+V) while a position is edited or the section is shown.
      *
      * Beginning an editor, and ending it by Play (when the rules take the draft) or Cancel, close the menu; a refused Play keeps it open and its reason shows in `{editorMessage}`. The component owns
      * no state: the side and the castling switches show `editorBlackToMove` and `editorCastle<K|Q|Kb|Qb>`, written from the draft when the game, the editing, the draft's revision or the message
@@ -29,6 +34,7 @@ namespace BECore::Chess {
 
     private:
         void OnAction(const InputEvents::ActionEvent& event);
+        void OnPaste(const ClipboardEvents::PasteEvent& event);
 
         bool _published = false;
         const void* _publishedGame = nullptr;

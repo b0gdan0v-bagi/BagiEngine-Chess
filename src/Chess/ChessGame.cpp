@@ -178,6 +178,28 @@ namespace BECore::Chess {
         return true;
     }
 
+    bool ChessGame::PasteFen(StringView text) {
+        const auto isSpace = [](char c) { return c == ' ' || c == '\t' || c == '\r' || c == '\n'; };
+        while (!text.empty() && isSpace(text.front())) {
+            text.remove_prefix(1);
+        }
+        while (!text.empty() && isSpace(text.back())) {
+            text.remove_suffix(1);
+        }
+        // LoadFen() leaves the draft as it was on an error; with no editor open nothing is shown either way
+        if (const auto result = _editor.LoadFen(text); !result) {
+            _editorMessage = String(EditorText::Refusal(result.error()));
+            return false;
+        }
+        _editorMessage.clear();
+        _model.ShowDraft(_editor.GetSquares());
+        return true;
+    }
+
+    void ChessGame::SetEditorMessage(StringView message) {
+        _editorMessage = String(message);
+    }
+
     void ChessGame::CancelEditing() {
         _editorMessage.clear();
         _model.EndDraft();

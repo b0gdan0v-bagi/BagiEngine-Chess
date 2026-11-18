@@ -3,11 +3,11 @@
      and the end-of-game bar), started hidden, built like the section "Game": the Position button of the menu list shows it (ChessOpenSection, value position: the row of
      Game/MenuSections.cpp), the editor bar shows it too while a position is edited; the one button, Back, returns to the list (ChessOpenMenu) and fills its row; the dim is a button of its
      own that hides both (ChessCloseMenu) with stateLook="false", always the first child. ChessPositionSectionComponent (listed before the canvas) answers ChessEditBegin (value current, empty or
-     start), ChessEditSide (value white or black), ChessEditCastle (value +K, -K, +Q, -Q, +k, -k, +q or -q), ChessEditPlay and ChessEditCancel; it owns no state: the side and the four castling
-     switches show the variables editorBlackToMove and editorCastle<K|Q|k|q>, and {editorMessage} is the reason the last Play was refused. A control that needs an open editor is greyed (the clicker's
+     start), ChessEditSide (value white or black), ChessEditCastle (value +K, -K, +Q, -Q, +k, -k, +q or -q), ChessEditCopy, ChessEditPaste, ChessEditPlay and ChessEditCancel; it owns no state: the side and the four castling
+     switches show the variables editorBlackToMove and editorCastle<K|Q|k|q>, and {editorMessage} is the reason the last Play or Paste was refused, or what the clipboard said. A control that needs an open editor is greyed (the clicker's
      disabled and the text's fadeWhenDisabled) while none is, and a castling switch while its king and rook are not on their squares. The pieces are not placed here: a modal panel hides the board,
-     so they are put from the editor bar. Two-column rows keep the plate low: 16 + 44 (title) + 56 (Edit this position) + 56 (Empty board, Start position) + 56 (the side) + 56 + 56 (the four
-     castling switches) + 28 (the message) + 56 (Play from here, Cancel editing) + 56 (Back) + 8 x 8 (spacing) + 16 = 560 units high, which the safe area of every view has. The plate is 94% of
+     so they are put from the editor bar. Two-column rows keep the plate low: 16 + 44 (title) + 56 (Edit this position) + 56 (Empty board, Start position) + 56 (Copy FEN, Paste FEN) + 56 (the side) + 56 + 56 (the four
+     castling switches) + 28 (the message) + 56 (Play from here, Cancel editing) + 56 (Back) + 9 x 8 (spacing) + 16 = 624 units high, which the safe area of every view has. The plate is 94% of
      the safe area up to 640 units, so a column of the narrowest Portrait window (94% of 590 safe units) is 257 units. Every name starts with PositionSection because elements are found by name in every canvas
      of the scene. -->
 <node name="PositionSection" layer="20" contentVersion="5">
@@ -20,7 +20,7 @@
             <component type="UIInputClicker" action="ChessCloseMenu" stateLook="false"/>
           </components>
         </element>
-        <element type="UIStack" name="PositionSectionPlate" anchor="Center" width="94%" maxWidth="640" height="560" direction="Vertical" spacing="8" padding="16" crossAlign="Stretch" color="36,40,52,255" blocksInput="true">
+        <element type="UIStack" name="PositionSectionPlate" anchor="Center" width="94%" maxWidth="640" height="624" direction="Vertical" spacing="8" padding="16" crossAlign="Stretch" color="36,40,52,255" blocksInput="true">
           <children>
             <element type="UIElement" name="PositionSectionTitle" height="44" fontSize="30">
               <components>
@@ -45,6 +45,22 @@
                   <components>
                     <component type="UITextComponent" text="Start position" align="Center" verticalAlign="Center" wrap="false"/>
                     <component type="UIInputClicker" action="ChessEditBegin" value="start"/>
+                  </components>
+                </element>
+              </children>
+            </element>
+            <element type="UIStack" name="PositionSectionClipboard" height="56" direction="Horizontal" spacing="8" crossAlign="Stretch">
+              <children>
+                <element type="UIElement" name="PositionSectionCopy" flex="1" height="56" fontSize="26" color="70,70,100,255">
+                  <components>
+                    <component type="UITextComponent" text="Copy FEN" align="Center" verticalAlign="Center" wrap="false"/>
+                    <component type="UIInputClicker" action="ChessEditCopy"/>
+                  </components>
+                </element>
+                <element type="UIElement" name="PositionSectionPaste" flex="1" height="56" fontSize="26" color="70,70,100,255">
+                  <components>
+                    <component type="UITextComponent" text="Paste FEN" align="Center" verticalAlign="Center" wrap="false"/>
+                    <component type="UIInputClicker" action="ChessEditPaste"/>
                   </components>
                 </element>
               </children>

@@ -1,3 +1,4 @@
+#include <BECore/Clipboard/FakeClipboard.h>
 #include <Chess/Game/EditorText.h>
 #include <tests/ChessUiHarness.h>
 
@@ -9,12 +10,12 @@ namespace BECore::Chess::Tests {
 
         constexpr const char* kSectionNode = "PositionSection";
         constexpr const char* kSectionPlate = "PositionSectionPlate";
-        constexpr float kMaxPlateHeight = 560.0f;  // every view's safe area holds the plate, and the row of two columns keeps it this low
+        constexpr float kMaxPlateHeight = 624.0f;  // every view's safe area holds the plate, and the rows of two columns keep it this low
 
         /// Every control of the section that a click acts on, by name
-        constexpr const char* kSectionControls[] = {"PositionSectionCurrent",    "PositionSectionEmpty",      "PositionSectionStart",       "PositionSectionSideRow",
-                                                    "PositionSectionCastleKRow", "PositionSectionCastleQRow", "PositionSectionCastleKbRow", "PositionSectionCastleQbRow",
-                                                    "PositionSectionPlay",       "PositionSectionCancel",     "PositionSectionBack"};
+        constexpr const char* kSectionControls[] = {"PositionSectionCurrent",    "PositionSectionEmpty",       "PositionSectionStart",       "PositionSectionSideRow", "PositionSectionCastleKRow",
+                                                    "PositionSectionCastleQRow", "PositionSectionCastleKbRow", "PositionSectionCastleQbRow", "PositionSectionPlay",    "PositionSectionCancel",
+                                                    "PositionSectionBack",       "PositionSectionCopy",        "PositionSectionPaste"};
 
         /// The longest line the editor can say: the panel's own line must hold it
         String LongestMessage() {
@@ -353,6 +354,213 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(Editor().ToFen(), fen);
         EXPECT_EQ(Editor().GetRevision(), revision);
         EXPECT_TRUE(Game().IsEditing());
+    }
+
+    /// The section with a fake clipboard in place of the system's, which no test touches
+    class ChessUiPositionClipboardTest : public ChessUiPositionSectionTest {
+    protected:
+        void SetUp() override {
+            ChessUiPositionSectionTest::SetUp();
+            _fake = New<FakeClipboard>();
+            _scoped.emplace(_fake);
+        }
+
+        void TearDown() override {
+            _scoped.reset();
+            _fake.Reset();
+            ChessUiPositionSectionTest::TearDown();
+        }
+
+        FakeClipboard& Fake() const {
+            return *_fake;
+        }
+
+        /// The clipboard answers the reads of this frame and the game sees the answers
+        static void Answer() {
+            CoreManager::GetClipboard().Update();
+        }
+
+        /// A click on Paste and the clipboard's answer
+        void PasteByButton() {
+            ASSERT_TRUE(ClickSection("PositionSectionPaste").Both());
+            Answer();
+            Draw();
+        }
+
+    private:
+        IntrusivePtr<FakeClipboard> _fake;
+        Optional<ScopedClipboardBackend> _scoped;
+    };
+
+    constexpr const char* kKingsAndARook = "4k3/8/8/8/8/8/8/R3K3 b Q - 0 1";
+
+    TEST_F(ChessUiPositionClipboardTest, CopyPutsTheFenOfTheDraftOnTheClipboardAndSaysSo) {
+        Game().BeginEditing(EditStart::Empty);
+        PutPiece("e1", PieceType::King, PieceColor::White);
+        Game().EditChanged();
+        ASSERT_TRUE(OpenTheSection());
+
+        ASSERT_TRUE(ClickSection("PositionSectionCopy").Both());
+        Draw();
+
+        EXPECT_EQ(Fake().Content(), Editor().ToFen()) << "a draft the rules refuse is copied too";
+        EXPECT_EQ(Var("editorMessage"), String(EditorText::Clipboard(ClipboardStatus::Ok)));
+        EXPECT_TRUE(Section()->_visible) << "the menu stays";
+        EXPECT_TRUE(Game().IsEditing());
+    }
+
+    TEST_F(ChessUiPositionClipboardTest, CopyOfAPlainGameTakesItsPositionAndBeginsNoEditor) {
+        ASSERT_TRUE(PlayAll(Model(), {"e2e4"}));
+        ASSERT_TRUE(OpenTheSection());
+
+        ASSERT_TRUE(ClickSection("PositionSectionCopy").Both());
+
+        EXPECT_EQ(Fake().Content(), Model().GetPosition().ToFen());
+        EXPECT_FALSE(Game().IsEditing());
+    }
+
+    TEST_F(ChessUiPositionClipboardTest, CopyWithNoClipboardSaysSoAndTheMessageDoesNotOutliveThePanel) {
+        Fake().SetAvailable(false);
+        Fake().SetRefuse(true);
+        ASSERT_TRUE(OpenTheSection());
+
+        ASSERT_TRUE(ClickSection("PositionSectionCopy").Both());
+        Draw();
+        EXPECT_EQ(Var("editorMessage"), String(EditorText::Clipboard(ClipboardStatus::Unavailable)));
+
+        ASSERT_TRUE(ClickSection("PositionSectionBack").Both());
+        Draw();
+        EXPECT_EQ(Var("editorMessage"), "") << "no editor: the line belongs to the panel";
+    }
+
+    TEST_F(ChessUiPositionClipboardTest, PasteOfAFenWithNoEditorOpenBeginsTheEditorOnItAndGivesTheBoardBack) {
+        ASSERT_TRUE(PlayAll(Model(), {"e2e4", "e7e5"}));
+        const uint64_t version = Model().GetVersion();
+        const String fen = Model().GetPosition().ToFen();
+        Fake().SetContent(String("  ") + kKingsAndARook + "\n");
+        ASSERT_TRUE(OpenTheSection());
+
+        PasteByButton();
+
+        ASSERT_TRUE(Game().IsEditing());
+        EXPECT_EQ(Editor().ToFen(), kKingsAndARook);
+        EXPECT_TRUE(MenuIsClosed());
+        EXPECT_EQ(Model().GetVersion(), version);
+        EXPECT_EQ(Model().GetPosition().ToFen(), fen) << "the game is not changed";
+    }
+
+    TEST_F(ChessUiPositionClipboardTest, PasteWhileEditingLoadsTheDraftAndKeepsTheMenu) {
+        Game().BeginEditing(EditStart::Start);
+        ASSERT_TRUE(OpenTheSection());
+        Fake().SetContent(kKingsAndARook);
+
+        PasteByButton();
+
+        EXPECT_EQ(Editor().ToFen(), kKingsAndARook);
+        EXPECT_TRUE(Section()->_visible);
+        EXPECT_EQ(Var("editorMessage"), "");
+    }
+
+    TEST_F(ChessUiPositionClipboardTest, ATextThatIsNoPositionChangesNeitherTheGameNorTheDraftAndSaysWhy) {
+        struct Case {
+            const char* text;
+            FenError error;
+        };
+        const Case cases[] = {{"8/8/8/8/8/8/8/8 w - - 0 1", FenError::BadKingCount}, {"hello", FenError::WrongFieldCount}};
+        for (const bool editing : {false, true}) {
+            for (const Case& refused : cases) {
+                SCOPED_TRACE(refused.text);
+                Game().CancelEditing();
+                if (editing) {
+                    Game().BeginEditing(EditStart::Start);
+                }
+                const String draft = Editor().ToFen();
+                const String game = Model().GetPosition().ToFen();
+                ASSERT_TRUE(OpenTheSection());
+                Fake().SetContent(refused.text);
+
+                PasteByButton();
+
+                EXPECT_EQ(Game().IsEditing(), editing) << "not even an empty editor is begun";
+                EXPECT_EQ(Editor().ToFen(), draft);
+                EXPECT_EQ(Model().GetPosition().ToFen(), game);
+                EXPECT_EQ(Var("editorMessage"), String(EditorText::Refusal(refused.error)));
+                EXPECT_TRUE(Section()->_visible);
+                ASSERT_TRUE(ClickSection("PositionSectionBack").Both());
+                ASSERT_TRUE(ClickMenuList("MenuClose").Both());
+            }
+        }
+    }
+
+    TEST_F(ChessUiPositionClipboardTest, AnEmptyAndARefusingAndAMissingClipboardEachSayTheirWords) {
+        struct Case {
+            ClipboardStatus status;
+            void (*prepare)(FakeClipboard&);
+        };
+        const Case cases[] = {{ClipboardStatus::Empty, [](FakeClipboard& fake) { fake.SetContent(""); }},
+                              {ClipboardStatus::Refused, [](FakeClipboard& fake) { fake.SetRefuse(true); }},
+                              {ClipboardStatus::Unavailable, [](FakeClipboard& fake) { fake.SetAvailable(false); }}};
+        ASSERT_TRUE(OpenTheSection());
+        for (const Case& answered : cases) {
+            SCOPED_TRACE(ToString(answered.status).data());
+            Fake().SetContent(kKingsAndARook);
+            Fake().SetRefuse(false);
+            Fake().SetAvailable(true);
+            answered.prepare(Fake());
+
+            PasteByButton();
+
+            EXPECT_EQ(Var("editorMessage"), String(EditorText::Clipboard(answered.status)));
+            EXPECT_FALSE(Game().IsEditing());
+        }
+    }
+
+    TEST_F(ChessUiPositionClipboardTest, AnAnswerThatComesAfterTheGameIsGoneIsIgnored) {
+        ASSERT_TRUE(OpenTheSection());
+        Fake().SetContent(kKingsAndARook);
+        ASSERT_TRUE(ClickSection("PositionSectionPaste").Both());
+
+        GameManager::GetInstance().Shutdown();
+        ASSERT_EQ(ChessGame::GetActive(), nullptr);
+        Answer();
+
+        EXPECT_FALSE(CoreManager::GetClipboard().HasPending());
+    }
+
+    TEST_F(ChessUiPositionClipboardTest, ThePasteEventLoadsTheDraftWhileEditingAndDoesNothingInAPlainGame) {
+        const String fen = Model().GetPosition().ToFen();
+        Fake().QueuePasted(kKingsAndARook);
+        Answer();
+        EXPECT_FALSE(Game().IsEditing()) << "a paste in the game is no editor";
+        EXPECT_EQ(Model().GetPosition().ToFen(), fen);
+
+        Game().BeginEditing(EditStart::Start);
+        Fake().QueuePasted(kKingsAndARook);
+        Answer();
+        EXPECT_EQ(Editor().ToFen(), kKingsAndARook);
+    }
+
+    TEST_F(ChessUiPositionClipboardTest, ThePasteEventWhileTheSectionIsShownBeginsTheEditor) {
+        ASSERT_TRUE(OpenTheSection());
+        Fake().QueuePasted(kKingsAndARook);
+
+        Answer();
+
+        ASSERT_TRUE(Game().IsEditing());
+        EXPECT_EQ(Editor().ToFen(), kKingsAndARook);
+        EXPECT_TRUE(MenuIsClosed());
+    }
+
+    TEST_F(ChessUiPositionClipboardTest, ThePasteEventWithATextThatIsNoPositionSaysWhyAndChangesNothing) {
+        Game().BeginEditing(EditStart::Start);
+        const String draft = Editor().ToFen();
+        Fake().QueuePasted("not a fen");
+
+        Answer();
+        Draw();
+
+        EXPECT_EQ(Editor().ToFen(), draft);
+        EXPECT_EQ(Var("turn"), String(EditorText::Refusal(FenError::WrongFieldCount))) << "the HUD says it while editing";
     }
 
 }  // namespace BECore::Chess::Tests

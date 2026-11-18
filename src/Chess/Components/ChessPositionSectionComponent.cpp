@@ -1,5 +1,6 @@
 #include "ChessPositionSectionComponent.h"
 
+#include <BECore/Clipboard/Clipboard.h>
 #include <BECore/GameManager/CoreManager.h>
 #include <BECore/Scene/SceneNode.h>
 #include <BECore/UI/UICanvasComponent.h>
@@ -7,6 +8,8 @@
 #include <BECore/UI/UIVars.h>
 #include <Chess/ChessGame.h>
 #include <Chess/Components/MenuActions.h>
+#include <Chess/Game/EditorText.h>
+#include <Events/ClipboardEvents.h>
 #include <Events/InputEvents.h>
 #include <Generated/ChessPositionSectionComponent.gen.hpp>
 
@@ -18,6 +21,8 @@ namespace BECore::Chess {
             static constexpr auto chessEditBegin = "ChessEditBegin"_intern;
             static constexpr auto chessEditCancel = "ChessEditCancel"_intern;
             static constexpr auto chessEditCastle = "ChessEditCastle"_intern;
+            static constexpr auto chessEditCopy = "ChessEditCopy"_intern;
+            static constexpr auto chessEditPaste = "ChessEditPaste"_intern;
             static constexpr auto chessEditPlay = "ChessEditPlay"_intern;
             static constexpr auto chessEditSide = "ChessEditSide"_intern;
             static constexpr auto editorBlackToMove = "editorBlackToMove"_intern;
@@ -93,10 +98,38 @@ namespace BECore::Chess {
             InputEvents::ActionEvent::Emit(MenuActions::closeMenu);
         }
 
+        /// The answer of the clipboard to a paste: a text is loaded as the draft (an editor that was not open begins, and the menu gives the board back), anything else is said in the message
+        void ApplyPaste(ChessGame& game, const ClipboardText& answer) {
+            if (answer.status != ClipboardStatus::Ok) {
+                game.SetEditorMessage(EditorText::Clipboard(answer.status));
+                return;
+            }
+            const bool wasEditing = game.IsEditing();
+            if (game.PasteFen(answer.text) && !wasEditing) {
+                CloseTheMenu();
+            }
+        }
+
+        void CopyFen(ChessGame& game) {
+            const String fen = game.IsEditing() ? game.GetEditor().ToFen() : game.GetModel().GetPosition().ToFen();
+            const bool copied = CoreManager::GetClipboard().SetText(fen);
+            game.SetEditorMessage(EditorText::Clipboard(copied ? ClipboardStatus::Ok : ClipboardStatus::Unavailable));
+        }
+
     }  // namespace
 
     void ChessPositionSectionComponent::OnAttached() {
         SubscribeInScene<InputEvents::ActionEvent, &ChessPositionSectionComponent::OnAction>(this);
+        SubscribeInScene<ClipboardEvents::PasteEvent, &ChessPositionSectionComponent::OnPaste>(this);
+    }
+
+    void ChessPositionSectionComponent::OnPaste(const ClipboardEvents::PasteEvent& event) {
+        ChessGame* game = ChessGame::GetActive();
+        const auto canvas = GetNode().GetComponent<UICanvasComponent>();
+        // A paste in the plain game is no editor: only an open editor or the shown section takes it
+        if (game && (game->IsEditing() || (canvas && canvas->_visible))) {
+            ApplyPaste(*game, ClipboardText{ClipboardStatus::Ok, event.text});
+        }
     }
 
     void ChessPositionSectionComponent::OnAction(const InputEvents::ActionEvent& event) {
@@ -106,8 +139,31 @@ namespace BECore::Chess {
         const bool castle = action == Ids::chessEditCastle;
         const bool play = action == Ids::chessEditPlay;
         const bool cancel = action == Ids::chessEditCancel;
-        ChessGame* game = (begin || side || castle || play || cancel) ? ChessGame::GetActive() : nullptr;
+        const bool copy = action == Ids::chessEditCopy;
+        const bool paste = action == Ids::chessEditPaste;
+        const bool leaves = action == MenuActions::openMenu || action == MenuActions::closeMenu;
+        ChessGame* game = (begin || side || castle || play || cancel || copy || paste || leaves) ? ChessGame::GetActive() : nullptr;
         if (!game) {
+            return;
+        }
+        if (leaves) {
+            // With no editor the message is only this panel's: it does not outlive the panel
+            if (!game->IsEditing()) {
+                game->SetEditorMessage({});
+            }
+            return;
+        }
+        if (copy) {
+            CopyFen(*game);
+            return;
+        }
+        if (paste) {
+            // The clipboard has no cancel: the answer finds the game itself, whatever has happened to this component and the game by then
+            CoreManager::GetClipboard().RequestText([](const ClipboardText& answer) {
+                if (ChessGame* active = ChessGame::GetActive()) {
+                    ApplyPaste(*active, answer);
+                }
+            });
             return;
         }
         const StringView value = event.value.ToStringView();

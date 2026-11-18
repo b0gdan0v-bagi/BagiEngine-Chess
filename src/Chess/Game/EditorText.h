@@ -1,5 +1,6 @@
 #pragma once
 
+#include <BECore/Clipboard/ClipboardTypes.h>
 #include <Chess/Game/PositionEditor.h>
 
 namespace BECore::Chess::EditorText {
@@ -12,5 +13,8 @@ namespace BECore::Chess::EditorText {
 
     /// Why the draft did not take an edit.
     [[nodiscard]] StringView Refusal(EditRefusal refusal);
+
+    /// What the clipboard answered to a copy or a paste, in a short line. Ok is what a copy says; a read that gave a text needs no words
+    [[nodiscard]] StringView Clipboard(ClipboardStatus status);
 
 }  // namespace BECore::Chess::EditorText

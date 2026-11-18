@@ -33,4 +33,18 @@ namespace BECore::Chess::EditorText {
         return "Not on the board";
     }
 
+    StringView Clipboard(ClipboardStatus status) {
+        switch (status) {
+            case ClipboardStatus::Ok:
+                return "FEN copied";
+            case ClipboardStatus::Empty:
+                return "Clipboard is empty";
+            case ClipboardStatus::Refused:
+                return "Clipboard refused";
+            case ClipboardStatus::Unavailable:
+                return "No clipboard access";
+        }
+        return "No clipboard access";
+    }
+
 }  // namespace BECore::Chess::EditorText
