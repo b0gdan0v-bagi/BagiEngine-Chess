@@ -1,11 +1,34 @@
 #include "ChessGame.h"
 
+#include <BECore/GameManager/CoreManager.h>
 #include <Chess/Game/GameEnding.h>
 #include <Games/GameManager.h>
 #include <Generated/ChessGame.gen.hpp>
 #include <random>
 
 namespace BECore::Chess {
+
+    OpeningBook ChessGame::LoadOpeningBook(StringView virtualPath) {
+        const std::filesystem::path file = CoreManager::GetFileSystem().ResolvePath(virtualPath);
+        if (file.empty()) {
+            LOG_WARNING("Opening names: '{}' not found, no opening is named"_format(virtualPath));
+            return {};
+        }
+        std::ifstream stream(file, std::ios::binary);  //-NoStd: engine-file-layer: a text file of the content, read whole
+        std::ostringstream content;                    //-NoStd: engine-file-layer: see above
+        content << stream.rdbuf();
+        if (!stream && !stream.eof()) {
+            LOG_WARNING("Opening names: '{}' cannot be read, no opening is named"_format(virtualPath));
+            return {};
+        }
+        const std::string text = content.str();  //-NoStd: engine-file-layer: see above
+        Vector<String> problems;
+        OpeningBook book = OpeningBook::Parse(StringView(text.data(), text.size()), &problems);
+        for (const String& problem : problems) {
+            LOG_WARNING("Opening names: {}"_format(problem));
+        }
+        return book;
+    }
 
     ChessGame* ChessGame::GetActive() {
         auto* active = GameManager::GetInstance().GetActive();
@@ -37,7 +60,12 @@ namespace BECore::Chess {
         return chess ? &chess->GetDrawJudge() : nullptr;
     }
 
-    ChessGame::ChessGame() : _opponent(_model), _choice(_opponent), _control(_model, _opponent, _analyst, _drawJudge) {
+    const OpeningBook* ChessGame::GetActiveOpenings() {
+        ChessGame* chess = GetActive();
+        return chess ? &chess->GetOpenings() : nullptr;
+    }
+
+    ChessGame::ChessGame() : _opponent(_model), _choice(_opponent), _control(_model, _opponent, _analyst, _drawJudge, _openings) {
         // A new game draws a new seed; a device per draw because the source has to be copyable and a Reset is rare
         _model.SetSeedSource([]() -> uint32_t {
             //-NoStd: the operating system's randomness is the real boundary of the seed
@@ -64,6 +92,7 @@ namespace BECore::Chess {
 
     void ChessGame::Start() {
         _model.Reset();
+        _openings = LoadOpeningBook(kOpeningsPath);
         _opponent.SetSettings(OpponentSettings::Load());
         // Two people: nothing is looked up or started until a side is picked, so none of the three can be refused (DefaultEngine() is Stockfish only when a file was found by SetSettings())
         [[maybe_unused]] const auto side = _opponent.SetSide(std::nullopt);

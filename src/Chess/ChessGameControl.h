@@ -4,6 +4,7 @@
 #include <Chess/Engine/OpponentController.h>
 #include <Chess/Engine/PositionAnalyst.h>
 #include <Chess/Game/ChessGameModel.h>
+#include <Chess/Game/OpeningBook.h>
 #include <Games/IControllableGame.h>
 
 namespace BECore::Chess {
@@ -24,7 +25,7 @@ namespace BECore::Chess {
     /**
      * @brief The external control API of Chess: the position, the legal moves, a way to play one, to load a position and to pick the computer opponent.
      *
-     * State: {"fen", "board", "turn", "status", "winner", "inCheck", "legalMoveCount", "startFen", "moves", "sanMoves", "takeBackPlies", "opponent", "material", "analysis", "drawOffer"}.
+     * State: {"fen", "board", "turn", "status", "winner", "inCheck", "legalMoveCount", "startFen", "moves", "sanMoves", "opening", "takeBackPlies", "opponent", "material", "analysis", "drawOffer"}.
      * board is 8 strings, rank 8 first, file a first: white pieces are upper case (PNBRQK), black ones lower case, '.' is an
      * empty square. turn and winner are "white" or "black" (winner is null until a side has won). status is one of
      * "ongoing", "checkmate", "stalemate", "draw_insufficient_material", "draw_threefold", "draw_fifty_moves", "resigned", "draw_agreed"; everything but
@@ -45,6 +46,11 @@ namespace BECore::Chess {
      * of the log). While an error stands the program does not play and waits for the version of the game to move (a reset, set_state, a move of someone else) or
      * for another pick. A pick of Stockfish succeeds whenever a Stockfish file is found and is engine_unavailable when none is (a launch that fails shows only at the first search, as error
      * "launch_failed"); a pick of "own" always succeeds.
+     *
+     * opening is {"eco", "name"} (OpeningBook: "B90", "Sicilian Defense: Najdorf Variation", the full name of the table, not the HUD's cut one) or null: the opening of the **game's** position, not
+     * of the one the screen views (like sanMoves), derived from startFen and moves at every call (it has no version of its own). It is the name of the last position of the game that the book
+     * knows, so it stays once the game has left the book, and a transposition has the name of its position; null when no position of the game is in the book (the start of every game, a
+     * set_state fen outside it) and when the game has no book (its file is missing).
      *
      * material is {"balance", "capturedByWhite", "capturedByBlack"}, derived from the position at every call (it has no version of its own): balance is White's points minus Black's on the board (pawn
      * 1, knight 3, bishop 3, rook 5, queen 9; a piece made by a promotion counts, so it is not a count of what was taken), positive when White is ahead; capturedByWhite is the Black pieces that are
@@ -123,8 +129,8 @@ namespace BECore::Chess {
      */
     class ChessGameControl : public IControllableGame {
     public:
-        /// All four must outlive the adapter (ChessGame declares them before it)
-        ChessGameControl(ChessGameModel& model, OpponentController& opponent, PositionAnalyst& analyst, DrawOfferJudge& drawJudge);
+        /// All five must outlive the adapter (ChessGame declares them before it)
+        ChessGameControl(ChessGameModel& model, OpponentController& opponent, PositionAnalyst& analyst, DrawOfferJudge& drawJudge, const OpeningBook& openings);
 
         [[nodiscard]] std::expected<Json, ControlError> GetState() const override;
         [[nodiscard]] std::expected<Json, ControlError> GetActions() const override;
@@ -149,6 +155,7 @@ namespace BECore::Chess {
         OpponentController& _opponent;
         PositionAnalyst& _analyst;
         DrawOfferJudge& _drawJudge;
+        const OpeningBook& _openings;
     };
 
 }  // namespace BECore::Chess

@@ -6,6 +6,7 @@
 #include <Chess/Engine/OpponentController.h>
 #include <Chess/Engine/PositionAnalyst.h>
 #include <Chess/Game/ChessGameModel.h>
+#include <Chess/Game/OpeningBook.h>
 #include <Chess/Save/ChessSaveKeeper.h>
 #include <Games/IGame.h>
 
@@ -18,6 +19,8 @@ namespace BECore::Chess {
      * opponent panel makes over it (OpponentChoice: it remembers the person's color while nobody plays), the analysis of the position (PositionAnalyst, with the default factory over the settings the
      * controller holds), the judge of the person's draw offers (DrawOfferJudge, which makes its engine through the analyst's factory, so a factory given to the analyst reaches it too), the
      * save keeper and the adapter of the control API (ChessGameControl). A game starts with nobody as the opponent (it is made when a side is picked) and the analysis off.
+     *
+     * Start() loads the opening names (OpeningBook) from kOpeningsPath; a file that is missing or cannot be read leaves the book empty (one warning), so the game plays and no position has a name.
      *
      * IGame has no per-frame hook, so ChessBoardComponent runs GetOpponent().Update(), GetAnalyst().Update(), GetDrawJudge().Update() and UpdateKeeper() every frame. Start() ends by restoring
      * the saved game, the opponent choice and the player's audio levels (ChessSaveKeeper, when the run asks for it). Stop() starts by writing them, then destroys the opponent and shuts the analyst
@@ -81,6 +84,21 @@ namespace BECore::Chess {
         /// Resign buttons, the HUD's and the menu section's
         [[nodiscard]] Optional<PieceColor> ResigningNow() const;
 
+        /// The virtual path of the table of opening names that Start() loads
+        static constexpr StringView kOpeningsPath = "assets/openings/openings.tsv";
+
+        /// The book of the table at @p virtualPath; empty, with one warning, when the file is missing or cannot be read (the game goes on without names)
+        [[nodiscard]] static OpeningBook LoadOpeningBook(StringView virtualPath);
+
+        const OpeningBook& GetOpenings() const noexcept {
+            return _openings;
+        }
+
+        /// Replaces the book Start() loaded; for a test, which has no game content root to load it from
+        void SetOpenings(OpeningBook openings) {
+            _openings = eastl::move(openings);
+        }
+
         const ChessSaveKeeper& GetKeeper() const noexcept {
             return _keeper;
         }
@@ -107,12 +125,16 @@ namespace BECore::Chess {
         /// The judge of draw offers of the active game
         static DrawOfferJudge* GetActiveDrawJudge();
 
+        /// The opening names of the active game
+        static const OpeningBook* GetActiveOpenings();
+
     private:
         ChessGameModel _model;
         OpponentController _opponent;  ///< after the model (it holds a reference to it) and before the adapter
         OpponentChoice _choice;        ///< after the controller (it holds a reference to it)
         PositionAnalyst _analyst;      ///< after the controller (its factory reads the controller's settings) and before the adapter
         DrawOfferJudge _drawJudge;     ///< after the analyst (its factory asks it) and before the adapter
+        OpeningBook _openings;         ///< before the adapter, which reads it
         ChessSaveKeeper _keeper;       ///< after everything it reads (it is handed the model, the controller and the choice in each call, and destroyed first)
         ChessGameControl _control;
         bool _stopped = false;  ///< between Stop() and the next Start(): UpdateKeeper() writes nothing

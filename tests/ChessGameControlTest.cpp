@@ -5,6 +5,7 @@
 #include <Common/EngineEnvironment.h>
 #include <EASTL/algorithm.h>
 #include <tests/ChessTestUtil.h>
+#include <tests/ShippedOpenings.h>
 #include <tests/TestEngines.h>
 
 /**
@@ -80,7 +81,7 @@ namespace BECore::Chess::Tests {
                 ::BECore::Tests::EngineEnvironment::EnsureCoreServices();  // TaskManager, which the searches run on
             }
 
-            ChessGameControlTest() : opponent(model), control(model, opponent, analyst, drawJudge) {
+            ChessGameControlTest() : opponent(model), control(model, opponent, analyst, drawJudge, openings) {
 #if CHESS_NO_STOCKFISH
                 // The cases below are a world of doubles in which "stockfish" is a name a test factory answers. A build without Stockfish starts with the own engine, so the
                 // fixture picks the name first, through a factory that makes any double. The cases of a real game of that build are those that say `WithoutStockfish`
@@ -234,6 +235,7 @@ namespace BECore::Chess::Tests {
             OpponentController opponent;
             PositionAnalyst analyst;
             DrawOfferJudge drawJudge;
+            OpeningBook openings;  ///< empty, like a game whose file is missing; a case that wants names copies the shipped book in
             ChessGameControl control;
         };
 
@@ -728,7 +730,8 @@ namespace BECore::Chess::Tests {
         OpponentController freshOpponent(freshModel);
         PositionAnalyst freshAnalyst;
         DrawOfferJudge freshJudge;
-        ChessGameControl freshControl(freshModel, freshOpponent, freshAnalyst, freshJudge);
+        const OpeningBook freshOpenings;
+        ChessGameControl freshControl(freshModel, freshOpponent, freshAnalyst, freshJudge, freshOpenings);
         const auto freshState = freshControl.GetState();
         ASSERT_TRUE(freshState.has_value());
         const Json* freshOpponentState = FindJsonMember(*freshState, "opponent");
@@ -3050,6 +3053,116 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(SetStateError(DrawRequest()), "game_over");
     }
 
+    // ---- The opening ----
+
+    namespace {
+
+        constexpr StringView kNajdorfMoves = "e2e4 c7c5 g1f3 d7d6 d2d4 c5d4 f3d4 g8f6 b1c3 a7a6";
+        constexpr StringView kNajdorfName = "Sicilian Defense: Najdorf Variation";
+
+        /// The "opening" of a state as "eco name", or "null"
+        String OpeningText(const Json& state) {
+            const Json* opening = FindJsonMember(state, "opening");
+            if (opening == nullptr) {
+                return "<missing>";
+            }
+            if (opening->is_null()) {
+                return "null";
+            }
+            return StringMember(*opening, "eco") + " " + StringMember(*opening, "name");
+        }
+
+        const String kNajdorfText = String("B90 ") + String(kNajdorfName.data(), kNajdorfName.size());
+
+        class ChessGameControlOpeningTest : public ChessGameControlTest {
+        protected:
+            ChessGameControlOpeningTest() {
+                openings = ShippedOpeningBook();
+            }
+
+            void PlayLine(StringView uciLine) {
+                size_t at = 0;
+                while (at < uciLine.size()) {
+                    const size_t end = uciLine.find(' ', at);
+                    const String uci(uciLine.data() + at, (end == StringView::npos ? uciLine.size() : end) - at);
+                    Perform(uci.c_str());
+                    if (end == StringView::npos) {
+                        break;
+                    }
+                    at = end + 1;
+                }
+            }
+        };
+
+    }  // namespace
+
+    TEST_F(ChessGameControlOpeningTest, TheStartStateHasNoOpening) {
+        EXPECT_EQ(OpeningText(State()), "null");
+    }
+
+    TEST_F(ChessGameControlOpeningTest, ThePlayedLineIsNamedWithItsEcoAndTheFullName) {
+        PlayLine(kNajdorfMoves);
+        EXPECT_EQ(OpeningText(State()), kNajdorfText);
+    }
+
+    TEST_F(ChessGameControlOpeningTest, TheOpeningFollowsEveryMoveOfTheLine) {
+        Perform("e2e4");
+        EXPECT_EQ(OpeningText(State()), "B00 King's Pawn Game");
+        Perform("c7c5");
+        EXPECT_EQ(OpeningText(State()), "B20 Sicilian Defense");
+    }
+
+    TEST_F(ChessGameControlOpeningTest, AnotherMoveOrderOfTheSamePositionHasTheSameName) {
+        PlayLine("g1f3 c7c5 e2e4 d7d6 d2d4 c5d4 f3d4 g8f6 b1c3 a7a6");
+        EXPECT_EQ(OpeningText(State()), kNajdorfText);
+    }
+
+    TEST_F(ChessGameControlOpeningTest, APositionSetByFenOutsideTheBookHasNoOpening) {
+        PlayLine(kNajdorfMoves);
+        SetFen("8/8/4k3/8/8/4K3/4P3/8 w - - 0 1");
+        EXPECT_EQ(OpeningText(State()), "null");
+    }
+
+    TEST_F(ChessGameControlOpeningTest, APositionSetByFenThatIsInTheBookIsNamedAtOnce) {
+        PlayLine("e2e4 c7c5");
+        const String fen = StringMember(State(), "fen");
+        ASSERT_TRUE(control.Reset(Json::object()).has_value());
+        EXPECT_EQ(OpeningText(State()), "null");
+        SetFen(fen);
+        EXPECT_EQ(OpeningText(State()), "B20 Sicilian Defense");
+    }
+
+    TEST_F(ChessGameControlOpeningTest, TheNameStaysWhenTheGameLeavesTheBookAndTheTakebackBringsTheEarlierOne) {
+        PlayLine("e2e4 c7c5 g1f3 d7d6");
+        const String earlier = OpeningText(State());
+        PlayLine("d2d4 c5d4 f3d4 g8f6 b1c3 a7a6");
+        PlayLine("a2a3 h7h6");
+        ASSERT_EQ(OpeningText(State()), kNajdorfText);
+
+        Json takeBack = Json::object();
+        takeBack["takeBack"] = Json::object();
+        takeBack["takeBack"]["plies"] = 8;
+        ASSERT_TRUE(control.SetState(takeBack).has_value());
+        EXPECT_EQ(OpeningText(State()), earlier);
+        EXPECT_NE(earlier, kNajdorfText);
+        EXPECT_NE(earlier, "null");
+    }
+
+    TEST_F(ChessGameControlOpeningTest, AResetEndsTheName) {
+        PlayLine("e2e4 c7c5");
+        ASSERT_EQ(OpeningText(State()), "B20 Sicilian Defense");
+        ASSERT_TRUE(control.Reset(Json::object()).has_value());
+        EXPECT_EQ(OpeningText(State()), "null");
+    }
+
+    TEST_F(ChessGameControlTest, WithNoBookNothingIsNamed) {
+        ASSERT_TRUE(openings.IsEmpty());
+        EXPECT_EQ(OpeningText(State()), "null");
+        Perform("e2e4");
+        Perform("c7c5");
+        EXPECT_EQ(OpeningText(State()), "null");
+    }
+
 #if CHESS_NO_STOCKFISH
 
     // ---- Without Stockfish (CHESS_NO_STOCKFISH): the default factory of a real controller ----
@@ -3058,7 +3171,7 @@ namespace BECore::Chess::Tests {
 
         /// A control adapter over a controller of its own, with the default factory and the default engine of this build
         struct RealDefaults {
-            RealDefaults() : opponent(model), control(model, opponent, analyst, drawJudge) {}
+            RealDefaults() : opponent(model), control(model, opponent, analyst, drawJudge, openings) {}
 
             Json OpponentState() const {
                 const auto state = control.GetState();
@@ -3070,6 +3183,7 @@ namespace BECore::Chess::Tests {
             OpponentController opponent;
             PositionAnalyst analyst;
             DrawOfferJudge drawJudge;
+            OpeningBook openings;
             ChessGameControl control;
         };
 

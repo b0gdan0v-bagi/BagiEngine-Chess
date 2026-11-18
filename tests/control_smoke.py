@@ -65,6 +65,7 @@ START_BOARD_TOP = "rnbqkbnr"
 START_BOARD_BOTTOM = "RNBQKBNR"
 START_MOVE_COUNT = 20
 OPENING = ["e2e4", "e7e5", "g1f3", "b8c6"]
+OPENING_NAME = {"eco": "C44", "name": "King's Knight Opening: Normal Variation"}
 MATE_IN_ONE_FEN = "6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1"  # Ra8#
 PROMOTION_FEN = "8/P6k/8/8/8/8/8/K7 w - - 0 1"
 
@@ -92,6 +93,7 @@ def check_start_position(client: BagiControlClient) -> None:
     check(state["turn"] == "white" and state["status"] == "ongoing" and state["winner"] is None, f"unexpected standing {state}")
     check(state["board"][0] == START_BOARD_TOP and state["board"][7] == START_BOARD_BOTTOM, f"unexpected board {state['board']}")
     check(state["moves"] == [] and state["legalMoveCount"] == START_MOVE_COUNT, f"unexpected moves {state['moves']} / {state['legalMoveCount']}")
+    check(state["opening"] is None, f"the start position has the opening {state['opening']}")
 
     actions = client.call("list_actions")["actions"]
     check(len(actions) == START_MOVE_COUNT, f"the start position lists {len(actions)} actions, not {START_MOVE_COUNT}")
@@ -114,6 +116,7 @@ def play_opening(client: BagiControlClient) -> dict:
     check(state["version"] == version, "get_state disagrees with perform_action about the version")
     check(state["state"]["moves"] == OPENING and state["state"]["startFen"] == START_FEN, f"unexpected history {state['state']['moves']}")
     check(state["state"]["board"][4] == "....P...", f"e4 is not on the board: {state['state']['board']}")
+    check(state["state"]["opening"] == OPENING_NAME, f"unexpected opening {state['state']['opening']}")  # the table is read from assets/openings/ of the game
     return reply
 
 

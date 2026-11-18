@@ -206,6 +206,18 @@ namespace BECore::Chess {
             return san;
         }
 
+        /// {"eco", "name"} of the opening of the game, or null
+        Json OpeningJson(const OpeningBook& openings, const ChessGameModel& model) {
+            const Optional<OpeningEntry> entry = OpeningOf(openings, model.GetStartFen(), model.GetMoves(), model.GetMoves().size());
+            if (!entry) {
+                return Json();
+            }
+            Json opening = Json::object();
+            opening["eco"] = TextJson(entry->eco);
+            opening["name"] = TextJson(entry->name);
+            return opening;
+        }
+
         ControlError BadOpponent(String message) {
             return MakeControlError(ControlErrors::kInvalidParams, message);
         }
@@ -294,8 +306,8 @@ namespace BECore::Chess {
 
     }  // namespace
 
-    ChessGameControl::ChessGameControl(ChessGameModel& model, OpponentController& opponent, PositionAnalyst& analyst, DrawOfferJudge& drawJudge)
-        : _model(model), _opponent(opponent), _analyst(analyst), _drawJudge(drawJudge) {}
+    ChessGameControl::ChessGameControl(ChessGameModel& model, OpponentController& opponent, PositionAnalyst& analyst, DrawOfferJudge& drawJudge, const OpeningBook& openings)
+        : _model(model), _opponent(opponent), _analyst(analyst), _drawJudge(drawJudge), _openings(openings) {}
 
     MoveList ChessGameControl::LegalMoves() const {
         return _model.IsGameOver() ? MoveList() : MoveGenerator::GenerateLegal(_model.GetPosition());
@@ -326,6 +338,7 @@ namespace BECore::Chess {
         state["startFen"] = TextJson(_model.GetStartFen());
         state["moves"] = std::move(moves);
         state["sanMoves"] = SanMovesJson(_model);
+        state["opening"] = OpeningJson(_openings, _model);
         state["takeBackPlies"] = TakeBackPlies(_model.GetMoves().size(), _model.GetTurn(), _opponent.GetPlays());
         state["opponent"] = OpponentJson();
         state["material"] = MaterialJson(_model.GetPosition());

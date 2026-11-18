@@ -306,6 +306,21 @@ namespace BECore::Chess::Tests {
         EXPECT_TRUE(std::filesystem::is_empty(_directory)) << "a folder or a file was made";
     }
 
+    TEST_F(ChessSaveGameTest, AStartLoadsTheOpeningTableOfItsPath) {
+        const ScopedEnvironment stockfish("STOCKFISH", FoundStockfishFile().c_str());
+        CoreManager::GetCommandLine().Set(Vector<String>{});
+        StartManager();
+
+        // Whether the table is found depends on where ChessTests runs (a game's assets/ is not mounted in it), so the start is held to the loader, not to a size
+        const ChessGame& game = Game();
+        EXPECT_EQ(game.GetOpenings().Size(), ChessGame::LoadOpeningBook(ChessGame::kOpeningsPath).Size());
+        EXPECT_EQ(ChessGame::GetActiveOpenings(), &game.GetOpenings());
+    }
+
+    TEST_F(ChessSaveGameTest, ATableThatIsNotThereIsAnEmptyBook) {
+        EXPECT_TRUE(ChessGame::LoadOpeningBook("assets/openings/no-such-table.tsv").IsEmpty());
+    }
+
     TEST_F(ChessSaveGameTest, AControlRunIgnoresASaveThatNoFlagNames) {
         MakeSave(SavedGameOf(kGameInProgress, "none"));
         const Vector<uint8_t> before = BytesOfFile(SaveFile());

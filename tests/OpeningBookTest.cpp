@@ -4,6 +4,7 @@
 #include <chrono>
 #include <iostream>
 #include <tests/ChessTestUtil.h>
+#include <tests/ShippedOpenings.h>
 
 /**
  * The opening book as a pure lookup: the mechanics on small inline tables, and the data on the shipped `assets/openings/openings.tsv`, found from the source
@@ -70,34 +71,6 @@ namespace BECore::Chess::Tests {
                 position.DoMove(move);
             }
             return position.Key();
-        }
-
-        String ReadShippedTable() {
-            const std::filesystem::path file = std::filesystem::path(__FILE__).parent_path().parent_path() / "assets/openings/openings.tsv";
-            std::ifstream stream(file, std::ios::binary);  //-NoStd: engine-file-layer: see the include
-            std::ostringstream content;                    //-NoStd: engine-file-layer: see the include
-            content << stream.rdbuf();
-            const std::string text = content.str();  //-NoStd: engine-file-layer: see the include
-            return String(text.data(), text.size());
-        }
-
-        struct ShippedBook {
-            String text;
-            OpeningBook book;
-            Vector<String> problems;
-        };
-
-        const ShippedBook& Shipped() {
-            static const ShippedBook shipped = [] {
-                ShippedBook result;
-                result.text = ReadShippedTable();
-                const auto start = std::chrono::steady_clock::now();
-                result.book = OpeningBook::Parse(result.text, &result.problems);
-                const auto took = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start);
-                std::cout << "[ openings ] parse of the shipped table: " << took.count() << " ms\n";
-                return result;
-            }();
-            return shipped;
         }
 
         /// The name of the opening of the game @p uciLine from the start, or "-" outside the book
@@ -224,25 +197,28 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(OpeningBookTest, TheShippedTableParsesWithoutAProblem) {
-        const ShippedBook& shipped = Shipped();
-        for (const String& problem : shipped.problems) {
+        Vector<String> problems;
+        const auto start = std::chrono::steady_clock::now();
+        const OpeningBook book = OpeningBook::Parse(ShippedOpeningsTable(), &problems);
+        const auto took = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start);
+        std::cout << "[ openings ] parse of the shipped table: " << took.count() << " ms\n";
+        for (const String& problem : problems) {
             ADD_FAILURE() << problem.c_str();
         }
-        EXPECT_FALSE(shipped.book.IsEmpty());
+        EXPECT_FALSE(book.IsEmpty());
     }
 
     TEST(OpeningBookTest, TheRowsThatLostTheirPositionToAnEarlierRowAreCounted) {
-        const ShippedBook& shipped = Shipped();
         size_t rows = 0;
-        for (const char c : shipped.text) {
+        for (const char c : ShippedOpeningsTable()) {
             rows += c == '\n' ? 1 : 0;
         }
         --rows;  // the header
-        EXPECT_EQ(rows - shipped.book.Size(), kShippedRowsLostToEarlierRows);
+        EXPECT_EQ(rows - ShippedOpeningBook().Size(), kShippedRowsLostToEarlierRows);
     }
 
     TEST(OpeningBookTest, TheNajdorfLineIsNamed) {
-        const OpeningBook& book = Shipped().book;
+        const OpeningBook& book = ShippedOpeningBook();
         const Vector<Move> moves = MovesOf(kNajdorf);
         const Optional<OpeningEntry> entry = OpeningOf(book, Position::kStartFen, moves, moves.size());
         ASSERT_TRUE(entry.has_value());
@@ -251,7 +227,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(OpeningBookTest, EachEcoFileHasItsLineNamed) {
-        const OpeningBook& book = Shipped().book;
+        const OpeningBook& book = ShippedOpeningBook();
         EXPECT_EQ(NameOf(book, "g1f3"), "Zukertort Opening");
         EXPECT_EQ(NameOf(book, "e2e4 d7d5"), "Scandinavian Defense");
         EXPECT_EQ(NameOf(book, "e2e4 e7e5 g1f3 b8c6 f1c4"), "Italian Game");
@@ -260,7 +236,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(OpeningBookTest, ATranspositionHasTheNameOfItsPosition) {
-        const OpeningBook& book = Shipped().book;
+        const OpeningBook& book = ShippedOpeningBook();
         // 1.Nf3 c5 2.e4 is 1.e4 c5 2.Nf3
         const String other = "g1f3 c7c5 e2e4 d7d6 d2d4 c5d4 f3d4 g8f6 b1c3 a7a6";
         EXPECT_EQ(FenAfter(other), FenAfter(kNajdorf));
@@ -271,14 +247,14 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(OpeningBookTest, TheStartPositionAndAPositionOutsideTheBookAreNamedNothing) {
-        const OpeningBook& book = Shipped().book;
+        const OpeningBook& book = ShippedOpeningBook();
         EXPECT_FALSE(OpeningOf(book, Position::kStartFen, {}, 0).has_value());
         EXPECT_FALSE(OpeningOf(book, "8/8/4k3/8/8/4K3/4P3/8 w - - 0 1", {}, 0).has_value());
         EXPECT_FALSE(OpeningOf(book, "not a fen", {}, 0).has_value());
     }
 
     TEST(OpeningBookTest, TheNameStaysAfterTheGameLeavesTheBook) {
-        const OpeningBook& book = Shipped().book;
+        const OpeningBook& book = ShippedOpeningBook();
         const String aside = String(kNajdorf) + " a2a3 h7h6";
         const Vector<Move> moves = MovesOf(aside);
         ASSERT_EQ(moves.size(), 12U);
@@ -295,7 +271,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(OpeningBookTest, ACountAboveTheMovesMeansAllOfThem) {
-        const OpeningBook& book = Shipped().book;
+        const OpeningBook& book = ShippedOpeningBook();
         const Vector<Move> moves = MovesOf(kNajdorf);
         const Optional<OpeningEntry> entry = OpeningOf(book, Position::kStartFen, moves, moves.size() + 100);
         ASSERT_TRUE(entry.has_value());
@@ -303,7 +279,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(OpeningBookTest, AGameFromAFenThatIsInTheBookIsNamedAtOnce) {
-        const OpeningBook& book = Shipped().book;
+        const OpeningBook& book = ShippedOpeningBook();
         const String fen = FenAfter("e2e4 c7c5");
         const Optional<OpeningEntry> entry = OpeningOf(book, fen, {}, 0);
         ASSERT_TRUE(entry.has_value());
