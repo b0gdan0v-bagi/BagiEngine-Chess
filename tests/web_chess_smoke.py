@@ -11,7 +11,7 @@ The engine's tools/web/tests/web_smoke.py is imported for what it shares (the se
 checks of the page and the console); see its docstring and tools/web/tests/CLAUDE.md for the venv and for what each of its checks proves.
 
 The window is 960x540 by default: the Wide view of the scene (config/SceneConfig.xml, the aspect 1.4 up), whose buttons and board are at
-the places of VIEW_* below. The page has no control API, so every step is judged by pictures. The checks, in this order:
+the places of VIEW_* below. The page has no control API, so every step is judged by pictures. The checks (numbered as the report numbers them; 6 is played before 3 and 7):
   1. the page loads: HTTP 200, no uncaught page error;
   2. the first frame is drawn (not one flat color);
   3. the opponent is picked with the menu (Menu, Opponent, Computer, Back, Close): each click changes the picture;
@@ -38,6 +38,7 @@ from the layout, and a run that misses is read from them.
 import argparse
 import hashlib
 import os
+import re
 import sys
 import time
 from dataclasses import dataclass, field
@@ -271,8 +272,8 @@ def parse_options(argv: list[str] | None = None) -> ChessOptions:
     for option, patterns in (("--allow-console", args.allow_console), ("--expect-console", args.expect_console)):
         for pattern in patterns:
             try:
-                smoke.re.compile(pattern)
-            except smoke.re.error as error:
+                re.compile(pattern)
+            except re.error as error:
                 parser.error(f"{option} '{pattern}' is not a regular expression: {error}")
     web = smoke.Options(args.dist, False, None, args.viewport, args.timeout, 0.0, [*ALLOWED_CONSOLE, *args.allow_console], args.chromium_arg,
                         "none", args.browser_channel, args.executable_path, expect_console=args.expect_console)
@@ -324,8 +325,8 @@ def run_browser(playwright_api, url: str, options: ChessOptions) -> ChessRun:
     with playwright_api.sync_playwright() as playwright:
         browser = smoke.launch_browser(playwright, web)
         try:
+            run.page.status = smoke.fetch_from(url)(smoke.PAGE_QUERY)[0]  # page.goto raises on a network failure, not on an HTTP error
             page, canvas = smoke.open_game_page(browser, url, web, run.page.console, run.page.page_errors, FRAME_COUNTER_SCRIPT)
-            run.page.status = 200  # open_game_page raises on a failed load; the page itself is checked by the first frame
             try:
                 canvas.wait_for(state="visible", timeout=web.timeout * 1000)
             except Exception as error:

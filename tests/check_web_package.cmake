@@ -12,6 +12,7 @@ if(NOT GAME_ROOT OR NOT (CHECK_DIR OR PACKAGE_JS))
     message(FATAL_ERROR "usage: cmake -DGAME_ROOT=<dir> (-DCHECK_DIR=<scratch dir> | -DPACKAGE_JS=<BagiChess.js>) -P check_web_package.cmake")
 endif()
 
+get_filename_component(GAME_ROOT "${GAME_ROOT}" ABSOLUTE)
 include(${GAME_ROOT}/cmake/ChessWeb.cmake)
 
 function(check_equal NAME ACTUAL EXPECTED)
@@ -101,7 +102,7 @@ endforeach()
 
 # --- stray files of a developer's machine do not change the list. A scratch copy of the layout in CHECK_DIR (the checkout is not
 # touched): the shipped names are the files of the real tree, so the check follows the assets of the game
-set(scratch "${CHECK_DIR}")
+get_filename_component(scratch "${CHECK_DIR}" ABSOLUTE)  # the glob of chess_web_package_files needs an absolute root
 file(REMOVE_RECURSE "${scratch}")
 foreach(_name ${tree_files})
     file(WRITE "${scratch}/${_name}" "x")
