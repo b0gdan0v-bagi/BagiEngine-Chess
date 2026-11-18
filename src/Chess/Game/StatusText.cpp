@@ -87,6 +87,46 @@ namespace BECore::Chess {
             return "Editing";
         }
 
+        String PuzzleTurn(PuzzlePhase phase) {
+            switch (phase) {
+                case PuzzlePhase::YourMove:
+                    return "Your move";
+                case PuzzlePhase::Replying:
+                    return "Replying";
+                case PuzzlePhase::Solved:
+                    return "Solved";
+            }
+            return "";
+        }
+
+        String PuzzleStatus(bool wrong) {
+            return wrong ? "Wrong move" : "";
+        }
+
+        String PuzzleNumber(size_t index, size_t count) {
+            return Format("Puzzle {} of {}", index + 1, count);
+        }
+
+        String PuzzleRating(int32_t rating) {
+            return Format("Rating {}", rating);
+        }
+
+        String PuzzleProgress(PuzzlePhase phase, bool wrong, size_t mistakes) {
+            String line = wrong ? PuzzleStatus(true) : PuzzleTurn(phase);
+            if (mistakes > 0) {
+                line += Format(", {} {}", mistakes, mistakes == 1 ? "mistake" : "mistakes");
+            }
+            return line;
+        }
+
+        String PuzzleNextWord(bool puzzleOn) {
+            return puzzleOn ? "Next" : "Start";
+        }
+
+        String NoPuzzles() {
+            return "No puzzles";
+        }
+
     }  // namespace StatusText
 
 }  // namespace BECore::Chess

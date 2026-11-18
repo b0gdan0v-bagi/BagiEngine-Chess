@@ -196,6 +196,43 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(StatusText::Editing(editor, ""), "Editing") << "the next edit that works takes the refusal away";
     }
 
+    TEST(StatusTextTest, ThePuzzleTurnNamesEveryPhase) {
+        EXPECT_EQ(StatusText::PuzzleTurn(PuzzlePhase::YourMove), "Your move");
+        EXPECT_EQ(StatusText::PuzzleTurn(PuzzlePhase::Solved), "Solved");
+        for (const PuzzlePhase phase : EnumUtils<PuzzlePhase>::Values()) {
+            EXPECT_FALSE(StatusText::PuzzleTurn(phase).empty()) << static_cast<int>(phase);
+        }
+        EXPECT_NE(StatusText::PuzzleTurn(PuzzlePhase::Replying), StatusText::PuzzleTurn(PuzzlePhase::YourMove)) << "the person cannot move while the reply is due";
+    }
+
+    TEST(StatusTextTest, ThePuzzleStatusIsEmptyUnlessTheLastMoveWasWrong) {
+        EXPECT_EQ(StatusText::PuzzleStatus(false), "");
+        EXPECT_EQ(StatusText::PuzzleStatus(true), "Wrong move");
+    }
+
+    TEST(StatusTextTest, ThePuzzleNumberCountsFromOneAndTheRatingIsTheNumber) {
+        EXPECT_EQ(StatusText::PuzzleNumber(0, 130), "Puzzle 1 of 130");
+        EXPECT_EQ(StatusText::PuzzleNumber(11, 130), "Puzzle 12 of 130");
+        EXPECT_EQ(StatusText::PuzzleNumber(9998, 9999), "Puzzle 9999 of 9999");
+        EXPECT_EQ(StatusText::PuzzleRating(1450), "Rating 1450");
+        EXPECT_EQ(StatusText::PuzzleRating(999), "Rating 999");
+    }
+
+    TEST(StatusTextTest, ThePuzzleProgressAddsTheMistakesOnlyWhenThereAreSome) {
+        EXPECT_EQ(StatusText::PuzzleProgress(PuzzlePhase::YourMove, false, 0), "Your move");
+        EXPECT_EQ(StatusText::PuzzleProgress(PuzzlePhase::Replying, false, 0), StatusText::PuzzleTurn(PuzzlePhase::Replying));
+        EXPECT_EQ(StatusText::PuzzleProgress(PuzzlePhase::YourMove, true, 1), "Wrong move, 1 mistake");
+        EXPECT_EQ(StatusText::PuzzleProgress(PuzzlePhase::YourMove, false, 2), "Your move, 2 mistakes");
+        EXPECT_EQ(StatusText::PuzzleProgress(PuzzlePhase::Solved, false, 3), "Solved, 3 mistakes");
+        EXPECT_EQ(StatusText::PuzzleProgress(PuzzlePhase::Solved, false, 0), "Solved");
+    }
+
+    TEST(StatusTextTest, TheOneButtonOfStartAndNextSaysWhichItIs) {
+        EXPECT_EQ(StatusText::PuzzleNextWord(false), "Start");
+        EXPECT_EQ(StatusText::PuzzleNextWord(true), "Next");
+        EXPECT_EQ(StatusText::NoPuzzles(), "No puzzles");
+    }
+
     TEST(StatusTextTest, EveryEditorLineFitsTheHud) {
         PositionEditor editor;
         EXPECT_LE(StatusText::Editing(editor, "").size(), EditorText::kMaxRefusalChars);

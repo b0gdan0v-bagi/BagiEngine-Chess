@@ -114,9 +114,9 @@ namespace BECore::Chess::Tests {
 
     }  // namespace HudWordsDetail
 
-    /// The words of the HUD, from a scratch game of their own that reaches every status and views its start and a move, then the thinking form of the turn, the declined draw and the sentence of every
-    /// kind of engine error (also the `opponentError` list: the variable of the panel's error line). The names of the segments of the panel (modes, colors, engines, levels) are not here: they are
-    /// elements of the scene that a test walks, and a test holds their text to the tables
+    /// The words of the HUD, from a scratch game of their own that reaches every status and views its start and a move, then the thinking form of the turn, the words of a puzzle, the declined draw
+    /// and the sentence of every kind of engine error (also the `opponentError` list: the variable of the panel's error line). The names of the segments of the panel (modes, colors, engines, levels)
+    /// are not here: they are elements of the scene that a test walks, and a test holds their text to the tables
     inline HudWords AllHudWords() {
         using namespace HudWordsDetail;
         HudWords words;
@@ -176,6 +176,14 @@ namespace BECore::Chess::Tests {
 
         model.Reset();
         Add(words.turn, StatusText::Turn(model, true));
+
+        // The words of a puzzle on the board; the words of the menu section "Puzzles" are the section test's
+        for (const PuzzlePhase phase : EnumUtils<PuzzlePhase>::Values()) {
+            Add(words.turn, StatusText::PuzzleTurn(phase));
+        }
+        for (const bool wrong : {false, true}) {
+            Add(words.status, StatusText::PuzzleStatus(wrong));
+        }
 
         Add(words.status, StatusText::DrawDeclined());
         for (const EngineErrorKind kind : EnumUtils<EngineErrorKind>::Values()) {
