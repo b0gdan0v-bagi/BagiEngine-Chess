@@ -1,0 +1,59 @@
+{"scenario": 1, "game": "Chess", "flags": ["--headless", "--manual-clock"], "title": "Chess: the position editor by the person's clicks on named elements, what get_state reads back (editor, fen, version) and a refused Play; the pieces on the board are placed by clicks on squares, which have no name, so the gtests hold those"}
+{"method": "step", "params": {"frames": 2}}
+{"method": "reset"}
+{"method": "set_state", "params": {"opponent": {"plays": null}}}
+{"method": "set_state", "params": {"fen": "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1"}, "expect": {"versionStep": 1}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "get_state", "expect": {"pointers": {"/state/editor": null, "/state/fen": "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1"}, "versionStep": 0}}
+{"method": "ui_click", "params": {"name": "EditorBarPlay"}, "expect": {"error": "not_clickable"}}
+{"method": "ui_click", "params": {"name": "Menu"}, "expect": {"equal": {"consumed": true, "action": "ChessOpenMenu", "value": ""}}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "ui_click", "params": {"name": "MenuSectionPosition"}, "expect": {"equal": {"consumed": true, "action": "ChessOpenSection", "value": "position"}}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "ui_click", "params": {"name": "PositionSectionCurrent"}, "expect": {"equal": {"consumed": true, "action": "ChessEditBegin", "value": "current"}}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "get_state", "expect": {"pointers": {"/state/editor/fen": "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1", "/state/editor/error": null, "/state/editor/tool/piece": "pawn", "/state/editor/tool/color": "white", "/state/fen": "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1", "/state/moves": []}, "versionStep": 1}}
+{"method": "ui_click", "params": {"name": "EditorBarQueen"}, "expect": {"equal": {"consumed": true, "action": "ChessEditPick", "value": "queen"}}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "ui_click", "params": {"name": "EditorBarColor"}, "expect": {"equal": {"consumed": true, "action": "ChessEditColor", "value": ""}}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "get_state", "expect": {"pointers": {"/state/editor/tool/piece": "queen", "/state/editor/tool/color": "black", "/state/fen": "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1"}, "versionStep": 2}}
+{"method": "ui_click", "params": {"name": "EditorBarErase"}, "expect": {"equal": {"consumed": true, "action": "ChessEditPick", "value": "erase"}}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "get_state", "expect": {"pointers": {"/state/editor/tool/piece": "erase", "/state/editor/tool/color": null}, "versionStep": 1}}
+{"method": "ui_click", "params": {"name": "EditorBarOptions"}, "expect": {"equal": {"consumed": true, "action": "ChessOpenSection", "value": "position"}}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "ui_click", "params": {"name": "PositionSectionSideRow"}, "expect": {"equal": {"consumed": true, "action": "ChessEditSide", "value": "black"}}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "ui_click", "params": {"name": "PositionSectionCastleKRow"}, "expect": {"equal": {"consumed": true, "action": "ChessEditCastle", "value": "-K"}}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "get_state", "expect": {"pointers": {"/state/editor/fen": "r3k2r/8/8/8/8/8/8/R3K2R b Qkq - 0 1", "/state/editor/error": null, "/state/fen": "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1"}, "versionStep": 2}}
+{"method": "ui_click", "params": {"name": "PositionSectionPlay"}, "expect": {"equal": {"consumed": true, "action": "ChessEditPlay", "value": ""}}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "get_state", "expect": {"pointers": {"/state/editor": null, "/state/fen": "r3k2r/8/8/8/8/8/8/R3K2R b Qkq - 0 1", "/state/startFen": "r3k2r/8/8/8/8/8/8/R3K2R b Qkq - 0 1", "/state/moves": [], "/state/turn": "black"}}}
+{"method": "perform_action", "params": {"type": "move", "uci": "e8g8"}, "expect": {"pointers": {"/outcome/move": "e8g8"}, "versionStep": 1}}
+{"method": "get_state", "expect": {"pointers": {"/state/fen": "r4rk1/8/8/8/8/8/8/R3K2R w Q - 1 2", "/state/moves": ["e8g8"]}, "versionStep": 0}}
+{"method": "ui_click", "params": {"name": "Menu"}, "expect": {"equal": {"consumed": true, "action": "ChessOpenMenu", "value": ""}}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "ui_click", "params": {"name": "MenuSectionPosition"}, "expect": {"equal": {"consumed": true, "action": "ChessOpenSection", "value": "position"}}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "ui_click", "params": {"name": "PositionSectionEmpty"}, "expect": {"equal": {"consumed": true, "action": "ChessEditBegin", "value": "empty"}}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "get_state", "expect": {"pointers": {"/state/editor/fen": "8/8/8/8/8/8/8/8 w - - 0 1", "/state/editor/error": "Needs one king each", "/state/fen": "r4rk1/8/8/8/8/8/8/R3K2R w Q - 1 2"}}}
+{"method": "ui_click", "params": {"name": "EditorBarOptions"}, "expect": {"equal": {"consumed": true, "action": "ChessOpenSection", "value": "position"}}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "ui_click", "params": {"name": "PositionSectionPlay"}, "expect": {"equal": {"consumed": true, "action": "ChessEditPlay", "value": ""}}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "get_state", "expect": {"pointers": {"/state/editor/error": "Needs one king each", "/state/fen": "r4rk1/8/8/8/8/8/8/R3K2R w Q - 1 2", "/state/moves": ["e8g8"]}, "versionStep": 0}}
+{"method": "ui_click", "params": {"name": "PositionSectionCancel"}, "expect": {"equal": {"consumed": true, "action": "ChessEditCancel", "value": ""}}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "get_state", "expect": {"pointers": {"/state/editor": null, "/state/fen": "r4rk1/8/8/8/8/8/8/R3K2R w Q - 1 2", "/state/moves": ["e8g8"]}, "versionStep": 1}}
+{"method": "ui_click", "params": {"name": "Menu"}, "expect": {"equal": {"consumed": true, "action": "ChessOpenMenu", "value": ""}}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "ui_click", "params": {"name": "MenuSectionPosition"}, "expect": {"equal": {"consumed": true, "action": "ChessOpenSection", "value": "position"}}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "ui_click", "params": {"name": "PositionSectionStart"}, "expect": {"equal": {"consumed": true, "action": "ChessEditBegin", "value": "start"}}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "set_state", "params": {"fen": "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1"}, "expect": {"versionStep": 2}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "get_state", "expect": {"pointers": {"/state/editor": null, "/state/fen": "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1"}, "versionStep": 0, "logClean": true}}
