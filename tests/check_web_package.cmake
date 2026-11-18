@@ -21,12 +21,14 @@ function(check_equal NAME ACTUAL EXPECTED)
     endif()
 endfunction()
 
-# The files without which the game does not start; a package that lacks one is broken, whatever else is in it
+# The files the game needs: without the first four it does not start, without the opening table it plays and names no opening; a package
+# that lacks one is broken, whatever else is in it
 set(CORE_FILES
     config/ApplicationConfig.xml
     config/SceneConfig.xml
     config/ChessSettings.xml
-    config/TextureLibrary.xml)
+    config/TextureLibrary.xml
+    assets/openings/openings.tsv)
 
 if(PACKAGE_JS)
     if(NOT EXISTS "${PACKAGE_JS}")
