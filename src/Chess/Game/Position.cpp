@@ -23,8 +23,6 @@ namespace BECore::Chess {
         constexpr int kEnPassantRankWhiteToMove = 5;  // rank index of the square behind a pawn that black just pushed two squares
         constexpr int kEnPassantRankBlackToMove = 2;
 
-        constexpr int kMaxPiecesPerSide = 16;  // promotion changes a piece, never adds one
-
         constexpr size_t kFenMinFields = 4;
         constexpr size_t kFenMaxFields = 6;
 
@@ -48,11 +46,6 @@ namespace BECore::Chess {
                 default:
                     return 0;
             }
-        }
-
-        constexpr char PieceLetter(Piece piece) noexcept {
-            const char lower = kPieceLetters[static_cast<size_t>(piece.type) - 1];
-            return piece.color == PieceColor::White ? static_cast<char>(lower - 'a' + 'A') : lower;
         }
 
         Optional<Piece> PieceFromLetter(char letter) noexcept {
@@ -79,6 +72,11 @@ namespace BECore::Chess {
         }
 
     }  // namespace
+
+    char FenPieceLetter(Piece piece) noexcept {
+        const char lower = kPieceLetters[static_cast<size_t>(piece.type) - 1];
+        return piece.color == PieceColor::White ? static_cast<char>(lower - 'a' + 'A') : lower;
+    }
 
     Position Position::Start() {
         auto start = FromFen(kStartFen);
@@ -263,7 +261,7 @@ namespace BECore::Chess {
                     fen.push_back(static_cast<char>('0' + empty));
                     empty = 0;
                 }
-                fen.push_back(PieceLetter(piece));
+                fen.push_back(FenPieceLetter(piece));
             }
             if (empty > 0) {
                 fen.push_back(static_cast<char>('0' + empty));
