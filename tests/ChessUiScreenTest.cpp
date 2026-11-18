@@ -532,6 +532,7 @@ namespace BECore::Chess::Tests {
                                                        {"Material", "TheMaterialCanvasPassesTheSizeMatrixWithEveryCountAndEverySign"},
                                                        {"MovePanel", "TheMovePanelPassesTheSizeMatrixWithTheLongestMoves"},
                                                        {"Hud", "TheHudPassesTheSizeMatrixWithTheLongestWords"},
+                                                       {"EditorBar", "TheEditorBarPassesTheSizeMatrixWithEveryWord"},
                                                        {"MenuPanel", "TheMenuPanelPassesTheSizeMatrix"},
                                                        {"OpponentPanel", "ThePanelPassesTheSizeMatrix"},
                                                        {"MovesSection", "TheMovesSectionPassesTheSizeMatrixWithTheLongestMoves"},

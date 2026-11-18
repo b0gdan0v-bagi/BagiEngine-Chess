@@ -8,6 +8,7 @@
 #include <BECore/Scene/SceneNode.h>
 #include <Chess/ChessGame.h>
 #include <Chess/Components/ChessBoardComponent.h>
+#include <Chess/Components/PieceSprite.h>
 #include <Events/SceneEvents.h>
 #include <Generated/ChessPieceComponent.gen.hpp>
 
@@ -17,11 +18,6 @@ namespace BECore::Chess {
 
         constexpr float kHiddenX = -10000.0f;
         constexpr float kHiddenY = -10000.0f;
-
-        // The sprites of TextureLibrary.xml are named after the color and the type: "WhiteQueen", "BlackKnight", ...
-        PoolString SpriteIdOf(Piece piece) {
-            return PoolString::Intern(Format("{}{}", EnumUtils<PieceColor>::ToString(piece.color), EnumUtils<PieceType>::ToString(piece.type)));
-        }
 
         // A view and a draft both show a position that is not the game's, so a move seen across either is no slide
         bool ShowsOtherPosition(const ChessGameModel& model) {
@@ -175,7 +171,7 @@ namespace BECore::Chess {
         if (!sprite) {
             return;
         }
-        sprite->_spriteId = SpriteIdOf(piece);
+        sprite->_spriteId = PieceSpriteId(piece);
         sprite->ReloadTexture();
         _shownType = piece.type;
     }

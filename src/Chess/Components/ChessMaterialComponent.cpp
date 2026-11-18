@@ -7,6 +7,7 @@
 #include <BECore/UI/UIImageComponent.h>
 #include <Chess/ChessGame.h>
 #include <Chess/Components/ChessBoardComponent.h>
+#include <Chess/Components/PieceSprite.h>
 #include <Chess/Game/BoardOrientation.h>
 #include <Chess/Game/CapturedMaterial.h>
 #include <Chess/Game/MovePanel.h>
@@ -98,7 +99,7 @@ namespace BECore::Chess {
                 const String word = count > 0 ? Format("x{}", count) : String();
                 vars.Set(names.vars[row], StringView(word));
                 if (iconsToo && canvas) {
-                    const PoolString sprite = PoolString::Intern(Format("{}{}", EnumUtils<PieceColor>::ToString(taken), EnumUtils<PieceType>::ToString(types[index])).c_str());
+                    const PoolString sprite = PieceSpriteId(Piece{types[index], taken});
                     for (size_t set = 0; set < kMaterialSetCount; ++set) {
                         if (UIElement* element = canvas->GetRoot().FindByName(names.icons[set][row])) {
                             if (UIImageComponent* icon = element->GetComponent<UIImageComponent>()) {

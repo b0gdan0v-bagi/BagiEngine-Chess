@@ -1,0 +1,98 @@
+<?xml version="1.0"?>
+<!-- The editor bar: the tools of the position editor, in the bottom margin of the view while a position is edited (ChessGame::IsEditing()). The menu section "Position" starts the
+     editor, but a modal panel dims the board, so the pieces are picked here, over the board that stays in reach. A non-modal canvas of the SceneView space (layer 20, above the HUD),
+     started hidden: ChessEditorBarComponent (listed before the canvas) shows it exactly while a position is edited, checked on every update and draw like the promotion picker, and
+     answers ChessEditPick (the id of the tool table of Game/PositionEditor.h as the value: king, queen, rook, bishop, knight, pawn, erase) and ChessEditColor (the color of the picked
+     piece, the word of it in {editorColor}). Play emits ChessEditPlay, which ChessPositionSectionComponent answers (a refusal shows in the HUD's Turn); More opens the section
+     (ChessOpenSection, value position). The six piece buttons show the sprites of the picked color, which the component sets, and the picked tool is the selected button. The bar blocks no
+     input but its own buttons. It stands where the HUD's Opening and Status stand (both are empty while editing; the move panel's box and the material are hidden): one row of 56-unit
+     controls 12 units above the bottom of the safe area, 6 x 56 + 64 (Erase) + 68 (the color) + 56 (Play) + 64 (More) + 9 x 4 (spacing) = 624 units wide at most (a stack that wraps: the
+     row is as wide as the safe area up to 640 units, and a window that is narrower puts the last buttons on a second row). The Portrait and Tall views have the room for two rows
+     (the board ends at y 784 of 960), so their variant makes the bar 120 units high. The Wide view has the room for none under the board: the home bar of side insets lifts the safe
+     edge to y 768, 48 units under the board, so its variant (minAspect:1.3, which only the Wide bounds meet) puts the bar in the right of the view, where the move panel stands while a
+     game is played: 330 units wide at the right edge of the safe area (746 to 1076 with side insets, 6 units off the board's edge), two rows of 120 units. Every name starts with EditorBar because elements are found by name in every canvas of the scene. -->
+<node name="EditorBar" layer="20" contentVersion="5">
+  <components>
+    <component type="ChessEditorBarComponent" />
+    <component type="UICanvasComponent" space="SceneView" useSafeArea="true" visible="false">
+      <elements>
+        <element type="UIStack" name="EditorBarRow" anchor="Bottom" y="-12" width="100%" maxWidth="640" height="56" direction="Horizontal" wrapChildren="true" spacing="4">
+          <children>
+            <element type="UIElement" name="EditorBarKing" width="56" height="56" color="70,70,100,255">
+              <components>
+                <component type="UIImageComponent" sprite="WhiteKing"/>
+                <component type="UIInputClicker" action="ChessEditPick" value="king"/>
+              </components>
+            </element>
+            <element type="UIElement" name="EditorBarQueen" width="56" height="56" color="70,70,100,255">
+              <components>
+                <component type="UIImageComponent" sprite="WhiteQueen"/>
+                <component type="UIInputClicker" action="ChessEditPick" value="queen"/>
+              </components>
+            </element>
+            <element type="UIElement" name="EditorBarRook" width="56" height="56" color="70,70,100,255">
+              <components>
+                <component type="UIImageComponent" sprite="WhiteRook"/>
+                <component type="UIInputClicker" action="ChessEditPick" value="rook"/>
+              </components>
+            </element>
+            <element type="UIElement" name="EditorBarBishop" width="56" height="56" color="70,70,100,255">
+              <components>
+                <component type="UIImageComponent" sprite="WhiteBishop"/>
+                <component type="UIInputClicker" action="ChessEditPick" value="bishop"/>
+              </components>
+            </element>
+            <element type="UIElement" name="EditorBarKnight" width="56" height="56" color="70,70,100,255">
+              <components>
+                <component type="UIImageComponent" sprite="WhiteKnight"/>
+                <component type="UIInputClicker" action="ChessEditPick" value="knight"/>
+              </components>
+            </element>
+            <element type="UIElement" name="EditorBarPawn" width="56" height="56" color="70,70,100,255">
+              <components>
+                <component type="UIImageComponent" sprite="WhitePawn"/>
+                <component type="UIInputClicker" action="ChessEditPick" value="pawn"/>
+              </components>
+            </element>
+            <element type="UIElement" name="EditorBarErase" width="64" height="56" fontSize="20" color="112,84,48,255">
+              <components>
+                <component type="UITextComponent" text="Erase" align="Center" verticalAlign="Center" wrap="false"/>
+                <component type="UIInputClicker" action="ChessEditPick" value="erase"/>
+              </components>
+            </element>
+            <element type="UIElement" name="EditorBarColor" width="68" height="56" fontSize="20" color="70,70,100,255">
+              <components>
+                <component type="UITextComponent" text="{editorColor}" align="Center" verticalAlign="Center" wrap="false"/>
+                <component type="UIInputClicker" action="ChessEditColor"/>
+              </components>
+            </element>
+            <element type="UIElement" name="EditorBarPlay" width="56" height="56" fontSize="20" color="50,115,85,255">
+              <components>
+                <component type="UITextComponent" text="Play" align="Center" verticalAlign="Center" wrap="false"/>
+                <component type="UIInputClicker" action="ChessEditPlay"/>
+              </components>
+            </element>
+            <element type="UIElement" name="EditorBarOptions" width="64" height="56" fontSize="20" color="70,70,100,255">
+              <components>
+                <component type="UITextComponent" text="More" align="Center" verticalAlign="Center" wrap="false"/>
+                <component type="UIInputClicker" action="ChessOpenSection" value="position"/>
+              </components>
+            </element>
+          </children>
+        </element>
+      </elements>
+      <variants>
+        <variant when="orientation:portrait">
+          <overrides>
+            <set element="EditorBarRow" height="120" />
+          </overrides>
+        </variant>
+        <variant when="minAspect:1.3">
+          <overrides>
+            <set element="EditorBarRow" anchor="BottomRight" x="-12" width="330" height="120" />
+          </overrides>
+        </variant>
+      </variants>
+    </component>
+  </components>
+</node>
