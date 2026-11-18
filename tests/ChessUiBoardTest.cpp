@@ -894,7 +894,7 @@ namespace BECore::Chess::Tests {
         EXPECT_NE(problemsOf(fileAtTheTop).find("FileLabel7 (725.0, 642.0"), String::npos) << "a file letter in the top right of its cell is not in the corner";
 
         String wrongColor = shipped;
-        Replace(wrongColor, "textColor=\"181,136,99,255\"", "textColor=\"240,217,181,255\"");
+        Replace(wrongColor, "textColor=\"@boardDark\"", "textColor=\"@boardLight\"");
         EXPECT_NE(problemsOf(wrongColor).find("RankLabel0 has not the color"), String::npos) << "cream on a light cell";
 
         String missing = shipped;
