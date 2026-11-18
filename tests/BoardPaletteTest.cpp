@@ -18,6 +18,7 @@ namespace BECore::Chess::Tests {
         struct Themes {
             static constexpr auto classic = "classic"_intern;
             static constexpr auto slate = "slate"_intern;
+            static constexpr auto tavern = "tavern"_intern;
         };
 
         // The look of the board before it had themes: `classic` must stay exactly this
@@ -141,12 +142,13 @@ namespace BECore::Chess::Tests {
         UIThemes _themes;
     };
 
-    TEST_F(BoardPaletteTest, TheShippedFileHasClassicAndSlateAndClassicIsTheDefault) {
-        EXPECT_EQ(_themes.GetDefaultTheme(), Themes::classic);
-        ASSERT_EQ(_themes.GetThemes().size(), 2u);
+    TEST_F(BoardPaletteTest, TheShippedFileHasClassicSlateAndTavernAndTavernIsTheDefault) {
+        EXPECT_EQ(_themes.GetDefaultTheme(), Themes::tavern);
+        ASSERT_EQ(_themes.GetThemes().size(), 3u);
         EXPECT_TRUE(_themes.HasTheme(Themes::classic));
         EXPECT_TRUE(_themes.HasTheme(Themes::slate));
-        EXPECT_EQ(_themes.GetTheme(), Themes::classic);
+        EXPECT_TRUE(_themes.HasTheme(Themes::tavern));
+        EXPECT_EQ(_themes.GetTheme(), Themes::tavern);
     }
 
     TEST_F(BoardPaletteTest, EveryThemeDefinesEveryTokenAndNoTokenOfThePaletteIsMissing) {
@@ -160,6 +162,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(BoardPaletteTest, ClassicIsTheColorsTheBoardAlwaysHad) {
+        ASSERT_TRUE(_themes.SetTheme(Themes::classic));
         BoardPalette palette;
         palette.Refresh(_themes);
         ExpectSame(palette.LightSquare(), kClassicLight, "light square");
@@ -176,6 +179,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(BoardPaletteTest, ASwitchOfTheThemeChangesThePaletteAtTheNextRefresh) {
+        ASSERT_TRUE(_themes.SetTheme(Themes::classic));
         BoardPalette palette;
         palette.Refresh(_themes);
         const Vector<Color> classic = Colors(palette);
@@ -220,7 +224,7 @@ namespace BECore::Chess::Tests {
             const String problems = ReadabilityProblems(palette);
             EXPECT_TRUE(problems.empty()) << theme.ToStringView().data() << ":\n" << problems.c_str();
         });
-        EXPECT_EQ(visited, 2u) << "classic and slate";
+        EXPECT_EQ(visited, 3u) << "classic, slate and tavern";
     }
 
     TEST_F(BoardPaletteTest, ABrokenCopyOfClassicIsCaughtByTheReadabilityChecks) {
@@ -228,6 +232,7 @@ namespace BECore::Chess::Tests {
         const auto problemsWith = [](const char* token, const Color& value) {
             UIThemes themes;
             EXPECT_TRUE(LoadShippedThemes(themes));
+            EXPECT_TRUE(themes.SetTheme(Themes::classic));
             EXPECT_TRUE(themes.Set(Themes::classic, token, value));
             BoardPalette palette;
             palette.Refresh(themes);

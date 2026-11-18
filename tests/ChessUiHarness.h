@@ -95,7 +95,7 @@ namespace BECore::Chess::Tests {
         constexpr float kWideMinAspect = kWideViewWidth / kViewHeight;
         constexpr float kWideNarrowestWidth = 700.0f;  // 700 x 480 is the narrowest Wide window with side insets (672 x 480 is the aspect 1.4 itself, a knife edge), at the scale 0.6
 
-        // The colors the board fills a full square with: the tokens of the theme `classic` of config/UIThemes.xml, the one the fixture leaves current
+        // The colors the board fills a full square with: the tokens of the theme `classic` of config/UIThemes.xml, the one the fixture selects after loading the shipped file
         const Color kSelectedColor{120, 200, 120, 200};
         const Color kLegalMoveColor{120, 200, 120, 120};
         const Color kCheckColor{230, 60, 60, 210};
@@ -517,7 +517,7 @@ namespace BECore::Chess::Tests {
 
         /// What is wrong with the labels of the board as they are laid out, one problem to a line, nothing when it is right: a glyph the box cuts (the validator does not see it for a label
         /// that clips), a box that is not in the corner of its edge cell (the top left, left of the piece, for a rank; the bottom right, right of it, for a file) and a text color that does not
-        /// read on the cell (the tokens resolved in the current theme, which the fixture keeps `classic`)
+        /// read on the cell (the tokens resolved in the current theme, which the fixture sets to `classic`)
         String BoardLabelProblems(const UICanvasLayout& layout) {
             String problems;
             const float scale = layout.GetResolved().scale;
@@ -893,7 +893,8 @@ namespace BECore::Chess::Tests {
 
             CoreManager::GetFontAtlasLibrary().Clear();
             CoreManager::GetUIVars().Clear();
-            ASSERT_TRUE(LoadShippedThemes(CoreManager::GetUIThemes()));  // the board and its labels draw tokens
+            ASSERT_TRUE(LoadShippedThemes(CoreManager::GetUIThemes()));          // the board and its labels draw tokens
+            ASSERT_TRUE(CoreManager::GetUIThemes().SetTheme("classic"_intern));  // the constants of this file are classic's, the shipped default is another theme
             _renderer = New<RecordingRenderer>();
             _renderer->width = 1280.0f;
             _renderer->height = 720.0f;
