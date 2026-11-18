@@ -1614,15 +1614,18 @@ namespace BECore::Chess::Tests {
             EXPECT_TRUE(text.find("{level}") == StringView::npos && text.find("{engine}") == StringView::npos) << found.node().attribute("name").value() << ": " << ToStd(text);
         }
 
-        // The same in the loaded scene: the HUD is Turn, Resign, Menu, Reset and Status, and nothing sits at the bottom left
+        // The same in the loaded scene: the HUD is Turn, Resign, Menu, Reset, Opening and Status, and the bottom left holds only the name of the opening (a label, never a button)
         const auto hud = Hud();
         ASSERT_TRUE(hud);
         size_t elements = 0;
         for (const auto& child : hud->GetRoot().children) {
             ++elements;
-            EXPECT_NE(child->style.rect.anchor, UIAnchor::BottomLeft) << child->name.CStr() << ": the bottom left of the HUD is empty";
+            if (child->style.rect.anchor == UIAnchor::BottomLeft) {
+                EXPECT_EQ(child->name, "Opening"_intern) << "the bottom left of the HUD holds only the name of the opening";
+                EXPECT_FALSE(child->IsInteractive());
+            }
         }
-        EXPECT_EQ(elements, 5u) << "Turn, Resign, Menu, Reset, Status";
+        EXPECT_EQ(elements, 6u) << "Turn, Resign, Menu, Reset, Opening, Status";
         for (const char* name : {"Side", "Engine", "Level"}) {
             EXPECT_EQ(HudElement(name), nullptr) << name;
             EXPECT_EQ(Panel()->GetRoot().FindByName(PoolString::Intern(name)), nullptr) << name;
