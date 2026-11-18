@@ -77,10 +77,13 @@ namespace BECore::Chess {
         if (!game) {
             return;
         }
-        // The opponent plays here, on the main thread, and not in OnDraw(): it changes the model
-        game->GetOpponent().Update();
+        // The opponent plays here, on the main thread, and not in OnDraw(): it changes the model. While a position is edited it keeps its setup and waits: a move of its own would end the draft
+        const bool editing = game->IsEditing();
+        if (!editing) {
+            game->GetOpponent().Update();
+        }
         game->GetAnalyst().Update(game->GetModel(), game->GetOpponent().GetEngine());  // the search runs on the pool; never waits
-        if (game->GetDrawJudge().Update(game->GetModel()) == DrawVerdict::Accepted) {
+        if (!editing && game->GetDrawJudge().Update(game->GetModel()) == DrawVerdict::Accepted) {
             static_cast<void>(game->GetModel().AgreeDraw());  // the judge gives a verdict only for the version it was asked at, so the game is still on
         }
         static_cast<void>(game->GetChoice().Color());  // reading it remembers the person's color of a side set from outside (the control API) before that side is cleared
@@ -145,6 +148,11 @@ namespace BECore::Chess {
 
         const ChessGameModel* model = ChessGame::GetActiveModel();
         if (!model) {
+            return;
+        }
+
+        // A draft is no position of the game: nothing of the game is marked on it
+        if (model->IsDrafting()) {
             return;
         }
 
@@ -236,6 +244,12 @@ namespace BECore::Chess {
             return;
         }
 
+        // While a position is edited the press puts or takes off a piece and nothing of the game's click flow runs
+        if (ChessGame* game = ChessGame::GetActive(); game && game->IsEditing()) {
+            EditSquare(*game, *clicked, e.button.button);
+            return;
+        }
+
         // A press on an earlier position only brings the game back: nothing is played, selected or started on a board the game is not at
         if (model->EndViewing()) {
             return;
@@ -273,9 +287,21 @@ namespace BECore::Chess {
         }
     }
 
+    void ChessBoardComponent::EditSquare(ChessGame& game, Square square, uint8_t button) {
+        PositionEditor& editor = game.GetEditor();
+        if (button == SDL_BUTTON_LEFT) {
+            editor.Apply(square);
+        } else if (button == SDL_BUTTON_RIGHT) {
+            editor.Remove(square);
+        } else {
+            return;
+        }
+        game.EditChanged();
+    }
+
     bool ChessBoardComponent::IsDragValid(const Drag& drag, const ChessGameModel* model) {
-        if (model != drag.model || model->GetVersion() != drag.version || model->IsGameOver() || model->IsViewing() || !model->HasSelection() || model->GetSelected() != drag.from ||
-            model->HasPendingPromotion()) {
+        if (model != drag.model || model->GetVersion() != drag.version || model->IsGameOver() || model->IsViewing() || model->IsDrafting() || !model->HasSelection() ||
+            model->GetSelected() != drag.from || model->HasPendingPromotion()) {
             return false;
         }
         const OpponentController* opponent = ChessGame::GetActiveOpponent();

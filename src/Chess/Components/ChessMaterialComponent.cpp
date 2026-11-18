@@ -129,9 +129,12 @@ namespace BECore::Chess {
             inPanel = MovePanelFits(safe.x, safe.y, safe.x + safe.w, safe.y + safe.h, MovePanelView::Wide);
             marginFits = MaterialListFits(safe.x, safe.y, safe.x + safe.w, safe.y + safe.h, ActiveMaterialView(GetScene()));
         }
+        // A draft has no captured pieces to count
+        const ChessGameModel* model = ChessGame::GetActiveModel();
+        const bool editing = model && model->IsDrafting();
         const MaterialNames& names = GetNames();
         for (size_t set = 0; set < kMaterialSetCount; ++set) {
-            const bool setWanted = (set == kMaterialPanelSet) == inPanel;
+            const bool setWanted = !editing && (set == kMaterialPanelSet) == inPanel;
             if (setWanted != _setShown[set]) {
                 _setShown[set] = setWanted;
                 for (const PoolString& root : names.roots[set]) {

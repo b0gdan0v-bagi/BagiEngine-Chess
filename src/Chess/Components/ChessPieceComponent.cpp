@@ -23,6 +23,11 @@ namespace BECore::Chess {
             return PoolString::Intern(Format("{}{}", EnumUtils<PieceColor>::ToString(piece.color), EnumUtils<PieceType>::ToString(piece.type)));
         }
 
+        // A view and a draft both show a position that is not the game's, so a move seen across either is no slide
+        bool ShowsOtherPosition(const ChessGameModel& model) {
+            return model.IsViewing() || model.IsDrafting();
+        }
+
     }  // namespace
 
     ChessPieceComponent::~ChessPieceComponent() {
@@ -110,7 +115,7 @@ namespace BECore::Chess {
         const bool unchanged = sameGame && moves == _seenMoves && current == _lastSquare;
         // One move is one more of both numbers: a reset adds a version too, so a reset and moves between two frames are not taken for one move. A view that begins or ends
         // jumps over any number of moves, so a move seen across one is placed at once
-        const bool played = sameGame && !_seenViewing && !model.IsViewing() && moves == _seenMoves + 1 && model.GetVersion() == _seenVersion + 1;
+        const bool played = sameGame && !_seenOtherPosition && !ShowsOtherPosition(model) && moves == _seenMoves + 1 && model.GetVersion() == _seenVersion + 1;
 
         // A move of another piece (played, this piece on its square) leaves a slide of this one under way alone.
         if (!unchanged && !(played && current == _lastSquare)) {
@@ -127,7 +132,7 @@ namespace BECore::Chess {
         _lastSquare = current;
         _seenMoves = moves;
         _seenVersion = model.GetVersion();
-        _seenViewing = model.IsViewing();
+        _seenOtherPosition = ShowsOtherPosition(model);
         if (!sameGame) {
             _seenStartFen = model.GetStartFen();
         }

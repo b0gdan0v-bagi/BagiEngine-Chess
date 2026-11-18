@@ -21,6 +21,7 @@ namespace BECore {
 
 namespace BECore::Chess {
 
+    class ChessGame;
     class ChessGameModel;
 
     /// The name of the second view of SceneConfig.xml (`viewVariants`), which the components that differ per view pick by
@@ -57,6 +58,9 @@ namespace BECore::Chess {
      *
      * The squares, the marks and the pieces are of ChessGameModel::GetShownPosition(): while an earlier position is viewed the board marks its move and check and draws no hint or
      * premove, and a press on the board only returns to the game.
+     *
+     * While a position is edited (ChessGame::IsEditing()) the board draws the squares and none of the game's marks, a left press puts the picked piece on the square under it (the same
+     * piece again takes it off), a right press takes the piece off, and nothing of the select, drag, premove and promotion flow runs. The opponent and the draw judge are not updated then.
      *
      * The board is drawn from Black's side (turned by 180 degrees) exactly when the program plays White, read live (GetBottomColor()); the model and the control API do not turn.
      */
@@ -125,6 +129,9 @@ namespace BECore::Chess {
         };
 
         void OnMouseDown(const SDLEvents::MouseButtonDownEvent&);
+
+        /// The press of a mouse @p button on @p square while a position is edited: the left puts or takes off the picked piece, the right takes the piece off, any other does nothing
+        static void EditSquare(ChessGame& game, Square square, uint8_t button);
         void OnMouseUp(const SDLEvents::MouseButtonUpEvent&);
         void OnMouseMotion(const SDLEvents::MouseMotionEvent&);
 

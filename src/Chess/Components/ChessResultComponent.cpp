@@ -25,8 +25,8 @@ namespace BECore::Chess {
     void ChessResultComponent::OnDraw() {
         const ChessGameModel* model = ChessGame::GetActiveModel();
         const ChessBoardComponent* board = ChessBoardComponent::GetActive();
-        // An earlier position of a finished game is viewed without the result over it
-        if (!model || !board || !model->IsGameOver() || model->IsViewing()) {
+        // An earlier position of a finished game is viewed without the result over it, and a position that is edited is not the finished game
+        if (!model || !board || !model->IsGameOver() || model->IsViewing() || model->IsDrafting()) {
             return;
         }
 

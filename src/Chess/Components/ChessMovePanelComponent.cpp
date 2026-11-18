@@ -108,7 +108,9 @@ namespace BECore::Chess {
         // the layout may still be the last view's for this one frame; no box lies inside a view that is not its own, so that frame shows none
         const UICanvasLayout& layout = canvas->GetLayout();
         bool fits = false;
-        if (layout.HasLayout()) {
+        // The editor's bar stands in the margin the box would share, and a draft has no moves to list
+        const ChessGameModel* model = ChessGame::GetActiveModel();
+        if (layout.HasLayout() && !(model && model->IsDrafting())) {
             const Rect& safe = layout.GetResolved().safeBounds;
             static const PoolString tall = PoolString::Intern(kTallView);
             const MovePanelView view = GetScene().GetActiveView().name == tall ? MovePanelView::Tall : MovePanelView::Wide;
