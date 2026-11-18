@@ -42,14 +42,14 @@ State lives in `ChessGameModel`; components keep none. Each folder above (and `t
 
 ## The web build
 
-Emscripten presets `web-release` / `web-debug` (`README.md`, "Browser build"); checked only on the desktop with a web-like build (`tests/CLAUDE.md`), never yet with emsdk or in a browser.
+Emscripten presets `web-release` / `web-debug` (`README.md`, "Browser build"); built with emsdk and played in a headless Chromium and Edge by `tests/web_chess_smoke.py` (run by hand: it needs emsdk, a browser and a built page; the web-like desktop build of `tests/CLAUDE.md` is the one in ctest). Not tried: a real GPU, a phone, Firefox, Safari, the deploy.
 
-The seven sound clips are in the preload package; Web Audio starts after the first click (not checked).
+The seven sound clips are in the preload package; Web Audio starts after the first click (sound is not heard by any check).
 
 - **Off there:** Stockfish (`CHESS_NO_STOCKFISH`, forced ON for the web, usable on the desktop: the game starts with the own engine), `BagiChessUci`, the control API, the editor, the tests.
 - **Config:** the engine's `web/` overlay replaces files of the same name whole. Chess ships no web config of its own (`ChessWebConfigTest`); to differ in the browser the engine has to learn a game overlay.
 - **Search:** single-thread, so the own engine's search is sliced and `co_await`ed (`src/Chess/Engine/CLAUDE.md`, "The sliced search").
-- **Package:** `cmake/ChessWeb.cmake` lists what stays out (`--exclude-file`, unverified without emsdk); `tests/check_web_package.cmake` (its fixed file list) is off in ctest until the web build brings it back (`chess-web-build`).
+- **Package:** `cmake/ChessWeb.cmake` lists what stays out (`--exclude-file`, which emcc applies to a `--preload-file` folder); `tests/check_web_package.cmake` holds it twice and keeps no list of files: the patterns against the tree in ctest, and after every web link the names emcc really packed (a `POST_BUILD` step of `BagiChess`).
 
 ## Rules
 

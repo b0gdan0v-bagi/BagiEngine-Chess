@@ -59,7 +59,7 @@ owner's reading of the licence, not legal advice.
 ## The web package
 
 What `cmake/ChessWeb.cmake` lets into the browser package from the game is `config/` (four XML files), `assets/chess_test.png`, the seven `assets/sounds/*.wav` and `assets/openings/openings.tsv`; the
-`.md` files, `*.local.xml` (a Stockfish path), `imgui.ini`, `.py` files and the `*.artgen.json` provenance files (paths of the owner's machine, no use to a player) stay out (`tests/check_web_package.cmake` holds the list, run by hand until the web build).
+`.md` files, `*.local.xml` (a Stockfish path), `imgui.ini`, `.py` files and the `*.artgen.json` provenance files (paths of the owner's machine, no use to a player) stay out (`tests/check_web_package.cmake` checks it in ctest and after every web link).
 Beside them the engine's `config/`, `assets/` (its fonts with their licence texts) and the `web/config` overlay are packaged, and the wasm module
 contains the engine's libraries: their notices are in `engine/THIRD_PARTY_NOTICES.md`. Stockfish, the own UCI program and the control
 API are not in the web build.
