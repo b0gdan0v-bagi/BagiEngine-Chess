@@ -42,9 +42,16 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/ChessWeb.cmake)
 if(ENGINE_TARGET_WEB)
     chess_web_exclude_patterns(OUT CHESS_WEB_EXCLUDE_PATTERNS)
     foreach(_pattern IN LISTS CHESS_WEB_EXCLUDE_PATTERNS)
-        # unverified: needs emsdk. One --exclude-file per pattern; SHELL: keeps the pair together, the quotes keep "*" from the shell
+        # One --exclude-file per pattern (emcc applies it to --preload-file folders: checked with emsdk 4.0.23 and the POST_BUILD check
+        # below); SHELL: keeps the pair together, the quotes keep "*" from the shell
         target_link_options(BagiChess PRIVATE "SHELL:--exclude-file \"${_pattern}\"")
     endforeach()
+    # What emcc really packed is read back after every link: a name of the patterns in the package, or a core file missing, fails the build
+    add_custom_command(TARGET BagiChess POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -DGAME_ROOT=${CMAKE_CURRENT_SOURCE_DIR} -DPACKAGE_JS=$<TARGET_FILE_DIR:BagiChess>/BagiChess.js
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_web_package.cmake
+        COMMENT "Checking the web package of BagiChess"
+        VERBATIM)
 endif()
 
 # The own engine as a UCI program (uci/main.cpp): a console executable with no window and no engine services. Not on the web: a
@@ -170,7 +177,10 @@ if(ENGINE_BUILD_TESTS)
         set_tests_properties(BagiChessPoolStrings PROPERTIES TIMEOUT 60)
     endif()
 
-    # tests/check_web_package.cmake (the preload package of the web build) is not run by the desktop ctest: its fixed file list broke on
-    # every new asset. It comes back with the web build (todo entry chess-web-build, slice 2); by hand:
-    #   cmake -DGAME_ROOT=<repo> -DCHECK_DIR=<scratch> -P tests/check_web_package.cmake
+    # The pure part of the web package check (cmake/ChessWeb.cmake: the patterns on names, the files of the real tree, a scratch copy with
+    # stray files and a new asset). Needs no emsdk and no list of files; the web build runs the real part after the link (above)
+    add_test(NAME BagiChessWebPackageCheck COMMAND ${CMAKE_COMMAND}
+        -DGAME_ROOT=${CMAKE_CURRENT_SOURCE_DIR} -DCHECK_DIR=${CMAKE_BINARY_DIR}/web-package-check
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_web_package.cmake)
+    set_tests_properties(BagiChessWebPackageCheck PROPERTIES TIMEOUT 60)
 endif()

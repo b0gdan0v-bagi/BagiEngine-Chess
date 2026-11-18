@@ -6,11 +6,12 @@
 # game with no filter; a doc, a person's ChessSettings.local.xml (a Stockfish path), an imgui.ini or the provenance of a generated asset
 # (*.artgen.json: the paths of the machine it was made on) must not be served to others.
 #
-# Unverified: needs emsdk. emcc has --exclude-file <pattern> (a glob, fnmatch against the full path of a file as file_packager walks the
-# folder), and the patterns below are written for that: a leading "*/" stands for the folders above a name. It applies to every
-# --preload-file of the link, the engine's folders and the web overlay too (they hold none of these names). If emcc turns out to match
-# otherwise, or to ignore the option for --preload-file, the fallback is a staged copy of config/ and assets/ for the package: a decision
-# for slice 2 of the entry chess-web-build.
+# emcc has --exclude-file <pattern> (a glob, fnmatch against the full path of a file as file_packager walks the folder), and the
+# patterns below are written for that: a leading "*/" stands for the folders above a name. It applies to every --preload-file of the
+# link, the engine's folders and the web overlay too (they hold none of these names), and it works for a folder given to
+# --preload-file (checked with emsdk 4.0.23: the package of a build with a CLAUDE.md and a *.local.xml in config/ holds neither). Two
+# checks hold it: tests/check_web_package.cmake, as a ctest on the patterns and the tree, and as a POST_BUILD step of BagiChess that
+# reads the files emcc really packed.
 #
 #   chess_web_exclude_patterns(OUT <var>)
 #       The patterns of the files that stay out of the package.
