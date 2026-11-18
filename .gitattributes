@@ -60,3 +60,6 @@ CMakeLists.txt text eol=lf
 *.spv  binary
 *.zip  binary
 *.7z   binary
+
+# Fuzz seeds are raw bytes: a CR or a missing final newline is part of the input
+tests/Fuzz/corpus/** binary

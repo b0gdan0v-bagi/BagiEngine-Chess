@@ -70,10 +70,29 @@ endif()
 
 # ChessTests, the control smoke and the checks below are behind ENGINE_BUILD_TESTS, which the web presets switch off
 if(ENGINE_BUILD_TESTS)
+    # The fuzz targets of the parsers that read untrusted text, replayed by tests/ChessFuzzCorpusTest.cpp. The engine's BagiFuzzTargets is
+    # built only inside the engine repository, so the game has a library of its own, made the way that one is. The engine's xorshift mutator
+    # is one self-contained source, compiled in here so that the replay draws the same bytes on every platform
+    file(GLOB CHESS_FUZZ_SOURCES
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/Fuzz/*.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/Fuzz/*.h"
+    )
+    add_library(ChessFuzzTargets STATIC ${CHESS_FUZZ_SOURCES} ${BAGI_ENGINE_DIR}/tests/Fuzz/FuzzMutator.cpp)
+    source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/tests/Fuzz" PREFIX "Fuzz" FILES ${CHESS_FUZZ_SOURCES})
+    set_target_properties(ChessFuzzTargets PROPERTIES FOLDER "Tests")
+    target_precompile_headers(ChessFuzzTargets REUSE_FROM BECoreModule)
+    be_force_include_pch(ChessFuzzTargets)
+    # IMGUI_VULKAN_AVAILABLE must match BECoreModule, otherwise the reused PCH is rejected
+    target_compile_definitions(ChessFuzzTargets PRIVATE IMGUI_VULKAN_AVAILABLE=1 REFLECTION_GENERATED=1)
+    # The game root, so that a header is <tests/Fuzz/ChessFuzzTargets.h> (<Fuzz/...> is the engine's folder)
+    target_include_directories(ChessFuzzTargets PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_BINARY_DIR})
+    target_link_libraries(ChessFuzzTargets PUBLIC ChessModule)
+
     file(GLOB CHESS_TEST_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/tests/*.cpp")
     # WHOLE_ARCHIVE: ChessUiTest loads the shipped SceneConfig.xml, which names components no test references
     be_add_game_tests(ChessTests
         SOURCES ${CHESS_TEST_SOURCES}
+        LINK ChessFuzzTargets
         WHOLE_ARCHIVE ChessModule
     )
     # Test helpers are included as <tests/ChessTestUtil.h>: be_add_game_tests puts this folder (the game root) on the include path of ChessTests
