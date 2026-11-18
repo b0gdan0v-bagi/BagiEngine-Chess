@@ -1,0 +1,16 @@
+assets/openings/openings.tsv: the names of the chess openings
+=============================================================
+
+Source:  https://github.com/lichess-org/chess-openings ("chess-openings", the lichess opening table)
+Commit:  3ba6b20d31b2e6125cb0e6a2e792f400717d9d39 (master at the time)
+Taken:   2026-11-18, the files a.tsv, b.tsv, c.tsv, d.tsv and e.tsv of that commit, joined under one header line
+         by tools/fetch_openings.py (the rows are unchanged; `python tools/fetch_openings.py` makes the same file again)
+
+Licence: CC0 1.0 Universal, https://creativecommons.org/publicdomain/zero/1.0/
+
+The README of the data set says:
+
+    "As a collection of facts, this data set is in the public domain. ... the work is released under the CC0 Public Domain Dedication."
+
+The repository has no LICENSE file of its own; the README is where upstream states the terms. CC0 asks nothing of a user (no notice, no
+attribution); this file records where the table came from and under what terms, so that the origin can be checked.

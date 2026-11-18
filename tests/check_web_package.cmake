@@ -33,6 +33,7 @@ endforeach()
 # --- the package is exactly the files of the game; a new config or asset file is a conscious change of this list
 set(expected
     assets/chess_test.png
+    assets/openings/openings.tsv
     assets/sounds/capture.wav
     assets/sounds/castle.wav
     assets/sounds/check.wav
