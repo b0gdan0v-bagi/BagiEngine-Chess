@@ -159,6 +159,11 @@ if(ENGINE_BUILD_TESTS)
             TIMEOUT 60
         )
 
+        # The pure parts of tests/web_chess_smoke.py (layout, verdicts, command line; standard library unittest, no Playwright, no browser, no build).
+        # The smoke itself needs emsdk and a browser and is run by hand
+        add_test(NAME BagiChessWebSmokeUnit COMMAND ${Python3_EXECUTABLE} -m unittest discover -s ${CMAKE_CURRENT_SOURCE_DIR}/tests -p "test_web_chess_smoke.py" WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+        set_tests_properties(BagiChessWebSmokeUnit PROPERTIES TIMEOUT 60)
+
         # LICENSE and THIRD_PARTY_NOTICES.md hold to the tree (tests/check_notices.py): a row for every asset, the Stockfish section, no Stockfish file in the repository
         add_test(NAME BagiChessThirdPartyNotices COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_notices.py)
         set_tests_properties(BagiChessThirdPartyNotices PROPERTIES TIMEOUT 60)
