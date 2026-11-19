@@ -69,6 +69,7 @@ OPENING_NAME = {"eco": "C44", "name": "King's Knight Opening: Normal Variation"}
 MATE_IN_ONE_FEN = "6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1"  # Ra8#
 PROMOTION_FEN = "8/P6k/8/8/8/8/8/K7 w - - 0 1"
 EDITOR_FEN = "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1"  # kings and rooks: nothing a draft would change
+EDITOR_FEN_WITH_PAWN = "r3k2r/8/8/8/4P3/8/8/R3K2R w KQkq - 0 1"  # the same with the default tool's white pawn on e4
 EDITOR_PASTED_FEN = "4k3/8/8/8/8/8/4P3/4K2R b K - 0 1"
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -1155,10 +1156,19 @@ def get_editor(client: BagiControlClient) -> dict | None:
     return client.call("get_state")["state"]["editor"]
 
 
+def click_square(client: BagiControlClient, file: int, rank: int, button: str = "left") -> None:
+    """A click on the centre of a square in scene units, White at the bottom (the board is there in the default and in the Wide view), then two frames. A square is no UI
+    element, so the click is not "consumed": the board takes it as a mouse event."""
+    x = BOARD_LEFT + SQUARE_SIZE * file + SQUARE_SIZE / 2
+    y = BOARD_TOP + SQUARE_SIZE * (7 - rank) + SQUARE_SIZE / 2
+    client.call("click_at", {"x": x, "y": y, "space": "scene", "button": button})
+    let_frames_pass(client, 2)
+
+
 def run_editor_scenario(client: BagiControlClient, headless: bool) -> None:
     """The position editor in the real window: the board while a draft is shown looks like the game in the same position (no marks, no slide), the draft is not the game, and a FEN
-    comes in and goes out over the clipboard. The clicks and the numbers of the state are `tests/scenarios/position_editor.jsonl`; the pieces are put on squares by the gtests (a
-    square has no name to click on).
+    comes in and goes out over the clipboard. The clicks on named elements and the numbers of the state are `tests/scenarios/position_editor.jsonl`; a square has no name, so the
+    pieces are put and taken off by `click_square`.
 
     The pictures are taken before the next click: a click leaves the pointer over its button, and its hover look would change the band."""
     if client.call("status")["manualClock"]:
@@ -1181,6 +1191,14 @@ def run_editor_scenario(client: BagiControlClient, headless: bool) -> None:
     check(editor is not None and editor["fen"] == EDITOR_FEN and editor["error"] is None, f"the draft of {EDITOR_FEN} reads {editor}")
     if headless:
         check(board_squares_band(take_screenshot(client)) == board_squares_band(by_the_game), "the draft of a position does not look like the game in it")
+
+    # A click on a square puts the picked piece on it and a right click takes it off, in the draft only
+    click_square(client, 4, 3)
+    state = client.call("get_state")["state"]
+    check(state["editor"]["fen"] == EDITOR_FEN_WITH_PAWN and state["fen"] == EDITOR_FEN, f"a click on e4 left the draft {state['editor']} over the game {state['fen']}, not {EDITOR_FEN_WITH_PAWN}")
+    click_square(client, 4, 3, "right")
+    state = client.call("get_state")["state"]
+    check(state["editor"]["fen"] == EDITOR_FEN and state["fen"] == EDITOR_FEN, f"a right click on e4 left the draft {state['editor']} over the game {state['fen']}")
 
     # A game with moves played shows the opening position as a draft, the pieces back on their squares at once
     client.call("reset")
