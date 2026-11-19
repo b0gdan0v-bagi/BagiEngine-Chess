@@ -159,6 +159,44 @@ namespace BECore::Chess::Tests {
         EXPECT_FALSE(Game().ProgramToMoveNow());
     }
 
+    TEST_F(ChessGamePuzzleTest, TheJudgeWaitsWhileAPositionIsEditedAndRepliesAfterTheDraftIsCancelled) {
+        Load();
+        ASSERT_TRUE(Game().BeginPuzzle(0));
+        Settle();
+        ClickMove("a1", "a7");
+        Frame();
+        ASSERT_EQ(Model().GetMoves().size(), 2u);
+
+        Game().BeginEditing(EditStart::Current);
+        Frames(8);
+        EXPECT_TRUE(Game().IsEditing()) << "the reply would have ended the draft";
+        EXPECT_EQ(Model().GetMoves().size(), 2u);
+        EXPECT_TRUE(Game().IsPuzzleOn());
+
+        Game().CancelEditing();
+        ASSERT_TRUE(FramesUntilMoves(3));
+        EXPECT_EQ(Model().GetMoves()[2].ToUci(), "g8h8");
+        EXPECT_TRUE(Game().IsPuzzleOn());
+    }
+
+    TEST_F(ChessGamePuzzleTest, AWrongMoveIsNotTakenBackWhileAPositionIsEdited) {
+        Load();
+        ASSERT_TRUE(Game().BeginPuzzle(0));
+        Settle();
+        ClickMove("b2", "b3");
+        ASSERT_EQ(Model().GetMoves().size(), 2u);
+
+        Game().BeginEditing(EditStart::Current);
+        Frames(2);
+        EXPECT_TRUE(Game().IsEditing());
+        EXPECT_EQ(Model().GetMoves().size(), 2u) << "the takeback would have ended the draft";
+
+        Game().CancelEditing();
+        Frame();
+        EXPECT_EQ(Model().GetMoves().size(), 1u);
+        EXPECT_TRUE(Game().GetPuzzle().WasWrong());
+    }
+
     TEST_F(ChessGamePuzzleTest, ASearchInFlightWhenThePuzzleBeginsNeverPlaysIntoItNorAfterIt) {
         SKIP_WITHOUT_WORKER_THREADS();
         Load();

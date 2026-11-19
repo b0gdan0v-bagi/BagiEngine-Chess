@@ -77,10 +77,13 @@ namespace BECore::Chess {
         if (!game) {
             return;
         }
-        // The opponent plays here, on the main thread, and not in OnDraw(): it changes the model. While a position is edited it keeps its setup and waits: a move of its own would end the draft.
-        // While a puzzle is on it gets no frame: the judge plays the other side, and a search that was in flight is stale by the time the puzzle ends
-        game->UpdatePuzzle(event.deltaTime);
+        // The opponent plays here, on the main thread, and not in OnDraw(): it changes the model. While a position is edited it and the puzzle's judge wait: a move of either (the program's reply, the
+        // takeback of a wrong move) would end the draft. While a puzzle is on the opponent gets no frame: the judge plays the other side, and a search that was in flight is stale by the time the
+        // puzzle ends
         const bool editing = game->IsEditing();
+        if (!editing) {
+            game->UpdatePuzzle(event.deltaTime);
+        }
         if (!editing && !game->IsPuzzleOn()) {
             game->GetOpponent().Update();
         }
