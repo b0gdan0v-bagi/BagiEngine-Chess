@@ -6,6 +6,8 @@
 #include <Common/Printers.h>
 #include <Common/TempPath.h>
 #include <Widgets/TextureEditor/SpriteAtlas.h>
+#include <tests/ChessPieceArt.h>
+#include <tests/FakeEngineUtil.h>
 #include <tests/ShippedScene.h>
 
 #if BE_WITH_EDITOR
@@ -18,55 +20,13 @@ namespace BECore::Chess::Tests {
 
     namespace {
 
-        constexpr StringView kPiecesGroup = "pieces";
-        // Four of the twelve pieces to a row make 1024 x 1024; the packer's default cap of 4096 would pick a 256 x 4096 strip of the same area (the smaller width wins a tie)
-        constexpr uint32_t kMaxAtlasSide = 1024;
         constexpr size_t kPieceCount = 12;
         constexpr float kPieceWidth = 244.0F;
         constexpr float kPieceHeight = 256.0F;
 
-        std::filesystem::path GameRoot() {
-            return ShippedConfigFolder().parent_path();
-        }
-
         std::filesystem::path ShippedLibraryFile() {
             return ShippedConfigFolder() / "TextureLibrary.xml";
         }
-
-        Vector<Piece> AllPieces() {
-            Vector<Piece> pieces;
-            for (const PieceColor color : EnumUtils<PieceColor>::Values()) {
-                for (const PieceType type : EnumUtils<PieceType>::Values()) {
-                    if (type != PieceType::None) {
-                        pieces.push_back(Piece{type, color});
-                    }
-                }
-            }
-            return pieces;
-        }
-
-        /// A folder of the test in the system temp folder, removed with the object
-        class TempFolder {
-        public:
-            TempFolder() : _path(BECore::Tests::TestTempDirectory("ChessPieceAtlas")) {
-                std::error_code ignored;
-                std::filesystem::remove_all(_path, ignored);
-                std::filesystem::create_directories(_path, ignored);
-            }
-            ~TempFolder() {
-                std::error_code ignored;
-                std::filesystem::remove_all(_path, ignored);
-            }
-            TempFolder(const TempFolder&) = delete;
-            TempFolder& operator=(const TempFolder&) = delete;
-
-            [[nodiscard]] const std::filesystem::path& Path() const {
-                return _path;
-            }
-
-        private:
-            std::filesystem::path _path;
-        };
 
         bool LoadShippedLibrary(TextureLibrary& library) {
             XmlDeserializer deserializer;
@@ -98,10 +58,6 @@ namespace BECore::Chess::Tests {
             settings.maxSide = kMaxAtlasSide;
             const auto resolve = [](StringView virtualPath) { return GameRoot() / ToStd(virtualPath); };
             return WriteAtlas(library, kPiecesGroup, settings, AtlasIo{assetsDir, resolve});
-        }
-
-        bool Overlap(const Rect& a, const Rect& b) {
-            return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
         }
 
         bool SameRect(const Rect& a, const Rect& b) {
@@ -138,7 +94,7 @@ namespace BECore::Chess::Tests {
             namesBefore.push_back(entry.name);
         }
 
-        const TempFolder temp;
+        const TempDirectory temp;
         const auto written = PackPiecesAtlas(library, temp.Path() / "assets");
         ASSERT_TRUE(written.has_value()) << written.error().c_str();
         EXPECT_EQ(written->changed.size(), kPieceCount);
@@ -192,7 +148,7 @@ namespace BECore::Chess::Tests {
         TextureLibrary repacked;
         ASSERT_TRUE(LoadShippedLibrary(repacked));
 
-        const TempFolder temp;
+        const TempDirectory temp;
         const auto written = PackPiecesAtlas(repacked, temp.Path() / "assets");
         ASSERT_TRUE(written.has_value()) << written.error().c_str();
 

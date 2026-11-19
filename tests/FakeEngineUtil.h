@@ -68,6 +68,11 @@ namespace BECore::Chess::Tests {
         TempDirectory(const TempDirectory&) = delete;
         TempDirectory& operator=(const TempDirectory&) = delete;
 
+        /// The directory itself
+        [[nodiscard]] const std::filesystem::path& Path() const {
+            return _path;
+        }
+
         /// The path of a file in the directory (the file is not made)
         [[nodiscard]] std::filesystem::path File(const char* name) const {
             return _path / name;
