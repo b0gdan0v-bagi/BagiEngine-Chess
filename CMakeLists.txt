@@ -97,9 +97,10 @@ if(ENGINE_BUILD_TESTS)
 
     file(GLOB CHESS_TEST_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/tests/*.cpp")
     # WHOLE_ARCHIVE: ChessUiTest loads the shipped SceneConfig.xml, which names components no test references
+    # RuntimeModule: ChessPieceAtlasTest drives the Texture editor's packer (SpriteAtlas.h), which is in the build only with BE_WITH_EDITOR
     be_add_game_tests(ChessTests
         SOURCES ${CHESS_TEST_SOURCES}
-        LINK ChessFuzzTargets
+        LINK ChessFuzzTargets RuntimeModule
         WHOLE_ARCHIVE ChessModule
     )
     # Test helpers are included as <tests/ChessTestUtil.h>: be_add_game_tests puts this folder (the game root) on the include path of ChessTests
