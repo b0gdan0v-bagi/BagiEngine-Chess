@@ -1,6 +1,7 @@
 #include <BECore/UI/UIProgressBar.h>
 #include <BECore/UI/UISwitchComponent.h>
 #include <BECore/UI/UIToggleComponent.h>
+#include <Chess/Engine/AnalysisText.h>
 #include <tests/ChessUiHarness.h>
 
 /// The analysis controls of the move panel: the Hint button, the evaluation cell and the ratings switch of the band MovePanelBandAnalysis in the Wide view and their twins in MovePanelBandButtons in
@@ -581,6 +582,153 @@ namespace BECore::Chess::Tests {
         ASSERT_EQ(analysis.factory.Calls(), 1);
         const StringView picked = OpponentEngineId(Opponent().GetEngine());
         EXPECT_EQ(analysis.factory.Engines().front(), String(picked.data(), picked.size()));
+    }
+
+    // ---- A held review: the band shows the evaluation of the viewed position ----
+
+    namespace {
+
+        /// What the band says for the review's entry @p entry: the words of AnalysisText over its score in White's view, and the bar of it
+        struct ReviewedWords {
+            String text;
+            String bar;
+        };
+
+        ReviewedWords WordsOf(const ReviewedPosition& entry) {
+            const AnalysisLine line{entry.best, ScoreForWhite(entry.score, entry.sideToMove), kReviewDepth};
+            return {AnalysisText::Evaluation(line, true, false, false), Format("{:.3f}", AnalysisText::Share(line.score))};
+        }
+
+    }  // namespace
+
+    TEST_F(ChessUiTest, AViewedPositionShowsTheReviewsEvaluationOfItInWhitesView) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        ReviewOnTheOwnEngine();
+        ASSERT_TRUE(PlayFoolsMate());
+        ASSERT_TRUE(Analyst().StartReview(Model()).has_value());
+        ASSERT_TRUE(WaitForReview());
+        ASSERT_FALSE(Analyst().IsEvaluationOn());
+
+        for (const size_t shown : {0u, 2u, 3u}) {
+            ASSERT_TRUE(Model().ShowMoves(shown));
+            const Optional<ReviewedPosition> entry = Analyst().GetReviewedPosition(Model(), shown);
+            ASSERT_TRUE(entry.has_value()) << shown;
+            const ReviewedWords expected = WordsOf(*entry);
+
+            EXPECT_EQ(Var("analysisText"), expected.text) << shown;
+            EXPECT_EQ(Var("analysisBar"), expected.bar) << shown;
+            EXPECT_EQ(ShownText(MovePanelElement("MovePanelEvalText")), expected.text) << shown;
+            EXPECT_EQ(Var("analysisEvaluationOn"), "false") << "the toggles are the analyst's, whatever the view shows";
+            EXPECT_EQ(Var("analysisRatingsOn"), "false");
+        }
+        EXPECT_EQ(Var("analysisText"), "#-1") << "after g4 Black mates in one: White's view";
+        EXPECT_EQ(Var("analysisBar"), "0.000");
+
+        Analyst().SetEvaluation(true);
+        EXPECT_EQ(Var("analysisEvaluationOn"), "true");
+        EXPECT_EQ(Var("analysisText"), "#-1") << "the evaluation's own switch does not change what a held review says";
+    }
+
+    TEST_F(ChessUiTest, BackToTheGameTheWordsAreTheGamesOwnAgain) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        ReviewOnTheOwnEngine();
+        ASSERT_TRUE(PlayFoolsMate());
+        Analyst().SetEvaluation(true);
+        ASSERT_TRUE(Analyst().StartReview(Model()).has_value());
+        ASSERT_TRUE(WaitForReview());
+        ASSERT_TRUE(Model().ShowMoves(2));
+        ASSERT_NE(Var("analysisText"), "-");
+
+        ASSERT_TRUE(Model().EndViewing());
+
+        EXPECT_EQ(Var("analysisText"), "-") << "the game is finished: nothing to analyse";
+        EXPECT_EQ(Var("analysisBar"), "0.500");
+    }
+
+    TEST_F(ChessUiTest, WithNoReviewOrACancelledOneAViewedPositionKeepsTheGamesWords) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        ReviewOnTheOwnEngine();
+        ASSERT_TRUE(PlayFoolsMate());
+        ASSERT_TRUE(Model().ShowMoves(2));
+        EXPECT_EQ(Var("analysisText"), "Eval off") << "no review held";
+
+        ASSERT_TRUE(Model().EndViewing());
+        ASSERT_TRUE(Analyst().StartReview(Model()).has_value());
+        ASSERT_TRUE(WaitForReview());
+        ASSERT_TRUE(Model().ShowMoves(2));
+        ASSERT_NE(Var("analysisText"), "Eval off");
+
+        Analyst().AbandonReview();
+        EXPECT_EQ(Var("analysisText"), "Eval off") << "the review is gone, the band is the game's again at the next draw";
+        EXPECT_EQ(Var("analysisBar"), "0.000");
+    }
+
+    TEST_F(ChessUiTest, AnUnfinishedGamesViewKeepsTheGamesEvaluation) {
+        ScriptedAnalysis analysis;
+        Analyst().SetEngineFactory(analysis.factory.AsFactory());
+        ASSERT_TRUE(PlayAll(Model(), {"e2e4", "e7e5", "g1f3"}));
+        Analyst().SetEvaluation(true);
+        ASSERT_TRUE(FramesUntil([&] { return Analyst().GetEvaluation(Model()).has_value(); }));
+        const String game = Var("analysisText");
+        ASSERT_NE(game, "...");
+
+        ASSERT_TRUE(Model().ShowMoves(1));
+
+        EXPECT_EQ(Var("analysisText"), game) << "no review: the evaluation is of the game's position, as before";
+    }
+
+    TEST_F(ChessUiTest, APositionTheRunningReviewHasNotReachedReadsPendingWithAnEvenBar) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        const auto engine = New<AnalysingEngine>();
+        engine->Gate(true);
+        CountingAnalysisFactory factory{engine};
+        Analyst().SetEngineFactory(factory.AsFactory());
+        ASSERT_TRUE(PlayFoolsMate());
+        ASSERT_TRUE(Analyst().StartReview(Model()).has_value());
+        ASSERT_TRUE(FramesUntil([&] { return engine->Calls() == 1; }));
+        ASSERT_TRUE(Model().ShowMoves(2));
+        ASSERT_FALSE(Analyst().GetReviewedPosition(Model(), 2).has_value());
+
+        EXPECT_EQ(Var("analysisText"), "...");
+        EXPECT_EQ(Var("analysisBar"), "0.500");
+        engine->Open();
+        ASSERT_TRUE(WaitForReview());
+        EXPECT_NE(Var("analysisText"), "...") << "the position came";
+    }
+
+    TEST_F(ChessUiTest, AViewedPositionOfAFailedReviewWithNoEntryReadsNoAnalysis) {
+        CountingAnalysisFactory factory(EngineError{EngineErrorKind::LaunchFailed, "no engine"});
+        Analyst().SetEngineFactory(factory.AsFactory());
+        ASSERT_TRUE(PlayFoolsMate());
+        ASSERT_TRUE(Analyst().StartReview(Model()).has_value());
+        ASSERT_TRUE(FramesUntil([&] { return Analyst().GetReviewState(Model()) == ReviewState::Failed; }));
+        ASSERT_TRUE(Model().ShowMoves(2));
+        ASSERT_FALSE(Analyst().GetReviewedPosition(Model(), 2).has_value());
+
+        EXPECT_EQ(Var("analysisText"), "No analysis");
+        EXPECT_EQ(Var("analysisBar"), "0.500");
+    }
+
+    TEST_F(ChessUiTest, AStepOfTheViewWritesTheWordsAndASteadyFrameWhileViewingWritesNoVariable) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        ReviewOnTheOwnEngine();
+        ASSERT_TRUE(PlayFoolsMate());
+        ASSERT_TRUE(Analyst().StartReview(Model()).has_value());
+        ASSERT_TRUE(WaitForReview());
+        ASSERT_TRUE(Model().ShowMoves(1));
+        const String first = Var("analysisText");
+        const uint64_t version = CoreManager::GetUIVars().GetVersion();
+        for (int frame = 0; frame < 3; ++frame) {
+            _manager->UpdateAll();
+            Draw();
+        }
+        EXPECT_EQ(CoreManager::GetUIVars().GetVersion(), version) << "a steady frame while viewing writes nothing";
+
+        ASSERT_TRUE(Model().ShowMoves(3));
+        Draw();
+
+        EXPECT_GT(CoreManager::GetUIVars().GetVersion(), version) << "a step of the view republishes: it moves no version and no revision";
+        EXPECT_NE(Var("analysisText"), first);
     }
 
 }  // namespace BECore::Chess::Tests

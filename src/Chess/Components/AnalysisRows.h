@@ -10,8 +10,8 @@ namespace BECore::Chess {
 
     class ChessGameModel;
 
-    /// What the evaluation words were last built from: the model and its version, the analyst and its revision. A view of an earlier position moves none of them: the evaluation is of the
-    /// game's position
+    /// What the evaluation words were last built from: the model, its version and the move count it shows, the analyst and its revision. A step of a view moves neither version nor revision,
+    /// so the shown count is part of the key: with a review held the words are those of the viewed position
     class AnalysisKey {
     public:
         /// Whether the words of @p model and @p analyst are other than the ones last built (always on the first call); remembers them as built
@@ -23,11 +23,16 @@ namespace BECore::Chess {
         const PositionAnalyst* _analyst = nullptr;
         uint64_t _version = 0;
         uint64_t _revision = 0;
+        size_t _shownMoves = 0;
     };
+
+    /// Whether the evaluation cell shows the review's evaluation of the viewed position: an earlier position is viewed and a review is held (any state but Idle). Else it shows the game's own
+    [[nodiscard]] bool ReviewViewApplies(const ChessGameModel& model, const PositionAnalyst& analyst);
 
     /// Writes the UIVars the evaluation cell of every canvas that shows it binds: `analysisText` (AnalysisText::Evaluation, the line in White's view), `analysisBar` (AnalysisText::Share as
     /// a number; 0 while the evaluation is off, an even bar while it has no line) and `analysisEvaluationOn` ("true" / "false", the value the toggle compares) and `analysisRatingsOn` (the same for
-    /// the ratings' toggle). With no game: both off
+    /// the ratings' toggle). With no game: both off. While ReviewViewApplies() the text and the bar are the review's entry of the viewed position (the evaluation's switch does not matter): its
+    /// score in White's view, "..." with an even bar while it has not come, "No analysis" when the review failed before it
     void PublishAnalysisWords(const ChessGameModel* model, const PositionAnalyst* analyst);
 
     /**

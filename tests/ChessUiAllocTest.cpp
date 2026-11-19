@@ -29,6 +29,8 @@ namespace BECore::Chess::Tests {
         constexpr FrameCost kTurnedResizedFrame{};
         constexpr FrameCost kSearchingFrame{};
         constexpr FrameCost kPuzzleFrame{};
+        constexpr FrameCost kReviewFrame{};
+        constexpr FrameCost kRunningReviewFrame{};
 
         /// The allocations the calling thread makes while @p frame runs
         template <typename Frame>
@@ -179,6 +181,36 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(ChessGame::GetActive()->IsPuzzleOn());
         WarmUp();
         EXPECT_TRUE(CostIs(MeasureFrame(), kPuzzleFrame));
+    }
+
+    // The section is open, its line and greys are written, the list shows the marks and the HUD's key has the review's revision: none of them may move in an idle frame
+    TEST_F(ChessUiAllocTest, AFrameWithTheReviewSectionOpenAndAReviewDoneAllocatesNothingNew) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        const auto engine = New<AnalysingEngine>();
+        CountingAnalysisFactory factory{engine};
+        Analyst().SetEngineFactory(factory.AsFactory());
+        ASSERT_TRUE(PlayFoolsMate());
+        ASSERT_TRUE(OpenTheReviewSection());
+        ASSERT_TRUE(ClickReviewSection("ReviewSectionStart").Both());
+        ASSERT_TRUE(WaitForReview());
+        WarmUp();
+        EXPECT_TRUE(CostIs(MeasureFrame(), kReviewFrame));
+    }
+
+    // The review's search is held at its gate, so the frames are the same however long the machine takes; the HUD says "Reviewing 0/4"
+    TEST_F(ChessUiAllocTest, AFrameWhileAReviewRunsAllocatesNothingNew) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        const auto engine = New<AnalysingEngine>();
+        engine->Gate(true);
+        CountingAnalysisFactory factory{engine};
+        Analyst().SetEngineFactory(factory.AsFactory());
+        ASSERT_TRUE(PlayFoolsMate());
+        Press("ChessReviewStart");
+        ASSERT_TRUE(FramesUntil([&] { return engine->Calls() == 1; })) << "the search never started";
+        ASSERT_EQ(Var("status"), "Reviewing 0/4");
+        WarmUp();
+        EXPECT_TRUE(CostIs(MeasureFrame(), kRunningReviewFrame));
+        engine->Open();
     }
 
     // The search is on a worker and held at its gate, so the frames are the same however long the machine takes

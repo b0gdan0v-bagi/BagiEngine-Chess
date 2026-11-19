@@ -38,6 +38,31 @@ namespace BECore::Chess {
 
     }  // namespace
 
+    Vector<MovePanelMistake> ReviewMistakesByPly(const ReviewedMoves& reviewed, const Vector<bool>& brilliantByPly) {
+        Vector<MovePanelMistake> byPly(reviewed.size(), MovePanelMistake::None);
+        for (size_t ply = 0; ply < reviewed.size(); ++ply) {
+            const bool brilliant = ply < brilliantByPly.size() && brilliantByPly[ply];
+            if (!reviewed[ply] || brilliant) {
+                continue;
+            }
+            switch (reviewed[ply]->review.quality) {
+                case MoveQuality::Inaccuracy:
+                    byPly[ply] = MovePanelMistake::Inaccuracy;
+                    break;
+                case MoveQuality::Mistake:
+                    byPly[ply] = MovePanelMistake::Mistake;
+                    break;
+                case MoveQuality::Blunder:
+                    byPly[ply] = MovePanelMistake::Blunder;
+                    break;
+                case MoveQuality::Best:
+                case MoveQuality::Good:
+                    break;
+            }
+        }
+        return byPly;
+    }
+
     Vector<MovePanelRow> CurrentMovePanelRows(const ChessGameModel* model, const PositionAnalyst* analyst) {
         Vector<MoveListRow> list;
         int shownPly = kNoCurrentPly;
@@ -47,14 +72,22 @@ namespace BECore::Chess {
         }
         Vector<MovePanelRow> rows = BuildMovePanelRows(list, shownPly);
         ASSERT(rows.size() == kMovePanelRows);
-        if (model && analyst && analyst->AreRatingsOn()) {
+        if (!model || !analyst) {
+            return rows;
+        }
+        Vector<bool> brilliantByPly;
+        if (analyst->AreRatingsOn()) {
             const MoveRatings ratings = analyst->GetRatings(*model);
-            Vector<bool> brilliantByPly;
             brilliantByPly.reserve(ratings.size());
             for (const Optional<MoveRating>& rating : ratings) {
                 brilliantByPly.push_back(rating && rating->IsBrilliant());
             }
             MarkMovePanelRows(rows, brilliantByPly);
+        }
+        // Empty while no review of this game is held (Idle), so the read is also the state check
+        const ReviewedMoves reviewed = analyst->GetReviewedMoves(*model);
+        if (!reviewed.empty()) {
+            MarkMovePanelMistakes(rows, ReviewMistakesByPly(reviewed, brilliantByPly));
         }
         return rows;
     }

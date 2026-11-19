@@ -57,8 +57,9 @@ namespace BECore::Chess {
 
     void PositionAnalyst::SetEngineFactory(AnalysisEngineFactory factory) {
         _factory = std::move(factory);
-        // A factory is move-only, so the rater asks through this one; the rater is a member and never outlives the analyst
+        // A factory is move-only, so the rater and the reviewer ask through this one; both are members and never outlive the analyst
         _rater.SetEngineFactory([this](OpponentEngine engine) { return MakeEngine(engine); });
+        _reviewer.SetEngineFactory([this](OpponentEngine engine) { return MakeEngine(engine); });
     }
 
     std::expected<ChessEnginePtr, EngineError> PositionAnalyst::MakeEngine(OpponentEngine engine) const {
@@ -87,6 +88,7 @@ namespace BECore::Chess {
         BE_PROFILE_SCOPE("Chess analyst update");
         UpdateSearch(model, picked);
         _rater.Update(model);
+        _reviewer.Update(model);
     }
 
     void PositionAnalyst::UpdateSearch(const ChessGameModel& model, OpponentEngine picked) {
@@ -140,6 +142,7 @@ namespace BECore::Chess {
 
     void PositionAnalyst::Cancel() {
         _rater.Cancel();
+        _reviewer.Cancel();
         if (_search) {
             _search->token.Cancel();
         }
@@ -157,6 +160,7 @@ namespace BECore::Chess {
         ClearError();
         _engine.Reset();
         _rater.Shutdown();
+        _reviewer.Shutdown();
     }
 
     bool PositionAnalyst::IsThinking() const {

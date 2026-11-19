@@ -186,16 +186,26 @@ namespace BECore::Chess {
         }
 
         // The hint, under the selection, once the engine has answered for this very position: the analyst gives nothing for another version, so any change of the position takes it off at the next
-        // frame
-        if (const PositionAnalyst* analyst = ChessGame::GetActiveAnalyst(); analyst && !viewing && !model->IsGameOver()) {
-            if (const Optional<AnalysisLine> hint = analyst->GetHint(*model)) {
-                float hx = 0.0f;
-                float hy = 0.0f;
-                SquareToPixel(hint->move.From().file, hint->move.From().rank, bottom, hx, hy);
-                renderer.DrawFilledRect(hx, hy, squareSize, squareSize, _palette.HintFrom());
-                SquareToPixel(hint->move.To().file, hint->move.To().rank, bottom, hx, hy);
-                renderer.DrawFilledRect(hx, hy, squareSize, squareSize, _palette.HintTo());
+        // frame. A viewed position has none of its own; a held review marks its best move there in the hint's colors (only a view asks the reviewer, a normal frame never does)
+        Optional<Move> hinted;
+        if (const PositionAnalyst* analyst = ChessGame::GetActiveAnalyst()) {
+            if (!viewing && !model->IsGameOver()) {
+                if (const Optional<AnalysisLine> hint = analyst->GetHint(*model)) {
+                    hinted = hint->move;
+                }
+            } else if (viewing) {
+                if (const Optional<ReviewedPosition> reviewed = analyst->GetReviewedPosition(*model, model->GetShownMoveCount()); reviewed && !reviewed->best.IsNull()) {
+                    hinted = reviewed->best;
+                }
             }
+        }
+        if (hinted) {
+            float hx = 0.0f;
+            float hy = 0.0f;
+            SquareToPixel(hinted->From().file, hinted->From().rank, bottom, hx, hy);
+            renderer.DrawFilledRect(hx, hy, squareSize, squareSize, _palette.HintFrom());
+            SquareToPixel(hinted->To().file, hinted->To().rank, bottom, hx, hy);
+            renderer.DrawFilledRect(hx, hy, squareSize, squareSize, _palette.HintTo());
         }
 
         // The queued premoves stand until the program has answered, so they are drawn under the selection of the next one

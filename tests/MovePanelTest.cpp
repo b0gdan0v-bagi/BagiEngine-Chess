@@ -435,4 +435,67 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(*shown, 3u);
     }
 
+    // ---- The suffixes of a reviewed mistake ----
+
+    TEST(MovePanelTest, TheSuffixesOfTheMistakesAreTheChessBookSigns) {
+        EXPECT_EQ(kMovePanelInaccuracySuffix, "?!");
+        EXPECT_EQ(kMovePanelMistakeSuffix, "?");
+        EXPECT_EQ(kMovePanelBlunderSuffix, "??");
+    }
+
+    TEST(MovePanelTest, EachKindOfMistakeGetsItsOwnSuffixAndNoneGetsNothing) {
+        Vector<MovePanelRow> panel = BuildMovePanelRows(RowsOf(2), 3);
+        const Vector<MovePanelRow> before = panel;
+        MarkMovePanelMistakes(panel, Vector<MovePanelMistake>{MovePanelMistake::Inaccuracy, MovePanelMistake::Mistake, MovePanelMistake::Blunder, MovePanelMistake::None});
+        EXPECT_EQ(panel[0].white.text, "w1?!");
+        EXPECT_EQ(panel[0].black.text, "b1?");
+        EXPECT_EQ(panel[1].white.text, "w2??");
+        EXPECT_EQ(panel[1].black.text, "b2");
+        for (size_t i = 0; i < panel.size(); ++i) {
+            EXPECT_EQ(panel[i].number, before[i].number);
+            EXPECT_EQ(panel[i].shown, before[i].shown);
+            EXPECT_EQ(panel[i].white.ply, before[i].white.ply);
+            EXPECT_EQ(panel[i].black.ply, before[i].black.ply);
+            EXPECT_EQ(panel[i].white.current, before[i].white.current);
+            EXPECT_EQ(panel[i].black.current, before[i].black.current);
+        }
+    }
+
+    TEST(MovePanelTest, AMistakeIsNeverPutOnACellWithNoMoveOrOnAPlyPastTheList) {
+        Vector<MoveListRow> rows = RowsOf(2);
+        rows[0].white = MoveListEntry{};
+        rows[1].black = MoveListEntry{};
+        Vector<MovePanelRow> panel = BuildMovePanelRows(rows, -1);
+        MarkMovePanelMistakes(panel, Vector<MovePanelMistake>(8, MovePanelMistake::Blunder));
+        EXPECT_EQ(panel[0].white.text, "...");
+        EXPECT_EQ(panel[0].black.text, "b1??");
+        EXPECT_EQ(panel[1].white.text, "w2??");
+        EXPECT_TRUE(panel[1].black.text.empty());
+        EXPECT_TRUE(panel[2].white.text.empty()) << "an entry the window does not show";
+
+        Vector<MovePanelRow> shorter = BuildMovePanelRows(RowsOf(2), -1);
+        MarkMovePanelMistakes(shorter, Vector<MovePanelMistake>{MovePanelMistake::Mistake, MovePanelMistake::Mistake});
+        EXPECT_EQ(shorter[0].white.text, "w1?");
+        EXPECT_EQ(shorter[0].black.text, "b1?");
+        EXPECT_EQ(shorter[1].white.text, "w2") << "ply 2 is past the two entries";
+        EXPECT_EQ(shorter[1].black.text, "b2");
+    }
+
+    TEST(MovePanelTest, AnEmptyListOfMistakesMarksNothing) {
+        Vector<MovePanelRow> panel = BuildMovePanelRows(RowsOf(2), -1);
+        MarkMovePanelMistakes(panel, Vector<MovePanelMistake>{});
+        EXPECT_EQ(panel[0].white.text, "w1");
+        EXPECT_EQ(panel[1].black.text, "b2");
+    }
+
+    TEST(MovePanelTest, APressOnACellWithAMistakeStillShowsItsMove) {
+        Vector<MovePanelRow> panel = BuildMovePanelRows(RowsOf(3), -1);
+        MarkMovePanelMistakes(panel, Vector<MovePanelMistake>{MovePanelMistake::None, MovePanelMistake::None, MovePanelMistake::Blunder});
+        const Optional<MoveListPress> press = ParseMoveListPress("white1");
+        ASSERT_TRUE(press.has_value());
+        const Optional<size_t> shown = ShownMovesAfter(*press, panel, 0, 6);
+        ASSERT_TRUE(shown.has_value());
+        EXPECT_EQ(*shown, 3u);
+    }
+
 }  // namespace BECore::Chess::Tests

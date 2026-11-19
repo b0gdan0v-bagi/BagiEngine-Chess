@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Chess/Engine/GameReviewer.h>
 #include <Chess/Game/MovePanel.h>
 
 namespace BECore {
@@ -11,12 +12,17 @@ namespace BECore::Chess {
     class ChessGameModel;
     class PositionAnalyst;
 
+    /// The mark of each ply of a review: what the move list adds after the SAN. None for a move not reviewed yet, a move that is no mistake, and a ply that @p brilliantByPly flags (the ratings
+    /// and the review search at different depths and may disagree; the cell keeps only the `!!` the ratings gave it)
+    [[nodiscard]] Vector<MovePanelMistake> ReviewMistakesByPly(const ReviewedMoves& reviewed, const Vector<bool>& brilliantByPly);
+
     /// The rows the move list shows for the game of @p model: the page of the move the board shows (the last one, or the viewed one), that move current; no game: every entry empty
-    /// and not shown. While @p analyst has the ratings on, the cell of a brilliant move says its SAN and kMovePanelBrilliantSuffix; null: no marks
+    /// and not shown. While @p analyst has the ratings on, the cell of a brilliant move says its SAN and kMovePanelBrilliantSuffix; while it holds a review of the game (also one that runs or
+    /// failed: the moves that came), the cell of a mistake says its SAN and the suffix of its kind; null: no marks. The ratings and the review are part of what the rows are built from
     [[nodiscard]] Vector<MovePanelRow> CurrentMovePanelRows(const ChessGameModel* model, const PositionAnalyst* analyst);
 
-    /// What the rows of a canvas were last built from: the model, its version and the moves of the shown position (a view moves no version), and the analyst's revision (a rating arrives with
-    /// no step of the model's version)
+    /// What the rows of a canvas were last built from: the model, its version and the moves of the shown position (a view moves no version), and the analyst's revision (a rating and a position
+    /// of the review arrive with no step of the model's version)
     class MoveRowsKey {
     public:
         /// Whether the rows of @p model are other than the ones last built (always on the first call); remembers @p model and @p analyst as built

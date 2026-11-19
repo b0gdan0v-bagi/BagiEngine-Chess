@@ -22,6 +22,7 @@ namespace BECore::Chess {
      * when the model's version, the controller's revision, the draw judge's revision, IsThinking(), the person's color or the view of an earlier position changed (`status` then says what is viewed,
      * StatusText::Viewing()), or the editing of a position, its refusal or its message changed (`turn` is StatusText::Editing(), `status` and `opening` are empty), or a puzzle began, ended or moved
      * on (ChessGame::IsPuzzleOn(), PuzzleSession::GetRevision(): `turn` is StatusText::PuzzleTurn(), `status` "Wrong move" or the game's own, the opponent's error and a draw offer are not shown).
+     * `status` says "Reviewing 12/40" (ReviewText::Hud()) while a review runs (PositionAnalyst::GetReviewRevision()), under every sentence above and over the game's own status.
      * `turn` says the program is thinking also while it judges a draw offer; `status` says "Draw declined" for a refused one until the game's version moves. `opponentColor` is the PERSON's color, the
      * opposite of the control API's `opponent.plays`. Greys the `Resign` button (the clicker's disabled) while nobody can resign (ChessGame::ResigningNow()), with the same change check;
      * ChessGameSectionComponent answers its `ChessResign`. Owns no game state.
@@ -53,6 +54,7 @@ namespace BECore::Chess {
         String _publishedEditorMessage;                  // the reason a "Play from here" was refused
         bool _publishedPuzzleOn = false;                 // a puzzle starts and ends with the model's game, whatever its version does
         uint64_t _publishedPuzzleRevision = 0;           // the session's own state: a verdict, a mistake, the reply
+        uint64_t _publishedReviewRevision = 0;           // a position of the review arrives, it starts or ends
         bool _resignDisabled = false;                    // what the clicker of Resign has: the XML starts it enabled
     };
 

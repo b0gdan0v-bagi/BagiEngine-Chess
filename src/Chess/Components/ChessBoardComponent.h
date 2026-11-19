@@ -57,7 +57,7 @@ namespace BECore::Chess {
      * ended it; a click on the board after the game has ended starts the next one.
      *
      * The squares, the marks and the pieces are of ChessGameModel::GetShownPosition(): while an earlier position is viewed the board marks its move and check and draws no hint or
-     * premove, and a press on the board only returns to the game.
+     * premove, and a press on the board only returns to the game. With a review held it marks that position's best move (PositionAnalyst::GetReviewedPosition()) in the hint's two colors.
      *
      * While a position is edited (ChessGame::IsEditing()) the board draws the squares and none of the game's marks, a left press puts the picked piece on the square under it (the same
      * piece again takes it off), a right press takes the piece off, and nothing of the select, drag, premove and promotion flow runs. The opponent and the draw judge are not updated then.

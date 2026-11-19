@@ -1,5 +1,6 @@
 #include <BECore/Profiler/ScopedTrace.h>
 #include <Chess/Engine/EngineOpponent.h>
+#include <Chess/Engine/GameReviewer.h>
 #include <Chess/Engine/OwnEngine.h>
 #include <Chess/Engine/PositionAnalyst.h>
 #include <Chess/Game/ChessGameModel.h>
@@ -21,6 +22,8 @@ namespace BECore::Chess::Tests {
         constexpr StringView kOpponentUpdateZone = "\"Chess opponent update\"";
         constexpr StringView kAnalystUpdateZone = "\"Chess analyst update\"";
         constexpr StringView kRaterUpdateZone = "\"Chess rater update\"";
+        constexpr StringView kReviewZone = "\"Chess review\"";
+        constexpr StringView kReviewerUpdateZone = "\"Chess reviewer update\"";
 
         String ReadFile(const std::filesystem::path& path) {
             //-NoStd: file layer (a trace file read back as text)
@@ -134,6 +137,30 @@ namespace BECore::Chess::Tests {
         EXPECT_TRUE(Contains(text, kRatingZone));
         EXPECT_TRUE(Contains(text, kAnalystUpdateZone));
         EXPECT_TRUE(Contains(text, kRaterUpdateZone));
+    }
+
+    TEST_F(EngineProfileZonesTest, TheReviewHasItsLabelAndItsFrameUpdateAZone) {
+        ChessGameModel model;
+        for (const StringView uci : {"e2e4", "e7e5"}) {
+            const auto played = MoveGenerator::ParseUci(model.GetPosition(), uci);
+            ASSERT_TRUE(played.has_value());
+            ASSERT_TRUE(model.TryMove(*played).has_value());
+        }
+        ASSERT_TRUE(model.Resign(PieceColor::White).has_value());
+        {
+            ScopedTrace trace(FromStdString(TracePath().string()));
+            GameReviewer reviewer;
+            reviewer.SetEngineFactory([](OpponentEngine) -> MadeEngine { return ChessEnginePtr(New<OwnEngine>()); });
+            ASSERT_TRUE(reviewer.Start(model).has_value());
+            const auto done = [&] { return reviewer.GetState(model) == ReviewState::Done; };
+            ASSERT_TRUE(RunFramesUntil([&] { reviewer.Update(model); }, done)) << DescribeError(reviewer.GetError()).c_str();
+            ASSERT_TRUE(PoolIsIdle());
+            reviewer.Shutdown();
+        }
+        const String text = ReadTrace();
+        EXPECT_TRUE(Contains(text, kReviewZone));
+        EXPECT_TRUE(Contains(text, kReviewerUpdateZone));
+        EXPECT_TRUE(Contains(text, kSearchSliceZone)) << "the slices of the search run inside the task";
     }
 
 }  // namespace BECore::Chess::Tests

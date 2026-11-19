@@ -85,6 +85,21 @@ namespace BECore::Chess {
      */
     void MarkMovePanelRows(Vector<MovePanelRow>& rows, const Vector<bool>& brilliantByPly);
 
+    /// How badly a reviewed move went, as the move list says it; the review's own scale is Engine/MoveReview.h, which Game/ must not know
+    CORE_ENUM(MovePanelMistake, uint8_t, None, Inaccuracy, Mistake, Blunder)
+
+    /// What an inaccuracy, a mistake and a blunder say after their SAN, the chess-book signs
+    constexpr StringView kMovePanelInaccuracySuffix = "?!";
+    constexpr StringView kMovePanelMistakeSuffix = "?";
+    constexpr StringView kMovePanelBlunderSuffix = "??";
+
+    /**
+     * @brief Appends the suffix of the mistake that @p byPly names to the text of each cell of @p rows.
+     *
+     * The rules of MarkMovePanelRows(): a cell with no move and a ply past the end of @p byPly get nothing, and only `text` changes.
+     */
+    void MarkMovePanelMistakes(Vector<MovePanelRow>& rows, const Vector<MovePanelMistake>& byPly);
+
     /// What a press in the move list asks for: the cell of a move, one move back or forward, or the game's own position
     CORE_ENUM(MoveListPressKind, uint8_t, White, Black, Back, Forward, Latest)
 
