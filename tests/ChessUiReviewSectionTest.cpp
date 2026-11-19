@@ -343,7 +343,7 @@ namespace BECore::Chess::Tests {
         ASSERT_FALSE(ReviewSection()->_visible);
 
         Press("ChessReviewStart");
-        EXPECT_EQ(Analyst().GetReviewState(Model()), ReviewState::Running) << "the result bar's button presses the same action";
+        EXPECT_EQ(Analyst().GetReviewState(Model()), ReviewState::Running) << "the action is answered with no menu open";
         Press("ChessReviewCancel");
         EXPECT_EQ(Analyst().GetReviewState(Model()), ReviewState::Idle);
         engine->Open();

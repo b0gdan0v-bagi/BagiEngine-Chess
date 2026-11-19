@@ -2,7 +2,7 @@
 <!-- The menu section "Review": the status line of the review of a finished game and its Start and Cancel. A modal canvas over everything (layer 20, above the HUD and the end-of-game bar),
      started hidden, built like the section "Puzzles": the Review button of the menu list shows it (ChessOpenSection, value review: the row of Game/MenuSections.cpp); the one button Back
      returns to the list (ChessOpenMenu) and fills its row; the dim is a button of its own that hides both (ChessCloseMenu) with stateLook="false", always the first child.
-     ChessReviewSectionComponent (listed before the canvas) answers ChessReviewStart and ChessReviewCancel, which the result bar presses too, writes {reviewStatus} and greys Start (the rule of
+     ChessReviewSectionComponent (listed before the canvas) answers ChessReviewStart and ChessReviewCancel wherever they come from, writes {reviewStatus} and greys Start (the rule of
      who may start) and Cancel (no review is held) with the clicker's disabled and the text's fadeWhenDisabled; the file starts with Start live and Cancel grey, the game's start. The plate
      holds five rows, none of them hidden: 16 + 44 (title) + 44 (the status line) + 3 x 56 (Start, Cancel, Back) + 4 x 12 (spacing) + 16 = 336 units high, which the safe area of every
      view has. Every name starts with ReviewSection because elements are found by name in every canvas of the scene. -->

@@ -128,7 +128,7 @@ While `ChessGame::IsEditing()` (the model shows a draft, `Game/CLAUDE.md`) the s
 - **Pieces** snap, as under a view (`ShowsOtherPosition`). No result dim; the material's sets and the move panel's box are hidden; `ChessShowMove` and Hint do nothing (they would end the draft).
 - **The section `Position`** (node `PositionSection`, layer 20, modal, built like `GameSection`): the three starts (each closes the menu), the side and four castling switches (greyed while the king or rook is off its square), Copy / Paste FEN, Play from here (a refusal keeps the menu open, its reason in `{editorMessage}`), Cancel. Play, Cancel and the switches are grey with no editor.
 - **Copy / Paste:** Copy writes the draft's FEN (else the game's) to `CoreManager::GetClipboard()`. Paste and Ctrl+V (`PasteEvent`, taken only while editing or with the section shown) call `ChessGame::PasteFen`: it begins the editor when none is open and loads the text, a bad one changes nothing. What the clipboard or the rules say is the message (`EditorText`, also with no editor: it is dropped when the menu closes or returns to the list). The read's callback holds no pointer: the game is found at the answer.
-- **The bar** (node `EditorBar`, layer 20, non-modal; shown exactly while editing, checked on every update and draw): six piece buttons Erase, the color, Play (`ChessEditPlay`, the section's) and More (opens the section). Places and limit: `config/CLAUDE.md`, "The bars".
+- **The bar** (node `EditorBar`, layer 20, non-modal; shown exactly while editing, checked on every update and draw): six piece buttons, Erase, the color, Play (`ChessEditPlay`, the section's) and More (opens the section). Places and limit: `config/CLAUDE.md`, "The bars".
 
 ## Draw order
 
