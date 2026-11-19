@@ -1,0 +1,10 @@
+{
+  "preset": 1,
+  "title": "Chess piece: a beer-glass chess set",
+  "workflow": "sdxl_cutout",
+  "prompt": "{subject}, a single chess piece made of beer glassware, stylized 3D game asset, glossy glass and polished wood, warm tavern light, centered, full view, plain light grey background",
+  "negative": "text, letters, label, logo, brand, watermark, chess board, hands, people, several objects, cropped, blurry, low quality",
+  "size": [1024, 1024],
+  "params": {"steps": 28, "cfg": 7.0},
+  "accept": {"trim": true, "padding": 3, "maxSize": 256}
+}

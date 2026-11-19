@@ -614,10 +614,10 @@ namespace BECore::Chess::Tests {
     TEST_F(ChessUiTest, NoCoordinateGlyphReachesAPieceInEitherOrientation) {
         SKIP_WITHOUT_WORKER_THREADS();
         // The width the labels keep clear is the width of a piece that Contain fits into a cell: the real draw of a rook says so
-        const auto whiteA1 = GiveAtlasCell("WhiteRook_a1");
-        const auto whiteH1 = GiveAtlasCell("WhiteRook_h1");
-        const auto blackA8 = GiveAtlasCell("BlackRook_a8");
-        const auto blackH8 = GiveAtlasCell("BlackRook_h8");
+        const auto whiteA1 = GiveSpriteCell("WhiteRook_a1");
+        const auto whiteH1 = GiveSpriteCell("WhiteRook_h1");
+        const auto blackA8 = GiveSpriteCell("BlackRook_a8");
+        const auto blackH8 = GiveSpriteCell("BlackRook_h8");
         const ITexture* const rooks[] = {whiteA1.Get(), whiteH1.Get(), blackA8.Get(), blackH8.Get()};
         CountingFactory factory({New<GatedEngine>(true)});
         Opponent().SetEngineFactory(factory.AsFactory());
@@ -637,7 +637,7 @@ namespace BECore::Chess::Tests {
                         continue;
                     }
                     ++pieces;
-                    // a rook is as wide as its atlas cell says, and the corner cells are the ones whose labels are closest
+                    // a rook is as wide as its cell says, and the corner cells are the ones whose labels are closest
                     EXPECT_NEAR(call.rect.w / call.rect.h, kCellWidth / kCellHeight, 1e-4f);
                     for (const DrawCall& other : _renderer->calls) {
                         if (IsLabelGlyph(other)) {
@@ -736,7 +736,7 @@ namespace BECore::Chess::Tests {
         EXPECT_GT(layerOf("OpponentPanel"), layerOf("Hud"));
 
         // and the frame says the same: squares, then glyphs, then a piece, then the dim of a finished game and the buttons of the HUD
-        const auto king = GiveAtlasCell("WhiteKing_e1");  // a piece that is still on the board in this position (at g1)
+        const auto king = GiveSpriteCell("WhiteKing_e1");  // a piece that is still on the board in this position (at g1)
         StartFrom(kBlackMatesOnA1);
         ASSERT_TRUE(Play(Model(), "a8a1"));
         ASSERT_TRUE(Model().IsGameOver());
@@ -1518,7 +1518,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheHintIsDrawnOverTheSquaresAndUnderThePiecesAndASelectionStaysOnTopOfIt) {
-        const auto pawn = GiveAtlasCell("WhitePawn_e2");
+        const auto pawn = GiveSpriteCell("WhitePawn_e2");
         CountingAnalysisFactory factory({New<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"))});
         Analyst().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
@@ -2650,8 +2650,8 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, ADraggedPieceIsDrawnOverThePiecesAndTheChipsAndUnderTheHud) {
-        const auto pawn = GiveAtlasCell("WhitePawn_b2");
-        const auto king = GiveAtlasCell("WhiteKing_e1");
+        const auto pawn = GiveSpriteCell("WhitePawn_b2");
+        const auto king = GiveSpriteCell("WhiteKing_e1");
         _manager->UpdateAll();                                      // the pieces register, so that the handles follow the moves
         for (const char* uci : {"e2e4", "d7d5", "e4d5", "d8d5"}) {  // a pawn each is gone: there are chips to draw over, and White is to move
             ASSERT_TRUE(Play(Model(), uci)) << uci;
@@ -2921,7 +2921,7 @@ namespace BECore::Chess::Tests {
             ASSERT_TRUE(ShowPortrait(output));
             ControlPlays(turned ? "white" : nullptr);
             StartFrom(turned ? kBlackToMoveAfterE4 : Position::kStartFen.data());
-            const auto texture = GiveAtlasCell(turned ? "BlackPawn_e7" : "WhitePawn_e2");
+            const auto texture = GiveSpriteCell(turned ? "BlackPawn_e7" : "WhitePawn_e2");
             _manager->UpdateAll();
 
             const int column = EColumn(turned);

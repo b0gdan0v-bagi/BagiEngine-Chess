@@ -95,7 +95,7 @@ namespace BECore::Chess::Tests {
         constexpr float kWideMinAspect = kWideViewWidth / kViewHeight;
         constexpr float kWideNarrowestWidth = 700.0f;  // 700 x 480 is the narrowest Wide window with side insets (672 x 480 is the aspect 1.4 itself, a knife edge), at the scale 0.6
 
-        // The colors the board fills a full square with: the tokens of the theme `classic` of config/UIThemes.xml, the one the fixture leaves current
+        // The colors the board fills a full square with: the tokens of the theme `classic` of config/UIThemes.xml, the one the fixture selects after loading the shipped file
         const Color kSelectedColor{120, 200, 120, 200};
         const Color kLegalMoveColor{120, 200, 120, 120};
         const Color kCheckColor{230, 60, 60, 210};
@@ -105,11 +105,10 @@ namespace BECore::Chess::Tests {
         const Color kLastMoveColor{245, 205, 50, 140};  // the two squares of the last move, one color for both
         const Color kPremoveColor{150, 90, 200, 150};   // the two squares of each queued premove, one color for all
 
-        // The tall cell of a pawn in the piece atlas (TextureLibrary.xml, assets/chess_test.png is 700 x 381).
-        // The library is empty in the test environment, so the test gives a sprite its cell.
-        constexpr uint32_t kAtlasWidth = 700;
-        constexpr uint32_t kAtlasHeight = 381;
-        constexpr float kCellX = 583.33f;
+        // A tall cell standing in for a piece sprite: the library is empty in the test environment, so a test that needs a sprite's size gives it this cell.
+        constexpr uint32_t kStandInTextureWidth = 700;
+        constexpr uint32_t kStandInTextureHeight = 381;
+        constexpr float kStandInCellX = 583.33f;
         constexpr float kCellWidth = 116.67f;
         constexpr float kCellHeight = 190.5f;
         constexpr size_t kPieceCount = 32;
@@ -471,7 +470,7 @@ namespace BECore::Chess::Tests {
             {"Wide view", {1280.0f, 720.0f}, {kWideNarrowestWidth, kNarrowestHeight}, kWideViewWidth, kViewHeight, kBoardLeft, kBoardTop, false},
             {"Tall view", {kNarrowestWidth, kNarrowestTallHeight}, {kNarrowestWidth, kNarrowestTallHeight}, kPortraitViewWidth, kTallViewHeight, kPortraitBoardLeft, kPortraitBoardTop, true}};
         constexpr size_t kBoardEdgeCells = kLastBoardIndex + 1;
-        constexpr float kPieceWidth = kCellSize * kCellWidth / kCellHeight;  // a piece fitted by Contain is as high as its cell, as wide as the aspect of its atlas cell, and centered
+        constexpr float kPieceWidth = kCellSize * kCellWidth / kCellHeight;  // a piece fitted by Contain is as high as its cell, as wide as the aspect of its stand-in cell, and centered
         constexpr float kPieceLeft = (kCellSize - kPieceWidth) * 0.5f;       // 15.5 units from the left edge of the cell
         constexpr float kPieceRight = kPieceLeft + kPieceWidth;              // 64.5 units
         constexpr float kLabelBand = 30.0f;                                  // a rank number lies in the top 30 units of its cell, a file letter in the bottom 30 (the boxes are 2..28 and 52..78)
@@ -518,7 +517,7 @@ namespace BECore::Chess::Tests {
 
         /// What is wrong with the labels of the board as they are laid out, one problem to a line, nothing when it is right: a glyph the box cuts (the validator does not see it for a label
         /// that clips), a box that is not in the corner of its edge cell (the top left, left of the piece, for a rank; the bottom right, right of it, for a file) and a text color that does not
-        /// read on the cell (the tokens resolved in the current theme, which the fixture keeps `classic`)
+        /// read on the cell (the tokens resolved in the current theme, which the fixture sets to `classic`)
         String BoardLabelProblems(const UICanvasLayout& layout) {
             String problems;
             const float scale = layout.GetResolved().scale;
@@ -894,7 +893,8 @@ namespace BECore::Chess::Tests {
 
             CoreManager::GetFontAtlasLibrary().Clear();
             CoreManager::GetUIVars().Clear();
-            ASSERT_TRUE(LoadShippedThemes(CoreManager::GetUIThemes()));  // the board and its labels draw tokens
+            ASSERT_TRUE(LoadShippedThemes(CoreManager::GetUIThemes()));          // the board and its labels draw tokens
+            ASSERT_TRUE(CoreManager::GetUIThemes().SetTheme("classic"_intern));  // the constants of this file are classic's, the shipped default is another theme
             _renderer = New<RecordingRenderer>();
             _renderer->width = 1280.0f;
             _renderer->height = 720.0f;
@@ -1995,15 +1995,15 @@ namespace BECore::Chess::Tests {
             return {};
         }
 
-        /// Gives the sprite of a piece the texture and the cell of the atlas that the library gives it in the game (the library is empty here), and returns the texture
-        IntrusivePtr<ITexture> GiveAtlasCell(const char* nodeName) const {
+        /// Gives the sprite of a piece the stand-in texture and its tall cell (the library is empty here), and returns the texture
+        IntrusivePtr<ITexture> GiveSpriteCell(const char* nodeName) const {
             auto sprite = PieceSprite(nodeName);
             EXPECT_TRUE(sprite) << nodeName;
-            const Vector<uint8_t> pixels(static_cast<size_t>(kAtlasWidth) * kAtlasHeight * 4, 0);
-            IntrusivePtr<ITexture> texture = _renderer->CreateTexture(pixels.data(), kAtlasWidth, kAtlasHeight);
+            const Vector<uint8_t> pixels(static_cast<size_t>(kStandInTextureWidth) * kStandInTextureHeight * 4, 0);
+            IntrusivePtr<ITexture> texture = _renderer->CreateTexture(pixels.data(), kStandInTextureWidth, kStandInTextureHeight);
             if (sprite) {
                 sprite->SetTexture(texture);
-                sprite->_srcRect = Rect{kCellX, 0.0f, kCellWidth, kCellHeight};
+                sprite->_srcRect = Rect{kStandInCellX, 0.0f, kCellWidth, kCellHeight};
             }
             return texture;
         }

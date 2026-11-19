@@ -206,13 +206,13 @@ namespace BECore::Chess::Tests {
             ++pieces;
             const auto sprite = node->GetComponent<SpriteRendererComponent>();
             ASSERT_TRUE(sprite) << node->GetName().CStr();
-            EXPECT_EQ(sprite->_fit, SpriteFit::Contain) << node->GetName().CStr() << ": the atlas cell is not square, Stretch would draw the piece squat";
+            EXPECT_EQ(sprite->_fit, SpriteFit::Contain) << node->GetName().CStr() << ": the sprite cell is not square, Stretch would draw the piece squat";
         }
         EXPECT_EQ(pieces, kPieceCount);
     }
 
     TEST_F(ChessUiTest, APieceKeepsTheAspectOfItsCellInsideItsSquare) {
-        const auto texture = GiveAtlasCell("WhitePawn_e2");
+        const auto texture = GiveSpriteCell("WhitePawn_e2");
         _manager->UpdateAll();  // ChessPieceComponent writes the transform of the piece in an update: the node starts at 0, 0
         Draw();
 
@@ -224,11 +224,11 @@ namespace BECore::Chess::Tests {
         EXPECT_LT(piece->rect.w, square.w);
         EXPECT_TRUE(IsCenteredIn(piece->rect, square));
         ASSERT_TRUE(piece->source.has_value());
-        EXPECT_TRUE(SameRect(*piece->source, Rect{kCellX, 0.0f, kCellWidth, kCellHeight})) << "the fit changes the destination, not the part of the atlas";
+        EXPECT_TRUE(SameRect(*piece->source, Rect{kStandInCellX, 0.0f, kCellWidth, kCellHeight})) << "the fit changes the destination, not the part of the texture";
     }
 
     TEST_F(ChessUiTest, TheSelectionAndTheLegalMovesSitAroundThePiece) {
-        const auto texture = GiveAtlasCell("WhitePawn_e2");
+        const auto texture = GiveSpriteCell("WhitePawn_e2");
         _manager->UpdateAll();
         Model().OnSquareClicked(Sq("e2"));
         ASSERT_TRUE(Model().HasSelection());
@@ -257,7 +257,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheCheckSitsAroundTheKing) {
-        const auto texture = GiveAtlasCell("BlackKing_e8");
+        const auto texture = GiveSpriteCell("BlackKing_e8");
         _manager->UpdateAll();  // the pieces register with the model in the first update; moves played before it would be dealt to them by square, not by identity
         for (const char* uci : {"e2e4", "f7f6", "d1h5"}) {
             ASSERT_TRUE(Play(Model(), uci)) << uci;
