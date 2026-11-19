@@ -1,6 +1,7 @@
 #include <BECore/Profiler/Alloc/AllocTracker.h>
 #include <new>
 #include <tests/ChessUiHarness.h>
+#include <tests/ShippedPuzzles.h>
 
 /// What one frame of the shipped scene allocates on the main thread when nothing changes in it, per state of the game (engine/CLAUDE.md, "Zero allocations in a steady frame"). The
 /// counts exist only in a profile build (ENGINE_PROFILER_ALLOC); elsewhere every case skips. Only the main thread is read: a search on a worker is never counted here
@@ -27,6 +28,7 @@ namespace BECore::Chess::Tests {
         constexpr FrameCost kHintFrame{};
         constexpr FrameCost kTurnedResizedFrame{};
         constexpr FrameCost kSearchingFrame{};
+        constexpr FrameCost kPuzzleFrame{};
 
         /// The allocations the calling thread makes while @p frame runs
         template <typename Frame>
@@ -167,6 +169,16 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(BlackIsAtTheBottom());
         WarmUp();
         EXPECT_TRUE(CostIs(MeasureFrame(), kTurnedResizedFrame));
+    }
+
+    // The bar is shown, the HUD's lines are the puzzle's and the board is the puzzle's side up: none of their keys may move in an idle frame
+    TEST_F(ChessUiAllocTest, AFrameWithAPuzzleOnAllocatesNothingNew) {
+        ChessGame::GetActive()->SetPuzzles(ShippedPuzzleSet());
+        ASSERT_TRUE(ChessGame::GetActive()->BeginPuzzle(0));
+        Settle();
+        ASSERT_TRUE(ChessGame::GetActive()->IsPuzzleOn());
+        WarmUp();
+        EXPECT_TRUE(CostIs(MeasureFrame(), kPuzzleFrame));
     }
 
     // The search is on a worker and held at its gate, so the frames are the same however long the machine takes

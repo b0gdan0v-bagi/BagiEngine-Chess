@@ -6,6 +6,7 @@
 #include <Chess/Game/ChessGameModel.h>
 #include <Chess/Game/OpeningBook.h>
 #include <Chess/Game/PositionEditor.h>
+#include <Chess/Game/PuzzleSession.h>
 #include <Games/IControllableGame.h>
 
 namespace BECore::Chess {
@@ -27,10 +28,10 @@ namespace BECore::Chess {
      * @brief The external control API of Chess: the position, the legal moves, a way to play one, to load a position and to pick the computer opponent.
      *
      * State: {"fen", "board", "turn", "status", "winner", "inCheck", "legalMoveCount", "startFen", "moves", "sanMoves", "opening", "takeBackPlies", "opponent", "material", "analysis", "drawOffer",
-     * "editor"}. board is 8 strings, rank 8 first, file a first: white pieces are upper case (PNBRQK), black ones lower case, '.' is an empty square. turn and winner are "white" or "black" (winner is
-     * null until a side has won). status is one of "ongoing", "checkmate", "stalemate", "draw_insufficient_material", "draw_threefold", "draw_fifty_moves", "resigned", "draw_agreed"; everything but
-     * "ongoing" ends the game. After a resignation winner is the other color; an agreed draw has none. startFen is the position the game began from and moves the UCI moves played since, so the pair
-     * rebuilds the game (and its repetitions); sanMoves is the same moves in standard algebraic notation ("e4", "Nf3", "O-O", "e8=Q#"), one per entry of moves, as the move list
+     * "editor", "puzzle"}. board is 8 strings, rank 8 first, file a first: white pieces are upper case (PNBRQK), black ones lower case, '.' is an empty square. turn and winner are "white" or "black"
+     * (winner is null until a side has won). status is one of "ongoing", "checkmate", "stalemate", "draw_insufficient_material", "draw_threefold", "draw_fifty_moves", "resigned", "draw_agreed";
+     * everything but "ongoing" ends the game. After a resignation winner is the other color; an agreed draw has none. startFen is the position the game began from and moves the UCI moves played
+     * since, so the pair rebuilds the game (and its repetitions); sanMoves is the same moves in standard algebraic notation ("e4", "Nf3", "O-O", "e8=Q#"), one per entry of moves, as the move list
      * shows them. takeBackPlies is how many moves {"takeBack": {}} (and the button of the move list) would take back now, 0 when nothing can be (see SetState). What the move list
      * of the screen views (an earlier position) is not in the state: like the selection it is the person's look, not the game, and it moves no version.
      *
@@ -86,20 +87,19 @@ namespace BECore::Chess {
      * SetState takes {"fen": ".."} (any position that Position::FromFen() accepts, which may be a finished game), {"opponent": {"plays": .., "level": ..,
      * "engine": .., "white": {"engine": .., "level": ..}, "black": {..}, "seed": n}} (inside it a missing member means unchanged, per seat; plays is "white", "black", "both" or null;
      * seed is an integer 0..4294967295, anything else is invalid_params, and it is a valid pick alone; a seed that equals the current one changes nothing;
-     * level and engine an id, "stockfish" or "own" for the engine, exactly as written) or both; none of fen, opponent, analysis, takeBack, resign, draw is invalid_params. level and engine set BOTH
-     * seats; the seat objects "white" and "black" (members optional, nothing else allowed in them) then override one seat; plays says who plays and a missing
-     * plays keeps the sides as they are. "both" starts a game of two programs, each with an engine object of its own; "plays": "white" while both play is a takeover (the person
-     * has Black, White's program and its search stay), null ends it. Everything is checked before anything changes, so a refused call (invalid_params) changes nothing.
-     * The opponent (the seed with it, after a pick that can fail) is applied first, then the position. SetState also takes {"analysis": {"evaluation": bool, "hint": bool, "ratings": bool}} (a missing
-     * member means unchanged; {} changes nothing; "evaluation" switches the evaluation on or off, "hint": true asks for a hint for the position now on the board and "hint": false drops it, "ratings"
-     * switches the rating of the moves, also on a finished game); a wrong type or a member that is not one of the three is invalid_params. **analysis cannot be combined with fen or opponent in one
-     * call** (invalid_params: the hint belongs to the position after them, two calls say it plainly). A hint on a side that the program plays (so on either turn while two programs play) is
-     * not_your_turn, on a finished game game_over; nothing is changed then, the evaluation and ratings switches of the same call included. list_actions is not changed by any of it. A pick that finds
-     * no engine (only Stockfish can fail) is engine_unavailable (with the sentence of the engine's error) and is refused as a whole, whichever seat has no engine: the position is not replaced and the
-     * opponent is unchanged (sides, seats and a running search stay as they were), the error is in the state, so a client can ask again with "engine": "own". A pick that changes nothing (the same
-     * sides and seats, no error standing) does nothing: a running Stockfish is not restarted. With an error standing, the same "plays" asks for an engine again, and plays null clears it. Without
-     * Stockfish (no Stockfish file found when the pick is made, or a CHESS_NO_STOCKFISH build) "stockfish" is engine_unavailable in "engine" and in the seat objects, also while nobody plays,
-     * and the default engine is "own" (a game that starts with no file found shows "own").
+     * level and engine an id, "stockfish" or "own" for the engine, exactly as written) or both; none of fen, opponent, analysis, takeBack, resign, draw, puzzle is invalid_params. level and engine set
+     * BOTH seats; the seat objects "white" and "black" (members optional, nothing else allowed in them) then override one seat; plays says who plays and a missing plays keeps the sides as they are.
+     * "both" starts a game of two programs, each with an engine object of its own; "plays": "white" while both play is a takeover (the person has Black, White's program and its search stay), null
+     * ends it. Everything is checked before anything changes, so a refused call (invalid_params) changes nothing. The opponent (the seed with it, after a pick that can fail) is applied first, then
+     * the position. SetState also takes {"analysis": {"evaluation": bool, "hint": bool, "ratings": bool}} (a missing member means unchanged; {} changes nothing; "evaluation" switches the evaluation
+     * on or off, "hint": true asks for a hint for the position now on the board and "hint": false drops it, "ratings" switches the rating of the moves, also on a finished game); a wrong type or a
+     * member that is not one of the three is invalid_params. **analysis cannot be combined with fen or opponent in one call** (invalid_params: the hint belongs to the position after them, two calls
+     * say it plainly). A hint on a side that the program plays (so on either turn while two programs play) is not_your_turn, on a finished game game_over; nothing is changed then, the evaluation and
+     * ratings switches of the same call included. list_actions is not changed by any of it. A pick that finds no engine (only Stockfish can fail) is engine_unavailable (with the sentence of the
+     * engine's error) and is refused as a whole, whichever seat has no engine: the position is not replaced and the opponent is unchanged (sides, seats and a running search stay as they were), the
+     * error is in the state, so a client can ask again with "engine": "own". A pick that changes nothing (the same sides and seats, no error standing) does nothing: a running Stockfish is not
+     * restarted. With an error standing, the same "plays" asks for an engine again, and plays null clears it. Without Stockfish (no Stockfish file found when the pick is made, or a CHESS_NO_STOCKFISH
+     * build) "stockfish" is engine_unavailable in "engine" and in the seat objects, also while nobody plays, and the default engine is "own" (a game that starts with no file found shows "own").
      *
      * SetState also takes {"takeBack": {"plies": n}} **alone** (combined with fen, opponent or analysis it is invalid_params): takes back the last n moves in one step, plies 1 up to the
      * moves played; without plies, what the person's takeback button takes (takeBackPlies: one move with two people or two programs; against the program the person's last move with its
@@ -126,17 +126,36 @@ namespace BECore::Chess {
      * (null for the eraser). The draft is not the game: fen, board, moves, turn and the rest above stay the game's, a draft moves no version of the game, and the game is played from it only by
      * "Play from here". A client edits it with ui_click; there is no set_state for it, and a set_state fen, a reset, a move or a takeback ends it (editor null again).
      *
+     * puzzle is null unless a puzzle is on (PuzzleSession::IsActiveFor(): the game is the puzzle's line, judged from the game at every call, so a reset or a set_state fen makes it null at
+     * once), else {"id", "index", "count", "rating", "themes", "solver", "state", "mistakes", "wrong", "step", "steps"}: id the lichess id, index the place in the set (ordered by rating, ascending)
+     * and count its size, themes an array of words, solver "white" or "black" (the person's color: the side to move after the program's setup move, which is the first move of moves; startFen
+     * is the row's position before it), state "your_move", "replying" (the program's answer waits for its short delay of game time) or "solved" (the line is complete or the person gave a mate),
+     * mistakes how many wrong moves were taken back since the puzzle began, wrong whether the last move of the person was one of them (until the next move), step the person's right moves
+     * on the board and steps the person's moves of the line. The person's move is read as it stands (step and state follow it at once); a wrong one is taken back at the next frame (mistakes, wrong),
+     * and the program's reply is played after kPuzzleReplySeconds of game time of the frames, so a client steps the clock. While a puzzle is on takeBackPlies is 0, the opponent gets no frame (its
+     * pick is kept and used again after the puzzle) and the game is not saved.
+     *
      * The state version is the version of the game (a changed seed moves it) plus the revision of the opponent (a pick, an error that appears or goes) plus the revision of the analyst (a switch of
      * the evaluation or the ratings, a hint asked or dropped, an answer or a rating that arrives or is dropped, an error that appears or goes, also the rater's, which is not in get_state) plus
-     * that of the draw offer (an offer, its verdict, a drop) plus the editor's count of changes (every change of a draft, its tool, its start and its cancelling; a count of all the drafts of the
-     * run, so it does not fall when a draft ends), so a push reports a change of the opponent, a hint, a rating, a verdict or a draft that came as well; it never goes back.
+     * that of the draw offer (an offer, its verdict, a drop) plus the puzzle's (a begin, a verdict, a mistake, the reply, a retry, an end) plus the editor's count of changes (every change of a draft,
+     * its tool, its start and its cancelling; a count of all the drafts of the run, so it does not fall when a draft ends), so a push reports a change of the opponent, a hint, a rating, a verdict or
+     * a draft that came as well; it never goes back.
+     *
+     * SetState also takes {"puzzle": {...}} **alone**, the object with exactly one member: {"index": n} or {"id": ".."} begins that puzzle (a new game from its position and the setup move; one
+     * that is on is replaced), {"next": true} the one after it (the first after the last), {"retry": true} the same one again (mistakes 0) and {"end": true} ends it with a plain reset of the
+     * game (the opponent as picked, a new seed); next, retry and end need a puzzle on, and false for them is not a way to say nothing. An index outside the set, an unknown id, an empty set, no
+     * puzzle on for next, retry or end, a wrong type, another or a second member, or puzzle combined with another member is invalid_params and changes nothing. **While a puzzle is on takeBack,
+     * resign and draw are invalid_params** (each would break the line); the call sets no opponent, and list_actions and perform_action are as always (a move for the program's side is
+     * accepted, the judge decides at the frames).
      *
      * The analyst is told of a changed engine pick by SetState at once, so a get_state right after never shows the old engine's answer.
      */
     class ChessGameControl : public IControllableGame {
     public:
-        /// All six must outlive the adapter (ChessGame declares them before it); the editor is read only, and is a draft the model shows (ChessGameModel::IsDrafting()) or not
-        ChessGameControl(ChessGameModel& model, OpponentController& opponent, PositionAnalyst& analyst, DrawOfferJudge& drawJudge, const OpeningBook& openings, const PositionEditor& editor);
+        /// All seven must outlive the adapter (ChessGame declares them before it); the editor is read only, and is a draft the model shows (ChessGameModel::IsDrafting()) or not; the puzzle
+        /// session judges @p model
+        ChessGameControl(ChessGameModel& model, OpponentController& opponent, PositionAnalyst& analyst, DrawOfferJudge& drawJudge, const OpeningBook& openings, const PositionEditor& editor,
+                         PuzzleSession& puzzle);
 
         [[nodiscard]] std::expected<Json, ControlError> GetState() const override;
         [[nodiscard]] std::expected<Json, ControlError> GetActions() const override;
@@ -153,10 +172,12 @@ namespace BECore::Chess {
         [[nodiscard]] Json AnalysisJson() const;
         [[nodiscard]] Json DrawOfferJson() const;
         [[nodiscard]] Json EditorJson() const;
+        [[nodiscard]] Json PuzzleJson() const;
         std::expected<void, ControlError> SetAnalysis(const Json& analysis);
         std::expected<void, ControlError> SetTakeBack(const Json& takeBack);
         std::expected<void, ControlError> SetResign(const Json& resign);
         std::expected<void, ControlError> SetDraw(const Json& draw);
+        std::expected<void, ControlError> SetPuzzle(const Json& puzzle);
 
         ChessGameModel& _model;
         OpponentController& _opponent;
@@ -164,6 +185,7 @@ namespace BECore::Chess {
         DrawOfferJudge& _drawJudge;
         const OpeningBook& _openings;
         const PositionEditor& _editor;
+        PuzzleSession& _puzzle;
     };
 
 }  // namespace BECore::Chess

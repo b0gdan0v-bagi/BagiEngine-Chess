@@ -155,9 +155,9 @@ namespace BECore::Chess {
 
     void ChessMaterialComponent::OnDraw() {
         const ChessGameModel* model = ChessGame::GetActiveModel();
-        const OpponentController* opponent = ChessGame::GetActiveOpponent();
-        // The orientation the board draws with, read on every draw like the board does: it follows the panel, a set_state and a Reset
-        const PieceColor bottom = BottomColor(opponent ? opponent->GetPlays() : std::nullopt);
+        const ChessGame* game = ChessGame::GetActive();
+        // The orientation the board draws with, read on every draw like the board does: it follows the panel, a set_state, a puzzle and a Reset
+        const PieceColor bottom = game ? game->BoardBottomColor() : PieceColor::White;
         const uint64_t version = model ? model->GetVersion() : 0;
         const bool bottomChanged = _publishedBottom != bottom;
         if (bottomChanged || model != _publishedModel || version != _publishedVersion) {

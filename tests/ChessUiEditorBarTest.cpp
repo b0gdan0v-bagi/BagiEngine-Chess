@@ -9,9 +9,6 @@ namespace BECore::Chess::Tests {
 
         constexpr const char* kBarNode = "EditorBar";
         constexpr const char* kBarRow = "EditorBarRow";
-        constexpr float kBoardEdge = 640.0f;
-        constexpr float kMinBarWidth = 56.0f;
-        constexpr float kHomeBarOverlap = 20.0f;  // the most the row covers of the board's lowest rank, and only where the home bar of an inset window lifts the safe edge over the margin
 
         constexpr const char* kPieceButtons[] = {"EditorBarKing", "EditorBarQueen", "EditorBarRook", "EditorBarBishop", "EditorBarKnight", "EditorBarPawn"};
         constexpr const char* kPieceIds[] = {"king", "queen", "rook", "bishop", "knight", "pawn"};
@@ -24,37 +21,6 @@ namespace BECore::Chess::Tests {
         String Var(const char* name) {
             const StringView value = CoreManager::GetUIVars().Get(PoolString::Intern(name));
             return String(value.data(), value.size());
-        }
-
-        /// What is wrong with the bar as it is laid out: a button that is cut, too small, or on the board, one problem to a line
-        String BarProblems(const UICanvasLayout& layout) {
-            String problems;
-            const float scale = layout.GetResolved().scale;
-            const bool portrait = LaidOutForPortrait(layout);
-            const Rect board{portrait ? kPortraitBoardLeft : kBoardLeft, portrait ? kPortraitBoardTop : kBoardTop, kBoardEdge, kBoardEdge};
-            for (const char* name : kBarButtons) {
-                const UIElement* button = layout.root->FindByName(PoolString::Intern(name));
-                if (!button || button->rect.IsEmpty()) {
-                    problems += Format("{} has no rect\n", name);
-                    continue;
-                }
-                const Rect& rect = button->rect;
-                const UIContentFit fit = button->CheckContent(rect.w - 2.0f * kButtonAir, rect.h, scale);
-                if (fit.hasContent && !fit.fits) {
-                    problems += Format("{} cuts '{}': {:.1f} units wide, at scale {:.3f}\n", name, ShownText(*button).c_str(), rect.w, scale);
-                }
-                if (rect.h < kSegmentHeight - kPixelTolerance || rect.w < kMinBarWidth - kPixelTolerance) {
-                    problems += Format("{} is {:.1f} x {:.1f} units, under {:.0f}\n", name, rect.w, rect.h, kSegmentHeight);
-                }
-                const bool overlaps = rect.x < board.x + board.w && rect.x + rect.w > board.x && rect.y < board.y + board.h && rect.y + rect.h > board.y;
-                const UICanvasResolved& resolved = layout.GetResolved();
-                const bool lifted = resolved.safeBounds.y + resolved.safeBounds.h < resolved.bounds.y + resolved.bounds.h - kPixelTolerance;
-                const float depth = board.y + board.h - rect.y;
-                if (overlaps && !(lifted && depth <= kHomeBarOverlap + kPixelTolerance)) {
-                    problems += Format("{} ({:.1f}, {:.1f}, {:.1f}, {:.1f}) is on the board\n", name, rect.x, rect.y, rect.w, rect.h);
-                }
-            }
-            return problems;
         }
 
     }  // namespace
@@ -79,7 +45,7 @@ namespace BECore::Chess::Tests {
             OnEveryCaseOfTheMatrix(
                 layout,
                 [&](const String& label, const UICanvasLayout& laidOut) {
-                    const String problems = BarProblems(laidOut);
+                    const String problems = BarProblems(laidOut, kBarButtons);
                     if (!problems.empty() && reported++ < kReportedCases) {
                         report += Format("{}, {}:\n{}", word, label.c_str(), problems.c_str());
                     }

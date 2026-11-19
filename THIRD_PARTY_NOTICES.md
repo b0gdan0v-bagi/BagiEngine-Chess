@@ -10,7 +10,7 @@ path and licence file must exist, `LICENSE` must be the Beerware text, and no St
 
 ## Files of other authors in this repository
 
-One is established, below. The sources (`src/`, `uci/`), the tools (`tools/`), the tests (`tests/`), the configs (`config/`) and the scripts
+Two are established, below. The sources (`src/`, `uci/`), the tools (`tools/`), the tests (`tests/`), the configs (`config/`) and the scripts
 of `CI/` were written for the game; no file of another author is copied into them, and none calls itself vendored. The expected
 node counts of `PerftTest` are facts published at chessprogramming.org (numbers, no code). The Python packages that
 `CI/setup_venv.*` installs (the reflection generator's, pytest) are tools of a developer's machine and never enter the repository or a
@@ -19,6 +19,7 @@ game.
 | Path | What | Licence | Licence file | In a game |
 |------|------|---------|--------------|-----------|
 | `assets/openings/openings.tsv` | the names of the openings (ECO code, name, moves) of the lichess `chess-openings` table, commit `3ba6b20d31b2e6125cb0e6a2e792f400717d9d39`, joined from its five files by `tools/fetch_openings.py` | CC0 1.0 (public domain dedication) | `licenses/lichess-chess-openings-CC0.txt` | ships (desktop and web) |
+| `assets/puzzles/puzzles.tsv` | the puzzles of the Puzzles mode (id, position, solution, rating, themes): 130 mate-in-1, 2 and 3 rows chosen by `tools/fetch_puzzles.py` from the lichess puzzle database `lichess_db_puzzle.csv.zst` of 2026-11-01, rows unchanged | CC0 1.0 (public domain dedication) | `licenses/lichess-puzzles-CC0.txt` | ships (desktop and web) |
 
 ## The game's own art
 
@@ -81,7 +82,7 @@ owner's reading of the licence, not legal advice.
 
 ## The web package
 
-What `cmake/ChessWeb.cmake` lets into the browser package from the game is `config/` (four XML files), the twelve `assets/artgen/*.png` pieces, the seven `assets/sounds/*.wav` and `assets/openings/openings.tsv`; the
+What `cmake/ChessWeb.cmake` lets into the browser package from the game is `config/` (four XML files), the twelve `assets/artgen/*.png` pieces, the seven `assets/sounds/*.wav`, `assets/openings/openings.tsv` and `assets/puzzles/puzzles.tsv`; the
 `.md` files, `*.local.xml` (a Stockfish path), `imgui.ini`, `.py` files and the `*.artgen.json` provenance files (paths of the owner's machine, no use to a player) stay out (`tests/check_web_package.cmake` checks it in ctest and after every web link).
 Beside them the engine's `config/`, `assets/` (its fonts with their licence texts) and the `web/config` overlay are packaged, and the wasm module
 contains the engine's libraries: their notices are in `engine/THIRD_PARTY_NOTICES.md`. Stockfish, the own UCI program and the control

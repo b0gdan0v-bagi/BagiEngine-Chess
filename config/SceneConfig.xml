@@ -32,12 +32,14 @@
         <node ref="nodes/ChessMovePanel" />
         <node ref="nodes/ChessHud" />
         <node ref="nodes/ChessEditorBar" />
+        <node ref="nodes/ChessPuzzleBar" />
         <node ref="nodes/ChessMenuPanel" />
         <node ref="nodes/ChessOpponentPanel" />
         <node ref="nodes/ChessMovesSection" />
         <node ref="nodes/ChessGameSection" />
         <node ref="nodes/ChessSoundPanel" />
         <node ref="nodes/ChessPositionSection" />
+        <node ref="nodes/ChessPuzzleSection" />
         <node ref="nodes/ChessPromotionPanel" />
         <node ref="nodes/ChessResult" />
         <node ref="nodes/ChessSound" />

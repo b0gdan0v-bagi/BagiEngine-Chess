@@ -30,10 +30,6 @@ namespace BECore::Chess {
             static constexpr auto gameSectionResign = "GameSectionResign"_intern;
         };
 
-        bool CanOfferDraw(const ChessGame& game) {
-            return !DrawOfferRefusalFor(game.GetModel(), game.GetOpponent().GetSides()).has_value();
-        }
-
         bool TwoPeoplePlay(const ChessGame& game) {
             const ProgramSides sides = game.GetOpponent().GetSides();
             return !sides.white && !sides.black;
@@ -109,7 +105,7 @@ namespace BECore::Chess {
                 ShowCanvas(true);
                 Ask(GameQuestion::Resign, *game, fromHud);
             }
-        } else if (CanOfferDraw(*game)) {
+        } else if (game->CanOfferDraw()) {
             if (TwoPeoplePlay(*game)) {
                 Ask(GameQuestion::Draw, *game);
             } else {
@@ -166,7 +162,7 @@ namespace BECore::Chess {
         _greyVersion = version;
         _greyRevision = revision;
         const bool resignDisabled = !game || !game->ResigningNow();
-        const bool drawDisabled = !game || !CanOfferDraw(*game);
+        const bool drawDisabled = !game || !game->CanOfferDraw();
         if (resignDisabled != _resignDisabled) {
             _resignDisabled = resignDisabled;
             SetClickerDisabled(*canvas, Ids::gameSectionResign, resignDisabled);

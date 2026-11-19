@@ -11,8 +11,9 @@ namespace BECore::Chess {
     /// The depth the own engine judges a draw offer at: fixed, so the same position gets the same answer twice
     inline constexpr int kDrawOfferDepth = 5;
 
-    /// Why a draw cannot be offered. GameOver: the game has ended. NotYourTurn: the program plays the side to move, and the offer is the person's, made on their turn. NoPerson: two programs
-    CORE_ENUM(DrawOfferRefusal, uint8_t, GameOver, NotYourTurn, NoPerson)
+    /// Why a draw cannot be offered. GameOver: the game has ended. NotYourTurn: the program plays the side to move, and the offer is the person's, made on their turn. NoPerson: two programs. Puzzle:
+    /// a puzzle is on (said by ChessGame::OfferDraw(), never by DrawOfferRefusalFor())
+    CORE_ENUM(DrawOfferRefusal, uint8_t, GameOver, NotYourTurn, NoPerson, Puzzle)
 
     /// The rule of when a draw may be offered, for every caller (the control API, the menu): refused on a finished game, with two programs and on the turn of the one color the program plays
     /// (@p programPlays). Nothing: the offer may be made; two people agree among themselves, so it is never refused for them

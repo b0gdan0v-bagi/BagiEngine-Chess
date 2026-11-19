@@ -72,14 +72,16 @@ namespace BECore::Chess {
         _drag.reset();
     }
 
-    void ChessBoardComponent::OnUpdate(const SceneEvents::SceneUpdateEvent&) {
+    void ChessBoardComponent::OnUpdate(const SceneEvents::SceneUpdateEvent& event) {
         ChessGame* game = ChessGame::GetActive();
         if (!game) {
             return;
         }
-        // The opponent plays here, on the main thread, and not in OnDraw(): it changes the model. While a position is edited it keeps its setup and waits: a move of its own would end the draft
+        // The opponent plays here, on the main thread, and not in OnDraw(): it changes the model. While a position is edited it keeps its setup and waits: a move of its own would end the draft.
+        // While a puzzle is on it gets no frame: the judge plays the other side, and a search that was in flight is stale by the time the puzzle ends
+        game->UpdatePuzzle(event.deltaTime);
         const bool editing = game->IsEditing();
-        if (!editing) {
+        if (!editing && !game->IsPuzzleOn()) {
             game->GetOpponent().Update();
         }
         game->GetAnalyst().Update(game->GetModel(), game->GetOpponent().GetEngine());  // the search runs on the pool; never waits
@@ -114,8 +116,8 @@ namespace BECore::Chess {
     }
 
     PieceColor ChessBoardComponent::GetBottomColor() const {
-        const OpponentController* opponent = ChessGame::GetActiveOpponent();
-        return BottomColor(opponent ? opponent->GetPlays() : std::nullopt);
+        const ChessGame* game = ChessGame::GetActive();
+        return game ? game->BoardBottomColor() : PieceColor::White;
     }
 
     void ChessBoardComponent::SquareToPixel(int file, int rank, float& outX, float& outY) const {
@@ -262,11 +264,12 @@ namespace BECore::Chess {
         }
 
         // The program's turn: the person has no move to make. When the program plays this side only, the click is a premove for the other color (no drag is armed, no promotion is asked: it
-        // plays as a queen); while two programs play the board takes no click on either turn
-        const OpponentController* opponent = ChessGame::GetActiveOpponent();
-        if (opponent && opponent->PlaysFor(model->GetTurn())) {
+        // plays as a queen); while two programs play the board takes no click on either turn. In a puzzle the program's turn is the reply of the line, which takes no click and no premove
+        ChessGame* game = ChessGame::GetActive();
+        if (game && game->ProgramToMoveNow()) {
+            const OpponentController& opponent = game->GetOpponent();
             const PieceColor person = Opposite(model->GetTurn());
-            if (!opponent->PlaysFor(person)) {
+            if (!game->IsPuzzleOn() && !opponent.PlaysFor(person)) {
                 model->OnPremoveClicked(person, *clicked);
             }
             return;
@@ -304,8 +307,8 @@ namespace BECore::Chess {
             model->GetSelected() != drag.from || model->HasPendingPromotion()) {
             return false;
         }
-        const OpponentController* opponent = ChessGame::GetActiveOpponent();
-        return !(opponent && opponent->PlaysFor(model->GetTurn()));
+        const ChessGame* game = ChessGame::GetActive();
+        return !(game && game->ProgramToMoveNow());
     }
 
     void ChessBoardComponent::OnMouseMotion(const SDLEvents::MouseMotionEvent& e) {

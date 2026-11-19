@@ -209,10 +209,16 @@ namespace BECore::Chess::Tests {
             keeper.Start(model, controller, choice);
         }
         void Update() {
-            keeper.Update(model, controller, choice);
+            keeper.Update(model, controller, choice, false);
         }
         void Flush() {
-            keeper.Flush(model, controller, choice);
+            keeper.Flush(model, controller, choice, false);
+        }
+        void UpdateDuringAPuzzle() {
+            keeper.Update(model, controller, choice, true);
+        }
+        void FlushDuringAPuzzle() {
+            keeper.Flush(model, controller, choice, true);
         }
     };
 
@@ -444,6 +450,36 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(Saved()->moves, "e2e4");
         game.Flush();  // the end of the game writes whatever the clock says
         EXPECT_EQ(Saved()->moves, "e2e4 e7e5");
+    }
+
+    TEST_F(ChessSaveKeeperTest, NothingOfTheGameIsWrittenWhileAPuzzleIsOnAndTheFirstFrameAfterItWritesTheGame) {
+        SetCommandLine({});
+        KeptGame game;
+        game.Start();
+        PlayLine(game.model, "e2e4");
+        game.Update();
+        ASSERT_EQ(Saved()->moves, "e2e4");
+
+        PlayLine(game.model, "e7e5 g1f3");  // what a puzzle's position is to the keeper: a changed game
+        AdvancePastTheDebounce();
+        game.UpdateDuringAPuzzle();
+        game.FlushDuringAPuzzle();
+        EXPECT_EQ(Saved()->moves, "e2e4") << "the game from before the puzzle is what a restart brings back";
+
+        game.Update();
+        EXPECT_EQ(Saved()->moves, "e2e4 e7e5 g1f3");
+    }
+
+    TEST_F(ChessSaveKeeperTest, TheLevelsAreWrittenWhileAPuzzleIsOn) {
+        SetCommandLine({});
+        KeptGame game;
+        game.Start();
+        CoreManager::GetAudio().SetMasterVolume(0.25f);
+
+        game.FlushDuringAPuzzle();
+
+        ASSERT_TRUE(SavedLevels().has_value());
+        EXPECT_FLOAT_EQ(SavedLevels()->_master._volume, 0.25f);
     }
 
     TEST_F(ChessSaveKeeperTest, AFlushAfterAWriteWritesNothingMore) {

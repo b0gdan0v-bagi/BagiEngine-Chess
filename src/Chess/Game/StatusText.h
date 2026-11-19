@@ -2,6 +2,7 @@
 
 #include <Chess/Game/ChessGameModel.h>
 #include <Chess/Game/PositionEditor.h>
+#include <Chess/Game/PuzzleSession.h>
 
 namespace BECore::Chess {
 
@@ -30,6 +31,22 @@ namespace BECore::Chess {
         /// The HUD's Turn line while a position is edited: @p message (the reason a "Play from here" was refused) when there is one, else the reason the editor last refused an edit, else "Editing".
         /// Never longer than EditorText::kMaxRefusalChars
         [[nodiscard]] String Editing(const PositionEditor& editor, StringView message);
+
+        /// The HUD's Turn line while a puzzle is on: "Your move" while the person is to move (also after a wrong move, which is taken back), a short word while the program's reply is due, "Solved"
+        [[nodiscard]] String PuzzleTurn(PuzzlePhase phase);
+
+        /// The HUD's status line over a puzzle: "Wrong move" while @p wrong (PuzzleSession::WasWrong()), else "". The game's own status ("Checkmate") stands when this is empty
+        [[nodiscard]] String PuzzleStatus(bool wrong);
+
+        /// The words of the menu section "Puzzles". @p index counts from 0, the word from 1 ("Puzzle 12 of 130")
+        [[nodiscard]] String PuzzleNumber(size_t index, size_t count);
+        [[nodiscard]] String PuzzleRating(int32_t rating);
+        /// The state line: the Turn word (or "Wrong move" while @p wrong) and, after the first mistake, how many there were
+        [[nodiscard]] String PuzzleProgress(PuzzlePhase phase, bool wrong, size_t mistakes);
+        /// The one button of Start and Next: "Next" while a puzzle is on, else "Start"
+        [[nodiscard]] String PuzzleNextWord(bool puzzleOn);
+        /// The state line of a game that has no puzzle set
+        [[nodiscard]] String NoPuzzles();
 
     }  // namespace StatusText
 

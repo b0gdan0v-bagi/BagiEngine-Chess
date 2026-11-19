@@ -192,6 +192,11 @@ namespace BECore::Chess {
 
         constexpr const char* kDrawUsage = "'draw' has to be an empty object {}: the person offers a draw (nothing else is a member of it)";
 
+        constexpr const char* kPuzzleUsage = "'puzzle' has to be an object with exactly one member: {\"index\": 0} or {\"id\": \"00sHx\"} begins a puzzle, {\"next\": true}, {\"retry\": true} or "
+                                             "{\"end\": true} acts on the one that is on";
+
+        constexpr const char* kPuzzleOnUsage = "a puzzle is on: leave it first with {\"puzzle\": {\"end\": true}} (a takeback, a resignation or a draw offer would break its line)";
+
         constexpr const char* kTakeBackUsage = "'takeBack' has to be an object like {} (the button's rule) or {\"plies\": 2} (the member is an optional integer from 1 to the moves played)";
 
         /// The SAN of every move of the game, in the order of GetMoves()
@@ -205,6 +210,18 @@ namespace BECore::Chess {
                 }
             }
             return san;
+        }
+
+        StringView PuzzlePhaseId(PuzzlePhase phase) {
+            switch (phase) {
+                case PuzzlePhase::YourMove:
+                    return "your_move";
+                case PuzzlePhase::Replying:
+                    return "replying";
+                case PuzzlePhase::Solved:
+                    return "solved";
+            }
+            return "your_move";
         }
 
         /// {"eco", "name"} of the opening of the game, or null
@@ -308,8 +325,8 @@ namespace BECore::Chess {
     }  // namespace
 
     ChessGameControl::ChessGameControl(ChessGameModel& model, OpponentController& opponent, PositionAnalyst& analyst, DrawOfferJudge& drawJudge, const OpeningBook& openings,
-                                       const PositionEditor& editor)
-        : _model(model), _opponent(opponent), _analyst(analyst), _drawJudge(drawJudge), _openings(openings), _editor(editor) {}
+                                       const PositionEditor& editor, PuzzleSession& puzzle)
+        : _model(model), _opponent(opponent), _analyst(analyst), _drawJudge(drawJudge), _openings(openings), _editor(editor), _puzzle(puzzle) {}
 
     MoveList ChessGameControl::LegalMoves() const {
         return _model.IsGameOver() ? MoveList() : MoveGenerator::GenerateLegal(_model.GetPosition());
@@ -341,13 +358,38 @@ namespace BECore::Chess {
         state["moves"] = std::move(moves);
         state["sanMoves"] = SanMovesJson(_model);
         state["opening"] = OpeningJson(_openings, _model);
-        state["takeBackPlies"] = TakeBackPlies(_model.GetMoves().size(), _model.GetTurn(), _opponent.GetPlays());
+        state["takeBackPlies"] = _puzzle.IsActiveFor(_model) ? 0 : TakeBackPlies(_model.GetMoves().size(), _model.GetTurn(), _opponent.GetPlays());
         state["opponent"] = OpponentJson();
         state["material"] = MaterialJson(_model.GetPosition());
         state["analysis"] = AnalysisJson();
         state["drawOffer"] = DrawOfferJson();
         state["editor"] = EditorJson();
+        state["puzzle"] = PuzzleJson();
         return state;
+    }
+
+    Json ChessGameControl::PuzzleJson() const {
+        const Puzzle* puzzle = _puzzle.GetCurrent();
+        if (puzzle == nullptr || !_puzzle.IsActiveFor(_model)) {
+            return Json();
+        }
+        Json themes = Json::array();
+        for (const String& theme : puzzle->themes) {
+            themes.push_back(TextJson(theme));
+        }
+        Json described = Json::object();
+        described["id"] = TextJson(puzzle->id);
+        described["index"] = *_puzzle.GetIndex();
+        described["count"] = _puzzle.GetPuzzles().Size();
+        described["rating"] = puzzle->rating;
+        described["themes"] = std::move(themes);
+        described["solver"] = MakeJsonString(PieceColorId(puzzle->SolverColor()));
+        described["state"] = MakeJsonString(PuzzlePhaseId(_puzzle.GetPhase(_model)));
+        described["mistakes"] = _puzzle.GetMistakes();
+        described["wrong"] = _puzzle.WasWrong();
+        described["step"] = _puzzle.GetStep(_model);
+        described["steps"] = _puzzle.GetSteps();
+        return described;
     }
 
     Json ChessGameControl::EditorJson() const {
@@ -520,10 +562,18 @@ namespace BECore::Chess {
         const Json* takeBackMember = FindJsonMember(state, "takeBack");
         const Json* resignMember = FindJsonMember(state, "resign");
         const Json* drawMember = FindJsonMember(state, "draw");
-        if (!fenMember && !opponentMember && !analysisMember && !takeBackMember && !resignMember && !drawMember) {
-            return std::unexpected(MakeControlError(ControlErrors::kInvalidParams,
-                                                    "'fen' (a FEN string), 'opponent' ({\"plays\", \"level\", \"engine\", \"white\", \"black\", \"seed\"}), both, or "
-                                                    "'analysis' ({\"evaluation\", \"hint\", \"ratings\"}), 'takeBack' ({\"plies\"}), 'resign' ({\"color\"}) or 'draw' ({}) alone are needed"));
+        const Json* puzzleMember = FindJsonMember(state, "puzzle");
+        if (!fenMember && !opponentMember && !analysisMember && !takeBackMember && !resignMember && !drawMember && !puzzleMember) {
+            return std::unexpected(
+                MakeControlError(ControlErrors::kInvalidParams,
+                                 "'fen' (a FEN string), 'opponent' ({\"plays\", \"level\", \"engine\", \"white\", \"black\", \"seed\"}), both, or "
+                                 "'analysis' ({\"evaluation\", \"hint\", \"ratings\"}), 'takeBack' ({\"plies\"}), 'resign' ({\"color\"}), 'draw' ({}) or 'puzzle' ({\"index\"}) alone are needed"));
+        }
+        if (puzzleMember) {
+            if (fenMember || opponentMember || analysisMember || takeBackMember || resignMember || drawMember) {
+                return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, "'puzzle' cannot be combined with another member: a puzzle is a game of its own"));
+            }
+            return SetPuzzle(*puzzleMember);
         }
         if (takeBackMember) {
             if (fenMember || opponentMember || analysisMember || resignMember || drawMember) {
@@ -628,6 +678,9 @@ namespace BECore::Chess {
     }
 
     std::expected<void, ControlError> ChessGameControl::SetTakeBack(const Json& takeBack) {
+        if (_puzzle.IsActiveFor(_model)) {
+            return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, kPuzzleOnUsage));
+        }
         if (!takeBack.is_object()) {
             return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, kTakeBackUsage));
         }
@@ -652,6 +705,9 @@ namespace BECore::Chess {
     }
 
     std::expected<void, ControlError> ChessGameControl::SetResign(const Json& resign) {
+        if (_puzzle.IsActiveFor(_model)) {
+            return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, kPuzzleOnUsage));
+        }
         if (!resign.is_object()) {
             return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, kResignUsage));
         }
@@ -682,6 +738,9 @@ namespace BECore::Chess {
     }
 
     std::expected<void, ControlError> ChessGameControl::SetDraw(const Json& draw) {
+        if (_puzzle.IsActiveFor(_model)) {
+            return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, kPuzzleOnUsage));
+        }
         if (!draw.is_object() || !draw.empty()) {
             return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, kDrawUsage));
         }
@@ -696,12 +755,58 @@ namespace BECore::Chess {
                 return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, "the program plays the side to move: a draw is offered on the person's turn"));
             case DrawOfferRefusal::NoPerson:
                 return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, "two programs play: nobody is there to offer a draw"));
+            case DrawOfferRefusal::Puzzle:
+                return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, "a puzzle is on: there is no draw to offer in it"));
         }
         return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, kDrawUsage));
     }
 
+    std::expected<void, ControlError> ChessGameControl::SetPuzzle(const Json& puzzle) {
+        if (!puzzle.is_object() || puzzle.size() != 1) {
+            return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, kPuzzleUsage));
+        }
+        const auto member = puzzle.items().begin();
+        const String key = String(member.key().c_str(), member.key().size());
+        const PuzzleSet& puzzles = _puzzle.GetPuzzles();
+        if (key == "index" || key == "id") {
+            Optional<size_t> index;
+            if (key == "index") {
+                const Optional<int64_t> asked = GetJsonInt(puzzle, "index");
+                if (!asked || *asked < 0 || static_cast<uint64_t>(*asked) >= puzzles.Size()) {
+                    return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, Format("'index' has to be an integer below the {} puzzles of the set", puzzles.Size())));
+                }
+                index = static_cast<size_t>(*asked);
+            } else {
+                const auto id = GetJsonString(puzzle, "id");
+                index = id ? puzzles.FindIndexById(StringView(id->data(), id->size())) : std::nullopt;
+                if (!index) {
+                    return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, "'id' has to be the id of a puzzle of the set"));
+                }
+            }
+            const bool begun = _puzzle.Begin(_model, *index);
+            EXPECT(begun, "ChessGameControl: a puzzle of the set does not begin");
+            return {};
+        }
+        const Json& value = member.value();
+        if ((key != "next" && key != "retry" && key != "end") || !value.is_boolean() || !value.get<bool>()) {
+            return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, kPuzzleUsage));
+        }
+        if (!_puzzle.IsActiveFor(_model)) {
+            return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, Format("'{}' needs a puzzle that is on: begin one with {{\"index\": 0}}", key)));
+        }
+        if (key == "next") {
+            static_cast<void>(_puzzle.Next(_model));
+        } else if (key == "retry") {
+            static_cast<void>(_puzzle.Retry(_model));
+        } else {
+            _puzzle.End();
+            _model.Reset();
+        }
+        return {};
+    }
+
     uint64_t ChessGameControl::GetStateVersion() const {
-        return _model.GetVersion() + _opponent.GetRevision() + _analyst.GetRevision() + _drawJudge.GetRevision() + _editor.GetRevision();
+        return _model.GetVersion() + _opponent.GetRevision() + _analyst.GetRevision() + _drawJudge.GetRevision() + _puzzle.GetRevision() + _editor.GetRevision();
     }
 
 }  // namespace BECore::Chess

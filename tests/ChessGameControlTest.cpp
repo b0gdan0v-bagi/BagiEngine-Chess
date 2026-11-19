@@ -81,7 +81,7 @@ namespace BECore::Chess::Tests {
                 ::BECore::Tests::EngineEnvironment::EnsureCoreServices();  // TaskManager, which the searches run on
             }
 
-            ChessGameControlTest() : opponent(model), control(model, opponent, analyst, drawJudge, openings, editor) {
+            ChessGameControlTest() : opponent(model), control(model, opponent, analyst, drawJudge, openings, editor, puzzle) {
 #if CHESS_NO_STOCKFISH
                 // The cases below are a world of doubles in which "stockfish" is a name a test factory answers. A build without Stockfish starts with the own engine, so the
                 // fixture picks the name first, through a factory that makes any double. The cases of a real game of that build are those that say `WithoutStockfish`
@@ -237,6 +237,7 @@ namespace BECore::Chess::Tests {
             DrawOfferJudge drawJudge;
             OpeningBook openings;  ///< empty, like a game whose file is missing; a case that wants names copies the shipped book in
             PositionEditor editor;
+            PuzzleSession puzzle;
             ChessGameControl control;
         };
 
@@ -733,7 +734,8 @@ namespace BECore::Chess::Tests {
         DrawOfferJudge freshJudge;
         const OpeningBook freshOpenings;
         const PositionEditor freshEditor;
-        ChessGameControl freshControl(freshModel, freshOpponent, freshAnalyst, freshJudge, freshOpenings, freshEditor);
+        PuzzleSession freshPuzzle;
+        ChessGameControl freshControl(freshModel, freshOpponent, freshAnalyst, freshJudge, freshOpenings, freshEditor, freshPuzzle);
         const auto freshState = freshControl.GetState();
         ASSERT_TRUE(freshState.has_value());
         const Json* freshOpponentState = FindJsonMember(*freshState, "opponent");
@@ -3173,7 +3175,7 @@ namespace BECore::Chess::Tests {
 
         /// A control adapter over a controller of its own, with the default factory and the default engine of this build
         struct RealDefaults {
-            RealDefaults() : opponent(model), control(model, opponent, analyst, drawJudge, openings, editor) {}
+            RealDefaults() : opponent(model), control(model, opponent, analyst, drawJudge, openings, editor, puzzle) {}
 
             Json OpponentState() const {
                 const auto state = control.GetState();
@@ -3187,6 +3189,7 @@ namespace BECore::Chess::Tests {
             DrawOfferJudge drawJudge;
             OpeningBook openings;
             PositionEditor editor;
+            PuzzleSession puzzle;
             ChessGameControl control;
         };
 

@@ -8,6 +8,7 @@
 #include <Chess/Game/ChessGameModel.h>
 #include <Chess/Game/OpeningBook.h>
 #include <Chess/Game/PositionEditor.h>
+#include <Chess/Game/PuzzleSession.h>
 #include <Chess/Save/ChessSaveKeeper.h>
 #include <Games/IGame.h>
 
@@ -30,6 +31,12 @@ namespace BECore::Chess {
      * ends the draft by the model's own rule.
      *
      * Start() loads the opening names (OpeningBook) from kOpeningsPath; a file that is missing or cannot be read leaves the book empty (one warning), so the game plays and no position has a name.
+     * It loads the puzzles (PuzzleSet) from kPuzzlesPath the same way: no file, no puzzle.
+     *
+     * Owns the PuzzleSession, the judge of a puzzle. A puzzle is **on** (IsPuzzleOn()) exactly while the model's game is the puzzle's line (PuzzleSession::IsActiveFor()), so a Reset(), a
+     * set_state or a takeback under the setup ends it with no flag to clear. While one is on the board hands the opponent no frame (a search that was in flight is never played: after the puzzle
+     * the game has moved on and the controller drops it as stale), the person moves for the solver's color whatever the opponent is picked, the board is turned for that color (BoardBottomColor()),
+     * and takeback, resignation, draw offers and the save are off. The opponent's pick is left as it was; LeavePuzzle() is a plain Reset().
      *
      * IGame has no per-frame hook, so ChessBoardComponent runs GetOpponent().Update(), GetAnalyst().Update(), GetDrawJudge().Update() and UpdateKeeper() every frame. Start() ends by restoring
      * the saved game, the opponent choice and the player's audio levels (ChessSaveKeeper, when the run asks for it). Stop() starts by writing them, then destroys the opponent and shuts the analyst
@@ -89,6 +96,9 @@ namespace BECore::Chess {
         /// ChessBoardComponent::OnUpdate); the control adapter makes the same offer through the same function
         std::expected<void, DrawOfferRefusal> OfferDraw();
 
+        /// Whether a draw may be offered now: the same refusals as OfferDraw() with no side effect (the menu's button greys on it)
+        [[nodiscard]] bool CanOfferDraw() const;
+
         /// The color the person resigns for in the game as it stands (ResigningColor()), or nothing when nobody can: a finished game, two programs. The one rule of both
         /// Resign buttons, the HUD's and the menu section's
         [[nodiscard]] Optional<PieceColor> ResigningNow() const;
@@ -99,6 +109,12 @@ namespace BECore::Chess {
         /// The book of the table at @p virtualPath; empty, with one warning, when the file is missing or cannot be read (the game goes on without names)
         [[nodiscard]] static OpeningBook LoadOpeningBook(StringView virtualPath);
 
+        /// The virtual path of the table of puzzles that Start() loads
+        static constexpr StringView kPuzzlesPath = "assets/puzzles/puzzles.tsv";
+
+        /// The puzzles of the table at @p virtualPath; empty, with one warning, when the file is missing or cannot be read (the game plays without puzzles)
+        [[nodiscard]] static PuzzleSet LoadPuzzles(StringView virtualPath);
+
         const OpeningBook& GetOpenings() const noexcept {
             return _openings;
         }
@@ -107,6 +123,45 @@ namespace BECore::Chess {
         void SetOpenings(OpeningBook openings) {
             _openings = eastl::move(openings);
         }
+
+        PuzzleSession& GetPuzzle() noexcept {
+            return _puzzle;
+        }
+        const PuzzleSession& GetPuzzle() const noexcept {
+            return _puzzle;
+        }
+
+        /// Replaces the puzzles Start() loaded and forgets the one picked; for a test, which has no game content root to load them from
+        void SetPuzzles(PuzzleSet puzzles) {
+            _puzzle.SetPuzzles(eastl::move(puzzles));
+        }
+
+        /// A puzzle is on: the game is its line (PuzzleSession::IsActiveFor()). Judged from the model at every call
+        [[nodiscard]] bool IsPuzzleOn() const {
+            return _puzzle.IsActiveFor(_model);
+        }
+
+        /// Starts puzzle @p index (a new game from its position: the model's SetPosition()); false, nothing changed, for an index outside the set
+        bool BeginPuzzle(size_t index);
+
+        /// The puzzle after the one that is on, the first after the last; the first one when none is on. False for an empty set
+        bool NextPuzzle();
+
+        /// Begins the puzzle that is on again; false when none is on
+        bool RetryPuzzle();
+
+        /// Ends the puzzle with a plain Reset() (a new game, the opponent as picked); false and nothing changed when none is on
+        bool LeavePuzzle();
+
+        /// Once per frame from ChessBoardComponent::OnUpdate (never from a draw): the judge's verdict and the program's reply
+        void UpdatePuzzle(float deltaSeconds);
+
+        /// The color at the bottom of the board: the solver's while a puzzle is on, else BottomColor() of what the program plays. The one place the board and the material lists ask
+        [[nodiscard]] PieceColor BoardBottomColor() const;
+
+        /// The side to move is the program's for the click flow of the board: with a puzzle on every turn but the solver's (the program's reply, which the person must not play), else the
+        /// opponent's seat
+        [[nodiscard]] bool ProgramToMoveNow() const;
 
         const ChessSaveKeeper& GetKeeper() const noexcept {
             return _keeper;
@@ -183,6 +238,9 @@ namespace BECore::Chess {
         /// The position editor of the active game
         static PositionEditor* GetActiveEditor();
 
+        /// The puzzle judge of the active game
+        static PuzzleSession* GetActivePuzzle();
+
     private:
         ChessGameModel _model;
         OpponentController _opponent;  ///< after the model (it holds a reference to it) and before the adapter
@@ -190,6 +248,7 @@ namespace BECore::Chess {
         PositionAnalyst _analyst;      ///< after the controller (its factory reads the controller's settings) and before the adapter
         DrawOfferJudge _drawJudge;     ///< after the analyst (its factory asks it) and before the adapter
         OpeningBook _openings;         ///< before the adapter, which reads it
+        PuzzleSession _puzzle;         ///< after the model (it judges it) and before the adapter and the keeper
         PositionEditor _editor;
         String _editorMessage;
         ChessSaveKeeper _keeper;  ///< after everything it reads (it is handed the model, the controller and the choice in each call, and destroyed first)

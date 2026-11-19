@@ -214,6 +214,7 @@ namespace BECore::Chess::Tests {
                                  {"GameSection", "GameSectionDim", "ChessCloseMenu"},
                                  {"SoundPanel", "SoundPanelDim", "ChessCloseMenu"},
                                  {"PositionSection", "PositionSectionDim", "ChessCloseMenu"},
+                                 {"PuzzleSection", "PuzzleSectionDim", "ChessCloseMenu"},
                                  {"PromotionPanel", "PromotionDim", "ChessCancelPromotion"}};
         size_t modals = 0;
         for (const auto& node : GetScene().GetRootNode().GetChildren()) {
@@ -260,6 +261,9 @@ namespace BECore::Chess::Tests {
             }
             if (StringView(node) == "PositionSection") {
                 return ClickButton(kMenuColor) && ClickMenuList("MenuSectionPosition").Both();
+            }
+            if (StringView(node) == "PuzzleSection") {
+                return ClickButton(kMenuColor) && ClickMenuList("MenuSectionPuzzles").Both();
             }
             StartFrom(kPromotionFen);
             ClickMove("a7", "a8");

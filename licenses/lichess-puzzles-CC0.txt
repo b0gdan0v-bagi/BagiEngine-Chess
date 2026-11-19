@@ -1,0 +1,21 @@
+assets/puzzles/puzzles.tsv: the puzzles of the Puzzles mode
+==========================================================
+
+Source:  https://database.lichess.org/lichess_db_puzzle.csv.zst ("Lichess Puzzle Database", https://database.lichess.org/#puzzles)
+File:    Last-Modified Sun, 01 Nov 2026 07:57:40 GMT, 309751173 bytes; only the first 60000000 bytes of the stream were taken
+         (1199447 puzzle rows after unpacking; the row the cut falls into is dropped)
+Taken:   2026-11-18, by tools/fetch_puzzles.py (`python tools/fetch_puzzles.py --max-bytes 60000000` makes the same file again from the
+         same prefix of the same database file; a newer database file gives other rows, then this file and the notices row change with it)
+Chosen:  rows whose themes name exactly one of mateIn1, mateIn2, mateIn3, with Popularity >= 90, NbPlays >= 1000, RatingDeviation <= 90 and
+         a rating from 600 to 2200; per theme (40, 60 and 30 rows) the most popular rows of the eight rating bands of 200 points.
+         130 rows in all, ordered by rating and id. The columns id, fen, moves, rating and themes are the database's, unchanged.
+
+Licence: CC0 1.0 Universal, https://creativecommons.org/publicdomain/zero/1.0/
+
+The page https://database.lichess.org/ (it lists the puzzles as one of the exports) says:
+
+    "Database exports are released under the Creative Commons CC0 license. Use them for research, commercial purpose, publication,
+    anything you like. You can download, modify and redistribute them, without asking for permission."
+
+CC0 asks nothing of a user (no notice, no attribution); this file records where the puzzles came from and under what terms, so that the
+origin can be checked. The rows carry the lichess puzzle id.

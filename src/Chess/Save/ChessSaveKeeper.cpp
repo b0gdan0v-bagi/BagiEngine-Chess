@@ -56,11 +56,14 @@ namespace BECore::Chess {
         _service = std::move(service);
     }
 
-    void ChessSaveKeeper::Update(const ChessGameModel& model, const OpponentController& controller, const OpponentChoice& choice) {
+    void ChessSaveKeeper::Update(const ChessGameModel& model, const OpponentController& controller, const OpponentChoice& choice, bool puzzleOn) {
         if (!_service) {
             return;
         }
         UpdateAudio();
+        if (puzzleOn) {
+            return;
+        }
         const Key key = KeyOf(model, controller, choice);
         if (key == _written || (_attemptFailed && key == _attempted)) {
             return;
@@ -71,11 +74,14 @@ namespace BECore::Chess {
         Write(model, controller, choice, key);
     }
 
-    void ChessSaveKeeper::Flush(const ChessGameModel& model, const OpponentController& controller, const OpponentChoice& choice) {
+    void ChessSaveKeeper::Flush(const ChessGameModel& model, const OpponentController& controller, const OpponentChoice& choice, bool puzzleOn) {
         if (!_service) {
             return;
         }
         FlushAudio();
+        if (puzzleOn) {
+            return;
+        }
         const Key key = KeyOf(model, controller, choice);
         if (key != _written) {
             Write(model, controller, choice, key);

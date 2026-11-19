@@ -1,0 +1,33 @@
+{"scenario": 1, "game": "Chess", "flags": ["--headless", "--manual-clock"], "title": "Chess: puzzle 0 of the shipped set solved through the API, a wrong move taken back, the retry, the program's reply after its delay, the refusals while a puzzle is on, the end"}
+{"method": "step", "params": {"frames": 2}}
+{"method": "reset"}
+{"method": "set_state", "params": {"opponent": {"plays": null}}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "get_state", "expect": {"pointers": {"/state/puzzle": null}, "versionStep": 0}}
+{"method": "set_state", "params": {"puzzle": {"next": true}}, "expect": {"error": "invalid_params"}, "note": "next needs a puzzle on"}
+{"method": "set_state", "params": {"puzzle": {"index": 0}}, "expect": {"versionStep": 3}}
+{"method": "get_state", "expect": {"pointers": {"/state/puzzle/index": 0, "/state/puzzle/state": "your_move", "/state/puzzle/solver": "white", "/state/puzzle/step": 0, "/state/puzzle/steps": 3, "/state/puzzle/mistakes": 0, "/state/puzzle/wrong": false, "/state/moves": ["d8f6"], "/state/turn": "white", "/state/takeBackPlies": 0}, "versionStep": 0}, "note": "the setup move is the first move of the game; the person plays White"}
+{"method": "set_state", "params": {"takeBack": {}}, "expect": {"error": "invalid_params"}}
+{"method": "set_state", "params": {"resign": {}}, "expect": {"error": "invalid_params"}}
+{"method": "set_state", "params": {"draw": {}}, "expect": {"error": "invalid_params"}}
+{"method": "perform_action", "params": {"type": "move", "uci": "a2a3"}, "expect": {"versionStep": 1}, "note": "legal, and not the line's move"}
+{"method": "step", "params": {"frames": 2}}
+{"method": "get_state", "expect": {"pointers": {"/state/puzzle/state": "your_move", "/state/puzzle/step": 0, "/state/puzzle/mistakes": 1, "/state/puzzle/wrong": true, "/state/moves": ["d8f6"]}, "versionStep": 2}, "note": "the judge took the move back at the frame"}
+{"method": "set_state", "params": {"puzzle": {"retry": true}}, "expect": {"versionStep": 3}}
+{"method": "get_state", "expect": {"pointers": {"/state/puzzle/mistakes": 0, "/state/puzzle/wrong": false, "/state/puzzle/step": 0, "/state/moves": ["d8f6"]}, "versionStep": 0}}
+{"method": "perform_action", "params": {"type": "move", "uci": "f3a8"}, "expect": {"versionStep": 1}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "get_state", "expect": {"pointers": {"/state/puzzle/state": "replying", "/state/puzzle/step": 1, "/state/moves": ["d8f6", "f3a8"]}}, "note": "two frames of 1/60 s are less than the reply delay"}
+{"method": "step", "params": {"frames": 60}}
+{"method": "get_state", "expect": {"pointers": {"/state/puzzle/state": "your_move", "/state/puzzle/step": 1, "/state/puzzle/mistakes": 0, "/state/moves": ["d8f6", "f3a8", "a6c8"], "/state/turn": "white"}}, "note": "a second of game time: the program has answered"}
+{"method": "perform_action", "params": {"type": "move", "uci": "a8c8"}, "expect": {"versionStep": 1}}
+{"method": "step", "params": {"frames": 60}}
+{"method": "get_state", "expect": {"pointers": {"/state/puzzle/state": "your_move", "/state/puzzle/step": 2, "/state/moves": ["d8f6", "f3a8", "a6c8", "a8c8", "f6d8"]}}}
+{"method": "perform_action", "params": {"type": "move", "uci": "c8d8"}, "expect": {"versionStep": 1}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "get_state", "expect": {"pointers": {"/state/puzzle/state": "solved", "/state/puzzle/step": 3, "/state/puzzle/steps": 3, "/state/puzzle/mistakes": 0, "/state/puzzle/wrong": false, "/state/status": "checkmate", "/state/winner": "white"}}}
+{"method": "set_state", "params": {"takeBack": {}}, "expect": {"error": "invalid_params"}, "note": "also refused once solved: the puzzle is on until it is left"}
+{"method": "set_state", "params": {"puzzle": {"end": true}}, "expect": {"versionStep": 2}}
+{"method": "get_state", "expect": {"pointers": {"/state/puzzle": null, "/state/moves": [], "/state/status": "ongoing"}, "versionStep": 0}}
+{"method": "set_state", "params": {"puzzle": {"end": true}}, "expect": {"error": "invalid_params"}, "note": "nothing to end"}
+{"method": "get_state", "expect": {"pointers": {"/state/puzzle": null}, "versionStep": 0, "logClean": true}}
