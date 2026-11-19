@@ -14,6 +14,7 @@ namespace BECore::Chess {
         struct Ids {
             static constexpr auto analysisBar = "analysisBar"_intern;
             static constexpr auto analysisEvaluationOn = "analysisEvaluationOn"_intern;
+            static constexpr auto analysisRatingsOn = "analysisRatingsOn"_intern;
             static constexpr auto analysisText = "analysisText"_intern;
         };
 
@@ -57,6 +58,7 @@ namespace BECore::Chess {
         vars.Set(Ids::analysisText, StringView(AnalysisText::Evaluation(lineForWhite, on, gameOver, failed)));
         vars.Set(Ids::analysisBar, StringView(Format("{:.3f}", bar)));
         vars.Set(Ids::analysisEvaluationOn, on ? "true" : "false");
+        vars.Set(Ids::analysisRatingsOn, model && analyst && analyst->AreRatingsOn() ? "true" : "false");
     }
 
     bool HintAllowedNow(const ChessGameModel* model) {

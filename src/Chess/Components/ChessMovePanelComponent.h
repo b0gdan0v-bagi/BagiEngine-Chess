@@ -31,7 +31,8 @@ namespace BECore::Chess {
      * The analysis band (the Wide band and the Tall twins) is published from the game's analyst (PublishAnalysisWords) when AnalysisKey says it changed, and the Hint buttons are greyed
      * while HintRefusalFor() refuses (HintOnCanvas). `ChessHint`: when the refusal does not hold, a view of an earlier position ends (the hint is for the game's position), the pick of the
      * opponent is told to the analyst and the hint is asked, as the control API's `set_state analysis` does. `ChessSetEvaluation` (`value` "true" / "false", what the toggle says): the same pick,
-     * then the evaluation is switched; any other value logs one warning. The evaluation is of the game's position, not of the one a view shows.
+     * then the evaluation is switched; any other value logs one warning. The evaluation is of the game's position, not of the one a view shows. `ChessSetRatings` (`value` "true" / "false") switches
+     * PositionAnalyst::SetRatings() with no engine pick (the rater is the own engine); any other value logs one warning.
      */
     class ChessMovePanelComponent : public IComponent {
         BE_CLASS(ChessMovePanelComponent)
@@ -50,6 +51,9 @@ namespace BECore::Chess {
 
         /// ChessSetEvaluation: switches the evaluation to @p value ("true" or "false"); another value only logs
         void SetEvaluation(StringView value);
+
+        /// ChessSetRatings: switches the ratings (the mark and the "!!" of the brilliant moves) to @p value ("true" or "false"); another value only logs
+        void SetRatings(StringView value);
 
         /// Writes the variables and the visibility of the rows and marks for the game of @p model (none: empty rows)
         void Publish(const ChessGameModel* model);

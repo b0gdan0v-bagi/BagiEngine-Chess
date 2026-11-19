@@ -16,6 +16,7 @@ namespace BECore::Chess {
         struct Ids {
             static constexpr auto chessHint = "ChessHint"_intern;
             static constexpr auto chessSetEvaluation = "ChessSetEvaluation"_intern;
+            static constexpr auto chessSetRatings = "ChessSetRatings"_intern;
             static constexpr auto chessShowMove = "ChessShowMove"_intern;
             static constexpr auto chessTakeBack = "ChessTakeBack"_intern;
             static constexpr auto movePanelBox = "MovePanelBox"_intern;
@@ -34,6 +35,10 @@ namespace BECore::Chess {
         }
         if (event.action == Ids::chessSetEvaluation) {
             SetEvaluation(event.value.ToStringView());
+            return;
+        }
+        if (event.action == Ids::chessSetRatings) {
+            SetRatings(event.value.ToStringView());
             return;
         }
         const bool takeBack = event.action == Ids::chessTakeBack;
@@ -93,6 +98,18 @@ namespace BECore::Chess {
         }
         analyst->SetPicked(opponent->GetEngine());
         analyst->SetEvaluation(value == "true");
+    }
+
+    void ChessMovePanelComponent::SetRatings(StringView value) {
+        PositionAnalyst* analyst = ChessGame::GetActiveAnalyst();
+        if (!analyst) {
+            return;
+        }
+        if (value != "true" && value != "false") {
+            LOG_WARNING("ChessSetRatings ignored: '{}' is neither true nor false"_format(value));
+            return;
+        }
+        analyst->SetRatings(value == "true");
     }
 
     void ChessMovePanelComponent::Publish(const ChessGameModel* model) {
