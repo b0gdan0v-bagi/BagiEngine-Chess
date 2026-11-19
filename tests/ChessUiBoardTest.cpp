@@ -3030,4 +3030,157 @@ namespace BECore::Chess::Tests {
         EXPECT_FALSE(Lifted().has_value());
     }
 
+    // ---- the best move of a viewed position (a held review) ------------------------------------------------------------------------
+    // While an earlier position is viewed and a review is held the board fills the two squares of that position's best move in the hint's colors. The game's own hint is never drawn there
+
+    TEST_F(ChessUiTest, AViewedPositionOfADoneReviewFillsTheSquaresOfItsBestMoveInTheHintsColors) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        ReviewOnTheOwnEngine();
+        ASSERT_TRUE(PlayFoolsMate());
+        ASSERT_TRUE(Analyst().StartReview(Model()).has_value());
+        ASSERT_TRUE(WaitForReview());
+        ASSERT_FALSE(BlackIsAtTheBottom());
+
+        for (const size_t shown : {0u, 2u}) {
+            SCOPED_TRACE(Format("position {}", shown).c_str());
+            ASSERT_TRUE(Model().ShowMoves(shown));
+            const Optional<ReviewedPosition> reviewed = Analyst().GetReviewedPosition(Model(), shown);
+            ASSERT_TRUE(reviewed.has_value());
+            ASSERT_FALSE(reviewed->best.IsNull());
+            Draw();
+
+            const auto [from, to] = HintFills();
+            ASSERT_EQ(from.size(), 1u);
+            ASSERT_EQ(to.size(), 1u);
+            EXPECT_TRUE(SameRect(from[0]->rect, SquareRect(reviewed->best.From()))) << "the square the best move leaves";
+            EXPECT_TRUE(SameRect(to[0]->rect, SquareRect(reviewed->best.To()))) << "the square it goes to";
+        }
+    }
+
+    TEST_F(ChessUiTest, TheBestMoveOfAViewedPositionFillsTheTurnedCellsWhenTheProgramPlaysWhite) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        CountingFactory opponentFactory({New<GatedEngine>(true)});  // the program holds its answer: nothing else moves
+        Opponent().SetEngineFactory(opponentFactory.AsFactory());
+        ReviewOnTheOwnEngine();
+        _manager->UpdateAll();
+        ControlPlays("white");
+        _manager->UpdateAll();
+        ASSERT_TRUE(BlackIsAtTheBottom());
+        ASSERT_TRUE(PlayFoolsMate());
+        ASSERT_TRUE(Analyst().StartReview(Model()).has_value());
+        ASSERT_TRUE(WaitForReview());
+        ASSERT_TRUE(Model().ShowMoves(2));
+        const Optional<ReviewedPosition> reviewed = Analyst().GetReviewedPosition(Model(), 2);
+        ASSERT_TRUE(reviewed.has_value());
+
+        Draw();
+
+        const auto [from, to] = HintFills();
+        ASSERT_EQ(from.size(), 1u);
+        ASSERT_EQ(to.size(), 1u);
+        const auto [fromColumn, fromRow] = CellOfSquare(reviewed->best.From(), true);
+        const auto [toColumn, toRow] = CellOfSquare(reviewed->best.To(), true);
+        EXPECT_TRUE(SameRect(from[0]->rect, CellRect(fromColumn, fromRow)));
+        EXPECT_TRUE(SameRect(to[0]->rect, CellRect(toColumn, toRow)));
+    }
+
+    TEST_F(ChessUiTest, NoBestMoveIsFilledWithNoReviewAfterAnAbandonOrWhileThePersonIsNotViewing) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        ReviewOnTheOwnEngine();
+        ASSERT_TRUE(PlayFoolsMate());
+        const auto expectNone = [&](const char* when) {
+            Draw();
+            EXPECT_TRUE(HintFills().first.empty()) << when;
+            EXPECT_TRUE(HintFills().second.empty()) << when;
+        };
+        ASSERT_TRUE(Model().ShowMoves(2));
+        expectNone("no review");
+
+        ASSERT_TRUE(Model().EndViewing());
+        ASSERT_TRUE(Analyst().StartReview(Model()).has_value());
+        ASSERT_TRUE(WaitForReview());
+        expectNone("a done review, the game's own position");
+
+        ASSERT_TRUE(Model().ShowMoves(2));
+        Draw();
+        ASSERT_EQ(HintFills().first.size(), 1u);
+        Analyst().AbandonReview();
+        expectNone("after the abandon, at the next draw");
+    }
+
+    TEST_F(ChessUiTest, APositionTheRunningReviewHasNotReachedFillsNothing) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        const auto engine = New<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"));
+        engine->Gate(true);
+        CountingAnalysisFactory factory{engine};
+        Analyst().SetEngineFactory(factory.AsFactory());
+        ASSERT_TRUE(PlayFoolsMate());
+        ASSERT_TRUE(Analyst().StartReview(Model()).has_value());
+        ASSERT_TRUE(FramesUntil([&] { return engine->Calls() == 1; }));
+        ASSERT_TRUE(Model().ShowMoves(2));
+        ASSERT_FALSE(Analyst().GetReviewedPosition(Model(), 2).has_value());
+
+        Draw();
+
+        EXPECT_TRUE(HintFills().first.empty());
+        EXPECT_TRUE(HintFills().second.empty());
+        engine->Open();
+        ASSERT_TRUE(WaitForReview());
+        Draw();
+        EXPECT_EQ(HintFills().first.size(), 1u) << "the position came, so the mark did";
+        EXPECT_EQ(HintFills().second.size(), 1u);
+    }
+
+    TEST_F(ChessUiTest, TheBestMoveOfAViewedPositionIsDrawnOverTheSquaresAndUnderThePieces) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        ReviewOnTheOwnEngine();
+        ASSERT_TRUE(PlayFoolsMate());
+        ASSERT_TRUE(Analyst().StartReview(Model()).has_value());
+        ASSERT_TRUE(WaitForReview());
+        const auto pawn = GiveSpriteCell("WhitePawn_e2");
+        ASSERT_TRUE(Model().ShowMoves(2));
+        _manager->UpdateAll();  // the pieces are placed at the update after a view begins
+        Draw();
+
+        long lastSquare = -1;
+        long hintFrom = -1;
+        long hintTo = -1;
+        long piece = -1;
+        const auto& calls = _renderer->calls;
+        for (size_t i = 0; i < calls.size(); ++i) {
+            const DrawCall& call = calls[i];
+            const long at = static_cast<long>(i);
+            if (call.kind == DrawKind::Rect && (SameColor(call.color, kLightSquareColor) || SameColor(call.color, kDarkSquareColor))) {
+                lastSquare = at;
+            } else if (call.kind == DrawKind::Rect && SameColor(call.color, kHintFromColor)) {
+                hintFrom = at;
+            } else if (call.kind == DrawKind::Rect && SameColor(call.color, kHintToColor)) {
+                hintTo = at;
+            } else if (call.kind == DrawKind::Texture && call.texture == pawn.Get()) {
+                piece = at;
+            }
+        }
+        ASSERT_GE(hintFrom, 0);
+        ASSERT_GE(hintTo, 0);
+        ASSERT_GE(piece, 0);
+        EXPECT_LT(lastSquare, hintFrom) << "over the squares";
+        EXPECT_LT(hintFrom, hintTo);
+        EXPECT_LT(hintTo, piece) << "and under the pieces; a selection cannot exist while viewing (a press on the board ends the view), so none is above it";
+    }
+
+    TEST_F(ChessUiTest, TheGamesOwnHintIsStillNeverDrawnOnAViewedPosition) {
+        CountingAnalysisFactory factory({New<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("g1f3"))});
+        Analyst().SetEngineFactory(factory.AsFactory());
+        ASSERT_TRUE(PlayAll(Model(), {"e2e4", "e7e5"}));
+        ASSERT_TRUE(ShowTheHint());
+        Draw();
+        ASSERT_EQ(HintFills().first.size(), 1u) << "the hint of the game's position";
+
+        ASSERT_TRUE(Model().ShowMoves(1));
+        Draw();
+
+        EXPECT_TRUE(HintFills().first.empty());
+        EXPECT_TRUE(HintFills().second.empty());
+    }
+
 }  // namespace BECore::Chess::Tests
