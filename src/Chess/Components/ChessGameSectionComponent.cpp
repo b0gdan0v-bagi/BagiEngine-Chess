@@ -4,8 +4,8 @@
 #include <BECore/Scene/Scene.h>
 #include <BECore/Scene/SceneNode.h>
 #include <BECore/UI/UICanvasComponent.h>
-#include <BECore/UI/UIInputClicker.h>
 #include <Chess/ChessGame.h>
+#include <Chess/Components/ClickerDisabled.h>
 #include <Chess/Components/MenuActions.h>
 #include <Chess/Engine/DrawOffer.h>
 #include <Chess/Game/StatusText.h>
@@ -37,13 +37,6 @@ namespace BECore::Chess {
 
         void CloseTheMenu() {
             InputEvents::ActionEvent::Emit(MenuActions::closeMenu);
-        }
-
-        void SetClickerDisabled(UICanvasComponent& canvas, PoolString name, bool disabled) {
-            UIElement* button = canvas.GetRoot().FindByName(name);
-            if (UIInputClicker* clicker = button ? button->GetComponent<UIInputClicker>() : nullptr) {
-                clicker->disabled = disabled;
-            }
         }
 
     }  // namespace

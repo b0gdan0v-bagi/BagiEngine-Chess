@@ -22,6 +22,7 @@ ChessPuzzleBarComponent on PuzzleBar, before its canvas: shown while a puzzle is
 PieceSprite             `PieceSpriteId(Piece)`: the one table of the piece sprites (pieces, material icons, the editor bar)
 AnalysisRows            the move panel's analysis band: the words and bar from the analyst, the grey of the Hint buttons
 MoveRows                the part both share: the game's rows, their words, the rows and marks of one canvas, the takeback
+ClickerDisabled         `SetClickerDisabled()`: the one place a button's clicker is greyed
 ChessPieceComponent     one piece node: follows its piece in the model, slides a played move, switches sprite after a promotion
 ChessResultComponent    its own node (layer 1): dims the board and draws the result bar once the game is over
 ```
@@ -96,7 +97,7 @@ Node `GameSection` (`ChessGameSection.xml`, layer 20, modal, hidden), built like
 
 ## The Puzzles section
 
-Node `PuzzleSection` (`ChessPuzzleSection.xml`, layer 20, modal, hidden), built like `GameSection`. `ChessPuzzleSectionComponent` answers `ChessPuzzleNext` (`NextPuzzle()` begins the first puzzle when none is on), `ChessPuzzleRetry` and `ChessPuzzleLeave` **wherever they come from** (the section may be hidden: the puzzle bar presses them), asks the game's rule again and after a success closes the menu. Its variables (`puzzle*`) are written only on a change of the game, its version, the session's revision, the set's size or `IsPuzzleOn()`; Start / Next is grey with an empty set, Retry and Leave while no puzzle is on.
+Node `PuzzleSection` (`ChessPuzzleSection.xml`, layer 20, modal, hidden), built like `GameSection`. `ChessPuzzleSectionComponent` answers `ChessPuzzleNext` (`NextPuzzle()` begins the first puzzle when none is on), `ChessPuzzleRetry` and `ChessPuzzleLeave` **wherever they come from** (the section may be hidden: the puzzle bar presses them), asks the game's rule again and after a success closes the menu. Its variables (`puzzle*`) are written only on a change of the game, its version, the session's revision, the set's size or `IsPuzzleOn()`.
 
 ## The puzzle bar
 

@@ -10,6 +10,7 @@ namespace BECore::InputEvents {
 namespace BECore::Chess {
 
     class ChessGame;
+    class ChessGameModel;
 
     /**
      * @brief The menu section "Puzzles", on the node `PuzzleSection` before its canvas: answers `ChessPuzzleNext` (Start and Next: the first puzzle when none is on, else the one after),
@@ -34,7 +35,7 @@ namespace BECore::Chess {
 
         bool _published = false;
         const ChessGame* _publishedGame = nullptr;
-        const void* _publishedModel = nullptr;
+        const ChessGameModel* _publishedModel = nullptr;
         uint64_t _publishedVersion = 0;
         uint64_t _publishedRevision = 0;
         size_t _publishedCount = 0;

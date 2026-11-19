@@ -4,9 +4,9 @@
 #include <BECore/GameManager/CoreManager.h>
 #include <BECore/Scene/SceneNode.h>
 #include <BECore/UI/UICanvasComponent.h>
-#include <BECore/UI/UIInputClicker.h>
 #include <BECore/UI/UIVars.h>
 #include <Chess/ChessGame.h>
+#include <Chess/Components/ClickerDisabled.h>
 #include <Chess/Components/MenuActions.h>
 #include <Chess/Game/EditorText.h>
 #include <Events/ClipboardEvents.h>
@@ -85,13 +85,6 @@ namespace BECore::Chess {
                 }
             }
             return std::nullopt;
-        }
-
-        void SetDisabled(UICanvasComponent& canvas, PoolString name, bool disabled) {
-            UIElement* element = canvas.GetRoot().FindByName(name);
-            if (UIInputClicker* clicker = element ? element->GetComponent<UIInputClicker>() : nullptr) {
-                clicker->disabled = disabled;
-            }
         }
 
         void CloseTheMenu() {
@@ -220,9 +213,9 @@ namespace BECore::Chess {
 
         UIVars& vars = CoreManager::GetUIVars();
         vars.Set(Ids::editorMessage, message);
-        SetDisabled(*canvas, Ids::positionSectionPlay, !editing);
-        SetDisabled(*canvas, Ids::positionSectionCancel, !editing);
-        SetDisabled(*canvas, Ids::positionSectionSideRow, !editing);
+        SetClickerDisabled(*canvas, Ids::positionSectionPlay, !editing);
+        SetClickerDisabled(*canvas, Ids::positionSectionCancel, !editing);
+        SetClickerDisabled(*canvas, Ids::positionSectionSideRow, !editing);
         if (!game) {
             return;
         }
@@ -231,7 +224,7 @@ namespace BECore::Chess {
         for (const CastleSwitch& castle : kCastleSwitches) {
             const char text[kCastleTextChars] = {editor.GetCastling(castle.right) ? kOnSign : kOffSign, castle.letter};
             vars.Set(castle.variable, StringView(text, kCastleTextChars));
-            SetDisabled(*canvas, castle.row, !editing || !editor.CanCastle(castle.right));
+            SetClickerDisabled(*canvas, castle.row, !editing || !editor.CanCastle(castle.right));
         }
     }
 
