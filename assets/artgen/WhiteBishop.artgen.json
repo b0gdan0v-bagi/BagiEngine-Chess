@@ -13,22 +13,22 @@
       "trim": true
     },
     "scale": 0.25051334702258726,
-    "seed": 3645578528,
+    "seed": 2987039496,
     "size": [
       244,
       256
     ],
-    "source": "D:/AHobbyProjects/BagiEngine-Chess.workers/w3/artgen/out/chess_beer/WhiteBishop/WhiteBishop_3645578528.png",
+    "source": "D:/AHobbyProjects/BagiEngine-Chess.workers/w3/artgen/out/chess_beer_bishop_w3/WhiteBishop/WhiteBishop_2987039496.png",
     "sprite": "WhiteBishop"
   },
   "checks": {
     "failed": [],
     "metrics": {
-      "cover": 0.2087,
+      "cover": 0.2737,
       "edgeRun": 0.0,
-      "fill": 0.1579,
-      "halo": 0.0235,
-      "offset": 0.0039,
+      "fill": 0.1961,
+      "halo": 0.0221,
+      "offset": 0.0195,
       "pieces": 1
     },
     "passed": true,
@@ -43,13 +43,13 @@
       "minPieceArea": 0.01
     }
   },
-  "date": "2026-11-18T22:59:19+00:00",
+  "date": "2026-11-18T23:56:13+00:00",
   "generator": {
     "name": "comfyui",
     "url": "http://127.0.0.1:8188",
     "version": "0.45.0"
   },
-  "generatorFile": "artgen_WhiteBishop_00008_.png",
+  "generatorFile": "artgen_WhiteBishop_00022_.png",
   "kind": "image",
   "models": {
     "bg_removal_name": [
@@ -90,14 +90,14 @@
   },
   "presetHash": "64a92fc05136db1a538a3bab99f38bd34e83bacf3d3bc8b0e41c32201a7b0069",
   "presetSource": "game",
-  "prompt": "a brown glass beer bottle with a long neck and a crown cap, no label, golden beer visible, a single chess piece made of beer glassware, stylized 3D game asset, glossy glass and polished wood, warm tavern light, centered, full view, plain light grey background",
+  "prompt": "one single brown glass beer bottle with a long neck and a crown cap, golden beer visible, clear glass, nothing printed on it, a single chess piece made of beer glassware, stylized 3D game asset, glossy glass and polished wood, warm tavern light, centered, full view, plain light grey background",
   "provenance": 1,
-  "seed": 3645578528,
+  "seed": 2987039496,
   "size": [
     1024,
     1024
   ],
-  "subject": "a brown glass beer bottle with a long neck and a crown cap, no label, golden beer visible",
+  "subject": "one single brown glass beer bottle with a long neck and a crown cap, golden beer visible, clear glass, nothing printed on it",
   "workflow": "sdxl_cutout",
   "workflowHash": "7afad3cd68b10eef102eb2103b5bdfb2130e2cfc7f69d2698344b3357b673b6a"
 }

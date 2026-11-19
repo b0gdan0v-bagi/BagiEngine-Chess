@@ -380,7 +380,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheMaterialIsDrawnOverThePiecesAndTheResultBarAndUnderTheHudAndThePanels) {
-        const auto king = GiveAtlasCell("WhiteKing_e1");
+        const auto king = GiveSpriteCell("WhiteKing_e1");
         StartFrom(kBlackMatesOnA1);
         ASSERT_TRUE(Play(Model(), "a8a1"));
         ASSERT_TRUE(Model().IsGameOver());
@@ -1154,17 +1154,17 @@ namespace BECore::Chess::Tests {
         }
     }
 
-    TEST_F(ChessUiTest, AnIconKeepsTheAspectOfItsAtlasCellCenteredInsideItsRow) {
-        // The library is empty in the test, so every icon is given the atlas of the pieces and a cell of it by hand; UIImageComponent fits the cell into its rect
+    TEST_F(ChessUiTest, AnIconKeepsTheAspectOfItsSpriteCenteredInsideItsRow) {
+        // The library is empty in the test, so every icon is given the stand-in texture and its tall cell by hand; UIImageComponent fits the cell into its rect
         StartFrom("4k3/8/8/8/8/8/8/4K3 w - - 0 1");
-        const Vector<uint8_t> pixels(static_cast<size_t>(kAtlasWidth) * kAtlasHeight * 4, 0);
-        const IntrusivePtr<ITexture> atlas = _renderer->CreateTexture(pixels.data(), kAtlasWidth, kAtlasHeight);
+        const Vector<uint8_t> pixels(static_cast<size_t>(kStandInTextureWidth) * kStandInTextureHeight * 4, 0);
+        const IntrusivePtr<ITexture> standIn = _renderer->CreateTexture(pixels.data(), kStandInTextureWidth, kStandInTextureHeight);
         for (const char* set : kMaterialSets) {
             for (const char* group : kMaterialGroups) {
                 for (const char* piece : kMaterialPieces) {
                     UIImageComponent* icon = MaterialElement(Format("Material{}{}{}Icon", set, group, piece).c_str()).GetComponent<UIImageComponent>();
                     ASSERT_NE(icon, nullptr) << set << group << piece;
-                    icon->GetSprite().SetTexture(atlas, Rect{kCellX, 0.0f, kCellWidth, kCellHeight});
+                    icon->GetSprite().SetTexture(standIn, Rect{kStandInCellX, 0.0f, kCellWidth, kCellHeight});
                 }
             }
         }
@@ -1178,7 +1178,7 @@ namespace BECore::Chess::Tests {
             const char* set = MaterialPlace() == "panel" ? kMaterialPanelSet : kMaterialMarginSet;
             Vector<const DrawCall*> drawn;
             for (const DrawCall& call : _renderer->calls) {
-                if (call.kind == DrawKind::Texture && call.texture == atlas.Get()) {
+                if (call.kind == DrawKind::Texture && call.texture == standIn.Get()) {
                     drawn.push_back(&call);
                 }
             }
@@ -1189,7 +1189,7 @@ namespace BECore::Chess::Tests {
                     SCOPED_TRACE(Format("{}{}", group, piece).c_str());
                     const Rect& call = drawn[index++]->rect;
                     const Rect box = OutputRect(MaterialElement(Format("Material{}{}{}Icon", set, group, piece).c_str()).rect);
-                    EXPECT_NEAR(call.w / call.h, kCellWidth / kCellHeight, 0.01f) << "the aspect of the atlas cell, not of the box";
+                    EXPECT_NEAR(call.w / call.h, kCellWidth / kCellHeight, 0.01f) << "the aspect of the cell, not of the box";
                     EXPECT_GE(call.x, box.x - 0.5f);
                     EXPECT_GE(call.y, box.y - 0.5f);
                     EXPECT_LE(call.x + call.w, box.x + box.w + 0.5f) << "inside its box";

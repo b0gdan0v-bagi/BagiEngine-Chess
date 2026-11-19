@@ -315,7 +315,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiTest, TheMovePanelIsDrawnOverThePiecesAndTheResultBarAndUnderTheHudAndThePanels) {
-        const auto king = GiveAtlasCell("WhiteKing_e1");
+        const auto king = GiveSpriteCell("WhiteKing_e1");
         StartFrom(kBlackMatesOnA1);
         ASSERT_TRUE(Play(Model(), "a8a1"));
         ASSERT_TRUE(Model().IsGameOver());
