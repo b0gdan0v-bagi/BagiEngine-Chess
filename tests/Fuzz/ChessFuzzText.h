@@ -1,6 +1,6 @@
 #pragma once
 
-/// What the text targets (FuzzUciCommand, FuzzUciOutput) read a line with, written here a second time so that they never call the code under test to learn what it should say
+/// What the targets read their input with, written here a second time so that they never call the code under test to learn what it should say
 namespace BECore::Chess::Fuzzing::Text {
 
     using Words = Vector<StringView>;

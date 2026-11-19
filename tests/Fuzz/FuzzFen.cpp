@@ -2,12 +2,14 @@
 #include <Chess/Game/Position.h>
 #include <tests/Fuzz/ChessFuzzBoard.h>
 #include <tests/Fuzz/ChessFuzzTargets.h>
+#include <tests/Fuzz/ChessFuzzText.h>
 
 namespace BECore::Chess::Fuzzing {
 
     namespace {
 
         using BoardScan::kBoardSide;
+        using Text::ViewOf;
 
         /// The most legal moves any position has
         constexpr size_t kMostLegalMoves = 218;
@@ -34,14 +36,6 @@ namespace BECore::Chess::Fuzzing {
             {kBlackKingSide, PieceColor::Black, 60, 63},
             {kBlackQueenSide, PieceColor::Black, 60, 56},
         }};
-
-        StringView ViewOf(const uint8_t* data, size_t size) {
-            return StringView(reinterpret_cast<const char*>(data), size);
-        }
-
-        StringView ViewOf(const String& text) {
-            return StringView(text.data(), text.size());
-        }
 
         /// The first field of a FEN, written from the cells
         String PlacementOf(const Position& position) {

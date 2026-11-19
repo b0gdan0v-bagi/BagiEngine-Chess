@@ -4,7 +4,7 @@ Library `ChessFuzzTargets` (namespace `BECore::Chess::Fuzzing`, headers `<tests/
 
 ## Run
 
-`ctest --preset <p> -R ChessFuzz` (`tests/ChessFuzzCorpusTest.cpp`): every seed of a target, then `BAGI_FUZZ_ITERATIONS` mutations of the seeds in turn, in every ctest on every platform (`kDefaultIterations` is 400000 divided by the target's cost weight, about 2 s a case in Debug). `BAGI_FUZZ_ITERATIONS=2000000` (run from the build directory: the corpus is found from `__FILE__`) is a longer run with no libFuzzer. The libFuzzer executables and the long runs are slice 2 of the entry `chess-fuzz-fen-uci`.
+`ctest --preset <p> -R ChessFuzz` (`tests/ChessFuzzCorpusTest.cpp`): every seed of a target, then `BAGI_FUZZ_ITERATIONS` mutations of the seeds in turn, in every ctest on every platform (`kDefaultIterations` divided by the target's cost weight). `BAGI_FUZZ_ITERATIONS=2000000` (run from the build directory: the corpus is found from `__FILE__`) is a longer run with no libFuzzer. The libFuzzer executables and the long runs are slice 2 of the entry `chess-fuzz-fen-uci`.
 
 ## The targets
 
@@ -17,12 +17,12 @@ Library `ChessFuzzTargets` (namespace `BECore::Chess::Fuzzing`, headers `<tests/
 
 - `ParseCommand` splits words at spaces and tabs, `ParseInfo` / `ParseBestMove` at spaces only: the models keep each its own.
 - `position fen` with no fields is a `Position` command with an empty `startFen`; `UciServer` refuses it later in `FromFen`, so a `Position` is not promised a non-empty FEN.
-- `ChessFuzzText.h` is the reading both text targets share (edges, words, `ReadInt`); `ChessFuzzBoard.h` is the board walked cell by cell for `Fen`.
+- `ChessFuzzText.h` is the reading all four targets share (`ViewOf`, edges, words, `ReadInt`); `ChessFuzzBoard.h` is the board walked cell by cell for `Fen`.
 
 ## The corpus
 
 `corpus/<folder>/`: small real inputs named for what they are (the perft and test FENs, the commands of `UciCommandTest` and `uci_smoke.py`, a Stockfish transcript and the shapes of `UciProtocolTest`), at most 64 KiB. `.gitattributes` marks `corpus/**` binary: a CR or a missing last newline is part of the seed. Both verdicts must be present in every folder (`SeedsHoldAnInputTheParserTakesAndOneItRefuses`; the `accepts` function of the row says what a take is). A finding becomes a seed `fix-<what>` committed with the fix and a gtest next to the fixed code; seeds are never deleted to make a run pass.
 
-**A new target:** `Fuzz<Name>.cpp` (the glob picks it up), its two declarations and a row in `ChessFuzzTargetList()`, a corpus folder, and a cost weight that keeps the case near 2 s.
+**A new target:** `Fuzz<Name>.cpp` (the glob picks it up), its two declarations and a row in `ChessFuzzTargetList()`, a corpus folder, and a cost weight that keeps its case as cheap as the others.
 
 **Not covered:** `UciServer` with a live search, the JSON around a FEN in the control API, the process side of `UciProcess`: `uci_smoke.py` and `ChessGameControlTest` hold those.

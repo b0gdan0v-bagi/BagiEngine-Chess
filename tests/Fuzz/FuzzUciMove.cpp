@@ -1,6 +1,7 @@
 #include <Chess/Game/MoveGenerator.h>
 #include <Chess/Game/Position.h>
 #include <tests/Fuzz/ChessFuzzTargets.h>
+#include <tests/Fuzz/ChessFuzzText.h>
 
 namespace BECore::Chess::Fuzzing {
 
@@ -15,7 +16,7 @@ namespace BECore::Chess::Fuzzing {
         };
 
         MoveInput SplitInput(const uint8_t* data, size_t size) {
-            const StringView all(reinterpret_cast<const char*>(data), size);
+            const StringView all = Text::ViewOf(data, size);
             MoveInput input;
             const size_t separator = all.find(kFenSeparator);
             if (separator == StringView::npos) {
