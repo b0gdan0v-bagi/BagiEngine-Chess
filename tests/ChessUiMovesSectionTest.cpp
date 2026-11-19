@@ -164,4 +164,24 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(ShownMoveRows(kSectionNode), "1. e4 [e5]");
     }
 
+    TEST_F(ChessUiTest, TheMovesSectionMarksTheMistakesOfAReviewLikeThePanelAndTheMarksGoWithTheReview) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        ReviewOnTheOwnEngine();
+        ASSERT_TRUE(PlayFoolsMate());
+        ASSERT_TRUE(ClickButton(kMenuColor));
+        ASSERT_TRUE(ClickMenuList("MenuSectionMoves").Both());
+        ASSERT_EQ(ShownMoveRows(kSectionNode), "1. f3 e5 | 2. g4 [Qh4#]");
+
+        ASSERT_TRUE(Analyst().StartReview(Model()).has_value());
+        ASSERT_TRUE(WaitForReview());
+        EXPECT_EQ(ShownMoveRows(kSectionNode), "1. f3? e5 | 2. g4?? [Qh4#]");
+        EXPECT_EQ(ShownMoveRows(kSectionNode), ShownMovePanelRows());
+
+        PressWith("ChessShowMove", "white1");
+        EXPECT_EQ(ShownMoveRows(kSectionNode), "1. f3? e5 | 2. [g4??] Qh4#") << "the viewed cell keeps its mark";
+
+        Analyst().AbandonReview();
+        EXPECT_EQ(ShownMoveRows(kSectionNode), "1. f3 e5 | 2. [g4] Qh4#");
+    }
+
 }  // namespace BECore::Chess::Tests

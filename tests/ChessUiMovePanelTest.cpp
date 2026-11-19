@@ -1,5 +1,6 @@
 #include <BECore/UI/UIToggleComponent.h>
 #include <Chess/Components/ChessMovePanelComponent.h>
+#include <Chess/Components/MoveRows.h>
 #include <Chess/Game/MoveList.h>
 #include <tests/ChessUiHarness.h>
 
@@ -30,6 +31,31 @@ namespace BECore::Chess::Tests {
                 }
             }
         }
+
+        /// The own engine for the first @p answers analyses, then every analysis fails: a review that stops half way
+        class AnalysesThenFails final : public IChessEngine {
+        public:
+            explicit AnalysesThenFails(int answers) : _answers(answers) {}
+
+            std::expected<Move, EngineError> FindMove(const SearchRequest& request, const CancellationToken&) override {
+                return FirstLegalMove(request);
+            }
+
+            std::expected<Analysis, EngineError> Analyse(const SearchRequest& request, const CancellationToken& token) override {
+                if (_calls.fetch_add(1) >= _answers) {
+                    return std::unexpected(EngineError{EngineErrorKind::ProcessDied, "the engine fell over"});
+                }
+                std::expected<ChessEnginePtr, EngineError> own = MakeAnalysisEngine(OpponentEngine::Own, {});
+                if (!own) {
+                    return std::unexpected(own.error());
+                }
+                return (*own)->Analyse(request, token);
+            }
+
+        private:
+            int _answers;
+            std::atomic<int> _calls{0};
+        };
 
         constexpr size_t kRowsPerColumn = (kMovePanelRows + 1) / 2;  // the rows are two columns, of four and three: one above the other in the Wide view, side by side in the Tall one
 
@@ -771,6 +797,135 @@ namespace BECore::Chess::Tests {
         EXPECT_TRUE(Model().IsViewing());
         EXPECT_EQ(Model().GetShownMoveCount(), 1u);
         EXPECT_EQ(ShownMovePanelRows(), "1. [e4!!] e5 | 2. Nf3") << "the viewed move is the marked cell, with its sign";
+    }
+
+    // ---- The marks of a review: the fool's mate, where g2g4 is the blunder ----
+
+    TEST(MoveRowsTest, TheMarkOfEachKindOfMoveIsThatOfItsQualityAndABrilliantPlyKeepsOnlyItsSign) {
+        const auto reviewed = [](MoveQuality quality) { return Optional<ReviewedMove>(ReviewedMove{MoveReview{0, quality}, Move{}}); };
+        const ReviewedMoves moves{reviewed(MoveQuality::Best),    reviewed(MoveQuality::Good),    reviewed(MoveQuality::Inaccuracy),
+                                  reviewed(MoveQuality::Mistake), reviewed(MoveQuality::Blunder), std::nullopt,
+                                  reviewed(MoveQuality::Blunder), reviewed(MoveQuality::Mistake)};
+        const Vector<bool> brilliant{false, false, false, false, false, false, true};
+
+        const Vector<MovePanelMistake> marks = ReviewMistakesByPly(moves, brilliant);
+
+        ASSERT_EQ(marks.size(), moves.size());
+        EXPECT_EQ(marks[0], MovePanelMistake::None);
+        EXPECT_EQ(marks[1], MovePanelMistake::None);
+        EXPECT_EQ(marks[2], MovePanelMistake::Inaccuracy);
+        EXPECT_EQ(marks[3], MovePanelMistake::Mistake);
+        EXPECT_EQ(marks[4], MovePanelMistake::Blunder);
+        EXPECT_EQ(marks[5], MovePanelMistake::None) << "a move not reviewed yet";
+        EXPECT_EQ(marks[6], MovePanelMistake::None) << "flagged brilliant by the ratings: only the `!!` stays";
+        EXPECT_EQ(marks[7], MovePanelMistake::Mistake) << "the flags are shorter than the moves";
+        EXPECT_TRUE(ReviewMistakesByPly({}, brilliant).empty());
+    }
+
+    TEST_F(ChessUiTest, AReviewMarksTheMistakesInTheListAsTheyComeAndAllOfThemWhenItIsDone) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        ReviewOnTheOwnEngine();
+        ASSERT_TRUE(PlayFoolsMate());
+        ASSERT_EQ(ShownMovePanelRows(), "1. f3 e5 | 2. g4 [Qh4#]") << "no review: no mark";
+
+        ASSERT_TRUE(Analyst().StartReview(Model()).has_value());
+        bool sawItRunWithTheBlunderUnknown = false;
+        ASSERT_TRUE(FramesUntil([&] {
+            const ReviewedMoves reviewed = Analyst().GetReviewedMoves(Model());
+            const String word = MovePanelWord(1, "White");
+            if (reviewed.size() == 4 && !reviewed[2]) {
+                EXPECT_EQ(word, "g4") << "a move that is not reviewed is not marked";
+                sawItRunWithTheBlunderUnknown = true;
+            } else if (reviewed.size() == 4) {
+                EXPECT_EQ(word, "g4??") << "the review has the blunder";
+            }
+            return Analyst().GetReviewState(Model()) == ReviewState::Done;
+        }));
+
+        EXPECT_TRUE(sawItRunWithTheBlunderUnknown) << "a position arrives per frame, so the blunder is not known at the first one";
+        EXPECT_EQ(MovePanelWord(1, "White"), "g4??");
+        EXPECT_EQ(MovePanelWord(0, "Black"), "e5") << "e7e5 is no mistake";
+        EXPECT_EQ(MovePanelWord(1, "Black"), "Qh4#") << "the mate is the best move";
+        EXPECT_EQ(ShownMovePanelRows(), "1. f3? e5 | 2. g4?? [Qh4#]");
+    }
+
+    TEST_F(ChessUiTest, ATakebackAndAResetTakeTheMarksOffWithNoFrameBetween) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        ReviewOnTheOwnEngine();
+        ASSERT_TRUE(PlayFoolsMate());
+        ASSERT_TRUE(Analyst().StartReview(Model()).has_value());
+        ASSERT_TRUE(WaitForReview());
+        ASSERT_EQ(MovePanelWord(1, "White"), "g4??");
+
+        ASSERT_EQ(Model().TakeBack(1), 1u);
+        EXPECT_EQ(Analyst().GetReviewState(Model()), ReviewState::Idle) << "read before any frame";
+        EXPECT_EQ(CurrentMovePanelRows(&Model(), &Analyst())[1].white.text, "g4");
+        EXPECT_EQ(ShownMovePanelRows(), "1. f3 e5 | 2. [g4]") << "the game is on again, the list shows no mark";
+
+        FrameOfGameTime(0.0);  // the analyst's Update() drops the review for good; before it the same game played again would still be the held one
+        ASSERT_TRUE(Play(Model(), "d8h4"));
+        EXPECT_EQ(ShownMovePanelRows(), "1. f3 e5 | 2. g4 [Qh4#]") << "the old review is gone, nothing marks the replayed game";
+    }
+
+    TEST_F(ChessUiTest, AResetTakesTheMarksOffWithNoFrameBetween) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        ReviewOnTheOwnEngine();
+        ASSERT_TRUE(PlayFoolsMate());
+        ASSERT_TRUE(Analyst().StartReview(Model()).has_value());
+        ASSERT_TRUE(WaitForReview());
+
+        Model().Reset();
+
+        EXPECT_EQ(Analyst().GetReviewState(Model()), ReviewState::Idle);
+        EXPECT_TRUE(Analyst().GetReviewedMoves(Model()).empty());
+        EXPECT_EQ(ShownMovePanelRows(), "");
+    }
+
+    TEST_F(ChessUiTest, AbandoningTheReviewTakesTheMarksOff) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        ReviewOnTheOwnEngine();
+        ASSERT_TRUE(PlayFoolsMate());
+        ASSERT_TRUE(Analyst().StartReview(Model()).has_value());
+        ASSERT_TRUE(WaitForReview());
+        ASSERT_EQ(MovePanelWord(1, "White"), "g4??");
+
+        Analyst().AbandonReview();
+
+        EXPECT_EQ(MovePanelWord(1, "White"), "g4");
+    }
+
+    TEST_F(ChessUiTest, AFailedReviewKeepsTheMarksOfTheMovesThatCame) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        // f3 e5 g4 a6: Black misses the mate, White resigns. The engine answers four positions and fails on the fifth, so g4 is reviewed and a6 is not
+        ASSERT_TRUE(PlayAll(Model(), {"f2f3", "e7e5", "g2g4", "a7a6"}));
+        Model().Resign(PieceColor::White);
+        ASSERT_TRUE(Model().IsGameOver());
+        constexpr int kAnswers = 4;
+        CountingAnalysisFactory factory({New<AnalysesThenFails>(kAnswers)});
+        Analyst().SetEngineFactory(factory.AsFactory());
+
+        ASSERT_TRUE(Analyst().StartReview(Model()).has_value());
+        ASSERT_TRUE(FramesUntil([&] { return Analyst().GetReviewState(Model()) == ReviewState::Failed; }));
+
+        EXPECT_EQ(MovePanelWord(1, "White"), "g4??") << "the blunder came before the failure";
+        EXPECT_EQ(MovePanelWord(1, "Black"), "a6") << "the last move has no review, so no mark";
+        EXPECT_FALSE(Analyst().GetReviewedMoves(Model())[3].has_value());
+    }
+
+    TEST_F(ChessUiTest, TheRatingsSignAndTheReviewMarksStandOnDifferentCells) {
+        // The double answers e2e4 at +35 everywhere: e2e4 is the engine's move (brilliant for the ratings, the best move for the review), e7e5 costs 70 centipawns (an inaccuracy)
+        CountingAnalysisFactory factory({New<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"))});
+        Analyst().SetEngineFactory(factory.AsFactory());
+        ASSERT_TRUE(PlayAll(Model(), {"e2e4", "e7e5"}));
+        Model().Resign(PieceColor::White);
+        Analyst().SetRatings(true);
+        ASSERT_TRUE(WaitForRatings());
+        ASSERT_EQ(ShownMovePanelRows(), "1. e4!! [e5]");
+
+        ASSERT_TRUE(Analyst().StartReview(Model()).has_value());
+        ASSERT_TRUE(WaitForReview());
+
+        EXPECT_EQ(ShownMovePanelRows(), "1. e4!! [e5?!]");
     }
 
     TEST_F(ChessUiTest, WithNoGameActiveTheMovePanelHasNoRowShown) {

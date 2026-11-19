@@ -577,7 +577,8 @@ namespace BECore::Chess::Tests {
         const Rect kPanelBottomBand{kMovePanelLeft, kMovePanelTop + 56.0f + kPanelBandGap + static_cast<float>(kMovePanelRows) * 56.0f + kPanelBandGap, kMovePanelRight - kMovePanelLeft, 56.0f};
 
         // The longest words of the move list (the move panel and the menu section "Moves" bind the same variables)
-        constexpr const char* kLongestMoves[] = {"Qh4xe1+!!", "exd8=Q#!!", "O-O-O!!"};  // the longest move of each kind of text the list can hold, with the sign of a brilliant move
+        constexpr const char* kLongestMoves[] = {"Qh4xe1+!!", "exd8=Q#!!", "O-O-O!!",
+                                                 "Qh4xe1+??"};  // the longest move of each kind of text the list can hold, with the sign of a brilliant move and the widest sign of a mistake
         constexpr const char* kLongestNumber = "100.";
         constexpr size_t kMovePanelWordRounds = std::size(kLongestMoves);
 
@@ -1519,6 +1520,21 @@ namespace BECore::Chess::Tests {
                 }
                 return all;
             });
+        }
+
+        /// Plays the fool's mate (f3 e5 g4 Qh4#) in the model: the game is over after four moves, and g2g4 is the blunder a review finds
+        bool PlayFoolsMate() {
+            return PlayAll(Model(), {"f2f3", "e7e5", "g2g4", "d8h4"}) && Model().IsGameOver();
+        }
+
+        /// Puts the default factory back in the analyst: a review then runs on the real own engine at kReviewDepth
+        void ReviewOnTheOwnEngine() {
+            Analyst().SetEngineFactory(AnalysisEngineFactory{});
+        }
+
+        /// Runs frames until the review of the game is done (it was started and the engine gives its answers)
+        bool WaitForReview() {
+            return FramesUntil([&] { return Analyst().GetReviewState(Model()) == ReviewState::Done; });
         }
 
         /// The recorded fills of the hint in the last frame: the squares it leaves and goes to, in drawing order

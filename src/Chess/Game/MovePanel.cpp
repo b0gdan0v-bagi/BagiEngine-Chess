@@ -74,6 +74,31 @@ namespace BECore::Chess {
         }
     }
 
+    void MarkMovePanelMistakes(Vector<MovePanelRow>& rows, const Vector<MovePanelMistake>& byPly) {
+        const auto mark = [&byPly](MovePanelCell& cell) {
+            if (cell.ply < 0 || static_cast<size_t>(cell.ply) >= byPly.size()) {
+                return;
+            }
+            switch (byPly[static_cast<size_t>(cell.ply)]) {
+                case MovePanelMistake::None:
+                    return;
+                case MovePanelMistake::Inaccuracy:
+                    cell.text.append(kMovePanelInaccuracySuffix.data(), kMovePanelInaccuracySuffix.size());
+                    return;
+                case MovePanelMistake::Mistake:
+                    cell.text.append(kMovePanelMistakeSuffix.data(), kMovePanelMistakeSuffix.size());
+                    return;
+                case MovePanelMistake::Blunder:
+                    cell.text.append(kMovePanelBlunderSuffix.data(), kMovePanelBlunderSuffix.size());
+                    return;
+            }
+        };
+        for (MovePanelRow& row : rows) {
+            mark(row.white);
+            mark(row.black);
+        }
+    }
+
     Optional<MoveListPress> ParseMoveListPress(StringView value) {
         if (value == "back") {
             return MoveListPress{MoveListPressKind::Back};
