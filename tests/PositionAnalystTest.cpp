@@ -3,6 +3,7 @@
 #include <Chess/Engine/PositionAnalyst.h>
 #include <Chess/Game/ChessGameModel.h>
 #include <Chess/Game/MoveGenerator.h>
+#include <Chess/Game/PuzzleSession.h>
 #include <Common/EngineEnvironment.h>
 #include <EASTL/algorithm.h>
 #include <tests/StockfishUtil.h>

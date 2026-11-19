@@ -18,7 +18,8 @@ namespace BECore::Chess::Fuzzing {
         using Text::WithoutEdges;
         using Text::Words;
 
-        constexpr StringView kWordSeparators = " 	";
+        /// The two blanks `go` and `position` split words on
+        constexpr StringView kWordSeparators = " \t";
 
         /// A `position` command with more moves than this replays only the first ones, so a line of many tokens stays cheap
         constexpr size_t kMostReplayedMoves = 64;

@@ -6,10 +6,11 @@
 #include <Chess/Engine/OpponentEngines.h>
 #include <Chess/Engine/OpponentSettings.h>
 #include <Chess/Engine/SearchRequest.h>
-#include <Chess/Game/PuzzleSession.h>
 #include <TaskSystem/Task.h>
 
 namespace BECore::Chess {
+
+    class PuzzleSession;
 
     /// Why a hint is refused. GameOver: the game has ended. ProgramsTurn: the program plays the side to move, and a hint is for the person
     CORE_ENUM(HintRefusal, uint8_t, GameOver, ProgramsTurn)

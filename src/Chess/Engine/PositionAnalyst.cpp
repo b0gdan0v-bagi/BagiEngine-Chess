@@ -4,6 +4,7 @@
 #include <Chess/Engine/OpponentLevels.h>
 #include <Chess/Engine/OwnEngine.h>
 #include <Chess/Engine/UciEngine.h>
+#include <Chess/Game/PuzzleSession.h>
 #include <TaskSystem/TaskManager.h>
 
 namespace BECore::Chess {
