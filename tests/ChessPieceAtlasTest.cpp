@@ -108,6 +108,26 @@ namespace BECore::Chess::Tests {
             return a.x == b.x && a.y == b.y && a.w == b.w && a.h == b.h;
         }
 
+        bool SamePack(const Optional<AtlasPackRecord>& a, const Optional<AtlasPackRecord>& b) {
+            if (a.has_value() != b.has_value()) {
+                return false;
+            }
+            return !a.has_value() || (a->padding == b->padding && a->sizeMode == b->sizeMode && a->maxSide == b->maxSide);
+        }
+
+        bool SameEntry(const SpriteEntry& a, const SpriteEntry& b) {
+            if (a.name != b.name || a.texturePath != b.texturePath || !SameRect(a.srcRect, b.srcRect) || a.atlas.has_value() != b.atlas.has_value()) {
+                return false;
+            }
+            if (!a.atlas.has_value()) {
+                return true;
+            }
+            if (a.atlas->name != b.atlas->name || a.atlas->source.has_value() != b.atlas->source.has_value() || !SamePack(a.atlas->pack, b.atlas->pack)) {
+                return false;
+            }
+            return !a.atlas->source.has_value() || (a.atlas->source->texturePath == b.atlas->source->texturePath && SameRect(a.atlas->source->rect, b.atlas->source->rect));
+        }
+
     }  // namespace
 
     TEST(ChessPieceAtlasTest, PackingTheShippedSourcesMakesOneAtlasOfTheTwelve) {
@@ -163,6 +183,32 @@ namespace BECore::Chess::Tests {
                 EXPECT_FALSE(Overlap(placed[i], placed[j])) << "pieces " << i << " and " << j << " overlap in the atlas";
             }
         }
+    }
+
+    /// The pixels, not the PNG bytes: the compressed bytes may differ between platforms
+    TEST(ChessPieceAtlasTest, PackingTheSourcesAgainGivesTheShippedAtlasAndEntries) {
+        TextureLibrary shipped;
+        ASSERT_TRUE(LoadShippedLibrary(shipped));
+        TextureLibrary repacked;
+        ASSERT_TRUE(LoadShippedLibrary(repacked));
+
+        const TempFolder temp;
+        const auto written = PackPiecesAtlas(repacked, temp.Path() / "assets");
+        ASSERT_TRUE(written.has_value()) << written.error().c_str();
+
+        ASSERT_EQ(repacked.GetAll().size(), shipped.GetAll().size());
+        for (size_t i = 0; i < shipped.GetAll().size(); ++i) {
+            EXPECT_TRUE(SameEntry(shipped.GetAll()[i], repacked.GetAll()[i]))
+                << "the shipped entry of " << String(shipped.GetAll()[i].name.ToStringView()).c_str() << " is not what the packer makes; run the disabled test";
+        }
+
+        const auto fresh = LoadRgbaImage(temp.Path() / "assets" / kAtlasAssetsFolder.data() / "pieces.png");
+        ASSERT_TRUE(fresh.has_value()) << fresh.error().c_str();
+        const auto onDisk = LoadRgbaImage(GameRoot() / "assets" / kAtlasAssetsFolder.data() / "pieces.png");
+        ASSERT_TRUE(onDisk.has_value()) << onDisk.error().c_str();
+        EXPECT_EQ(fresh->width, onDisk->width);
+        EXPECT_EQ(fresh->height, onDisk->height);
+        EXPECT_TRUE(fresh->pixels == onDisk->pixels) << "assets/atlases/pieces.png is not what the packer makes of the sources; run ChessPieceAtlasTest.DISABLED_RewriteTheShippedAtlas";
     }
 
     /// Run by hand (`--gtest_also_run_disabled_tests --gtest_filter=ChessPieceAtlasTest.DISABLED_*`) when a source piece changed outside Accept of the Generate panel: it writes the checkout

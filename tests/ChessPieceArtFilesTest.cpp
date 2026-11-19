@@ -3,13 +3,17 @@
 #include <tests/ChessTestUtil.h>
 #include <tests/ShippedScene.h>
 
-/// The shipped piece art held to `config/TextureLibrary.xml`: files of the source tree, never decoded (that the pieces look right is for the eye, `artgen/presets/chess_piece.json`)
+/// The shipped piece art held to `config/TextureLibrary.xml`: the atlas `assets/atlases/pieces.png` and the sources it was packed from, files of the source tree whose PNG headers are
+/// read and never decoded (that the pieces look right is for the eye, `artgen/presets/chess_piece.json`; that the atlas is what the packer makes of the sources is `ChessPieceAtlasTest`)
 namespace BECore::Chess::Tests {
 
     namespace {
 
-        constexpr const char* kArtFolder = "assets/artgen/";
-        constexpr uint32_t kMaxSide = 256;  // `accept.maxSize` of the preset
+        constexpr const char* kAtlasPath = "assets/atlases/pieces.png";
+        constexpr const char* kAtlasGroup = "pieces";
+        constexpr const char* kSourceFolder = "assets/artgen/";
+        constexpr uint32_t kMaxSide = 256;        // `accept.maxSize` of the preset
+        constexpr uint32_t kMaxAtlasSide = 1024;  // the cap `ChessPieceAtlasTest` packs with: four pieces to a row
 
         constexpr size_t kSignatureSize = 8;
         constexpr size_t kIhdrTypeOffset = 12;
@@ -47,10 +51,30 @@ namespace BECore::Chess::Tests {
             return true;
         }
 
-        /// The `texturePath` of the sprite named @p name, empty when the library has none
-        String TexturePathOf(const pugi::xml_document& document, const String& name) {
-            const pugi::xml_node sprite = document.select_node("/root/sprites").node().find_child_by_attribute("sprite", "name", name.c_str());
-            return String(sprite.attribute("texturePath").as_string());
+        /// The `<sprite>` named @p name, empty when the library has none
+        pugi::xml_node SpriteOf(const pugi::xml_document& document, const String& name) {
+            return document.select_node("/root/sprites").node().find_child_by_attribute("sprite", "name", name.c_str());
+        }
+
+        /// The file a sprite was packed from (`<atlas><source texturePath>`), empty when it is not packed
+        String SourcePathOf(const pugi::xml_node& sprite) {
+            return String(sprite.child("atlas").child("source").attribute("texturePath").as_string());
+        }
+
+        struct SpriteRect {
+            float x = 0;
+            float y = 0;
+            float w = 0;
+            float h = 0;
+        };
+
+        SpriteRect SrcRectOf(const pugi::xml_node& sprite) {
+            const pugi::xml_node rect = sprite.child("srcRect");
+            return SpriteRect{rect.attribute("x").as_float(), rect.attribute("y").as_float(), rect.attribute("w").as_float(), rect.attribute("h").as_float()};
+        }
+
+        bool Overlap(const SpriteRect& a, const SpriteRect& b) {
+            return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
         }
 
         struct PngHeader {
@@ -90,33 +114,76 @@ namespace BECore::Chess::Tests {
 
     }  // namespace
 
-    TEST(ChessPieceArtFilesTest, EveryPieceHasASpriteOfItsOwnInTheArtFolder) {
+    TEST(ChessPieceArtFilesTest, EveryPieceIsOneSpriteOfTheAtlasGroup) {
         pugi::xml_document library;
         ASSERT_TRUE(LoadLibrary(library));
-        Vector<String> paths;
+        const pugi::xml_node sprites = library.select_node("/root/sprites").node();
         for (const Piece piece : AllPieces()) {
             const String name = String(PieceSpriteId(piece).ToStringView());
             SCOPED_TRACE(name.c_str());
-            const String texturePath = TexturePathOf(library, name);
-            EXPECT_TRUE(StringView(texturePath).starts_with(kArtFolder)) << "the library has no sprite of this name under " << kArtFolder << ": '" << texturePath.c_str() << "'";
-            EXPECT_EQ(std::count(paths.begin(), paths.end(), texturePath), 0) << "two pieces share a file";
-            paths.push_back(texturePath);
+            size_t count = 0;
+            for (const pugi::xml_node sprite : sprites.children("sprite")) {
+                count += String(sprite.attribute("name").as_string()) == name ? 1 : 0;
+            }
+            EXPECT_EQ(count, 1u) << "the library names the sprite once";
+            const pugi::xml_node sprite = SpriteOf(library, name);
+            EXPECT_EQ(String(sprite.attribute("texturePath").as_string()), String(kAtlasPath));
+            EXPECT_EQ(String(sprite.child("atlas").attribute("name").as_string()), String(kAtlasGroup));
         }
     }
 
-    TEST(ChessPieceArtFilesTest, EveryPieceFileIsAnRgbaPngAndTheTwelveShareOneFrame) {
+    TEST(ChessPieceArtFilesTest, TheAtlasIsAnRgbaPngWithinItsLimit) {
+        const PngHeader header = ReadPngHeader(FileOfTexturePath(kAtlasPath));
+        ASSERT_TRUE(header.valid) << "not a PNG: " << kAtlasPath;
+        EXPECT_EQ(header.bitDepth, kBitDepth);
+        EXPECT_EQ(header.colorType, kColorTypeRgba) << "the cut-out needs an alpha channel";
+        EXPECT_GT(header.width, 0u);
+        EXPECT_GT(header.height, 0u);
+        EXPECT_LE(std::max(header.width, header.height), kMaxAtlasSide);
+    }
+
+    TEST(ChessPieceArtFilesTest, EveryPieceRectLiesInTheAtlasWithoutOverlapAndAllShareOneSize) {
+        pugi::xml_document library;
+        ASSERT_TRUE(LoadLibrary(library));
+        const PngHeader atlas = ReadPngHeader(FileOfTexturePath(kAtlasPath));
+        ASSERT_TRUE(atlas.valid);
+        Vector<SpriteRect> rects;
+        for (const Piece piece : AllPieces()) {
+            const String name = String(PieceSpriteId(piece).ToStringView());
+            SCOPED_TRACE(name.c_str());
+            const SpriteRect rect = SrcRectOf(SpriteOf(library, name));
+            EXPECT_GE(rect.x, 0.0F);
+            EXPECT_GE(rect.y, 0.0F);
+            EXPECT_GT(rect.w, 0.0F);
+            EXPECT_GT(rect.h, 0.0F);
+            EXPECT_LE(rect.x + rect.w, static_cast<float>(atlas.width));
+            EXPECT_LE(rect.y + rect.h, static_cast<float>(atlas.height));
+            if (!rects.empty()) {
+                EXPECT_EQ(rect.w, rects.front().w) << "one set, one frame";
+                EXPECT_EQ(rect.h, rects.front().h) << "one set, one frame";
+            }
+            rects.push_back(rect);
+        }
+        for (size_t i = 0; i < rects.size(); ++i) {
+            for (size_t j = i + 1; j < rects.size(); ++j) {
+                EXPECT_FALSE(Overlap(rects[i], rects[j])) << "pieces " << i << " and " << j << " share pixels of the atlas";
+            }
+        }
+    }
+
+    TEST(ChessPieceArtFilesTest, EveryPieceSourceIsAnRgbaPngOfOneFrameWithItsProvenanceBeside) {
         pugi::xml_document library;
         ASSERT_TRUE(LoadLibrary(library));
         PngHeader first;
         for (const Piece piece : AllPieces()) {
             const String name = String(PieceSpriteId(piece).ToStringView());
             SCOPED_TRACE(name.c_str());
-            const String texturePath = TexturePathOf(library, name);
-            ASSERT_FALSE(texturePath.empty()) << "no sprite in the library";
-            const std::filesystem::path file = FileOfTexturePath(texturePath);
-            ASSERT_TRUE(std::filesystem::exists(file)) << texturePath.c_str();
+            const String source = SourcePathOf(SpriteOf(library, name));
+            EXPECT_EQ(source, Format("{}{}.png", kSourceFolder, name)) << "the sprite is not packed from the file of its name";
+            const std::filesystem::path file = FileOfTexturePath(source);
+            ASSERT_TRUE(std::filesystem::exists(file)) << source.c_str();
             const PngHeader header = ReadPngHeader(file);
-            ASSERT_TRUE(header.valid) << "not a PNG: " << texturePath.c_str();
+            ASSERT_TRUE(header.valid) << "not a PNG: " << source.c_str();
             EXPECT_EQ(header.bitDepth, kBitDepth);
             EXPECT_EQ(header.colorType, kColorTypeRgba) << "the cut-out needs an alpha channel";
             EXPECT_GT(header.width, 0u);
@@ -127,16 +194,8 @@ namespace BECore::Chess::Tests {
             }
             EXPECT_EQ(header.width, first.width) << "one set, one frame";
             EXPECT_EQ(header.height, first.height) << "one set, one frame";
-        }
-    }
 
-    TEST(ChessPieceArtFilesTest, EveryPieceFileHasItsProvenanceBeside) {
-        pugi::xml_document library;
-        ASSERT_TRUE(LoadLibrary(library));
-        for (const Piece piece : AllPieces()) {
-            const String name = String(PieceSpriteId(piece).ToStringView());
-            SCOPED_TRACE(name.c_str());
-            std::filesystem::path provenance = FileOfTexturePath(TexturePathOf(library, name));
+            std::filesystem::path provenance = file;
             provenance.replace_extension(".artgen.json");
             EXPECT_TRUE(std::filesystem::exists(provenance)) << provenance.filename().string();
         }

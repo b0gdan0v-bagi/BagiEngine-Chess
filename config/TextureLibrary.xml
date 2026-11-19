@@ -1,47 +1,121 @@
 <?xml version="1.0"?>
 <!--
-  The 12 piece sprites: one PNG each in assets/artgen/, written by Accept of the Generate panel from artgen/presets/chess_piece.json, with its
-  <Name>.artgen.json beside it. The background is transparent (alpha 0), so the square under a piece shows through.
-  The entries are the Accept's own lines; only this comment is edited by hand.
+  The 12 piece sprites are the atlas group "pieces", packed into assets/atlases/pieces.png. Each entry's <atlas><source> is the PNG it came from, written by
+  Accept of the Generate panel from artgen/presets/chess_piece.json (assets/artgen/<Name>.png, with its <Name>.artgen.json beside it); the background is
+  transparent (alpha 0), so the square under a piece shows through. The sources stay out of the web package.
+  The entries are written by the packer, never by hand: Accept of a member in the Generate panel and the Texture editor's Pack repack the group, and so does
+  the disabled test ChessPieceAtlasTest.DISABLED_RewriteTheShippedAtlas (config/CLAUDE.md). Only this comment is edited by hand.
 -->
 <root>
   <sprites>
-    <sprite name="WhiteKing" texturePath="assets/artgen/WhiteKing.png">
-      <srcRect x="0" y="0" w="244" h="256" />
+    <sprite name="WhiteKing" texturePath="assets/atlases/pieces.png">
+      <srcRect x="735" y="257" w="244" h="256" />
+      <atlas name="pieces">
+        <source texturePath="assets/artgen/WhiteKing.png">
+          <rect x="0" y="0" w="244" h="256" />
+        </source>
+        <pack padding="1" sizeMode="PowerOfTwo" maxSide="1024" />
+      </atlas>
     </sprite>
-    <sprite name="WhiteQueen" texturePath="assets/artgen/WhiteQueen.png">
-      <srcRect x="0" y="0" w="244" h="256" />
+    <sprite name="WhiteQueen" texturePath="assets/atlases/pieces.png">
+      <srcRect x="490" y="514" w="244" h="256" />
+      <atlas name="pieces">
+        <source texturePath="assets/artgen/WhiteQueen.png">
+          <rect x="0" y="0" w="244" h="256" />
+        </source>
+        <pack padding="1" sizeMode="PowerOfTwo" maxSide="1024" />
+      </atlas>
     </sprite>
-    <sprite name="WhiteRook" texturePath="assets/artgen/WhiteRook.png">
-      <srcRect x="0" y="0" w="244" h="256" />
+    <sprite name="WhiteRook" texturePath="assets/atlases/pieces.png">
+      <srcRect x="735" y="514" w="244" h="256" />
+      <atlas name="pieces">
+        <source texturePath="assets/artgen/WhiteRook.png">
+          <rect x="0" y="0" w="244" h="256" />
+        </source>
+        <pack padding="1" sizeMode="PowerOfTwo" maxSide="1024" />
+      </atlas>
     </sprite>
-    <sprite name="WhiteBishop" texturePath="assets/artgen/WhiteBishop.png">
-      <srcRect x="0" y="0" w="244" h="256" />
+    <sprite name="WhiteBishop" texturePath="assets/atlases/pieces.png">
+      <srcRect x="490" y="257" w="244" h="256" />
+      <atlas name="pieces">
+        <source texturePath="assets/artgen/WhiteBishop.png">
+          <rect x="0" y="0" w="244" h="256" />
+        </source>
+        <pack padding="1" sizeMode="PowerOfTwo" maxSide="1024" />
+      </atlas>
     </sprite>
-    <sprite name="WhiteKnight" texturePath="assets/artgen/WhiteKnight.png">
-      <srcRect x="0" y="0" w="244" h="256" />
+    <sprite name="WhiteKnight" texturePath="assets/atlases/pieces.png">
+      <srcRect x="0" y="514" w="244" h="256" />
+      <atlas name="pieces">
+        <source texturePath="assets/artgen/WhiteKnight.png">
+          <rect x="0" y="0" w="244" h="256" />
+        </source>
+        <pack padding="1" sizeMode="PowerOfTwo" maxSide="1024" />
+      </atlas>
     </sprite>
-    <sprite name="WhitePawn" texturePath="assets/artgen/WhitePawn.png">
-      <srcRect x="0" y="0" w="244" h="256" />
+    <sprite name="WhitePawn" texturePath="assets/atlases/pieces.png">
+      <srcRect x="245" y="514" w="244" h="256" />
+      <atlas name="pieces">
+        <source texturePath="assets/artgen/WhitePawn.png">
+          <rect x="0" y="0" w="244" h="256" />
+        </source>
+        <pack padding="1" sizeMode="PowerOfTwo" maxSide="1024" />
+      </atlas>
     </sprite>
 
-    <sprite name="BlackKing" texturePath="assets/artgen/BlackKing.png">
-      <srcRect x="0" y="0" w="244" h="256" />
+    <sprite name="BlackKing" texturePath="assets/atlases/pieces.png">
+      <srcRect x="245" y="0" w="244" h="256" />
+      <atlas name="pieces">
+        <source texturePath="assets/artgen/BlackKing.png">
+          <rect x="0" y="0" w="244" h="256" />
+        </source>
+        <pack padding="1" sizeMode="PowerOfTwo" maxSide="1024" />
+      </atlas>
     </sprite>
-    <sprite name="BlackQueen" texturePath="assets/artgen/BlackQueen.png">
-      <srcRect x="0" y="0" w="244" h="256" />
+    <sprite name="BlackQueen" texturePath="assets/atlases/pieces.png">
+      <srcRect x="0" y="257" w="244" h="256" />
+      <atlas name="pieces">
+        <source texturePath="assets/artgen/BlackQueen.png">
+          <rect x="0" y="0" w="244" h="256" />
+        </source>
+        <pack padding="1" sizeMode="PowerOfTwo" maxSide="1024" />
+      </atlas>
     </sprite>
-    <sprite name="BlackRook" texturePath="assets/artgen/BlackRook.png">
-      <srcRect x="0" y="0" w="244" h="256" />
+    <sprite name="BlackRook" texturePath="assets/atlases/pieces.png">
+      <srcRect x="245" y="257" w="244" h="256" />
+      <atlas name="pieces">
+        <source texturePath="assets/artgen/BlackRook.png">
+          <rect x="0" y="0" w="244" h="256" />
+        </source>
+        <pack padding="1" sizeMode="PowerOfTwo" maxSide="1024" />
+      </atlas>
     </sprite>
-    <sprite name="BlackBishop" texturePath="assets/artgen/BlackBishop.png">
+    <sprite name="BlackBishop" texturePath="assets/atlases/pieces.png">
       <srcRect x="0" y="0" w="244" h="256" />
+      <atlas name="pieces">
+        <source texturePath="assets/artgen/BlackBishop.png">
+          <rect x="0" y="0" w="244" h="256" />
+        </source>
+        <pack padding="1" sizeMode="PowerOfTwo" maxSide="1024" />
+      </atlas>
     </sprite>
-    <sprite name="BlackKnight" texturePath="assets/artgen/BlackKnight.png">
-      <srcRect x="0" y="0" w="244" h="256" />
+    <sprite name="BlackKnight" texturePath="assets/atlases/pieces.png">
+      <srcRect x="490" y="0" w="244" h="256" />
+      <atlas name="pieces">
+        <source texturePath="assets/artgen/BlackKnight.png">
+          <rect x="0" y="0" w="244" h="256" />
+        </source>
+        <pack padding="1" sizeMode="PowerOfTwo" maxSide="1024" />
+      </atlas>
     </sprite>
-    <sprite name="BlackPawn" texturePath="assets/artgen/BlackPawn.png">
-      <srcRect x="0" y="0" w="244" h="256" />
+    <sprite name="BlackPawn" texturePath="assets/atlases/pieces.png">
+      <srcRect x="735" y="0" w="244" h="256" />
+      <atlas name="pieces">
+        <source texturePath="assets/artgen/BlackPawn.png">
+          <rect x="0" y="0" w="244" h="256" />
+        </source>
+        <pack padding="1" sizeMode="PowerOfTwo" maxSide="1024" />
+      </atlas>
     </sprite>
   </sprites>
 </root>
