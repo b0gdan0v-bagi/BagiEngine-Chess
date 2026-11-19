@@ -46,6 +46,13 @@ namespace BECore::Chess {
         /// Forgets the puzzle. The game is not touched: the caller starts a new one
         void End();
 
+        /**
+         * @brief Leaves the puzzle: End(), and a plain Reset() of @p model when the puzzle was on (the new game the caller promises).
+         *
+         * @return whether a puzzle was on
+         */
+        bool Leave(ChessGameModel& model);
+
         /// Whether a puzzle is on in @p model: pure, no side effect, true also for a puzzle that is solved
         [[nodiscard]] bool IsActiveFor(const ChessGameModel& model) const;
 

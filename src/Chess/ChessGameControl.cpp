@@ -799,8 +799,7 @@ namespace BECore::Chess {
         } else if (key == "retry") {
             static_cast<void>(_puzzle.Retry(_model));
         } else {
-            _puzzle.End();
-            _model.Reset();
+            static_cast<void>(_puzzle.Leave(_model));
         }
         return {};
     }
