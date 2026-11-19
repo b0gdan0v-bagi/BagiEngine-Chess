@@ -14,10 +14,11 @@ namespace BECore::Chess {
         if (canvas) {
             _takeBack.Sync(*canvas, model);
         }
-        if (!_published.Changed(model)) {
+        const PositionAnalyst* analyst = ChessGame::GetActiveAnalyst();
+        if (!_published.Changed(model, analyst)) {
             return;
         }
-        const Vector<MovePanelRow> rows = CurrentMovePanelRows(model);
+        const Vector<MovePanelRow> rows = CurrentMovePanelRows(model, analyst);
         PublishMovePanelWords(rows);
         if (canvas) {
             _rows.Show(*canvas, rows);

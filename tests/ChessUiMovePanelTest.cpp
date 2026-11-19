@@ -716,6 +716,53 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(ShownMovePanelRows(), "2. ... [dxe4]");
     }
 
+    TEST_F(ChessUiTest, ABrilliantMoveReadsWithTheSignOnlyWhileTheRatingsAreOn) {
+        CountingAnalysisFactory factory({New<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"))});
+        Analyst().SetEngineFactory(factory.AsFactory());
+        ASSERT_TRUE(PlayAll(Model(), {"e2e4", "e7e5"}));
+        ASSERT_EQ(ShownMovePanelRows(), "1. e4 [e5]") << "nothing is rated while the switch is off";
+
+        Analyst().SetRatings(true);
+        ASSERT_TRUE(WaitForRatings());
+        EXPECT_EQ(ShownMovePanelRows(), "1. e4!! [e5]") << "e2e4 is the engine's move, e7e5 is not";
+        EXPECT_EQ(MovePanelWord(0, "White"), "e4!!");
+
+        Analyst().SetRatings(false);
+        EXPECT_EQ(ShownMovePanelRows(), "1. e4 [e5]") << "off takes the sign back, the rows are rebuilt with no new version of the game";
+    }
+
+    TEST_F(ChessUiTest, TheRowsAreRebuiltWhenARatingArrivesWithNoNewVersionOfTheGame) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        const auto engine = New<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"));
+        engine->Gate(true);
+        CountingAnalysisFactory factory({engine});
+        Analyst().SetEngineFactory(factory.AsFactory());
+        Analyst().SetRatings(true);
+        ASSERT_TRUE(Play(Model(), "e2e4"));
+        ASSERT_TRUE(FramesUntil([&] { return engine->Calls() == 1; }));
+        ASSERT_EQ(ShownMovePanelRows(), "1. [e4]") << "the move is not rated yet";
+        const uint64_t version = Model().GetVersion();
+
+        engine->Open();
+        ASSERT_TRUE(WaitForRatings());
+        EXPECT_EQ(ShownMovePanelRows(), "1. [e4!!]");
+        EXPECT_EQ(Model().GetVersion(), version) << "a rating is no change of the game";
+    }
+
+    TEST_F(ChessUiTest, APressOnAMarkedCellStillShowsThatMove) {
+        CountingAnalysisFactory factory({New<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"))});
+        Analyst().SetEngineFactory(factory.AsFactory());
+        Analyst().SetRatings(true);
+        ASSERT_TRUE(PlayAll(Model(), {"e2e4", "e7e5", "g1f3"}));
+        ASSERT_TRUE(WaitForRatings());
+        ASSERT_EQ(ShownMovePanelRows(), "1. e4!! e5 | 2. [Nf3]");
+
+        PressWith("ChessShowMove", "white0");
+        EXPECT_TRUE(Model().IsViewing());
+        EXPECT_EQ(Model().GetShownMoveCount(), 1u);
+        EXPECT_EQ(ShownMovePanelRows(), "1. [e4!!] e5 | 2. Nf3") << "the viewed move is the marked cell, with its sign";
+    }
+
     TEST_F(ChessUiTest, WithNoGameActiveTheMovePanelHasNoRowShown) {
         ASSERT_TRUE(PlayAll(Model(), {"e2e4", "e7e5"}));
         ASSERT_EQ(ShownMovePanelRows(), "1. e4 [e5]");

@@ -5,6 +5,7 @@
 #include <Chess/ChessGame.h>
 #include <Chess/Components/ClickerDisabled.h>
 #include <Chess/Engine/OpponentController.h>
+#include <Chess/Engine/PositionAnalyst.h>
 #include <Chess/Game/ChessGameModel.h>
 #include <Chess/Game/MoveList.h>
 #include <Chess/Game/TakeBack.h>
@@ -37,7 +38,7 @@ namespace BECore::Chess {
 
     }  // namespace
 
-    Vector<MovePanelRow> CurrentMovePanelRows(const ChessGameModel* model) {
+    Vector<MovePanelRow> CurrentMovePanelRows(const ChessGameModel* model, const PositionAnalyst* analyst) {
         Vector<MoveListRow> list;
         int shownPly = kNoCurrentPly;
         if (model) {
@@ -46,18 +47,30 @@ namespace BECore::Chess {
         }
         Vector<MovePanelRow> rows = BuildMovePanelRows(list, shownPly);
         ASSERT(rows.size() == kMovePanelRows);
+        if (model && analyst && analyst->AreRatingsOn()) {
+            const MoveRatings ratings = analyst->GetRatings(*model);
+            Vector<bool> brilliantByPly;
+            brilliantByPly.reserve(ratings.size());
+            for (const Optional<MoveRating>& rating : ratings) {
+                brilliantByPly.push_back(rating && rating->IsBrilliant());
+            }
+            MarkMovePanelRows(rows, brilliantByPly);
+        }
         return rows;
     }
 
-    bool MoveRowsKey::Changed(const ChessGameModel* model) {
+    bool MoveRowsKey::Changed(const ChessGameModel* model, const PositionAnalyst* analyst) {
         const uint64_t version = model ? model->GetVersion() : 0;
+        const uint64_t analystRevision = analyst ? analyst->GetRevision() : 0;
         const size_t shownMoves = model ? model->GetShownMoveCount() : 0;
-        if (_built && model == _model && version == _version && shownMoves == _shownMoves) {
+        if (_built && model == _model && analyst == _analyst && version == _version && analystRevision == _analystRevision && shownMoves == _shownMoves) {
             return false;
         }
         _built = true;
         _model = model;
+        _analyst = analyst;
         _version = version;
+        _analystRevision = analystRevision;
         _shownMoves = shownMoves;
         return true;
     }

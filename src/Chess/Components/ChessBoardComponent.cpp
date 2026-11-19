@@ -87,7 +87,7 @@ namespace BECore::Chess {
         if (!editing && !game->IsPuzzleOn()) {
             game->GetOpponent().Update();
         }
-        game->GetAnalyst().Update(game->GetModel(), game->GetOpponent().GetEngine());  // the search runs on the pool; never waits
+        game->GetAnalyst().Update(game->GetModel(), game->GetOpponent().GetEngine());  // also steps the rater of the moves; the searches run on the pool and never wait
         if (!editing && game->GetDrawJudge().Update(game->GetModel()) == DrawVerdict::Accepted) {
             static_cast<void>(game->GetModel().AgreeDraw());  // the judge gives a verdict only for the version it was asked at, so the game is still on
         }

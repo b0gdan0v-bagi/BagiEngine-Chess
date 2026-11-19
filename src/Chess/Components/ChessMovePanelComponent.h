@@ -16,7 +16,8 @@ namespace BECore::Chess {
      * @brief Gives the canvas of the node `MovePanel` (the move list right of the board in the Wide view, under it in the Tall view) its words from the game. Keeps no game state.
      *
      * OnDraw() runs before the canvas on the same node draws: only when the rows changed (MoveRowsKey) it rebuilds them (BuildMoveList and BuildMovePanelRows, the page of
-     * the move the board shows), publishes the three `UIVars` of every row and shows the rows and the marks the rows say. With no game active every row is empty and hidden.
+     * the move the board shows), publishes the three `UIVars` of every row and shows the rows and the marks the rows say. While the analyst's ratings are on, a brilliant move's cell reads `<san>!!`
+     * (CurrentMovePanelRows()), and the rows are rebuilt when the analyst's revision moves too: a rating arrives with no new version of the model. With no game active every row is empty and hidden.
      *
      * The panel is shown only while the box of the active view lies inside the safe area of the canvas (MovePanelFits), asked on every draw: the safe area changes with the window, not with the model.
      * Before the canvas has been laid out once it stays hidden, so nothing flashes.

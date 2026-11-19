@@ -10,9 +10,9 @@ namespace BECore::Chess {
     /**
      * @brief Gives the canvas of the node `MovesSection` (the menu section "Moves", for the windows with no move panel on the screen) the rows of the move list. Keeps no game state.
      *
-     * OnDraw() runs before the canvas on the same node draws: only when the rows changed (MoveRowsKey) it writes the words the move panel's canvas binds too (the same rows, so the
-     * two never disagree) and shows the rows and marks of this canvas; on every draw it greys its Take back while nothing can be taken back (the press is ChessMovePanelComponent's).
-     * The menu shows and hides the canvas (Game/MenuSections.*).
+     * OnDraw() runs before the canvas on the same node draws: only when the rows changed (MoveRowsKey: the model, or the analyst's ratings) it writes the words the move panel's canvas binds too (the
+     * same rows, so the two never disagree, with the `!!` of a brilliant move) and shows the rows and marks of this canvas; on every draw it greys its Take back while nothing can be taken back (the
+     * press is ChessMovePanelComponent's). The menu shows and hides the canvas (Game/MenuSections.*).
      */
     class ChessMovesSectionComponent : public IComponent {
         BE_CLASS(ChessMovesSectionComponent)

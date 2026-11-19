@@ -147,4 +147,21 @@ namespace BECore::Chess::Tests {
         }
     }
 
+    TEST_F(ChessUiTest, TheMovesSectionReadsTheSignOfABrilliantMoveLikeThePanelWhileTheRatingsAreOn) {
+        CountingAnalysisFactory factory({New<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"))});
+        Analyst().SetEngineFactory(factory.AsFactory());
+        ASSERT_TRUE(PlayAll(Model(), {"e2e4", "e7e5"}));
+        ASSERT_TRUE(ClickButton(kMenuColor));
+        ASSERT_TRUE(ClickMenuList("MenuSectionMoves").Both());
+        ASSERT_EQ(ShownMoveRows(kSectionNode), "1. e4 [e5]");
+
+        Analyst().SetRatings(true);
+        ASSERT_TRUE(WaitForRatings());
+        EXPECT_EQ(ShownMoveRows(kSectionNode), "1. e4!! [e5]");
+        EXPECT_EQ(ShownMoveRows(kSectionNode), ShownMovePanelRows());
+
+        Analyst().SetRatings(false);
+        EXPECT_EQ(ShownMoveRows(kSectionNode), "1. e4 [e5]");
+    }
+
 }  // namespace BECore::Chess::Tests

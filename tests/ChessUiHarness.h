@@ -577,7 +577,7 @@ namespace BECore::Chess::Tests {
         const Rect kPanelBottomBand{kMovePanelLeft, kMovePanelTop + 56.0f + kPanelBandGap + static_cast<float>(kMovePanelRows) * 56.0f + kPanelBandGap, kMovePanelRight - kMovePanelLeft, 56.0f};
 
         // The longest words of the move list (the move panel and the menu section "Moves" bind the same variables)
-        constexpr const char* kLongestMoves[] = {"Qh4xe1+", "exd8=Q#", "O-O-O"};  // the longest move of each kind of text the list can hold
+        constexpr const char* kLongestMoves[] = {"Qh4xe1+!!", "exd8=Q#!!", "O-O-O!!"};  // the longest move of each kind of text the list can hold, with the sign of a brilliant move
         constexpr const char* kLongestNumber = "100.";
         constexpr size_t kMovePanelWordRounds = std::size(kLongestMoves);
 
@@ -1507,6 +1507,18 @@ namespace BECore::Chess::Tests {
                 return false;
             }
             return FramesUntil([&] { return Analyst().GetHint(Model()).has_value(); });
+        }
+
+        /// Runs frames until every move of the game has its rating (the ratings are on and the analyst's factory gives the engine)
+        bool WaitForRatings() {
+            return FramesUntil([&] {
+                const MoveRatings ratings = Analyst().GetRatings(Model());
+                bool all = !ratings.empty();
+                for (const Optional<MoveRating>& rating : ratings) {
+                    all = all && rating.has_value();
+                }
+                return all;
+            });
         }
 
         /// The recorded fills of the hint in the last frame: the squares it leaves and goes to, in drawing order

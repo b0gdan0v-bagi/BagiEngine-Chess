@@ -9,21 +9,25 @@ namespace BECore {
 namespace BECore::Chess {
 
     class ChessGameModel;
+    class PositionAnalyst;
 
     /// The rows the move list shows for the game of @p model: the page of the move the board shows (the last one, or the viewed one), that move current; no game: every entry empty
-    /// and not shown
-    [[nodiscard]] Vector<MovePanelRow> CurrentMovePanelRows(const ChessGameModel* model);
+    /// and not shown. While @p analyst has the ratings on, the cell of a brilliant move says its SAN and kMovePanelBrilliantSuffix; null: no marks
+    [[nodiscard]] Vector<MovePanelRow> CurrentMovePanelRows(const ChessGameModel* model, const PositionAnalyst* analyst);
 
-    /// What the rows of a canvas were last built from: the model, its version and the moves of the shown position (a view moves no version)
+    /// What the rows of a canvas were last built from: the model, its version and the moves of the shown position (a view moves no version), and the analyst's revision (a rating arrives with
+    /// no step of the model's version)
     class MoveRowsKey {
     public:
-        /// Whether the rows of @p model are other than the ones last built (always on the first call); remembers @p model as built
-        bool Changed(const ChessGameModel* model);
+        /// Whether the rows of @p model are other than the ones last built (always on the first call); remembers @p model and @p analyst as built
+        bool Changed(const ChessGameModel* model, const PositionAnalyst* analyst);
 
     private:
         bool _built = false;
         const ChessGameModel* _model = nullptr;
+        const PositionAnalyst* _analyst = nullptr;
         uint64_t _version = 0;
+        uint64_t _analystRevision = 0;
         size_t _shownMoves = 0;
     };
 

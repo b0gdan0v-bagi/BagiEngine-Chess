@@ -24,7 +24,7 @@ namespace BECore::Chess::Tests {
         constexpr UiNode kUiNodes[] = {
             {"Board", -1},           {"BoardCoordinates", -1}, {"Material", 5},        {"MovePanel", 4},     {"Hud", 10},         {"EditorBar", 20},
             {"PuzzleBar", 20},       {"MenuPanel", 20},        {"OpponentPanel", 20},  {"MovesSection", 20}, {"GameSection", 20}, {"SoundPanel", 20},
-            {"PositionSection", 20}, {"PuzzleSection", 20},    {"PromotionPanel", 20}, {"Result", 1},        {"Sound", 0},
+            {"PositionSection", 20}, {"PuzzleSection", 20},    {"PromotionPanel", 20}, {"RatingMark", 1},    {"Result", 1},       {"Sound", 0},
         };
         constexpr size_t kUiCount = std::size(kUiNodes);
 
