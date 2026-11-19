@@ -15,6 +15,7 @@ import ui_shots
 from bagi_control_client import ControlError
 from ui_shots import (
     AFTER_E4_FEN,
+    BRILLIANT_MOVES,
     DEFAULT_MAX_SIZE,
     DEFAULT_WINDOW,
     MATE_IN_ONE_FEN,
@@ -37,7 +38,7 @@ PICTURE_HEIGHT = 108
 class FakeChess:
     """What the control API of the game answers, as far as the scenes read it: a handful of members of `get_state` that follow the calls."""
 
-    def __init__(self, width: int = PICTURE_WIDTH, height: int = PICTURE_HEIGHT, misread_color: bool = False, refuse: str | None = None):
+    def __init__(self, width: int = PICTURE_WIDTH, height: int = PICTURE_HEIGHT, misread_color: bool = False, refuse: str | None = None, rated_after_polls: int | None = 3, last_brilliant: bool = True):
         self.width = width
         self.height = height
         self.misread_color = misread_color  # ColorWhite makes the program play White, as if the segment had been renamed
@@ -48,6 +49,10 @@ class FakeChess:
         self.status = "ongoing"
         self.winner = None
         self.opponent = {"plays": None, "level": "medium", "engine": "stockfish", "thinking": False}
+        self.ratings_on = False
+        self.rated_after_polls = rated_after_polls  # get_state calls after the moves until every move is rated; None: never
+        self.last_brilliant = last_brilliant
+        self.polls = 0
 
     def call(self, method: str, params: dict | None = None) -> dict:
         self.calls.append((method, params))
@@ -66,6 +71,7 @@ class FakeChess:
 
     def on_set_state(self, params: dict) -> dict:
         self.opponent.update(params.get("opponent", {}))
+        self.ratings_on = params.get("analysis", {}).get("ratings", self.ratings_on)
         if "fen" in params:
             self.fen = params["fen"]
             self.moves = []
@@ -88,12 +94,24 @@ class FakeChess:
             self.opponent["plays"] = "white"
         return {"consumed": True}
 
+    def ratings(self) -> list:
+        """One entry per move, null until the scripted number of polls has passed, as the background rater fills them in."""
+        self.polls += 1
+        if not self.ratings_on or not self.moves:
+            return []
+        rated = self.rated_after_polls is not None and self.polls > self.rated_after_polls
+        entries = []
+        for index in range(len(self.moves)):
+            brilliant = index in (1, 3, 5) and (self.last_brilliant or index != 5)
+            entries.append({"brilliant": brilliant, "reason": "brilliant" if brilliant else "not_best"} if rated else None)
+        return entries
+
     def on_get_state(self, params: dict) -> dict:
         taken_by_white = {"pawn": 1 if len(self.moves) >= 3 else 0}
         taken_by_black = {"pawn": 1 if len(self.moves) >= 4 else 0}
         turn = ("black" if len(self.moves) % 2 else "white") if self.moves else {"w": "white", "b": "black"}[self.fen.split()[1]]
         fen = self.fen if not self.moves else f"{self.fen} + {len(self.moves)} moves"
-        return {"state": {"fen": fen, "turn": turn, "status": self.status, "winner": self.winner, "opponent": dict(self.opponent), "material": {"balance": 0, "capturedByWhite": taken_by_white, "capturedByBlack": taken_by_black}}}
+        return {"state": {"fen": fen, "turn": turn, "status": self.status, "winner": self.winner, "opponent": dict(self.opponent), "material": {"balance": 0, "capturedByWhite": taken_by_white, "capturedByBlack": taken_by_black}, "analysis": {"ratingsOn": self.ratings_on, "ratings": self.ratings()}}}
 
     def on_screenshot(self, params: dict) -> dict:
         return {"width": self.width, "height": self.height, "png_base64": base64.b64encode(FAKE_PNG).decode("ascii")}
@@ -143,6 +161,35 @@ def test_the_middlegame_plays_the_scripted_moves_and_settles(tmp_path: Path):
     ui_shots.play_scene("middlegame", game, tmp_path)
     assert game.moves == list(MIDDLEGAME_MOVES)
     assert {"frames": 4, "dt": 0.1} in game.params_of("step")
+
+
+def test_the_brilliant_scene_switches_the_ratings_on_plays_the_moves_and_waits_until_every_move_is_rated(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(ui_shots, "RATING_POLL_SECONDS", 0.0)
+    game = FakeChess()
+    ui_shots.play_scene("brilliant", game, tmp_path)
+    assert game.params_of("set_state") == [{"analysis": {"ratings": True}}]
+    assert game.moves == list(BRILLIANT_MOVES)
+    assert game.methods().index("set_state") < game.methods().index("perform_action")
+    assert game.polls > game.rated_after_polls, "the picture is taken after the last rating arrived"
+    assert game.methods().count("step") > 3, "a frame passes between two polls: the rater is stepped by the frames"
+    assert {"frames": 4, "dt": 0.1} in game.params_of("step")
+
+
+def test_the_brilliant_scene_names_itself_when_the_ratings_never_come(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(ui_shots, "RATING_WAIT_SECONDS", 0.05)
+    monkeypatch.setattr(ui_shots, "RATING_POLL_SECONDS", 0.01)
+    game = FakeChess(rated_after_polls=None)
+    with pytest.raises(ShotError, match=r"scene brilliant.*not all rated"):
+        ui_shots.play_scene("brilliant", game, tmp_path)
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_the_brilliant_scene_fails_when_the_last_move_is_not_brilliant(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(ui_shots, "RATING_POLL_SECONDS", 0.0)
+    game = FakeChess(last_brilliant=False)
+    with pytest.raises(ShotError, match=r"scene brilliant.*g8f6.*brilliant"):
+        ui_shots.play_scene("brilliant", game, tmp_path)
+    assert list(tmp_path.iterdir()) == []
 
 
 def test_the_opponent_panel_clicks_the_buttons_by_name_in_order(tmp_path: Path):

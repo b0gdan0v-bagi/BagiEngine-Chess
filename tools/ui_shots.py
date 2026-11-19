@@ -36,6 +36,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Iterator
@@ -75,6 +76,9 @@ STALEMATE_FEN = "7k/5Q2/6K1/8/8/8/8/8 b - - 0 1"
 MIDDLEGAME_MOVES = ("e2e4", "d7d5", "e4d5", "d8d5", "b1c3", "d5a5")
 OPPONENT_PANEL_CLICKS = ("Menu", "MenuSectionOpponent", "EngineOwn", "ModeComputer", "LevelMedium", "ColorWhite")  # the person is White: the program plays Black and has nothing to answer
 OPPONENT_PANEL_EXPECTED = {"plays": "black", "engine": "own", "level": "medium"}
+BRILLIANT_MOVES = ("e2e4", "e7e5", "g1f3", "b8c6", "f1c4", "g8f6")  # MoveRaterTest pins e5, Nc6 and Nf6 as brilliant (the own engine, depth 5)
+RATING_WAIT_SECONDS = 60.0  # the own engine rates six moves in the background; the limit only ends a broken run
+RATING_POLL_SECONDS = 0.05
 TURNED_BOARD_OPPONENT = {"plays": "white", "engine": "own", "level": "max"}  # the person is Black; White's turn is not on, so nothing is searched
 
 
@@ -156,6 +160,22 @@ def scene_middlegame(session: Session) -> None:
     session.settle()
 
 
+def scene_brilliant(session: Session) -> None:
+    session.step()
+    session.call("set_state", {"analysis": {"ratings": True}})
+    play_moves(session, BRILLIANT_MOVES)
+    deadline = time.monotonic() + RATING_WAIT_SECONDS
+    while True:
+        ratings = session.state()["analysis"]["ratings"]
+        if len(ratings) == len(BRILLIANT_MOVES) and all(rating is not None for rating in ratings):
+            break
+        session.check(time.monotonic() < deadline, f"the moves {' '.join(BRILLIANT_MOVES)} were not all rated in {RATING_WAIT_SECONDS:g} s: {ratings}")
+        session.step()
+        time.sleep(RATING_POLL_SECONDS)
+    session.check(ratings[-1]["brilliant"], f"{BRILLIANT_MOVES[-1]} should be a brilliant move: {ratings[-1]}")
+    session.settle()
+
+
 def scene_opponent_panel(session: Session) -> None:
     session.step()
     for name in OPPONENT_PANEL_CLICKS:
@@ -194,8 +214,9 @@ def scene_stalemate(session: Session) -> None:
 # name -> (what it shows, how to reach it); the names are the pairing key of `shots.py diff` and the sentences are those of
 # `.claude/rules/qa-project.md`, which a test keeps equal
 SCENES: dict[str, tuple[str, Callable[[Session], None]]] = {
-    "start": ("the start position of two people: the HUD, the coordinates and the empty margins", scene_start),
-    "middlegame": ("a scripted game with a capture by each side: the captured material, the marks of the last move, the HUD", scene_middlegame),
+    "start": ("the start position of two people: the HUD, the coordinates, the empty margins and the move panel with no moves", scene_start),
+    "middlegame": ("a scripted game with a capture by each side: the captured material, the marks of the last move, the move list with the last move marked, the HUD", scene_middlegame),
+    "brilliant": ("a game whose last move is brilliant, the ratings on: the gold badge at the top right of its square and the move marked !! in the list", scene_brilliant),
     "opponent-panel": ("the opponent panel open, set to Computer, the own engine, medium level, the person as White", scene_opponent_panel),
     "turned-board": ("the board turned for a person who plays Black against the program as White", scene_turned_board),
     "checkmate": ("a game won by a checkmate: the red king, the dimmed board, the bar and the HUD saying who won", scene_checkmate),
