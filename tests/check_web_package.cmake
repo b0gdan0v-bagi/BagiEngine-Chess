@@ -73,13 +73,13 @@ endif()
 foreach(_name
         config/CLAUDE.md config/README.md assets/notes.md
         config/ChessSettings.local.xml config/imgui.ini config/.DS_Store assets/.DS_Store
-        assets/tool.py assets/__pycache__/tool.cpython-312.pyc config/sub/CLAUDE.md assets/sounds/move.artgen.json)
+        assets/tool.py assets/__pycache__/tool.cpython-312.pyc config/sub/CLAUDE.md assets/sounds/move.artgen.json assets/artgen/WhiteKing.artgen.json)
     chess_web_excluded("${_name}" OUT _excluded)
     check_equal("excluded: ${_name}" "${_excluded}" "TRUE")
 endforeach()
 foreach(_name
         config/ApplicationConfig.xml config/ChessSettings.xml config/SceneConfig.xml config/TextureLibrary.xml
-        assets/chess_test.png config/localxml.xml assets/imgui.png config/nodes/ChessHud.xml assets/artgen.json)
+        assets/artgen/WhiteKing.png config/localxml.xml assets/imgui.png config/nodes/ChessHud.xml assets/artgen.json)
     chess_web_excluded("${_name}" OUT _excluded)
     check_equal("not excluded: ${_name}" "${_excluded}" "FALSE")
 endforeach()

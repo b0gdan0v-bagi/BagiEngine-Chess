@@ -3,8 +3,9 @@
      (ExpectThemesComplete), so a new theme is a new <theme> with the same eleven names; BoardPaletteTest checks each theme for marks that cannot be seen or told apart.
      boardLight / boardDark are the two squares; the labels of the board use boardDark on a light cell and boardLight on a dark one. The other nine are drawn over a square with their
      alpha: the selection and its legal targets, a capture target, the check and the mate, the hint (the square the piece leaves, the square it goes to), the last move and the premoves.
-     `classic` is the look the board has always had; `slate` has cool grey-blue squares with marks chosen to be seen on them. -->
-<UIThemes default="classic">
+     `classic` is the look the board had before the themes; `slate` has cool grey-blue squares with marks chosen to be seen on them; `tavern` (the default) is a pale cream table and dark
+     oak, chosen so that the golden beer pieces stand out on the light squares and the near-black ones on the dark squares. -->
+<UIThemes default="tavern">
   <theme id="classic">
     <color name="boardLight" value="240,217,181,255"/>
     <color name="boardDark" value="181,136,99,255"/>
@@ -30,5 +31,18 @@
     <color name="boardHintTo" value="255,120,0,215"/>
     <color name="boardLastMove" value="240,225,80,150"/>
     <color name="boardPremove" value="170,90,210,160"/>
+  </theme>
+  <theme id="tavern">
+    <color name="boardLight" value="238,226,200,255"/>
+    <color name="boardDark" value="160,114,76,255"/>
+    <color name="boardSelected" value="70,190,110,210"/>
+    <color name="boardLegalMove" value="70,190,110,120"/>
+    <color name="boardLegalCapture" value="225,75,70,170"/>
+    <color name="boardCheck" value="235,50,50,215"/>
+    <color name="boardMate" value="140,15,20,245"/>
+    <color name="boardHintFrom" value="50,140,235,120"/>
+    <color name="boardHintTo" value="50,140,235,205"/>
+    <color name="boardLastMove" value="240,200,40,150"/>
+    <color name="boardPremove" value="160,90,210,160"/>
   </theme>
 </UIThemes>
