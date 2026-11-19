@@ -114,9 +114,10 @@ if(ENGINE_BUILD_TESTS)
 
     # Starts BagiChess with the control API and drives the opponent, analysis and rating scenarios over WebSocket
     be_add_game_control_tests(BagiChess SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/tests/control_smoke.py)
-    # The script is a row of about 30 game starts and searches: its total grows with the load (about 60 s alone, over 230 s beside 2 x nproc burners),
-    # while every wait in it has its own give-up limit. This one only ends a hung run, so it is far above any loaded total.
-    set_tests_properties(BagiChessControlSmoke PROPERTIES TIMEOUT 1200)
+    # Every wait in the script has its own give-up limit; this timeout only ends a hung run. The test is not registered when Python is missing.
+    if(TEST BagiChessControlSmoke)
+        set_tests_properties(BagiChessControlSmoke PROPERTIES TIMEOUT 1200)
+    endif()
     # One ctest entry per recorded control scenario of tests/scenarios/ (BagiChessScenario.<file>), played on the manual clock
     be_add_game_scenario_tests(BagiChess DIR tests/scenarios)
 

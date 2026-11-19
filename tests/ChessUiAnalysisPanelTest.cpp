@@ -248,6 +248,15 @@ namespace BECore::Chess::Tests {
         /// Quiet frames in which a request that wrongly got through would have reached the engine
         constexpr int kQuietFrames = 20;
 
+        /// White solves: Black's setup h8g8, then Ra1a7, the reply g8h8 and Rb2b8#
+        constexpr StringView kMateInTwoRow = "ladder\t7k/8/8/8/8/8/1R6/R6K b - - 0 1\th8g8 a1a7 g8h8 b2b8\t1200\tmateIn2\n";
+
+        PuzzleSet MateInTwoSet() {
+            String tsv = "id\tfen\tmoves\trating\tthemes\n";
+            tsv.append(kMateInTwoRow.data(), kMateInTwoRow.size());
+            return PuzzleSet::Parse(StringView(tsv.data(), tsv.size()));
+        }
+
     }  // namespace
 
     TEST_F(ChessUiTest, TheHintButtonIsGreyOnlyWhereAHintCannotBeAsked) {
@@ -269,6 +278,30 @@ namespace BECore::Chess::Tests {
         ControlPlays("black");
         Settle();
         EXPECT_FALSE(ClickerOf(button)->disabled) << "the person's turn against the program";
+    }
+
+    TEST_F(ChessUiTest, TheHintButtonOfAPuzzleFollowsTheSolverWhateverTheOpponentIs) {
+        ChessGame& game = *ChessGame::GetActive();
+        game.SetPuzzles(MateInTwoSet());
+        const UIElement& button = MovePanelElement("MovePanelHint");
+
+        ControlPlays("white");  // the program is picked for the solver's color
+        ASSERT_TRUE(game.BeginPuzzle(0));
+        Settle();
+        EXPECT_FALSE(ClickerOf(button)->disabled) << "the solver's turn";
+
+        ASSERT_TRUE(PlayAll(Model(), {"a1a7"}));
+        Settle();
+        ASSERT_TRUE(game.IsPuzzleOn());
+        EXPECT_TRUE(ClickerOf(button)->disabled) << "the program's reply is due, though the opponent seat is White";
+
+        ASSERT_TRUE(game.LeavePuzzle());
+        ControlPlays(nullptr);  // two people
+        ASSERT_TRUE(game.BeginPuzzle(0));
+        ASSERT_TRUE(PlayAll(Model(), {"a1a7"}));
+        Settle();
+        ASSERT_TRUE(game.IsPuzzleOn());
+        EXPECT_TRUE(ClickerOf(button)->disabled) << "two people: the reply is still the program's";
     }
 
     TEST_F(ChessUiTest, TheHintButtonIsGreyInAFinishedGame) {

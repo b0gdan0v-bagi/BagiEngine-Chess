@@ -2,8 +2,8 @@
 
 #include <BECore/GameManager/CoreManager.h>
 #include <BECore/UI/UICanvasComponent.h>
-#include <BECore/UI/UIInputClicker.h>
 #include <Chess/ChessGame.h>
+#include <Chess/Components/ClickerDisabled.h>
 #include <Chess/Engine/AnalysisText.h>
 #include <Chess/Game/ChessGameModel.h>
 
@@ -61,7 +61,8 @@ namespace BECore::Chess {
 
     bool HintAllowedNow(const ChessGameModel* model) {
         const OpponentController* opponent = ChessGame::GetActiveOpponent();
-        return model && opponent && !model->IsDrafting() && !HintRefusalFor(*model, opponent->GetSides());
+        const PuzzleSession* puzzle = ChessGame::GetActivePuzzle();
+        return model && opponent && puzzle && !model->IsDrafting() && !HintRefusalFor(*model, HintSeatsFor(*model, *puzzle, opponent->GetSides()));
     }
 
     HintOnCanvas::HintOnCanvas(StringView name) : _name(PoolString::Intern(name)) {}
@@ -71,10 +72,7 @@ namespace BECore::Chess {
         if (disabled == _disabled) {
             return;
         }
-        UIElement* button = canvas.GetRoot().FindByName(_name);
-        UIInputClicker* clicker = button ? button->GetComponent<UIInputClicker>() : nullptr;
-        if (clicker) {
-            clicker->disabled = disabled;
+        if (SetClickerDisabled(canvas, _name, disabled)) {
             _disabled = disabled;
         }
     }

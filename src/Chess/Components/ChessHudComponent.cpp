@@ -3,8 +3,8 @@
 #include <BECore/GameManager/CoreManager.h>
 #include <BECore/Scene/SceneNode.h>
 #include <BECore/UI/UICanvasComponent.h>
-#include <BECore/UI/UIInputClicker.h>
 #include <Chess/ChessGame.h>
+#include <Chess/Components/ClickerDisabled.h>
 #include <Chess/Engine/OpponentText.h>
 #include <Chess/Game/OpeningBook.h>
 #include <Chess/Game/StatusText.h>
@@ -138,10 +138,8 @@ namespace BECore::Chess {
         const bool resignDisabled = !game->ResigningNow();
         if (resignDisabled != _resignDisabled) {
             _resignDisabled = resignDisabled;
-            const auto canvas = GetNode().GetComponent<UICanvasComponent>();
-            UIElement* button = canvas ? canvas->GetRoot().FindByName(Ids::resign) : nullptr;
-            if (UIInputClicker* clicker = button ? button->GetComponent<UIInputClicker>() : nullptr) {
-                clicker->disabled = resignDisabled;
+            if (const auto canvas = GetNode().GetComponent<UICanvasComponent>()) {
+                SetClickerDisabled(*canvas, Ids::resign, resignDisabled);
             }
         }
     }

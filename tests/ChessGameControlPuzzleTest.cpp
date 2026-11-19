@@ -321,6 +321,46 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(State()["moves"].size(), 3u);
     }
 
+    TEST_F(ChessGameControlPuzzleTest, AHintFollowsTheSolverNotTheOpponentSeat) {
+        const auto askForHint = [&] {
+            Json analysis = Json::object();
+            analysis["hint"] = true;
+            Json request = Json::object();
+            request["analysis"] = analysis;
+            return Control().SetState(request);
+        };
+        const auto pickProgram = [&](const char* plays) {
+            Json opponent = Json::object();
+            opponent["plays"] = plays;
+            Json request = Json::object();
+            request["opponent"] = opponent;
+            ASSERT_TRUE(Control().SetState(request).has_value());
+        };
+
+        pickProgram("white");  // the solver's color
+        ASSERT_TRUE(SetPuzzle("index", Json(0)).has_value());
+        EXPECT_TRUE(askForHint().has_value()) << "the solver's turn";
+
+        pickProgram("black");
+        ASSERT_TRUE(SetPuzzle("index", Json(0)).has_value());
+        ASSERT_TRUE(Move("a1a7"));
+        game.UpdatePuzzle(kFrame);
+        const auto refused = askForHint();
+        ASSERT_FALSE(refused.has_value()) << "the program's reply is due";
+        EXPECT_EQ(String(refused.error().code.c_str(), refused.error().code.size()), "not_your_turn");
+
+        ASSERT_TRUE(SetPuzzle("end", Json(true)).has_value());
+        Json twoPeople = Json::object();
+        twoPeople["opponent"]["plays"] = Json();
+        ASSERT_TRUE(Control().SetState(twoPeople).has_value());
+        ASSERT_TRUE(SetPuzzle("index", Json(0)).has_value());
+        ASSERT_TRUE(Move("a1a7"));
+        game.UpdatePuzzle(kFrame);
+        const auto twoPeopleRefused = askForHint();
+        ASSERT_FALSE(twoPeopleRefused.has_value()) << "two people: the reply is still the program's";
+        EXPECT_EQ(String(twoPeopleRefused.error().code.c_str(), twoPeopleRefused.error().code.size()), "not_your_turn");
+    }
+
     TEST_F(ChessGameControlPuzzleTest, ASetStateFenAndAResetEndItAtOnce) {
         ASSERT_TRUE(SetPuzzle("index", Json(0)).has_value());
         Json request = Json::object();

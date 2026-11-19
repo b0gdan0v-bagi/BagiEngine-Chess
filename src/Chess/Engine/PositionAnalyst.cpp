@@ -4,6 +4,7 @@
 #include <Chess/Engine/OpponentLevels.h>
 #include <Chess/Engine/OwnEngine.h>
 #include <Chess/Engine/UciEngine.h>
+#include <Chess/Game/PuzzleSession.h>
 #include <TaskSystem/TaskManager.h>
 
 namespace BECore::Chess {
@@ -20,6 +21,13 @@ namespace BECore::Chess {
 
     Optional<HintRefusal> HintRefusalFor(const ChessGameModel& model, Optional<PieceColor> programPlays) {
         return HintRefusalFor(model, ProgramSides::Of(programPlays));
+    }
+
+    ProgramSides HintSeatsFor(const ChessGameModel& model, const PuzzleSession& puzzle, ProgramSides opponent) {
+        if (const Puzzle* current = puzzle.GetCurrent(); current && puzzle.IsActiveFor(model)) {
+            return ProgramSides::Of(Opposite(current->SolverColor()));
+        }
+        return opponent;
     }
 
     std::expected<ChessEnginePtr, EngineError> MakeAnalysisEngine(OpponentEngine engine, const OpponentSettings& settings) {

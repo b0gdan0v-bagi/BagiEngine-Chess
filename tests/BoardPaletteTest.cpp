@@ -42,7 +42,7 @@ namespace BECore::Chess::Tests {
         // What "readable" means, in 0..255 channels. The numbers are the least that `classic` meets, not what a better board would want: raising one fails the look the board always had.
         // The distance (Euclid over the three channels, 441 at most) between a mark over a square and the bare square; classic's weakest is the capture over a dark square, 38
         constexpr float kMinMarkDistance = 30.0f;
-        // The same between two marks, each over the bare square; classic's weakest is the selection against a legal target on a dark square, 29
+        // The same between two marks, each over the bare square; classic's weakest is the selection against a legal target on a dark square, 28
         constexpr float kMinMarkPairDistance = 25.0f;
         // The contrast ratio (WCAG, 1 to 21) of a coordinate label against its own cell; classic's brown pair is 2.29. A label is a letter or a digit, so the 4.5 of a body of text is not asked
         constexpr float kMinLabelContrast = 2.0f;

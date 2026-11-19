@@ -2,8 +2,8 @@
 
 #include <BECore/GameManager/CoreManager.h>
 #include <BECore/UI/UICanvasComponent.h>
-#include <BECore/UI/UIInputClicker.h>
 #include <Chess/ChessGame.h>
+#include <Chess/Components/ClickerDisabled.h>
 #include <Chess/Engine/OpponentController.h>
 #include <Chess/Game/ChessGameModel.h>
 #include <Chess/Game/MoveList.h>
@@ -114,10 +114,7 @@ namespace BECore::Chess {
         if (disabled == _disabled) {
             return;
         }
-        UIElement* button = canvas.GetRoot().FindByName(_name);
-        UIInputClicker* clicker = button ? button->GetComponent<UIInputClicker>() : nullptr;
-        if (clicker) {
-            clicker->disabled = disabled;
+        if (SetClickerDisabled(canvas, _name, disabled)) {
             _disabled = disabled;
         }
     }

@@ -10,6 +10,8 @@
 
 namespace BECore::Chess {
 
+    class PuzzleSession;
+
     /// Why a hint is refused. GameOver: the game has ended. ProgramsTurn: the program plays the side to move, and a hint is for the person
     CORE_ENUM(HintRefusal, uint8_t, GameOver, ProgramsTurn)
 
@@ -19,6 +21,10 @@ namespace BECore::Chess {
 
     /// The same for a program that plays one color or none
     [[nodiscard]] Optional<HintRefusal> HintRefusalFor(const ChessGameModel& model, Optional<PieceColor> programPlays);
+
+    /// The seats HintRefusalFor() is asked with: while a puzzle is on in @p model every side the solver does not play (the program's reply is not the person's to hint, whatever the opponent is
+    /// picked), else @p opponent unchanged
+    [[nodiscard]] ProgramSides HintSeatsFor(const ChessGameModel& model, const PuzzleSession& puzzle, ProgramSides opponent);
 
     /// How many lines the analyst asks of the engine: the best one (the evaluation and the hint) and the second best, for GetLines()
     inline constexpr int kAnalysisLines = 2;

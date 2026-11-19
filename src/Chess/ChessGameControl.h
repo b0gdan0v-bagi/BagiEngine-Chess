@@ -20,7 +20,8 @@ namespace BECore::Chess {
         /// set_state asked for a computer opponent and there is no engine to make it (no Stockfish found; the own engine cannot fail): the pick is refused as a whole, so the position and the opponent
         /// stay as they were and the error is in the state
         inline constexpr StringView kEngineUnavailable = "engine_unavailable";
-        /// set_state asked for a hint on a side that the program plays (either side while two programs play): a hint is for the person (HintRefusalFor). On a finished game the code is game_over
+        /// set_state asked for a hint on a side that the program plays (either side while two programs play, the reply of a puzzle): a hint is for the person (HintRefusalFor). On a finished game the
+        /// code is game_over
         inline constexpr StringView kNotYourTurn = "not_your_turn";
     }  // namespace ChessControlErrors
 
@@ -94,12 +95,13 @@ namespace BECore::Chess {
      * the position. SetState also takes {"analysis": {"evaluation": bool, "hint": bool, "ratings": bool}} (a missing member means unchanged; {} changes nothing; "evaluation" switches the evaluation
      * on or off, "hint": true asks for a hint for the position now on the board and "hint": false drops it, "ratings" switches the rating of the moves, also on a finished game); a wrong type or a
      * member that is not one of the three is invalid_params. **analysis cannot be combined with fen or opponent in one call** (invalid_params: the hint belongs to the position after them, two calls
-     * say it plainly). A hint on a side that the program plays (so on either turn while two programs play) is not_your_turn, on a finished game game_over; nothing is changed then, the evaluation and
-     * ratings switches of the same call included. list_actions is not changed by any of it. A pick that finds no engine (only Stockfish can fail) is engine_unavailable (with the sentence of the
-     * engine's error) and is refused as a whole, whichever seat has no engine: the position is not replaced and the opponent is unchanged (sides, seats and a running search stay as they were), the
-     * error is in the state, so a client can ask again with "engine": "own". A pick that changes nothing (the same sides and seats, no error standing) does nothing: a running Stockfish is not
-     * restarted. With an error standing, the same "plays" asks for an engine again, and plays null clears it. Without Stockfish (no Stockfish file found when the pick is made, or a CHESS_NO_STOCKFISH
-     * build) "stockfish" is engine_unavailable in "engine" and in the seat objects, also while nobody plays, and the default engine is "own" (a game that starts with no file found shows "own").
+     * say it plainly). A hint on a side that the program plays (with a puzzle on, any turn but the solver's; so on either turn while two programs play) is not_your_turn, on a finished game game_over;
+     * nothing is changed then, the evaluation and ratings switches of the same call included. list_actions is not changed by any of it. A pick that finds no engine (only Stockfish can fail) is
+     * engine_unavailable (with the sentence of the engine's error) and is refused as a whole, whichever seat has no engine: the position is not replaced and the opponent is unchanged (sides, seats
+     * and a running search stay as they were), the error is in the state, so a client can ask again with "engine": "own". A pick that changes nothing (the same sides and seats, no error standing)
+     * does nothing: a running Stockfish is not restarted. With an error standing, the same "plays" asks for an engine again, and plays null clears it. Without Stockfish (no Stockfish file found when
+     * the pick is made, or a CHESS_NO_STOCKFISH build) "stockfish" is engine_unavailable in "engine" and in the seat objects, also while nobody plays, and the default engine is "own" (a game that
+     * starts with no file found shows "own").
      *
      * SetState also takes {"takeBack": {"plies": n}} **alone** (combined with fen, opponent or analysis it is invalid_params): takes back the last n moves in one step, plies 1 up to the
      * moves played; without plies, what the person's takeback button takes (takeBackPlies: one move with two people or two programs; against the program the person's last move with its

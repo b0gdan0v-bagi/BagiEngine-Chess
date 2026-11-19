@@ -256,12 +256,7 @@ namespace BECore::Chess {
     }
 
     bool ChessGame::LeavePuzzle() {
-        const bool wasOn = IsPuzzleOn();
-        _puzzle.End();
-        if (wasOn) {
-            _model.Reset();
-        }
-        return wasOn;
+        return _puzzle.Leave(_model);
     }
 
     void ChessGame::UpdatePuzzle(float deltaSeconds) {

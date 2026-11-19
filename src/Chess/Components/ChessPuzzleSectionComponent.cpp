@@ -3,9 +3,9 @@
 #include <BECore/GameManager/CoreManager.h>
 #include <BECore/Scene/SceneNode.h>
 #include <BECore/UI/UICanvasComponent.h>
-#include <BECore/UI/UIInputClicker.h>
 #include <BECore/UI/UIVars.h>
 #include <Chess/ChessGame.h>
+#include <Chess/Components/ClickerDisabled.h>
 #include <Chess/Components/MenuActions.h>
 #include <Chess/Game/StatusText.h>
 #include <Events/InputEvents.h>
@@ -27,13 +27,6 @@ namespace BECore::Chess {
             static constexpr auto puzzleSectionRetry = "PuzzleSectionRetry"_intern;
             static constexpr auto puzzleState = "puzzleState"_intern;
         };
-
-        void SetClickerDisabled(UICanvasComponent& canvas, PoolString name, bool disabled) {
-            UIElement* button = canvas.GetRoot().FindByName(name);
-            if (UIInputClicker* clicker = button ? button->GetComponent<UIInputClicker>() : nullptr) {
-                clicker->disabled = disabled;
-            }
-        }
 
         /// Writes @p disabled to the button only when it differs from @p known, which then follows it
         void Grey(UICanvasComponent& canvas, PoolString name, bool disabled, bool& known) {

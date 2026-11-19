@@ -1,4 +1,4 @@
-{"scenario": 1, "game": "Chess", "flags": ["--headless", "--manual-clock"], "title": "Chess: the position editor by the person's clicks on named elements, what get_state reads back (editor, fen, version) and a refused Play; the pieces on the board are placed by clicks on squares, which have no name, so the gtests hold those"}
+{"scenario": 1, "game": "Chess", "flags": ["--headless", "--manual-clock"], "title": "Chess: the position editor by the person's clicks on named elements and on a square (click_at in scene units: a piece put by a left click, taken off by a right one), what get_state reads back (editor, fen, version) and a refused Play"}
 {"method": "step", "params": {"frames": 2}}
 {"method": "reset"}
 {"method": "set_state", "params": {"opponent": {"plays": null}}}
@@ -13,6 +13,12 @@
 {"method": "ui_click", "params": {"name": "PositionSectionCurrent"}, "expect": {"equal": {"consumed": true, "action": "ChessEditBegin", "value": "current"}}}
 {"method": "step", "params": {"frames": 2}}
 {"method": "get_state", "expect": {"pointers": {"/state/editor/fen": "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1", "/state/editor/error": null, "/state/editor/tool/piece": "pawn", "/state/editor/tool/color": "white", "/state/fen": "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1", "/state/moves": []}, "versionStep": 1}}
+{"method": "click_at", "params": {"x": 460, "y": 440, "space": "scene"}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "get_state", "expect": {"pointers": {"/state/editor/fen": "r3k2r/8/8/8/4P3/8/8/R3K2R w KQkq - 0 1", "/state/fen": "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1"}, "versionStep": 1}}
+{"method": "click_at", "params": {"x": 460, "y": 440, "space": "scene", "button": "right"}}
+{"method": "step", "params": {"frames": 2}}
+{"method": "get_state", "expect": {"pointers": {"/state/editor/fen": "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1", "/state/fen": "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1"}, "versionStep": 1}}
 {"method": "ui_click", "params": {"name": "EditorBarQueen"}, "expect": {"equal": {"consumed": true, "action": "ChessEditPick", "value": "queen"}}}
 {"method": "step", "params": {"frames": 2}}
 {"method": "ui_click", "params": {"name": "EditorBarColor"}, "expect": {"equal": {"consumed": true, "action": "ChessEditColor", "value": ""}}}

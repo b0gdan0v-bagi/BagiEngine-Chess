@@ -62,6 +62,15 @@ namespace BECore::Chess {
         ++_revision;
     }
 
+    bool PuzzleSession::Leave(ChessGameModel& model) {
+        const bool wasOn = IsActiveFor(model);
+        End();
+        if (wasOn) {
+            model.Reset();
+        }
+        return wasOn;
+    }
+
     const Puzzle* PuzzleSession::GetCurrent() const {
         return _index ? &_puzzles.At(*_index) : nullptr;
     }

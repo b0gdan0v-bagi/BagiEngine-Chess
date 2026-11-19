@@ -495,6 +495,31 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(session.GetRevision(), afterEnd);
     }
 
+    TEST_F(PuzzleSessionTest, LeaveResetsTheGameOfAPuzzleThatIsOn) {
+        Load({kMateInOne});
+        Start();
+        ASSERT_TRUE(session.IsActiveFor(model));
+
+        EXPECT_TRUE(session.Leave(model));
+
+        EXPECT_FALSE(session.IsActiveFor(model));
+        EXPECT_EQ(session.GetCurrent(), nullptr);
+        EXPECT_TRUE(model.GetMoves().empty());
+    }
+
+    TEST_F(PuzzleSessionTest, LeaveWithNoPuzzleOnChangesNothing) {
+        Load({kMateInOne});
+        Play("e2e4");
+        const uint64_t version = model.GetVersion();
+        const uint64_t revision = session.GetRevision();
+
+        EXPECT_FALSE(session.Leave(model));
+
+        EXPECT_EQ(model.GetVersion(), version);
+        EXPECT_EQ(model.GetMoves().size(), 1U);
+        EXPECT_EQ(session.GetRevision(), revision);
+    }
+
     TEST_F(PuzzleSessionTest, SetPuzzlesEndsThePuzzleThatWasOn) {
         Load({kMateInOne});
         Start();
