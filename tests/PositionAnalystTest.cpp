@@ -1112,6 +1112,32 @@ namespace BECore::Chess::Tests {
         EXPECT_FALSE(analyst.GetReviewError().has_value());
     }
 
+    TEST_F(PositionAnalystTest, TheReviewRevisionGrowsWithAReviewPositionAndAnAbandonAndNothingElseMovesIt) {
+        CountingAnalysisFactory factory{MakeEngine()};
+        ChessGameModel model;
+        PositionAnalyst analyst;
+        analyst.SetEngineFactory(factory.AsFactory());
+        ASSERT_TRUE(PlayFoolsMate(model));
+        EXPECT_EQ(analyst.GetReviewRevision(), 0u);
+        analyst.SetEvaluation(true);
+        EXPECT_EQ(analyst.GetReviewRevision(), 0u) << "the analysis's switches are not the review's";
+
+        ASSERT_TRUE(analyst.StartReview(model).has_value());
+        const uint64_t started = analyst.GetReviewRevision();
+        EXPECT_GT(started, 0u);
+        uint64_t last = started;
+        ASSERT_TRUE(UpdateUntil(analyst, model, OpponentEngine::Own, [&] {
+            EXPECT_GE(analyst.GetReviewRevision(), last) << "never goes back";
+            last = analyst.GetReviewRevision();
+            return IsReviewDone(analyst, model);
+        }));
+        EXPECT_GT(analyst.GetReviewRevision(), started) << "a position that arrives moves it";
+
+        const uint64_t done = analyst.GetReviewRevision();
+        analyst.AbandonReview();
+        EXPECT_GT(analyst.GetReviewRevision(), done) << "the marks go with the review: a display has to see it";
+    }
+
     TEST_F(PositionAnalystTest, TheReviewUsesTheOwnEngineWhicheverEngineIsPicked) {
         const auto engine = MakeEngine();
         CountingAnalysisFactory factory{engine};

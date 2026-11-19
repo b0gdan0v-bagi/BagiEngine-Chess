@@ -189,6 +189,11 @@ namespace BECore::Chess {
             return _reviewer.GetError();
         }
 
+        /// The review's own revision (GameReviewer::GetRevision()): a display that shows only the review keys on this one
+        [[nodiscard]] uint64_t GetReviewRevision() const noexcept {
+            return _reviewer.GetRevision();
+        }
+
         /// A hint was asked at the version of @p model and not dropped; it may not have come yet
         [[nodiscard]] bool IsHintRequested(const ChessGameModel& model) const noexcept {
             return _hintVersion && *_hintVersion == model.GetVersion();

@@ -214,9 +214,12 @@ namespace BECore::Chess {
             return san;
         }
 
+        /// The caller answers null for Idle first: an Idle review has no state to name
         StringView ReviewStateId(ReviewState state) {
             switch (state) {
                 case ReviewState::Idle:
+                    ASSERT(false, "ReviewStateId: an Idle review is null in the state, never named");
+                    return "";
                 case ReviewState::Running:
                     return "running";
                 case ReviewState::Done:
@@ -224,7 +227,7 @@ namespace BECore::Chess {
                 case ReviewState::Failed:
                     return "failed";
             }
-            return "running";
+            return "";
         }
 
         StringView PuzzlePhaseId(PuzzlePhase phase) {

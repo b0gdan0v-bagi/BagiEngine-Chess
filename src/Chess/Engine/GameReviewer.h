@@ -78,6 +78,7 @@ namespace BECore::Chess {
      * **Threads and shutdown** are PositionAnalyst's: main thread only; the worker sees a copy of the request and a state of its own (the engine, a CancellationToken, the answer behind a
      * mutex, an atomic `done`) shared through an IntrusivePtrAtomic, so nothing dangles whichever side ends first. The destructor, Cancel() and Shutdown() cancel the token and return at once; call
      * Shutdown() (or destroy the reviewer) before TaskManager::Shutdown(), which joins the pool and would wait for a search nobody cancelled. The destructor does not touch TaskManager.
+     * Drop() forgets a search whose task may still run on the engine object; that is safe only because the reviewer always uses the own engine (OwnEngine allows concurrent calls).
      *
      * GetRevision() grows with a position that arrives, a start, an abandon or a drop, and a failure; never with a search that starts or ends, and never goes back. A display that publishes the
      * review adds it to the version of the model. One of the classes of Engine/ that log.
