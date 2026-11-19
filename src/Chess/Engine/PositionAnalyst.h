@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Chess/Engine/AnalysisEngineFactory.h>
+#include <Chess/Engine/GameReviewer.h>
 #include <Chess/Engine/MoveRater.h>
 #include <Chess/Engine/OpponentController.h>
 #include <Chess/Engine/OpponentEngines.h>
@@ -76,7 +77,11 @@ namespace BECore::Chess {
      * Update(), Cancel() and Shutdown() forward to it. The rater has an engine of its own (the factory is asked for OpponentEngine::Own, whatever the person picked) and a history rule of its own,
      * not the version rule. IsThinking() is the analyst's only.
      *
-     * Logging: with EngineOpponent, OpponentController, MoveRater and DrawOfferJudge, one of the classes of Engine/ that log.
+     * **The review of a finished game.** The analyst owns a GameReviewer (GameReviewer.h has the rules), so it is shut down and stepped with everything else: StartReview() and AbandonReview()
+     * are the person's, the reads forward to it. Its engine is the own engine (the factory is asked for OpponentEngine::Own) and a search of its own, so the analysis of the position on the
+     * board is never delayed by a review. Shutdown() drops the review.
+     *
+     * Logging: with EngineOpponent, OpponentController, MoveRater, GameReviewer and DrawOfferJudge, one of the classes of Engine/ that log.
      */
     class PositionAnalyst {
     public:
@@ -90,7 +95,7 @@ namespace BECore::Chess {
         PositionAnalyst(PositionAnalyst&&) = delete;
         PositionAnalyst& operator=(PositionAnalyst&&) = delete;
 
-        /// How an engine is made; an empty one puts the default back (MakeAnalysisEngine over empty settings). Read at the next search. The rater gets the same factory
+        /// How an engine is made; an empty one puts the default back (MakeAnalysisEngine over empty settings). Read at the next search. The rater and the reviewer get the same factory
         void SetEngineFactory(AnalysisEngineFactory factory);
 
         /// Makes an engine through the factory set (or the default). For the owner that hands the same factory to another object, which is move-only and so cannot be given twice
@@ -121,10 +126,20 @@ namespace BECore::Chess {
         /// Switches the rating of the moves on or off (MoveRater::SetOn())
         void SetRatings(bool on);
 
-        /// Cancels the search in flight (the rater's too) and drops the answer; the switches stay, so the next Update() asks again. Returns at once
+        /// Begins the review of the finished game of @p model (GameReviewer::Start())
+        std::expected<void, ReviewRefusal> StartReview(const ChessGameModel& model) {
+            return _reviewer.Start(model);
+        }
+
+        /// The person's cancel of the review: drops it, partial results included (GameReviewer::Abandon())
+        void AbandonReview() {
+            _reviewer.Abandon();
+        }
+
+        /// Cancels the search in flight (the rater's and the reviewer's too) and drops the answer; the switches stay, so the next Update() asks again. Returns at once
         void Cancel();
 
-        /// Cancels, switches the evaluation and the ratings off, drops the hint, the answer, the ratings and the engines. Call it before TaskManager::Shutdown()
+        /// Cancels, switches the evaluation and the ratings off, drops the hint, the answer, the ratings, the review and the engines. Call it before TaskManager::Shutdown()
         void Shutdown();
 
         [[nodiscard]] bool IsEvaluationOn() const noexcept {
@@ -148,6 +163,30 @@ namespace BECore::Chess {
         /// Why the rating of a move failed (MoveRater::GetError()); apart from GetError(), which is the analysis's
         [[nodiscard]] const Optional<EngineError>& GetRatingError() const noexcept {
             return _rater.GetError();
+        }
+
+        /// The state of the review of @p model; Idle for a game that is not the reviewed one (GameReviewer::GetState())
+        [[nodiscard]] ReviewState GetReviewState(const ChessGameModel& model) const {
+            return _reviewer.GetState(model);
+        }
+
+        [[nodiscard]] ReviewProgress GetReviewProgress(const ChessGameModel& model) const {
+            return _reviewer.GetProgress(model);
+        }
+
+        /// The evaluated positions of the review of @p model, empty for another game (GameReviewer::GetPositions())
+        [[nodiscard]] ReviewedPositions GetReviewedPositions(const ChessGameModel& model) const {
+            return _reviewer.GetPositions(model);
+        }
+
+        /// The reviewed moves of @p model, empty for another game (GameReviewer::GetMoves())
+        [[nodiscard]] ReviewedMoves GetReviewedMoves(const ChessGameModel& model) const {
+            return _reviewer.GetMoves(model);
+        }
+
+        /// Why the review failed (GameReviewer::GetError())
+        [[nodiscard]] const Optional<EngineError>& GetReviewError() const noexcept {
+            return _reviewer.GetError();
         }
 
         /// A hint was asked at the version of @p model and not dropped; it may not have come yet
@@ -175,7 +214,7 @@ namespace BECore::Chess {
 
         /// See the class comment
         [[nodiscard]] uint64_t GetRevision() const noexcept {
-            return _revision + _rater.GetRevision();
+            return _revision + _rater.GetRevision() + _reviewer.GetRevision();
         }
 
     private:
@@ -193,7 +232,7 @@ namespace BECore::Chess {
         /// Runs on the pool: asks the engine and leaves the answer in @p search. Its arguments are by value, so the frame owns everything it uses
         static Task<void> RunSearch(IntrusivePtrAtomic<Search> search, SearchRequest request);
 
-        /// Update() without the rater
+        /// Update() without the rater and the reviewer
         void UpdateSearch(const ChessGameModel& model, OpponentEngine picked);
 
         [[nodiscard]] bool IsWantedAt(uint64_t version) const noexcept;
@@ -226,7 +265,8 @@ namespace BECore::Chess {
 
         uint64_t _revision = 0;
 
-        MoveRater _rater;  ///< the ratings of the moves, with its own engine and history; its revision is added in GetRevision()
+        MoveRater _rater;        ///< the ratings of the moves, with its own engine and history; its revision is added in GetRevision()
+        GameReviewer _reviewer;  ///< the review of a finished game, with its own engine and history; its revision is added in GetRevision()
     };
 
 }  // namespace BECore::Chess

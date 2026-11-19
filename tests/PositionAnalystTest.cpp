@@ -1063,4 +1063,146 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(rating->LastRequest().moves.size(), 0u) << "the rating is about the position before the move";
     }
 
+    // ---- The review of a finished game (the GameReviewer the analyst owns) ----
+
+    namespace {
+
+        /// Four plies and a checkmate: the review has 5 positions and searches 4
+        bool PlayFoolsMate(ChessGameModel& model) {
+            for (const StringView uci : {"f2f3", "e7e5", "g2g4", "d8h4"}) {
+                if (!Play(model, uci)) {
+                    return false;
+                }
+            }
+            return model.IsGameOver();
+        }
+
+        bool IsReviewDone(const PositionAnalyst& analyst, const ChessGameModel& model) {
+            return analyst.GetReviewState(model) == ReviewState::Done;
+        }
+
+    }  // namespace
+
+    TEST_F(PositionAnalystTest, AReviewStartedThroughTheAnalystRunsAndShowsInTheReads) {
+        const auto engine = MakeEngine();
+        CountingAnalysisFactory factory{engine};
+        ChessGameModel model;
+        PositionAnalyst analyst;
+        analyst.SetEngineFactory(factory.AsFactory());
+        ASSERT_TRUE(PlayFoolsMate(model));
+        EXPECT_EQ(analyst.GetReviewState(model), ReviewState::Idle);
+        const uint64_t before = analyst.GetRevision();
+
+        ASSERT_TRUE(analyst.StartReview(model).has_value());
+        EXPECT_GT(analyst.GetRevision(), before) << "a start is a change a display shows";
+        const uint64_t started = analyst.GetRevision();
+        ASSERT_TRUE(UpdateUntil(analyst, model, OpponentEngine::Stockfish, [&] { return IsReviewDone(analyst, model); })) << DescribeError(analyst.GetReviewError()).c_str();
+
+        EXPECT_EQ(analyst.GetReviewProgress(model).done, 4u);
+        EXPECT_EQ(analyst.GetReviewProgress(model).total, 4u) << "the mated position is not searched";
+        const ReviewedPositions positions = analyst.GetReviewedPositions(model);
+        ASSERT_EQ(positions.size(), 5u);
+        EXPECT_TRUE(positions[4].has_value());
+        const ReviewedMoves moves = analyst.GetReviewedMoves(model);
+        ASSERT_EQ(moves.size(), 4u);
+        EXPECT_TRUE(moves[3].has_value());
+        EXPECT_EQ(engine->Calls(), 4);
+        ASSERT_EQ(factory.Calls(), 1);
+        EXPECT_GT(analyst.GetRevision(), started) << "a position that arrives moves the revision";
+        EXPECT_FALSE(analyst.GetReviewError().has_value());
+    }
+
+    TEST_F(PositionAnalystTest, TheReviewUsesTheOwnEngineWhicheverEngineIsPicked) {
+        const auto engine = MakeEngine();
+        CountingAnalysisFactory factory{engine};
+        ChessGameModel model;
+        PositionAnalyst analyst;
+        analyst.SetEngineFactory(factory.AsFactory());
+        ASSERT_TRUE(PlayFoolsMate(model));
+
+        ASSERT_TRUE(analyst.StartReview(model).has_value());
+        ASSERT_TRUE(UpdateUntil(analyst, model, OpponentEngine::Stockfish, [&] { return IsReviewDone(analyst, model); }));
+
+        ASSERT_EQ(factory.Calls(), 1);
+        EXPECT_EQ(factory.Engines()[0], "own");
+    }
+
+    TEST_F(PositionAnalystTest, AReviewNeverHoldsTheAnalysisOfAPosition) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        const auto reviewEngine = MakeEngine();
+        reviewEngine->Gate(false);  // the review's search is stuck at its gate for the whole test
+        const auto analysing = MakeEngine(kScore, Mv("e2e4"));
+        CountingAnalysisFactory factory{reviewEngine, analysing};
+        ChessGameModel model;
+        PositionAnalyst analyst;
+        analyst.SetEngineFactory(factory.AsFactory());
+        ASSERT_TRUE(PlayFoolsMate(model));
+        ASSERT_TRUE(analyst.StartReview(model).has_value());
+        ASSERT_TRUE(UpdateUntil(analyst, model, OpponentEngine::Own, [&] { return reviewEngine->Calls() == 1; }));
+
+        // A takeback ends the game, which drops the review; its search still holds the gate
+        ASSERT_EQ(model.TakeBack(1), 1u);
+        analyst.SetEvaluation(true);
+        ASSERT_TRUE(UpdateUntil(analyst, model, OpponentEngine::Own, [&] { return analyst.GetEvaluation(model).has_value(); })) << DescribeError(analyst.GetError()).c_str();
+
+        EXPECT_EQ(analyst.GetEvaluation(model)->move, Mv("e2e4"));
+        EXPECT_EQ(reviewEngine->Answered(), 0) << "the review's engine is still at its gate";
+        ASSERT_EQ(factory.Calls(), 2);
+        EXPECT_EQ(analyst.GetReviewState(model), ReviewState::Idle);
+        reviewEngine->Open();
+        ASSERT_TRUE(WaitUntil([&] { return reviewEngine->Answered() == 1; }));
+    }
+
+    TEST_F(PositionAnalystTest, ShutdownDropsTheReviewAndCancelsItsSearch) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        const auto engine = MakeEngine();
+        engine->Gate(true);
+        CountingAnalysisFactory factory{engine};
+        ChessGameModel model;
+        PositionAnalyst analyst;
+        analyst.SetEngineFactory(factory.AsFactory());
+        ASSERT_TRUE(PlayFoolsMate(model));
+        ASSERT_TRUE(analyst.StartReview(model).has_value());
+        ASSERT_TRUE(UpdateUntil(analyst, model, OpponentEngine::Own, [&] { return engine->Calls() == 1; }));
+        EXPECT_EQ(analyst.GetReviewState(model), ReviewState::Running);
+
+        analyst.Shutdown();
+
+        EXPECT_EQ(analyst.GetReviewState(model), ReviewState::Idle);
+        EXPECT_TRUE(analyst.GetReviewedPositions(model).empty());
+        ASSERT_TRUE(WaitUntil([&] { return engine->WasCancelled(); })) << "the search saw its token";
+        UpdateMany(analyst, model, OpponentEngine::Own);
+        EXPECT_EQ(engine->Calls(), 1) << "nothing starts again until a new StartReview()";
+    }
+
+    TEST_F(PositionAnalystTest, AbandonReviewReturnsToIdle) {
+        const auto engine = MakeEngine();
+        CountingAnalysisFactory factory{engine};
+        ChessGameModel model;
+        PositionAnalyst analyst;
+        analyst.SetEngineFactory(factory.AsFactory());
+        ASSERT_TRUE(PlayFoolsMate(model));
+        ASSERT_TRUE(analyst.StartReview(model).has_value());
+        ASSERT_TRUE(UpdateUntil(analyst, model, OpponentEngine::Own, [&] { return IsReviewDone(analyst, model); }));
+
+        analyst.AbandonReview();
+
+        EXPECT_EQ(analyst.GetReviewState(model), ReviewState::Idle);
+        EXPECT_TRUE(analyst.GetReviewedMoves(model).empty());
+    }
+
+    TEST_F(PositionAnalystTest, AReviewIsRefusedOnAGameThatIsNotFinished) {
+        CountingAnalysisFactory factory{MakeEngine()};
+        ChessGameModel model;
+        PositionAnalyst analyst;
+        analyst.SetEngineFactory(factory.AsFactory());
+        ASSERT_TRUE(Play(model, "e2e4"));
+
+        const std::expected<void, ReviewRefusal> started = analyst.StartReview(model);
+
+        ASSERT_FALSE(started.has_value());
+        EXPECT_EQ(started.error(), ReviewRefusal::NotFinished);
+        EXPECT_EQ(analyst.GetReviewState(model), ReviewState::Idle);
+    }
+
 }  // namespace BECore::Chess::Tests
