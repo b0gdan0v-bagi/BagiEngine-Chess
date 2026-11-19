@@ -74,6 +74,17 @@ namespace BECore::Chess {
      */
     [[nodiscard]] Vector<MovePanelRow> BuildMovePanelRows(const Vector<MoveListRow>& rows, int currentPly, size_t visibleRows = kMovePanelRows);
 
+    /// What a brilliant move says after its SAN, the chess-book sign
+    constexpr StringView kMovePanelBrilliantSuffix = "!!";
+
+    /**
+     * @brief Appends kMovePanelBrilliantSuffix to the text of each cell of @p rows whose ply @p brilliantByPly flags.
+     *
+     * A cell with no move (ply -1, also the absent White move) and a ply past the end of @p brilliantByPly get nothing, so a list shorter than the game marks what it knows. Only
+     * `text` changes: ShownMovesAfter() reads `ply`, never the text.
+     */
+    void MarkMovePanelRows(Vector<MovePanelRow>& rows, const Vector<bool>& brilliantByPly);
+
     /// What a press in the move list asks for: the cell of a move, one move back or forward, or the game's own position
     CORE_ENUM(MoveListPressKind, uint8_t, White, Black, Back, Forward, Latest)
 
