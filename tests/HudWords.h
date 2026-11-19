@@ -4,6 +4,7 @@
 #include <BECore/Text/Utf8.h>
 #include <Chess/Components/ChessHudComponent.h>
 #include <Chess/Engine/OpponentText.h>
+#include <Chess/Engine/ReviewText.h>
 #include <Chess/Game/ChessGameModel.h>
 #include <Chess/Game/MoveGenerator.h>
 #include <Chess/Game/StatusText.h>
@@ -46,7 +47,8 @@ namespace BECore::Chess::Tests {
 
     namespace HudWordsDetail {
 
-        constexpr size_t kLongestOpenings = 24;  ///< how many display names of the book the layout tests lay out
+        constexpr size_t kLongestOpenings = 24;     ///< how many display names of the book the layout tests lay out
+        constexpr size_t kWorstReviewCount = 9999;  ///< the digits of the review's progress the status line is held to
 
         inline void Add(Vector<String>& words, String word) {
             if (eastl::find(words.begin(), words.end(), word) == words.end()) {
@@ -114,9 +116,9 @@ namespace BECore::Chess::Tests {
 
     }  // namespace HudWordsDetail
 
-    /// The words of the HUD, from a scratch game of their own that reaches every status and views its start and a move, then the thinking form of the turn, the words of a puzzle, the declined draw
-    /// and the sentence of every kind of engine error (also the `opponentError` list: the variable of the panel's error line). The names of the segments of the panel (modes, colors, engines, levels)
-    /// are not here: they are elements of the scene that a test walks, and a test holds their text to the tables
+    /// The words of the HUD, from a scratch game of their own that reaches every status and views its start and a move, then the thinking form of the turn, the words of a puzzle, the declined draw,
+    /// the review's progress and the sentence of every kind of engine error (also the `opponentError` list: the variable of the panel's error line). The names of the segments of the panel (modes,
+    /// colors, engines, levels) are not here: they are elements of the scene that a test walks, and a test holds their text to the tables
     inline HudWords AllHudWords() {
         using namespace HudWordsDetail;
         HudWords words;
@@ -186,6 +188,8 @@ namespace BECore::Chess::Tests {
         }
 
         Add(words.status, StatusText::DrawDeclined());
+        Add(words.status, ReviewText::Hud({0, kWorstReviewCount}));
+        Add(words.status, ReviewText::Hud({kWorstReviewCount, kWorstReviewCount}));
         for (const EngineErrorKind kind : EnumUtils<EngineErrorKind>::Values()) {
             Add(words.status, OpponentText::Error(EngineError{kind, {}}));
         }

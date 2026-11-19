@@ -6,6 +6,7 @@
 #include <Chess/ChessGame.h>
 #include <Chess/Components/ClickerDisabled.h>
 #include <Chess/Engine/OpponentText.h>
+#include <Chess/Engine/ReviewText.h>
 #include <Chess/Game/OpeningBook.h>
 #include <Chess/Game/StatusText.h>
 #include <Events/InputEvents.h>
@@ -71,10 +72,13 @@ namespace BECore::Chess {
         const PuzzleSession& puzzle = game->GetPuzzle();
         const bool puzzleOn = game->IsPuzzleOn();
         const uint64_t puzzleRevision = puzzle.GetRevision();
+        // A review's positions arrive with no step of the model's version; the takeback or reset that drops one moves the version
+        const PositionAnalyst& analyst = game->GetAnalyst();
+        const uint64_t reviewRevision = analyst.GetReviewRevision();
         const bool opponentChanged = &model != _publishedModel || opponent.GetRevision() != _publishedRevision || judge.GetRevision() != _publishedJudgeRevision;
         if (!opponentChanged && model.GetVersion() == _publishedVersion && thinking == _publishedThinking && personColor == _publishedColor && shown == _publishedShown &&
             editing == _publishedEditing && refusal == _publishedRefusal && editorMessage == StringView(_publishedEditorMessage) && puzzleOn == _publishedPuzzleOn &&
-            puzzleRevision == _publishedPuzzleRevision) {
+            puzzleRevision == _publishedPuzzleRevision && reviewRevision == _publishedReviewRevision) {
             return;
         }
         _publishedModel = &model;
@@ -89,10 +93,12 @@ namespace BECore::Chess {
         _publishedEditorMessage = String(editorMessage);
         _publishedPuzzleOn = puzzleOn;
         _publishedPuzzleRevision = puzzleRevision;
+        _publishedReviewRevision = reviewRevision;
 
         // While an error of the opponent stands the game is stalled by it, so its sentence wins over the others; a refused draw offer wins over the game's own status ("Check"); a view
         // wins over all: the board shows another position and the line says how to get back to the game (the panel keeps the error, and the line has it again when the view ends).
-        // A puzzle parks the opponent, so its error and draw offers say nothing on the board: the Turn line is the puzzle's, and a wrong move stands over the game's status
+        // A puzzle parks the opponent, so its error and draw offers say nothing on the board: the Turn line is the puzzle's, and a wrong move stands over the game's status. A review that runs
+        // comes after all of them, so it never hides a sentence that asks for something; only the game's own status gives way to it, and the Turn line stays
         const Optional<EngineError>& error = opponent.GetError();
         // A position that is edited has no turn, status or opening of the game: the Turn line is the editor's, and the bottom margin is the editor bar's
         String turn;
@@ -116,6 +122,8 @@ namespace BECore::Chess {
                 status = OpponentText::Error(*error);
             } else if (offer == DrawOfferState::Declined) {
                 status = StatusText::DrawDeclined();
+            } else if (analyst.GetReviewState(model) == ReviewState::Running) {
+                status = ReviewText::Hud(analyst.GetReviewProgress(model));
             } else {
                 status = StatusText::Status(model);
             }

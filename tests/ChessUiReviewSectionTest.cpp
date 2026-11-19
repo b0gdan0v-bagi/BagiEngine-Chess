@@ -1,5 +1,6 @@
 #include <Chess/Components/ChessReviewSectionComponent.h>
 #include <Chess/Components/MoveRows.h>
+#include <Chess/Engine/OpponentText.h>
 #include <Chess/Engine/ReviewText.h>
 #include <tests/ChessUiHarness.h>
 
@@ -431,6 +432,93 @@ namespace BECore::Chess::Tests {
         engine->Open();
         ASSERT_TRUE(WaitForReview());
         steady("a done review");
+    }
+
+    // ---- the HUD while a review runs ------------------------------------------------------------------------------------------------
+
+    TEST_F(ChessUiTest, WhileAReviewRunsTheStatusLineSaysHowFarItIsAndTheTurnLineStaysTheGames) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        const auto engine = New<AnalysingEngine>();
+        engine->Gate(true);
+        CountingAnalysisFactory factory{engine};
+        Analyst().SetEngineFactory(factory.AsFactory());
+        ASSERT_TRUE(PlayFoolsMate());
+        ASSERT_EQ(Var("status"), "Checkmate");
+
+        Press("ChessReviewStart");
+        ASSERT_EQ(Analyst().GetReviewState(Model()), ReviewState::Running);
+        EXPECT_EQ(Var("status"), "Reviewing 0/4");
+        EXPECT_EQ(Var("turn"), StatusText::Turn(Model(), false)) << "the Turn line still says who won";
+
+        engine->Open();
+        ASSERT_TRUE(WaitForReview());
+        EXPECT_EQ(Var("status"), "Checkmate") << "a done review leaves nothing of its words";
+    }
+
+    TEST_F(ChessUiTest, EveryStepOfTheReviewReachesTheStatusLineAndACancelledOneLeavesNothing) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        const auto engine = New<AnalysingEngine>();
+        CountingAnalysisFactory factory{engine};
+        Analyst().SetEngineFactory(factory.AsFactory());
+        ASSERT_TRUE(PlayFoolsMate());
+
+        Press("ChessReviewStart");
+        ASSERT_TRUE(FramesUntil([&] {
+            const ReviewState state = Analyst().GetReviewState(Model());
+            const String status = Var("status");
+            if (state == ReviewState::Running) {
+                EXPECT_EQ(status, ReviewText::Hud(Analyst().GetReviewProgress(Model())));
+            }
+            return state == ReviewState::Done;
+        }));
+
+        Press("ChessReviewCancel");
+        EXPECT_EQ(Var("status"), "Checkmate");
+
+        const auto gated = New<AnalysingEngine>();
+        gated->Gate(true);
+        CountingAnalysisFactory gatedFactory{gated};
+        Analyst().SetEngineFactory(gatedFactory.AsFactory());
+        Press("ChessReviewStart");
+        ASSERT_EQ(Var("status"), "Reviewing 0/4");
+        Press("ChessReviewCancel");
+        EXPECT_EQ(Var("status"), "Checkmate");
+        gated->Open();
+    }
+
+    TEST_F(ChessUiTest, AViewOverAReviewShowsTheViewsLineAndTheReviewComesBackWhenTheViewEnds) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        const auto engine = New<AnalysingEngine>();
+        engine->Gate(true);
+        CountingAnalysisFactory factory{engine};
+        Analyst().SetEngineFactory(factory.AsFactory());
+        ASSERT_TRUE(PlayFoolsMate());
+        Press("ChessReviewStart");
+        ASSERT_EQ(Var("status"), "Reviewing 0/4");
+
+        ASSERT_TRUE(Model().ShowMoves(2));
+        EXPECT_EQ(Var("status"), StatusText::Viewing(Model()));
+        ASSERT_TRUE(Model().EndViewing());
+        EXPECT_EQ(Var("status"), "Reviewing 0/4");
+        engine->Open();
+    }
+
+    TEST_F(ChessUiTest, AStandingErrorOfTheOpponentIsShownOverARunningReview) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        const auto engine = New<AnalysingEngine>();
+        engine->Gate(true);
+        CountingAnalysisFactory factory{engine};
+        Analyst().SetEngineFactory(factory.AsFactory());
+        CountingFactory opponents(EngineError{EngineErrorKind::LaunchFailed, "the program cannot be started"});
+        Opponent().SetEngineFactory(opponents.AsFactory());
+        ASSERT_TRUE(PlayFoolsMate());
+        Press("ChessReviewStart");
+        ASSERT_EQ(Var("status"), "Reviewing 0/4");
+
+        ASSERT_FALSE(Opponent().SetSide(PieceColor::Black).has_value()) << "no engine can be made, the pick is refused";
+        ASSERT_TRUE(Opponent().GetError().has_value());
+        EXPECT_EQ(Var("status"), OpponentText::Error(*Opponent().GetError()));
+        engine->Open();
     }
 
 }  // namespace BECore::Chess::Tests
