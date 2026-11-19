@@ -1,5 +1,6 @@
 #include <Chess/Components/PieceSprite.h>
 #include <Chess/Game/ChessTypes.h>
+#include <tests/ChessPieceArt.h>
 #include <tests/ChessTestUtil.h>
 #include <tests/ShippedScene.h>
 
@@ -9,11 +10,8 @@ namespace BECore::Chess::Tests {
 
     namespace {
 
-        constexpr const char* kAtlasPath = "assets/atlases/pieces.png";
-        constexpr const char* kAtlasGroup = "pieces";
         constexpr const char* kSourceFolder = "assets/artgen/";
-        constexpr uint32_t kMaxSide = 256;        // `accept.maxSize` of the preset
-        constexpr uint32_t kMaxAtlasSide = 1024;  // the cap `ChessPieceAtlasTest` packs with: four pieces to a row
+        constexpr uint32_t kMaxSide = 256;  // `accept.maxSize` of the preset
 
         constexpr size_t kSignatureSize = 8;
         constexpr size_t kIhdrTypeOffset = 12;
@@ -25,22 +23,6 @@ namespace BECore::Chess::Tests {
         constexpr uint8_t kBitDepth = 8;
         constexpr uint8_t kColorTypeRgba = 6;
         constexpr uint8_t kPngSignature[kSignatureSize] = {0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n'};
-
-        std::filesystem::path GameRoot() {
-            return ShippedConfigFolder().parent_path();
-        }
-
-        Vector<Piece> AllPieces() {
-            Vector<Piece> pieces;
-            for (const PieceColor color : EnumUtils<PieceColor>::Values()) {
-                for (const PieceType type : EnumUtils<PieceType>::Values()) {
-                    if (type != PieceType::None) {
-                        pieces.push_back(Piece{type, color});
-                    }
-                }
-            }
-            return pieces;
-        }
 
         bool LoadLibrary(pugi::xml_document& document) {
             const std::filesystem::path file = ShippedConfigFolder() / "TextureLibrary.xml";
@@ -71,10 +53,6 @@ namespace BECore::Chess::Tests {
         SpriteRect SrcRectOf(const pugi::xml_node& sprite) {
             const pugi::xml_node rect = sprite.child("srcRect");
             return SpriteRect{rect.attribute("x").as_float(), rect.attribute("y").as_float(), rect.attribute("w").as_float(), rect.attribute("h").as_float()};
-        }
-
-        bool Overlap(const SpriteRect& a, const SpriteRect& b) {
-            return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
         }
 
         struct PngHeader {
@@ -127,14 +105,14 @@ namespace BECore::Chess::Tests {
             }
             EXPECT_EQ(count, 1u) << "the library names the sprite once";
             const pugi::xml_node sprite = SpriteOf(library, name);
-            EXPECT_EQ(String(sprite.attribute("texturePath").as_string()), String(kAtlasPath));
-            EXPECT_EQ(String(sprite.child("atlas").attribute("name").as_string()), String(kAtlasGroup));
+            EXPECT_EQ(String(sprite.attribute("texturePath").as_string()), String(kPiecesAtlasPath));
+            EXPECT_EQ(String(sprite.child("atlas").attribute("name").as_string()), String(kPiecesGroup));
         }
     }
 
     TEST(ChessPieceArtFilesTest, TheAtlasIsAnRgbaPngWithinItsLimit) {
-        const PngHeader header = ReadPngHeader(FileOfTexturePath(kAtlasPath));
-        ASSERT_TRUE(header.valid) << "not a PNG: " << kAtlasPath;
+        const PngHeader header = ReadPngHeader(FileOfTexturePath(kPiecesAtlasPath));
+        ASSERT_TRUE(header.valid) << "not a PNG: " << kPiecesAtlasPath;
         EXPECT_EQ(header.bitDepth, kBitDepth);
         EXPECT_EQ(header.colorType, kColorTypeRgba) << "the cut-out needs an alpha channel";
         EXPECT_GT(header.width, 0u);
@@ -145,7 +123,7 @@ namespace BECore::Chess::Tests {
     TEST(ChessPieceArtFilesTest, EveryPieceRectLiesInTheAtlasWithoutOverlapAndAllShareOneSize) {
         pugi::xml_document library;
         ASSERT_TRUE(LoadLibrary(library));
-        const PngHeader atlas = ReadPngHeader(FileOfTexturePath(kAtlasPath));
+        const PngHeader atlas = ReadPngHeader(FileOfTexturePath(kPiecesAtlasPath));
         ASSERT_TRUE(atlas.valid);
         Vector<SpriteRect> rects;
         for (const Piece piece : AllPieces()) {
