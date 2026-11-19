@@ -195,6 +195,8 @@ namespace BECore::Chess {
         constexpr const char* kPuzzleUsage = "'puzzle' has to be an object with exactly one member: {\"index\": 0} or {\"id\": \"00sHx\"} begins a puzzle, {\"next\": true}, {\"retry\": true} or "
                                              "{\"end\": true} acts on the one that is on";
 
+        constexpr const char* kReviewUsage = "'review' has to be an object with exactly one member: {\"start\": true} or {\"cancel\": true}";
+
         constexpr const char* kPuzzleOnUsage = "a puzzle is on: leave it first with {\"puzzle\": {\"end\": true}} (a takeback, a resignation or a draw offer would break its line)";
 
         constexpr const char* kTakeBackUsage = "'takeBack' has to be an object like {} (the button's rule) or {\"plies\": 2} (the member is an optional integer from 1 to the moves played)";
@@ -210,6 +212,19 @@ namespace BECore::Chess {
                 }
             }
             return san;
+        }
+
+        StringView ReviewStateId(ReviewState state) {
+            switch (state) {
+                case ReviewState::Idle:
+                case ReviewState::Running:
+                    return "running";
+                case ReviewState::Done:
+                    return "done";
+                case ReviewState::Failed:
+                    return "failed";
+            }
+            return "running";
         }
 
         StringView PuzzlePhaseId(PuzzlePhase phase) {
@@ -365,7 +380,53 @@ namespace BECore::Chess {
         state["drawOffer"] = DrawOfferJson();
         state["editor"] = EditorJson();
         state["puzzle"] = PuzzleJson();
+        state["review"] = ReviewJson();
         return state;
+    }
+
+    Json ChessGameControl::ReviewJson() const {
+        const ReviewState reviewState = _analyst.GetReviewState(_model);
+        if (reviewState == ReviewState::Idle) {
+            return Json();
+        }
+        const ReviewProgress progress = _analyst.GetReviewProgress(_model);
+
+        Json positions = Json::array();
+        for (const Optional<ReviewedPosition>& position : _analyst.GetReviewedPositions(_model)) {
+            if (!position) {
+                positions.push_back(Json());
+                continue;
+            }
+            const AnalysisScore white = ScoreForWhite(position->score, position->sideToMove);
+            Json described = Json::object();
+            described["score"] = ScoreJson(white);
+            described["text"] = TextJson(ScoreText(white));
+            described["best"] = position->best.IsNull() ? Json() : TextJson(position->best.ToUci());
+            positions.push_back(std::move(described));
+        }
+
+        Json moves = Json::array();
+        for (const Optional<ReviewedMove>& move : _analyst.GetReviewedMoves(_model)) {
+            if (!move) {
+                moves.push_back(Json());
+                continue;
+            }
+            Json described = Json::object();
+            described["loss"] = move->review.loss;
+            described["quality"] = MakeJsonString(MoveQualityId(move->review.quality));
+            described["best"] = TextJson(move->best.ToUci());
+            moves.push_back(std::move(described));
+        }
+
+        Json review = Json::object();
+        review["state"] = MakeJsonString(ReviewStateId(reviewState));
+        review["done"] = progress.done;
+        review["total"] = progress.total;
+        review["depth"] = kReviewDepth;
+        review["positions"] = std::move(positions);
+        review["moves"] = std::move(moves);
+        review["error"] = ErrorJson(_analyst.GetReviewError());
+        return review;
     }
 
     Json ChessGameControl::PuzzleJson() const {
@@ -563,11 +624,18 @@ namespace BECore::Chess {
         const Json* resignMember = FindJsonMember(state, "resign");
         const Json* drawMember = FindJsonMember(state, "draw");
         const Json* puzzleMember = FindJsonMember(state, "puzzle");
-        if (!fenMember && !opponentMember && !analysisMember && !takeBackMember && !resignMember && !drawMember && !puzzleMember) {
-            return std::unexpected(
-                MakeControlError(ControlErrors::kInvalidParams,
-                                 "'fen' (a FEN string), 'opponent' ({\"plays\", \"level\", \"engine\", \"white\", \"black\", \"seed\"}), both, or "
-                                 "'analysis' ({\"evaluation\", \"hint\", \"ratings\"}), 'takeBack' ({\"plies\"}), 'resign' ({\"color\"}), 'draw' ({}) or 'puzzle' ({\"index\"}) alone are needed"));
+        const Json* reviewMember = FindJsonMember(state, "review");
+        if (!fenMember && !opponentMember && !analysisMember && !takeBackMember && !resignMember && !drawMember && !puzzleMember && !reviewMember) {
+            return std::unexpected(MakeControlError(ControlErrors::kInvalidParams,
+                                                    "'fen' (a FEN string), 'opponent' ({\"plays\", \"level\", \"engine\", \"white\", \"black\", \"seed\"}), both, or "
+                                                    "'analysis' ({\"evaluation\", \"hint\", \"ratings\"}), 'takeBack' ({\"plies\"}), 'resign' ({\"color\"}), 'draw' ({}), 'puzzle' ({\"index\"}) or "
+                                                    "'review' ({\"start\": true}) alone are needed"));
+        }
+        if (reviewMember) {
+            if (fenMember || opponentMember || analysisMember || takeBackMember || resignMember || drawMember || puzzleMember) {
+                return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, "'review' cannot be combined with another member: it belongs to the finished game they would change"));
+            }
+            return SetReview(*reviewMember);
         }
         if (puzzleMember) {
             if (fenMember || opponentMember || analysisMember || takeBackMember || resignMember || drawMember) {
@@ -802,6 +870,36 @@ namespace BECore::Chess {
             static_cast<void>(_puzzle.Leave(_model));
         }
         return {};
+    }
+
+    std::expected<void, ControlError> ChessGameControl::SetReview(const Json& review) {
+        if (!review.is_object() || review.size() != 1) {
+            return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, kReviewUsage));
+        }
+        const auto member = review.items().begin();
+        const String key = String(member.key().c_str(), member.key().size());
+        const Json& value = member.value();
+        if ((key != "start" && key != "cancel") || !value.is_boolean() || !value.get<bool>()) {
+            return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, kReviewUsage));
+        }
+        if (key == "cancel") {
+            _analyst.AbandonReview();
+            return {};
+        }
+        if (_puzzle.IsActiveFor(_model)) {
+            return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, "a puzzle is on: leave it first with {\"puzzle\": {\"end\": true}} (a puzzle is not reviewed)"));
+        }
+        const std::expected<void, ReviewRefusal> started = _analyst.StartReview(_model);
+        if (started) {
+            return {};
+        }
+        switch (started.error()) {
+            case ReviewRefusal::NotFinished:
+                return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, "the game is not finished: only a finished game is reviewed"));
+            case ReviewRefusal::NoMoves:
+                return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, "the game has no moves: there is nothing to review"));
+        }
+        return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, kReviewUsage));
     }
 
     uint64_t ChessGameControl::GetStateVersion() const {
