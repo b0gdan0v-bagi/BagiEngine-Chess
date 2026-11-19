@@ -121,8 +121,8 @@ namespace BECore::Chess {
             }
         }
         const String opponentError = error ? OpponentText::Error(*error) : String();
-        // The name of the position the board shows: a view names the viewed one, as the board does
-        const Optional<OpeningEntry> opening = editing ? std::nullopt : OpeningOf(game->GetOpenings(), model.GetStartFen(), model.GetMoves(), model.GetShownMoveCount());
+        // The name of the position the board shows: a view names the viewed one, as the board does. The puzzle bar stands in the place of the name, so none shows while a puzzle is on
+        const Optional<OpeningEntry> opening = (editing || puzzleOn) ? std::nullopt : OpeningOf(game->GetOpenings(), model.GetStartFen(), model.GetMoves(), model.GetShownMoveCount());
         const String openingText = opening ? OpeningDisplayName(opening->name, kOpeningMaxChars) : String();
         UIVars& vars = CoreManager::GetUIVars();
         vars.Set(Ids::turn, StringView(turn));

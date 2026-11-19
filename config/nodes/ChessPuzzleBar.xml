@@ -1,0 +1,48 @@
+<?xml version="1.0"?>
+<!-- The puzzle bar: Retry, Next and Leave in the bottom-left margin of the view while a puzzle is on (ChessGame::IsPuzzleOn()), so the person does not need the menu between two puzzles.
+     A non-modal canvas of the SceneView space (layer 20, above the HUD), started hidden: ChessPuzzleBarComponent (listed before the canvas) shows it exactly while a puzzle is on, checked
+     on every update and draw like the editor bar, and answers no action: the buttons emit ChessPuzzleRetry, ChessPuzzleNext and ChessPuzzleLeave, which ChessPuzzleSectionComponent answers
+     wherever they come from (the section may be hidden). The bar blocks no input but its own buttons. It stands where the HUD's Opening stands: Turn and the top row, Status (the puzzle's
+     "Wrong move" and "Solved" stand in it) and the move panel's Hint and Take back are in use while a puzzle is on, and the HUD leaves Opening empty then, so the bar and a name never share
+     the place. One row of 56-unit buttons 12 units above the bottom of the safe area, from x 80 (past the lower group of the captured material in the left margin, as Opening), 3 x 68 +
+     2 x 4 (spacing) = 212 units wide: Opening has 248 in the narrowest default window (36 % of 689) and Status begins at 347. The Portrait view has no such group in the margin, so its variant
+     starts the row at 12 as Opening does. Known limit, the same as the editor bar's: in a Wide window with side insets the home bar lifts the safe edge to y 768 and the row covers 20
+     units of the board's lowest rank. Every name starts with PuzzleBar because elements are found by name in every canvas of the scene. -->
+<node name="PuzzleBar" layer="20" contentVersion="5">
+  <components>
+    <component type="ChessPuzzleBarComponent" />
+    <component type="UICanvasComponent" space="SceneView" useSafeArea="true" visible="false">
+      <elements>
+        <element type="UIStack" name="PuzzleBarRow" anchor="BottomLeft" x="80" y="-12" width="212" height="56" direction="Horizontal" spacing="4" blocksInput="false">
+          <children>
+            <element type="UIElement" name="PuzzleBarRetry" width="68" height="56" fontSize="20" color="112,84,48,255">
+              <components>
+                <component type="UITextComponent" text="Retry" align="Center" verticalAlign="Center" wrap="false"/>
+                <component type="UIInputClicker" action="ChessPuzzleRetry"/>
+              </components>
+            </element>
+            <element type="UIElement" name="PuzzleBarNext" width="68" height="56" fontSize="20" color="50,115,85,255">
+              <components>
+                <component type="UITextComponent" text="Next" align="Center" verticalAlign="Center" wrap="false"/>
+                <component type="UIInputClicker" action="ChessPuzzleNext"/>
+              </components>
+            </element>
+            <element type="UIElement" name="PuzzleBarLeave" width="68" height="56" fontSize="20" color="70,70,100,255">
+              <components>
+                <component type="UITextComponent" text="Leave" align="Center" verticalAlign="Center" wrap="false"/>
+                <component type="UIInputClicker" action="ChessPuzzleLeave"/>
+              </components>
+            </element>
+          </children>
+        </element>
+      </elements>
+      <variants>
+        <variant when="orientation:portrait">
+          <overrides>
+            <set element="PuzzleBarRow" x="12" />
+          </overrides>
+        </variant>
+      </variants>
+    </component>
+  </components>
+</node>

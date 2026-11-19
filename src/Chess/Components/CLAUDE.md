@@ -18,6 +18,7 @@ ChessGameSectionComponent on GameSection ("Resign / Draw"), before its canvas: C
 ChessPositionSectionComponent on PositionSection ("Position"), before its canvas: ChessEditBegin, ChessEditSide, ChessEditCastle, ChessEditPlay, ChessEditCancel
 ChessPuzzleSectionComponent on PuzzleSection ("Puzzles"), before its canvas: ChessPuzzleNext, ChessPuzzleRetry, ChessPuzzleLeave
 ChessEditorBarComponent on EditorBar, before its canvas: shown while a position is edited; ChessEditPick, ChessEditColor
+ChessPuzzleBarComponent on PuzzleBar, before its canvas: shown while a puzzle is on
 PieceSprite             `PieceSpriteId(Piece)`: the one table of the piece sprites (pieces, material icons, the editor bar)
 AnalysisRows            the move panel's analysis band: the words and bar from the analyst, the grey of the Hint buttons
 MoveRows                the part both share: the game's rows, their words, the rows and marks of one canvas, the takeback
@@ -95,7 +96,7 @@ Node `GameSection` (`ChessGameSection.xml`, layer 20, modal, hidden), built like
 
 ## The Puzzles section
 
-Node `PuzzleSection` (`ChessPuzzleSection.xml`, layer 20, modal, hidden), built like `GameSection`. `ChessPuzzleSectionComponent` answers `ChessPuzzleNext` (`NextPuzzle()` begins the first puzzle when none is on), `ChessPuzzleRetry` and `ChessPuzzleLeave` **wherever they come from** (the section may be hidden: the puzzle bar presses them), asks the game's rule again and after a success closes the menu. Its variables (`puzzle*`) are written only on a change of the game, its version, the session's revision, the set's size or `IsPuzzleOn()`; Start / Next is grey with an empty set, Retry and Leave while no puzzle is on.
+Node `PuzzleSection` (`ChessPuzzleSection.xml`, layer 20, modal, hidden), built like `GameSection`. `ChessPuzzleSectionComponent` answers `ChessPuzzleNext` (`NextPuzzle()` begins the first puzzle when none is on), `ChessPuzzleRetry` and `ChessPuzzleLeave` **wherever they come from** (the section may be hidden: the puzzle bar presses them), asks the game's rule again and after a success closes the menu. Its variables (`puzzle*`) are written only on a change of the game, its version, the session's revision, the set's size or `IsPuzzleOn()`; Start / Next is grey with an empty set, Retry and Leave while no puzzle is on. The bar (node `PuzzleBar`) shows exactly while `IsPuzzleOn()`, where `Opening` stands (empty then), and only emits those actions (`config/CLAUDE.md`, "The bars").
 
 ## The opponent panel
 
@@ -115,9 +116,9 @@ While `ChessGame::IsEditing()` (the model shows a draft, `Game/CLAUDE.md`) the s
 - **Pieces** snap, as under a view (`ShowsOtherPosition`). No result dim; the material's sets and the move panel's box are hidden; `ChessShowMove` and Hint do nothing (they would end the draft).
 - **The section `Position`** (node `PositionSection`, layer 20, modal, built like `GameSection`): the three starts (each closes the menu), the side and four castling switches (greyed while the king or rook is off its square), Copy / Paste FEN, Play from here (a refusal keeps the menu open, its reason in `{editorMessage}`), Cancel. Play, Cancel and the switches are grey with no editor.
 - **Copy / Paste:** Paste and Ctrl+V (`PasteEvent`, taken only while editing or with the section shown) call `ChessGame::PasteFen`: it begins the editor when none is open and loads the text, a bad one changes nothing. What the clipboard or the rules say is the message (`EditorText`, also with no editor: it is dropped when the menu closes or returns to the list). The read's callback holds no pointer: the game is found at the answer.
-- **The bar** (node `EditorBar`, layer 20, non-modal; shown exactly while editing, checked on every update and draw): six piece buttons (icons follow the picked color), Erase, the color, Play (`ChessEditPlay`, the section's) and More (opens the section); the picked tool is the `selected` button. A wrapping stack of 56-unit buttons in the bottom margin where `Opening` / `Status` stand; two rows in Portrait and Tall, at the right of the board in Wide. **Known limit:** where a home bar lifts the safe edge in a default-view window (an inset 4:3 one) the row covers 20 units of the lowest rank.
+- **The bar** (node `EditorBar`, layer 20, non-modal; shown exactly while editing, checked on every update and draw): six piece buttons (icons follow the picked color), Erase, the color, Play (`ChessEditPlay`, the section's) and More (opens the section); the picked tool is the `selected` button. Places and limit: `config/CLAUDE.md`, "The bars".
 - **HUD:** `turn` is `StatusText::Editing()`, `status` and `opening` are empty; republished when the editing flag, the editor's refusal or the message changes (none moves a version).
 
 ## Draw order
 
-By layer, not by place among the references of `SceneConfig.xml` (`engine/src/Modules/BECore/Scene/CLAUDE.md`, "Draw order"); the same layer draws in scene order. `Board` and then `BoardCoordinates` -1, pieces 0, `Result` 1, `MovePanel` 4, `Material` 5, a dragged piece 6, `Hud` 10, the panels, the menu and the editor bar 20 (the bar is listed before the menu, so a panel draws over it).
+By layer, not by place among the references of `SceneConfig.xml` (`engine/src/Modules/BECore/Scene/CLAUDE.md`, "Draw order"); the same layer draws in scene order. `Board` and then `BoardCoordinates` -1, pieces 0, `Result` 1, `MovePanel` 4, `Material` 5, a dragged piece 6, `Hud` 10, the panels, the menu and the two bars 20 (a bar is listed before the menu, so a panel draws over it).

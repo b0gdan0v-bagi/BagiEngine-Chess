@@ -869,6 +869,41 @@ namespace BECore::Chess::Tests {
                 CollectNames(*child, names);
             }
         }
+
+        constexpr float kMinBarWidth = 56.0f;
+        constexpr float kHomeBarOverlap = 20.0f;  // the most a bar covers of the board's lowest rank, and only where the home bar of an inset window lifts the safe edge over the margin
+
+        /// What is wrong with a bar (the editor's, the puzzle's) as it is laid out, one problem to a line: a button of @p names that is cut, too small, or on the board
+        template <size_t Count>
+        String BarProblems(const UICanvasLayout& layout, const char* const (&names)[Count]) {
+            String problems;
+            const float scale = layout.GetResolved().scale;
+            const bool portrait = LaidOutForPortrait(layout);
+            const Rect board{portrait ? kPortraitBoardLeft : kBoardLeft, portrait ? kPortraitBoardTop : kBoardTop, kBoardUnits, kBoardUnits};
+            for (const char* name : names) {
+                const UIElement* button = layout.root->FindByName(PoolString::Intern(name));
+                if (!button || button->rect.IsEmpty()) {
+                    problems += Format("{} has no rect\n", name);
+                    continue;
+                }
+                const Rect& rect = button->rect;
+                const UIContentFit fit = button->CheckContent(rect.w - 2.0f * kButtonAir, rect.h, scale);
+                if (fit.hasContent && !fit.fits) {
+                    problems += Format("{} cuts '{}': {:.1f} units wide, at scale {:.3f}\n", name, ShownText(*button).c_str(), rect.w, scale);
+                }
+                if (rect.h < kSegmentHeight - kPixelTolerance || rect.w < kMinBarWidth - kPixelTolerance) {
+                    problems += Format("{} is {:.1f} x {:.1f} units, under {:.0f}\n", name, rect.w, rect.h, kSegmentHeight);
+                }
+                const bool overlaps = rect.x < board.x + board.w && rect.x + rect.w > board.x && rect.y < board.y + board.h && rect.y + rect.h > board.y;
+                const UICanvasResolved& resolved = layout.GetResolved();
+                const bool lifted = resolved.safeBounds.y + resolved.safeBounds.h < resolved.bounds.y + resolved.bounds.h - kPixelTolerance;
+                const float depth = board.y + board.h - rect.y;
+                if (overlaps && !(lifted && depth <= kHomeBarOverlap + kPixelTolerance)) {
+                    problems += Format("{} ({:.1f}, {:.1f}, {:.1f}, {:.1f}) is on the board\n", name, rect.x, rect.y, rect.w, rect.h);
+                }
+            }
+            return problems;
+        }
     }  // namespace
 
 // The panel of a build without Stockfish (CHESS_NO_STOCKFISH) hides the segment EngineStockfish (ChessOpponentPanelComponent::SyncStockfishSegment), so a case that clicks it, or counts ten
