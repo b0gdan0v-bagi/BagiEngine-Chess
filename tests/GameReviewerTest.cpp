@@ -587,6 +587,93 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(noLines.GetProgress(model).done, 0u);
     }
 
+    namespace {
+
+        /// GetPosition(model, i) is GetPositions(model)[i] for every index of the list and gives nothing past it
+        void ExpectOneEntryReadsLikeTheList(const GameReviewer& reviewer, const ChessGameModel& model) {
+            const ReviewedPositions positions = reviewer.GetPositions(model);
+            for (size_t index = 0; index < positions.size(); ++index) {
+                EXPECT_EQ(reviewer.GetPosition(model, index), positions[index]) << index;
+            }
+            EXPECT_FALSE(reviewer.GetPosition(model, positions.size()).has_value());
+            EXPECT_FALSE(reviewer.GetPosition(model, positions.size() + 100).has_value());
+        }
+
+    }  // namespace
+
+    TEST_F(GameReviewerTest, OnePositionReadsLikeTheListDuringAndAfterAReview) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        const auto engine = MakeFoolsMateEngine();
+        engine->Gate(false, 2);
+        CountingAnalysisFactory factory{engine};
+        ChessGameModel model;
+        ASSERT_TRUE(PlayFoolsMate(model));
+        GameReviewer reviewer;
+        reviewer.SetEngineFactory(factory.AsFactory());
+        ASSERT_TRUE(reviewer.Start(model).has_value());
+        EXPECT_FALSE(reviewer.GetPosition(model, 0).has_value()) << "started, nothing has come";
+        EXPECT_TRUE(reviewer.GetPosition(model, 4).has_value()) << "the terminal position needs no search";
+
+        ASSERT_TRUE(UpdateUntil(reviewer, model, [&] { return engine->Calls() == 3; }));
+        UpdateMany(reviewer, model, 100);
+
+        ExpectOneEntryReadsLikeTheList(reviewer, model);
+        EXPECT_TRUE(reviewer.GetPosition(model, 1).has_value());
+        EXPECT_FALSE(reviewer.GetPosition(model, 2).has_value()) << "not evaluated yet";
+        EXPECT_FALSE(reviewer.GetPosition(model, 3).has_value());
+
+        engine->Open();
+        ASSERT_TRUE(UpdateUntil(reviewer, model, [&] { return IsDone(reviewer, model); }));
+        ExpectOneEntryReadsLikeTheList(reviewer, model);
+        EXPECT_EQ(reviewer.GetPosition(model, 0), (ReviewedPosition{Cp(20), 20, Mv("e2e4"), PieceColor::White}));
+        EXPECT_EQ(reviewer.GetPosition(model, 3), (ReviewedPosition{Mate(1), kMateCentipawns - kCentipawnsPerMateMove, Mv("d8h4"), PieceColor::Black}));
+    }
+
+    TEST_F(GameReviewerTest, TheTerminalPositionHasItsOwnValueAndNoBestMoveThroughTheOneEntryRead) {
+        const auto engine = MakeFoolsMateEngine();
+        CountingAnalysisFactory factory{engine};
+        ChessGameModel model;
+        ASSERT_TRUE(PlayFoolsMate(model));
+        GameReviewer reviewer;
+        reviewer.SetEngineFactory(factory.AsFactory());
+        ASSERT_TRUE(reviewer.Start(model).has_value());
+        ASSERT_TRUE(UpdateUntil(reviewer, model, [&] { return IsDone(reviewer, model); }));
+
+        const Optional<ReviewedPosition> terminal = reviewer.GetPosition(model, model.GetMoves().size());
+
+        ASSERT_TRUE(terminal.has_value());
+        EXPECT_EQ(terminal->centipawns, -kMateCentipawns);
+        EXPECT_TRUE(terminal->best.IsNull());
+        EXPECT_EQ(terminal->sideToMove, PieceColor::White);
+    }
+
+    TEST_F(GameReviewerTest, OnePositionIsEmptyWithNoReviewAndForAnotherGameBeforeTheNextUpdate) {
+        const auto engine = MakeFoolsMateEngine();
+        CountingAnalysisFactory factory{engine};
+        ChessGameModel model;
+        ASSERT_TRUE(PlayFoolsMate(model));
+        GameReviewer reviewer;
+        reviewer.SetEngineFactory(factory.AsFactory());
+        EXPECT_FALSE(reviewer.GetPosition(model, 0).has_value()) << "nothing started";
+
+        ASSERT_TRUE(reviewer.Start(model).has_value());
+        ASSERT_TRUE(UpdateUntil(reviewer, model, [&] { return IsDone(reviewer, model); }));
+        ASSERT_TRUE(reviewer.GetPosition(model, 0).has_value());
+
+        ASSERT_EQ(model.TakeBack(1), 1u);
+        EXPECT_FALSE(reviewer.GetPosition(model, 0).has_value()) << "a takeback: the game is not the held one, before any Update";
+        EXPECT_FALSE(reviewer.GetPosition(model, 3).has_value());
+
+        ChessGameModel other;
+        other.SetPosition(PositionFromFen("4k3/8/8/8/8/8/4P3/4K3 w - - 0 1"));
+        EXPECT_FALSE(reviewer.GetPosition(other, 0).has_value()) << "another start FEN";
+
+        reviewer.Abandon();
+        ChessGameModel again;
+        ASSERT_TRUE(PlayFoolsMate(again));
+        EXPECT_FALSE(reviewer.GetPosition(again, 0).has_value()) << "an abandoned review holds nothing";
+    }
+
     TEST_F(GameReviewerTest, AnUpdateWithNothingToDoStartsNothing) {
         const auto engine = MakeFoolsMateEngine();
         CountingAnalysisFactory factory{engine};

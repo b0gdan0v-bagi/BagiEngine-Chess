@@ -1112,6 +1112,32 @@ namespace BECore::Chess::Tests {
         EXPECT_FALSE(analyst.GetReviewError().has_value());
     }
 
+    TEST_F(PositionAnalystTest, GetReviewedPositionForwardsOneEntryOfTheList) {
+        CountingAnalysisFactory factory{MakeEngine()};
+        ChessGameModel model;
+        PositionAnalyst analyst;
+        analyst.SetEngineFactory(factory.AsFactory());
+        ASSERT_TRUE(PlayFoolsMate(model));
+        EXPECT_FALSE(analyst.GetReviewedPosition(model, 0).has_value()) << "no review";
+
+        ASSERT_TRUE(analyst.StartReview(model).has_value());
+        ASSERT_TRUE(UpdateUntil(analyst, model, OpponentEngine::Own, [&] { return IsReviewDone(analyst, model); }));
+
+        const ReviewedPositions positions = analyst.GetReviewedPositions(model);
+        ASSERT_EQ(positions.size(), 5u);
+        for (size_t index = 0; index < positions.size(); ++index) {
+            EXPECT_EQ(analyst.GetReviewedPosition(model, index), positions[index]) << index;
+        }
+        EXPECT_FALSE(analyst.GetReviewedPosition(model, positions.size()).has_value());
+        const Optional<ReviewedPosition> terminal = analyst.GetReviewedPosition(model, 4);
+        ASSERT_TRUE(terminal.has_value());
+        EXPECT_TRUE(terminal->best.IsNull());
+        EXPECT_EQ(terminal->centipawns, -kMateCentipawns);
+
+        ASSERT_EQ(model.TakeBack(1), 1u);
+        EXPECT_FALSE(analyst.GetReviewedPosition(model, 0).has_value()) << "another game, before the next Update";
+    }
+
     TEST_F(PositionAnalystTest, TheReviewRevisionGrowsWithAReviewPositionAndAnAbandonAndNothingElseMovesIt) {
         CountingAnalysisFactory factory{MakeEngine()};
         ChessGameModel model;

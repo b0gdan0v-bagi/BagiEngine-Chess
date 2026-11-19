@@ -124,6 +124,10 @@ namespace BECore::Chess {
         /// The positions of the game of @p model, as ReviewedPositions says; empty for a game that is not the held one
         [[nodiscard]] ReviewedPositions GetPositions(const ChessGameModel& model) const;
 
+        /// Position @p index of the game of @p model, as GetPositions()[index], and no allocation (what a display asks once per frame): empty when @p index is out of range, the position is not
+        /// evaluated yet, or the game is not the held one
+        [[nodiscard]] Optional<ReviewedPosition> GetPosition(const ChessGameModel& model, size_t index) const;
+
         /// The moves of the game of @p model, as ReviewedMoves says; empty for a game that is not the held one
         [[nodiscard]] ReviewedMoves GetMoves(const ChessGameModel& model) const;
 

@@ -179,6 +179,11 @@ namespace BECore::Chess {
             return _reviewer.GetPositions(model);
         }
 
+        /// Position @p index of the review of @p model without building the list (GameReviewer::GetPosition()); for a display that asks once per frame
+        [[nodiscard]] Optional<ReviewedPosition> GetReviewedPosition(const ChessGameModel& model, size_t index) const {
+            return _reviewer.GetPosition(model, index);
+        }
+
         /// The reviewed moves of @p model, empty for another game (GameReviewer::GetMoves())
         [[nodiscard]] ReviewedMoves GetReviewedMoves(const ChessGameModel& model) const {
             return _reviewer.GetMoves(model);

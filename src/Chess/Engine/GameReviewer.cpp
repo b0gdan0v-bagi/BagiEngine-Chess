@@ -107,6 +107,13 @@ namespace BECore::Chess {
         return IsHeld(model) ? _positions : ReviewedPositions{};
     }
 
+    Optional<ReviewedPosition> GameReviewer::GetPosition(const ChessGameModel& model, size_t index) const {
+        if (!IsHeld(model) || index >= _positions.size()) {
+            return std::nullopt;
+        }
+        return _positions[index];
+    }
+
     ReviewedMoves GameReviewer::GetMoves(const ChessGameModel& model) const {
         ReviewedMoves reviewed;
         if (!IsHeld(model)) {
