@@ -384,4 +384,56 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(Review(), first);
     }
 
+    // ---- The real own engine, through the adapter ----
+
+    TEST_F(ChessGameControlReviewTest, TheRealEngineReviewsTheFoolsMateTheSameTwiceAndFindsTheBlunder) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        game.GetAnalyst().SetEngineFactory(AnalysisEngineFactory{});  // the default: the own engine at kReviewDepth
+
+        Json reviews[2];
+        for (Json& review : reviews) {
+            ASSERT_TRUE(PlayFoolsMate());
+            ASSERT_TRUE(StartReview().has_value());
+            ASSERT_TRUE(FrameUntilDone()) << DumpJson(Review()).c_str();
+            review = Review();
+            ASSERT_TRUE(Control().Reset(Json::object()).has_value());
+            game.GetAnalyst().Shutdown();  // the next review has an engine of its own
+        }
+
+        EXPECT_EQ(reviews[0], reviews[1]);
+        const Json& moves = Member(reviews[0], "moves");
+        ASSERT_EQ(moves.size(), kFoolsMateMoves);
+        EXPECT_EQ(Text(moves[2], "quality"), "blunder") << "g2g4 allows the mate";
+        EXPECT_EQ(Text(moves[2], "best").size(), 4u);
+        const String quality = Text(moves[1], "quality");
+        EXPECT_TRUE(quality == "best" || quality == "good") << "e7e5 is a fine reply: " << quality.c_str();
+    }
+
+    TEST_F(ChessGameControlReviewTest, AReviewDroppedWhileItsSearchRunsDoesNotDelayAHintAndTheGameCanBeReviewedAgain) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        game.GetAnalyst().SetEngineFactory(AnalysisEngineFactory{});
+        ASSERT_TRUE(PlayFoolsMate());
+        ASSERT_TRUE(StartReview().has_value());
+        game.GetAnalyst().Update(game.GetModel(), game.GetOpponent().GetEngine());  // the first search is handed to the pool
+
+        // A review needs a finished game and a hint an ongoing one, so one game never has both; what is shown is that the search of the dropped review, still on the pool, does not hold
+        // the hint's (an engine object of its own for each)
+        Json takeBack = Json::object();
+        takeBack["takeBack"] = Json::object();
+        ASSERT_TRUE(Control().SetState(takeBack).has_value());
+        EXPECT_TRUE(Review().is_null());
+        Json hint = Json::object();
+        hint["hint"] = true;
+        Json analysis = Json::object();
+        analysis["analysis"] = hint;
+        ASSERT_TRUE(Control().SetState(analysis).has_value());
+
+        ASSERT_TRUE(FrameUntil([&] { return !Member(Member(State(), "analysis"), "hint").is_null(); }));
+        EXPECT_EQ(Text(Member(Member(State(), "analysis"), "hint"), "move"), "d8h4") << "the mate in one";
+
+        ASSERT_TRUE(Move("d8h4"));
+        ASSERT_TRUE(StartReview().has_value());
+        ASSERT_TRUE(FrameUntilDone()) << DumpJson(Review()).c_str();
+    }
+
 }  // namespace BECore::Chess::Tests
