@@ -24,6 +24,7 @@ AnalysisRows            the move panel's analysis band: the words and bar from t
 MoveRows                the part both share: the game's rows, their words, the rows and marks of one canvas, the takeback
 ClickerDisabled         `SetClickerDisabled()`: the one place a button's clicker is greyed
 ChessPieceComponent     one piece node: follows its piece in the model, slides a played move, switches sprite after a promotion
+ChessRatingMarkComponent its own node (layer 1, before Result): the badge of a brilliant move on the board
 ChessResultComponent    its own node (layer 1): dims the board and draws the result bar once the game is over
 ```
 
@@ -34,7 +35,7 @@ ChessResultComponent    its own node (layer 1): dims the board and draws the res
 - **Four views** (`viewVariants` of `ChessScene`: the default, `Tall`, `Portrait` and `Wide`; sizes in `config/CLAUDE.md`, why in the comment of `SceneConfig.xml`). The board is 640 x 640 in all (a square 80 units), at (100, 80) in the default and Wide view and (40, 144) in Portrait and Tall. **The one rule: a view is widened or heightened only where the other side already limits the view it replaces**: Wide and Tall never shrink a board, font or touch target; the letterbox they take is the move panel's. Tall is Portrait with 244 units more at the bottom, every place of Portrait kept (`HasPortraitPlaces()`). A canvas lays out per view with a variant `orientation:portrait` (on the canvas's bounds, the view in units; it holds in Tall too); Wide needs no variant of its own, the HUD's anchors move its right end.
 - **Geometry** is in scene units of the active view: `_originX/_originY/_squareSize` (default and Wide) and the `_portrait...` triple (Portrait and Tall), one set taken on `SceneViewChangedEvent` (`HasPortraitPlaces(name)`) that every accessor reads, so the squares, pieces and result bar never disagree; a drag in the hand ends with the view. The mouse goes through `Scene::ScreenToSceneX/Y`.
 - **Orientation:** the board is drawn from Black's side exactly when the program plays White, or while a puzzle is on that Black solves (`BoardBottomColor()`, read live, also for the material lists). While a puzzle is on the click flow asks `ProgramToMoveNow()` (every turn but the solver's: no click, no premove, whatever the opponent is), `OnUpdate` runs `UpdatePuzzle()` (not while editing) and skips the opponent's `Update()`. `SquareToPixel` and `OnMouseDown` map through `Game/BoardOrientation.h`, as everything placed on a square does. The HUD, panels, model, control API and FEN do not turn.
-- **Coordinates:** 16 labels of a `SceneView` canvas on `BoardCoordinates` (layer -1, no safe area, no `blocksInput`). The rects are fixed per view, the text (`coordRank<row>`, `coordFile<column>`, `Game/BoardCoordinates.h`) turns; a turn keeps the grid's parity, so the colors are static: `boardDark` on a light cell, `boardLight` on a dark one.
+- **Coordinates:** 16 labels of a `SceneView` canvas on `BoardCoordinates` (layer -1, no safe area, no `blocksInput`). The rects are fixed per view, the text (`coordRank<row>`, `coordFile<column>`, `Game/BoardCoordinates.h`) turns; a turn keeps the grid's parity, so the colors are static.
 - `ChessOpponentPanelComponent` shows the segment `EngineStockfish` exactly while `OpponentController::OffersStockfish()` (a **cached** answer; `RefreshStockfish()` looks again when the opponent section opens).
 
 ## Highlights
@@ -72,12 +73,15 @@ Node `Material` (`ChessMaterial.xml`, layer 5): `ChessMaterialComponent`, then a
 
 Node `MovePanel` (`ChessMovePanel.xml`, layer 4, under `Material`, which draws over its bands): `ChessMovePanelComponent`, then a `SceneView` canvas (no safe area, not modal) with one root `MovePanelBox`, the plate right of the board in the **Wide view** (`Game/MovePanel.h`); names start with `MovePanel`, the last move's cell shows its gold `...Mark<i>`. **In the Tall view** a variant of the canvas (`maxAspect:0.6`) puts the box under the board; the bands and rows are in "Node anatomy" of `config/CLAUDE.md`.
 
-- **Analysis band:** `ChessHint` and `ChessSetEvaluation` are answered by `ChessMovePanelComponent`; **Known limit:** the evaluation is of the game's position, not a viewed one; windows without the panel have neither control (the owner's decision).
-- The component (with `MoveRows`) rebuilds the rows only when the model, its version or its shown move count changed (`MoveRowsKey`); the rows are the **page** of the shown move (the engine's UI has no scroll: `Game/MovePanel.h`), its cell marked.
+- **Analysis band:** `ChessHint`, `ChessSetEvaluation` and `ChessSetRatings` (the switch of "The rating mark", off at every game start; its cell shows the state by a thumb, not by colour) are answered by `ChessMovePanelComponent`; **Known limit:** the evaluation is of the game's position, not a viewed one; windows without the panel have none of them (the owner's decision).
+- The component (with `MoveRows`) rebuilds the rows only when the model, its version, its shown move count or the analyst's revision changed (`MoveRowsKey`; a rating arrives with no version step); the rows are the **page** of the shown move, its cell marked.
 - **Where it is hidden:** `MovePanelBox` is shown only while `MovePanelFits` holds for the box of the active view (`MovePanelView`: Tall for `Tall`, else Wide) and the canvas's `safeBounds`, asked on every draw, never before the first layout. The default and Portrait views hold neither box; side insets cut it in the narrowest Wide windows and every Tall one. The menu section `Moves` (node `MovesSection`, layer 20, modal, built like the opponent panel) has the same rows and step buttons on the same variables; it is in every window's menu and stays open while it views.
 - **Clicks (viewing):** the move cells and the step buttons `‹` `›` `»` are buttons of one action `ChessShowMove`, its `value` the press of `Game/MovePanel.h`, answered for both canvases with `ChessGameModel::ShowMoves`. The last move's cell and `»` return to the game, so do a press on the board and any change of the game.
-- **Take back** (`<prefix>TakeBack`, the rest of the band): action `ChessTakeBack`, answered by `ChessMovePanelComponent` for both canvases with `TakeBack(TakeBackPliesNow())` (`Game/TakeBack.h`), greyed (clicker `disabled`) while that is 0. While viewing it ends the view and takes back from the game's last move.
-- **Known limit** (the owner's rule): the HUD follows the safe area, the box does not (`config/CLAUDE.md`, "Node anatomy").
+- **Take back** (`<prefix>TakeBack`): action `ChessTakeBack`, answered by `ChessMovePanelComponent` for both canvases with `TakeBack(TakeBackPliesNow())` (`Game/TakeBack.h`), greyed (clicker `disabled`) while that is 0. While viewing it ends the view and takes back from the game's last move.
+
+## The rating mark
+
+Node `RatingMark` (`ChessRatingMark.xml`, layer 1, before `Result`, so the dim of a finished game covers it): `ChessRatingMarkComponent` draws the badge of `Game/RatingMark.h` (filled rects, no sprite) at the top right of the destination square of the **shown** move, so a viewed earlier position shows that move's mark; only while `AreRatingsOn()` and that move is brilliant, never on a draft. The same switch adds `!!` to the SAN in the list.
 
 ## The HUD
 
@@ -93,15 +97,15 @@ Node `MenuPanel` (`ChessMenuPanel.xml`, layer 20, modal, `visible="false"`): `Me
 
 ## The Game section
 
-Node `GameSection` (`ChessGameSection.xml`, layer 20, modal, hidden), built like `MovesSection`. Resign asks "Resign?", Draw between two people "Agree a draw?" (`{gameQuestion}`, Yes / No); Draw against the program offers at once, the HUD answers. `ChessGameSectionComponent` keeps the **one UI-only state, the open question**, dropped by any menu change, No, and a change of the version or the opponent. Yes asks the rules again (`ChessGame::ResigningNow()`, `DrawOfferRefusalFor`, which also grey the buttons), ends the game and closes the menu.
+Node `GameSection` (`ChessGameSection.xml`, layer 20, modal, hidden), built like `MovesSection`. Resign asks "Resign?", Draw between two people "Agree a draw?" (`{gameQuestion}`, Yes / No); Draw against the program offers at once, the HUD answers. `ChessGameSectionComponent` keeps the **one UI-only state, the open question**, dropped by any menu change, No, and a change of the version or the opponent. Yes asks the rules again (`ChessGame::ResigningNow()`, `DrawOfferRefusalFor`), ends the game and closes the menu.
 
 ## The Puzzles section
 
-Node `PuzzleSection` (`ChessPuzzleSection.xml`, layer 20, modal, hidden), built like `GameSection`. `ChessPuzzleSectionComponent` answers `ChessPuzzleNext` (`NextPuzzle()` begins the first puzzle when none is on), `ChessPuzzleRetry` and `ChessPuzzleLeave` **wherever they come from** (the section may be hidden: the puzzle bar presses them), asks the game's rule again and after a success closes the menu. Its variables (`puzzle*`) are written only on a change of the game, its version, the session's revision, the set's size or `IsPuzzleOn()`.
+Node `PuzzleSection` (`ChessPuzzleSection.xml`, layer 20, modal, hidden), built like `GameSection`. `ChessPuzzleSectionComponent` answers `ChessPuzzleNext` (`NextPuzzle()` begins the first puzzle when none is on), `ChessPuzzleRetry` and `ChessPuzzleLeave` **wherever they come from** (the section may be hidden: the puzzle bar presses them), asks the game's rule again and after a success closes the menu.
 
 ## The puzzle bar
 
-Node `PuzzleBar` (`ChessPuzzleBar.xml`, layer 20, non-modal): Retry, Next and Leave, shown by `ChessPuzzleBarComponent` exactly while `IsPuzzleOn()` (every update and draw). It stands where `Opening` does, bottom left, because a puzzle uses the top row and `Status` and the move panel keeps Hint and Take back; the HUD's `opening` is empty then. The component answers no action: the buttons emit the section's. Places and Known limit: `config/CLAUDE.md`, "The bars".
+Node `PuzzleBar` (`ChessPuzzleBar.xml`, layer 20, non-modal): Retry, Next and Leave, shown by `ChessPuzzleBarComponent` exactly while `IsPuzzleOn()` (every update and draw). It stands where `Opening` does, bottom left (the HUD's `opening` is empty then). The component answers no action: the buttons emit the section's. Places and Known limit: `config/CLAUDE.md`, "The bars".
 
 ## The opponent panel
 
@@ -110,7 +114,7 @@ Node `OpponentPanel` (`ChessOpponentPanel.xml`, layer 20, modal, `visible="false
 - The group owns no choice: a press emits the action, `ChessOpponentPanelComponent` picks through `ChessGame::GetActiveChoice()` and `ChessHudComponent` publishes the variable, so the panel shows what the game has. An id in no table logs one warning.
 - **The color is the person's**; `opponent.plays` is the program's.
 - A pick applies at once and the panel stays open. No group is greyed (it read as a dead button): a pick made while two people play is kept and applies when Computer is picked.
-- A refused pick changes nothing (no fallback); "Engine not found" stays in `OpponentError` and `Status` until someone's move, a reset, `set_state` or the next pick. The panel never offers a Stockfish that is not found.
+- A refused pick changes nothing (no fallback); "Engine not found" stays in `OpponentError` and `Status` until someone's move, a reset, `set_state` or the next pick.
 - No name may be in two canvases, hence `ModeGroup`, not `Mode`.
 
 ## The position editor
@@ -121,9 +125,8 @@ While `ChessGame::IsEditing()` (the model shows a draft, `Game/CLAUDE.md`) the s
 - **Pieces** snap, as under a view (`ShowsOtherPosition`). No result dim; the material's sets and the move panel's box are hidden; `ChessShowMove` and Hint do nothing (they would end the draft).
 - **The section `Position`** (node `PositionSection`, layer 20, modal, built like `GameSection`): the three starts (each closes the menu), the side and four castling switches (greyed while the king or rook is off its square), Copy / Paste FEN, Play from here (a refusal keeps the menu open, its reason in `{editorMessage}`), Cancel. Play, Cancel and the switches are grey with no editor. Pieces are not placed here (a modal panel hides the board).
 - **Copy / Paste:** Copy writes the draft's FEN (else the game's) to `CoreManager::GetClipboard()`. Paste and Ctrl+V (`PasteEvent`, taken only while editing or with the section shown) call `ChessGame::PasteFen`: it begins the editor when none is open and loads the text, a bad one changes nothing. What the clipboard or the rules say is the message (`EditorText`, also with no editor: it is dropped when the menu closes or returns to the list). The read's callback holds no pointer: the game is found at the answer.
-- **The bar** (node `EditorBar`, layer 20, non-modal; shown exactly while editing, checked on every update and draw): six piece buttons (icons follow the picked color), Erase, the color, Play (`ChessEditPlay`, the section's) and More (opens the section); the picked tool is the `selected` button. Places and limit: `config/CLAUDE.md`, "The bars".
-- **HUD:** `turn` is `StatusText::Editing()`, `status` and `opening` are empty; republished when the editing flag, the editor's refusal or the message changes (none moves a version).
+- **The bar** (node `EditorBar`, layer 20, non-modal; shown exactly while editing, checked on every update and draw): six piece buttons (icons follow the picked color), Erase, the color, Play (`ChessEditPlay`, the section's) and More (opens the section). Places and limit: `config/CLAUDE.md`, "The bars".
 
 ## Draw order
 
-By layer, not by place among the references of `SceneConfig.xml` (`engine/src/Modules/BECore/Scene/CLAUDE.md`, "Draw order"); the same layer draws in scene order. `Board` and then `BoardCoordinates` -1, pieces 0, `Result` 1, `MovePanel` 4, `Material` 5, a dragged piece 6, `Hud` 10, the panels, the menu and the two bars 20 (a bar is listed before the menu, so a panel draws over it).
+By layer, not by place among the references of `SceneConfig.xml` (`engine/src/Modules/BECore/Scene/CLAUDE.md`, "Draw order"); the same layer draws in scene order. `Board` and then `BoardCoordinates` -1, pieces 0, `RatingMark` and `Result` 1 (the mark first), `MovePanel` 4, `Material` 5, a dragged piece 6, `Hud` 10, the panels, the menu and the two bars 20 (a bar is listed before the menu, so a panel draws over it).

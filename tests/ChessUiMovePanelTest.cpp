@@ -378,11 +378,12 @@ namespace BECore::Chess::Tests {
         const auto canvas = MovePanel();
         ASSERT_TRUE(canvas);
         ASSERT_TRUE(MovePanelElement("MovePanelBox").active.visible);
-        // The cells of the moves and the three step buttons of the band are buttons of ChessShowMove, Take back of ChessTakeBack, Hint of ChessHint and the evaluation cell a toggle
-        // of ChessSetEvaluation; nothing else blocks or takes the pointer
+        // The cells of the moves and the three step buttons of the band are buttons of ChessShowMove, Take back of ChessTakeBack, Hint of ChessHint, and the evaluation cell and the ratings cell
+        // toggles of ChessSetEvaluation and ChessSetRatings; nothing else blocks or takes the pointer
         const PoolString takeBack = "MovePanelTakeBack"_intern;
         const PoolString hintNames[] = {"MovePanelHint"_intern, "MovePanelTallHint"_intern};
         const PoolString evalNames[] = {"MovePanelEval"_intern, "MovePanelTallEval"_intern};
+        const PoolString ratingsNames[] = {"MovePanelRatings"_intern, "MovePanelTallRatings"_intern};
         Vector<String> clickable;
         for (const UIElement* element : AllElements(canvas->GetRoot())) {
             EXPECT_FALSE(element->blocksInput) << element->name.CStr();
@@ -407,11 +408,20 @@ namespace BECore::Chess::Tests {
                 EXPECT_EQ(toggle->bind, "analysisEvaluationOn"_intern);
                 continue;
             }
+            if (eastl::find(eastl::begin(ratingsNames), eastl::end(ratingsNames), element->name) != eastl::end(ratingsNames)) {
+                const UIToggleComponent* toggle = element->GetComponent<UIToggleComponent>();
+                ASSERT_NE(toggle, nullptr) << element->name.CStr();
+                EXPECT_EQ(toggle->action, "ChessSetRatings"_intern);
+                EXPECT_EQ(toggle->bind, "analysisRatingsOn"_intern);
+                continue;
+            }
             EXPECT_EQ(clicker->action, "ChessShowMove"_intern) << element->name.CStr();
             EXPECT_TRUE(ParseMoveListPress(clicker->value.ToStringView()).has_value()) << element->name.CStr();
         }
-        EXPECT_EQ(clickable.size(), 2 * kMovePanelRows + 4 + 2 * std::size(hintNames)) << "the cells, the four buttons, and Hint and the evaluation cell of the Wide band and of the Tall twins";
-        for (const char* name : {"MovePanelStepBack", "MovePanelStepForward", "MovePanelLatest", "MovePanelTakeBack", "MovePanelHint", "MovePanelEval", "MovePanelWhite6", "MovePanelBlack0"}) {
+        EXPECT_EQ(clickable.size(), 2 * kMovePanelRows + 4 + 3 * std::size(hintNames))
+            << "the cells, the four buttons, and Hint, the evaluation cell and the ratings cell of the Wide band and of the Tall twins";
+        for (const char* name :
+             {"MovePanelStepBack", "MovePanelStepForward", "MovePanelLatest", "MovePanelTakeBack", "MovePanelHint", "MovePanelEval", "MovePanelRatings", "MovePanelWhite6", "MovePanelBlack0"}) {
             EXPECT_NE(eastl::find(clickable.begin(), clickable.end(), String(name)), clickable.end()) << name;
         }
         for (const char* name : {"MovePanelBox", "MovePanelBandTopPlayer", "MovePanelBandBottomPlayer", "MovePanelNumber0"}) {
@@ -714,6 +724,53 @@ namespace BECore::Chess::Tests {
         engine->Open();
         ASSERT_TRUE(FramesUntil([&] { return Model().GetMoves().size() == 1; })) << "the program took the pawn";
         EXPECT_EQ(ShownMovePanelRows(), "2. ... [dxe4]");
+    }
+
+    TEST_F(ChessUiTest, ABrilliantMoveReadsWithTheSignOnlyWhileTheRatingsAreOn) {
+        CountingAnalysisFactory factory({New<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"))});
+        Analyst().SetEngineFactory(factory.AsFactory());
+        ASSERT_TRUE(PlayAll(Model(), {"e2e4", "e7e5"}));
+        ASSERT_EQ(ShownMovePanelRows(), "1. e4 [e5]") << "nothing is rated while the switch is off";
+
+        Analyst().SetRatings(true);
+        ASSERT_TRUE(WaitForRatings());
+        EXPECT_EQ(ShownMovePanelRows(), "1. e4!! [e5]") << "e2e4 is the engine's move, e7e5 is not";
+        EXPECT_EQ(MovePanelWord(0, "White"), "e4!!");
+
+        Analyst().SetRatings(false);
+        EXPECT_EQ(ShownMovePanelRows(), "1. e4 [e5]") << "off takes the sign back, the rows are rebuilt with no new version of the game";
+    }
+
+    TEST_F(ChessUiTest, TheRowsAreRebuiltWhenARatingArrivesWithNoNewVersionOfTheGame) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        const auto engine = New<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"));
+        engine->Gate(true);
+        CountingAnalysisFactory factory({engine});
+        Analyst().SetEngineFactory(factory.AsFactory());
+        Analyst().SetRatings(true);
+        ASSERT_TRUE(Play(Model(), "e2e4"));
+        ASSERT_TRUE(FramesUntil([&] { return engine->Calls() == 1; }));
+        ASSERT_EQ(ShownMovePanelRows(), "1. [e4]") << "the move is not rated yet";
+        const uint64_t version = Model().GetVersion();
+
+        engine->Open();
+        ASSERT_TRUE(WaitForRatings());
+        EXPECT_EQ(ShownMovePanelRows(), "1. [e4!!]");
+        EXPECT_EQ(Model().GetVersion(), version) << "a rating is no change of the game";
+    }
+
+    TEST_F(ChessUiTest, APressOnAMarkedCellStillShowsThatMove) {
+        CountingAnalysisFactory factory({New<AnalysingEngine>(AnalysisScore{AnalysisScoreKind::Centipawns, 35}, Mv("e2e4"))});
+        Analyst().SetEngineFactory(factory.AsFactory());
+        Analyst().SetRatings(true);
+        ASSERT_TRUE(PlayAll(Model(), {"e2e4", "e7e5", "g1f3"}));
+        ASSERT_TRUE(WaitForRatings());
+        ASSERT_EQ(ShownMovePanelRows(), "1. e4!! e5 | 2. [Nf3]");
+
+        PressWith("ChessShowMove", "white0");
+        EXPECT_TRUE(Model().IsViewing());
+        EXPECT_EQ(Model().GetShownMoveCount(), 1u);
+        EXPECT_EQ(ShownMovePanelRows(), "1. [e4!!] e5 | 2. Nf3") << "the viewed move is the marked cell, with its sign";
     }
 
     TEST_F(ChessUiTest, WithNoGameActiveTheMovePanelHasNoRowShown) {

@@ -71,9 +71,11 @@ namespace BECore::Chess::Tests {
         public:
             explicit PlyEngine(Vector<Move> best = {}, int gap = 25) : _best(std::move(best)), _gap(gap) {}
 
-            void Gate(bool honorsToken) {
+            /// Holds the answer at a gate; of the request of @p ply moves only, or of every one
+            void Gate(bool honorsToken, Optional<size_t> ply = std::nullopt) {
                 _gated = true;
                 _honorsToken = honorsToken;
+                _gatePly = ply;
             }
 
             void Open() {
@@ -120,7 +122,7 @@ namespace BECore::Chess::Tests {
 
         private:
             std::expected<Analysis, EngineError> Answer(const SearchRequest& request, const CancellationToken& token) {
-                if (_gated) {
+                if (_gated && (!_gatePly || *_gatePly == request.moves.size())) {
                     const bool released = WaitUntil([&] { return _open.load() || (_honorsToken && token.IsCancelled()); }, kGateGiveUp);
                     if (_honorsToken && token.IsCancelled()) {
                         _cancelled.store(true);
@@ -159,6 +161,7 @@ namespace BECore::Chess::Tests {
             int _gap;
             bool _gated = false;
             bool _honorsToken = false;
+            Optional<size_t> _gatePly;
             Optional<EngineError> _error;
             Optional<size_t> _failPly;
             mutable std::mutex _mutex;  ///< guards _requests
@@ -371,7 +374,62 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(engine->Calls(), 3) << "the new game was rated from the start";
     }
 
-    TEST_F(MoveRaterTest, AnotherMoveAtTheSamePlyIsAnotherGameAndIsRatedFromTheStart) {
+    TEST_F(MoveRaterTest, ATakeBackKeepsTheRatingsOfTheMovesThatRemainAndRatesNothingTwice) {
+        const auto engine = MakeEngine({Mv("e2e4"), Mv("e7e5"), Mv("g1f3"), Mv("b8c6")});
+        CountingAnalysisFactory factory{engine};
+        ChessGameModel model;
+        MoveRater rater;
+        rater.SetEngineFactory(factory.AsFactory());
+        rater.SetOn(true);
+        ASSERT_TRUE(PlayAll(model, {"e2e4", "e7e5", "g1f3", "b8c6"}));
+        ASSERT_TRUE(UpdateUntil(rater, model, [&] { return AllRated(rater, model); }));
+        ASSERT_EQ(engine->Calls(), 4);
+
+        for (const size_t plies : {size_t{1}, size_t{2}}) {
+            const uint64_t revision = rater.GetRevision();
+            ASSERT_EQ(model.TakeBack(plies), plies);
+            const MoveRatings meanwhile = rater.GetRatings(model);
+            ASSERT_EQ(meanwhile.size(), model.GetMoves().size());
+            for (size_t ply = 0; ply < meanwhile.size(); ++ply) {
+                EXPECT_TRUE(meanwhile[ply].has_value()) << "ply " << ply << " is read before the next Update()";
+            }
+            rater.Update(model);
+            EXPECT_GT(rater.GetRevision(), revision) << "a display must see the ratings that went";
+            EXPECT_TRUE(AllRated(rater, model));
+        }
+
+        UpdateMany(rater, model);
+        EXPECT_EQ(engine->Calls(), 4) << "nothing of the remaining moves is rated again";
+        EXPECT_FALSE(rater.IsThinking());
+    }
+
+    TEST_F(MoveRaterTest, ADifferentMoveAfterATakeBackIsRatedFromThatPlyOnOnly) {
+        const auto engine = MakeEngine({Mv("e2e4"), Mv("e7e5")});
+        CountingAnalysisFactory factory{engine};
+        ChessGameModel model;
+        MoveRater rater;
+        rater.SetEngineFactory(factory.AsFactory());
+        rater.SetOn(true);
+        ASSERT_TRUE(PlayAll(model, {"e2e4", "e7e5"}));
+        ASSERT_TRUE(UpdateUntil(rater, model, [&] { return AllRated(rater, model); }));
+
+        ASSERT_EQ(model.TakeBack(1), 1u);
+        ASSERT_TRUE(Play(model, "c7c5"));  // as long as the held history, without an Update() between
+        const MoveRatings meanwhile = rater.GetRatings(model);
+        ASSERT_EQ(meanwhile.size(), 2u);
+        EXPECT_TRUE(meanwhile[0].has_value()) << "the shared first move keeps its rating";
+        EXPECT_FALSE(meanwhile[1].has_value()) << "the other move is not the held one's";
+        EXPECT_TRUE(rater.GetRating(model, 0).has_value());
+        EXPECT_FALSE(rater.GetRating(model, 1).has_value());
+        ASSERT_TRUE(UpdateUntil(rater, model, [&] { return AllRated(rater, model); }));
+
+        EXPECT_EQ(engine->Calls(), 3) << "only the new ply was asked";
+        EXPECT_EQ(engine->Requests()[2].moves.size(), 1u);
+        EXPECT_EQ(ReasonAt(rater, model, 0), MoveRatingReason::Brilliant);
+        EXPECT_EQ(ReasonAt(rater, model, 1), MoveRatingReason::NotBest) << "c7c5, the engine wanted e7e5";
+    }
+
+    TEST_F(MoveRaterTest, AnotherFirstMoveIsAnotherGameAndIsRatedFromTheStart) {
         const auto engine = MakeEngine();
         CountingAnalysisFactory factory{engine};
         ChessGameModel model;
@@ -381,15 +439,99 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(PlayAll(model, {"e2e4", "e7e5"}));
         ASSERT_TRUE(UpdateUntil(rater, model, [&] { return AllRated(rater, model); }));
 
-        model.Reset();
-        ASSERT_TRUE(PlayAll(model, {"e2e4", "c7c5"}));  // as long as the old history, without an Update() between: the first move is shared, the second is not
+        ASSERT_EQ(model.TakeBack(2), 2u);
+        ASSERT_TRUE(PlayAll(model, {"d2d4", "d7d5"}));
         const MoveRatings ratings = rater.GetRatings(model);
         ASSERT_EQ(ratings.size(), 2u);
-        EXPECT_FALSE(ratings[0].has_value()) << "a game that is no extension of the held one gets nothing, not even for the moves they share";
+        EXPECT_FALSE(ratings[0].has_value());
         EXPECT_FALSE(ratings[1].has_value());
         ASSERT_TRUE(UpdateUntil(rater, model, [&] { return AllRated(rater, model); }));
         EXPECT_EQ(engine->Calls(), 4) << "and it is rated from the start again";
         EXPECT_EQ(engine->Requests()[2].moves.size(), 0u);
+    }
+
+    TEST_F(MoveRaterTest, GetRatingIsTheEntryOfGetRatingsAndEmptyWhereThatIsNotTheHeldGame) {
+        const auto engine = MakeEngine({Mv("e2e4"), Mv("d7d5")});
+        CountingAnalysisFactory factory{engine};
+        ChessGameModel model;
+        MoveRater rater;
+        rater.SetEngineFactory(factory.AsFactory());
+        rater.SetOn(true);
+        ASSERT_TRUE(PlayAll(model, {"e2e4", "e7e5", "g1f3"}));
+        ASSERT_TRUE(UpdateUntil(rater, model, [&] { return AllRated(rater, model); }));
+
+        const MoveRatings ratings = rater.GetRatings(model);
+        ASSERT_EQ(ratings.size(), 3u);
+        for (size_t ply = 0; ply < ratings.size(); ++ply) {
+            ASSERT_TRUE(rater.GetRating(model, ply).has_value()) << ply;
+            EXPECT_EQ(*rater.GetRating(model, ply), *ratings[ply]) << ply;
+        }
+        EXPECT_FALSE(rater.GetRating(model, 3).has_value()) << "out of range";
+        EXPECT_FALSE(rater.GetRating(model, 1000).has_value());
+
+        ChessGameModel other;
+        other.SetPosition(PositionFromFen(kOneMoveFen));
+        ASSERT_TRUE(Play(other, "a8b8"));
+        EXPECT_FALSE(rater.GetRating(other, 0).has_value()) << "another start FEN";
+        const ChessGameModel fresh;
+        EXPECT_FALSE(rater.GetRating(fresh, 0).has_value()) << "no move";
+
+        ChessGameModel diverged;
+        ASSERT_TRUE(PlayAll(diverged, {"e2e4", "c7c5"}));
+        EXPECT_TRUE(rater.GetRating(diverged, 0).has_value());
+        EXPECT_FALSE(rater.GetRating(diverged, 1).has_value()) << "the second move is not the held one's";
+    }
+
+    TEST_F(MoveRaterTest, TheAnswerForATakenBackPlyIsDroppedAlsoFromAnEngineThatIgnoresItsToken) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        for (const bool honorsToken : {false, true}) {
+            const auto engine = MakeEngine({Mv("e2e4"), Mv("e7e5")});
+            engine->Gate(honorsToken, 1);
+            CountingAnalysisFactory factory{engine};
+            ChessGameModel model;
+            MoveRater rater;
+            rater.SetEngineFactory(factory.AsFactory());
+            rater.SetOn(true);
+            ASSERT_TRUE(PlayAll(model, {"e2e4", "e7e5"}));
+            ASSERT_TRUE(UpdateUntil(rater, model, [&] { return engine->Calls() == 2; })) << honorsToken;
+            EXPECT_TRUE(RatedAt(rater, model, 0));
+            EXPECT_TRUE(rater.IsThinking());
+
+            ASSERT_EQ(model.TakeBack(1), 1u);
+            ASSERT_TRUE(Play(model, "d7d5"));
+            rater.Update(model);
+            EXPECT_FALSE(rater.IsThinking()) << "the search for the taken-back ply is cancelled: " << honorsToken;
+            EXPECT_FALSE(RatedAt(rater, model, 1));
+            engine->Open();  // the old worker answers now, for the old second move
+            ASSERT_TRUE(UpdateUntil(rater, model, [&] { return AllRated(rater, model); })) << DescribeError(rater.GetError()).c_str();
+
+            EXPECT_EQ(engine->Calls(), 3) << "the late answer was thrown away and the new move was asked: " << honorsToken;
+            EXPECT_EQ(ReasonAt(rater, model, 0), MoveRatingReason::Brilliant) << "the rating of the remaining move stayed";
+            EXPECT_EQ(ReasonAt(rater, model, 1), MoveRatingReason::NotBest) << "d7d5, not the e7e5 of the answer that arrived late: " << honorsToken;
+            EXPECT_FALSE(rater.GetError().has_value()) << "a search the rater cancelled is not an error";
+        }
+    }
+
+    TEST_F(MoveRaterTest, ASearchForAPlyBelowTheCommonPrefixSurvivesATakeBack) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        const auto engine = MakeEngine({Mv("e2e4")});
+        engine->Gate(false, 0);
+        CountingAnalysisFactory factory{engine};
+        ChessGameModel model;
+        MoveRater rater;
+        rater.SetEngineFactory(factory.AsFactory());
+        rater.SetOn(true);
+        ASSERT_TRUE(PlayAll(model, {"e2e4", "e7e5"}));
+        ASSERT_TRUE(UpdateUntil(rater, model, [&] { return engine->Calls() == 1; }));
+
+        ASSERT_EQ(model.TakeBack(1), 1u);
+        UpdateMany(rater, model, 100);
+        EXPECT_TRUE(rater.IsThinking()) << "the request of ply 0 is the prefix that did not change";
+        engine->Open();
+        ASSERT_TRUE(UpdateUntil(rater, model, [&] { return AllRated(rater, model); }));
+
+        EXPECT_EQ(engine->Calls(), 1) << "that one answer was taken, and the taken-back move is not asked";
+        EXPECT_EQ(ReasonAt(rater, model, 0), MoveRatingReason::Brilliant);
     }
 
     TEST_F(MoveRaterTest, TheAnswerOfAnEngineThatIgnoresItsTokenIsDroppedAfterTheGameChanged) {

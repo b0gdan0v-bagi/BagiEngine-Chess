@@ -25,10 +25,12 @@ namespace BECore::Chess {
      * Update() once per frame on the main thread; one search runs at a time on the Background pool (TaskManager must be running), the oldest move that is not rated first. The request of ply `i`
      * is the start FEN of the game with the moves `[0, i)`, so the answer is about the position the move `i` was played in.
      *
-     * **The history rule** (the pattern of EngineOpponent, with the history of the game in place of the version). The rater keeps the start FEN and the moves it has seen. A game that only grew
-     * keeps its ratings (unlike a hint, a rating does not go with the next move). A game that is not an extension of the held one (another start FEN, a shorter history, a move that differs: a
-     * reset, a position set from outside) cancels the search, throws its answer away, also when the engine ignores the token, drops every rating and the error, and starts again. GetRatings()
-     * gives nothing for a model whose game is not an extension of the held one, even before the next Update().
+     * **The history rule** (the pattern of EngineOpponent, with the history of the game in place of the version). The rater keeps the start FEN and the moves it has seen, and a game is read
+     * against them as the longest common prefix L: the same start FEN and the same first L moves. A game that only grew keeps its ratings (unlike a hint, a rating does not go with the next
+     * move); a takeback keeps the ratings of the moves that remain, and a different move after it is rated from ply L on. What is past L (ratings, failures) is dropped, and a search for a ply
+     * `>= L` is cancelled and its answer thrown away, also when the engine ignores the token; a search for a ply below L is about a request that did not change and stays. Another start FEN (a
+     * reset, a position set from outside) is L = 0. GetRating() and GetRatings() give nothing at or past L even before the next Update(), so the display of a game that has diverged never shows
+     * the held game's rating.
      *
      * **Errors.** An engine that cannot be made blocks the rater: the error is kept in GetError(), logged once (LOG_ERROR), and nothing is tried again. A search that fails (any EngineError)
      * fails that one move: logged once, kept in GetError(), the move stays empty and is not asked again every frame; **the later moves are still tried**. Both go with a new history, a switch off
@@ -75,9 +77,13 @@ namespace BECore::Chess {
         /// A search is under way and wanted. False once it is cancelled, though the worker may still be returning
         [[nodiscard]] bool IsThinking() const;
 
-        /// The ratings of the moves of @p model, in the order of GetMoves() and never more than there are moves; an empty entry is a move that is not rated yet, and so is every move of a game that is
-        /// not an extension of the one held
+        /// The ratings of the moves of @p model, in the order of GetMoves() and never more than there are moves; an empty entry is a move that is not rated yet, and so is every move at or past
+        /// the common prefix of the game and the held one
         [[nodiscard]] MoveRatings GetRatings(const ChessGameModel& model) const;
+
+        /// The rating of move @p ply of @p model, as GetRatings()[ply], and no allocation: empty when @p ply is out of range, the move is not rated, or the game does not hold that move as the
+        /// rater has it
+        [[nodiscard]] Optional<MoveRating> GetRating(const ChessGameModel& model, size_t ply) const;
 
         /// Why the last search failed (an engine that could not be made included); empty when none did or after it went with a new history, a switch or Shutdown()
         [[nodiscard]] const Optional<EngineError>& GetError() const noexcept {
@@ -104,10 +110,11 @@ namespace BECore::Chess {
         /// Runs on the pool: asks the engine and leaves the answer in @p search. Its arguments are by value, so the frame owns everything it uses
         static Task<void> RunSearch(IntrusivePtrAtomic<Search> search, SearchRequest request);
 
-        /// The game of @p model is the held one, perhaps grown: the same start FEN and the held moves as its first moves
-        [[nodiscard]] bool Extends(const ChessGameModel& model) const;
+        /// How many first moves @p model has in common with the held game; 0 for another start FEN
+        [[nodiscard]] size_t CommonPrefix(const ChessGameModel& model) const;
         void SyncHistory(const ChessGameModel& model);
-        void DropHistory();
+        /// Drops the held moves, ratings and failures from ply @p keep on, the search for such a ply and the error
+        void DropHistoryFrom(size_t keep);
         void TakeAnswer();
         void StartSearch(size_t ply);
         [[nodiscard]] Optional<size_t> OldestUnrated() const;
@@ -122,7 +129,7 @@ namespace BECore::Chess {
         Vector<Move> _moves;
         MoveRatings _ratings;      ///< aligned with _moves
         Vector<bool> _failed;      ///< aligned with _moves: the search for this move failed and is not retried
-        uint64_t _generation = 0;  ///< grows when the held history is dropped; a search of an older one is thrown away
+        uint64_t _generation = 0;  ///< grows when the search in flight is for a dropped ply; its answer is thrown away
 
         IntrusivePtrAtomic<Search> _search;  ///< the search under way, null when none; main thread only
         size_t _searchPly = 0;               ///< the move _search rates

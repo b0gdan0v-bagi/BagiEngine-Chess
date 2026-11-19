@@ -26,7 +26,8 @@ namespace BECore::Chess {
     };
 
     /// Writes the UIVars the evaluation cell of every canvas that shows it binds: `analysisText` (AnalysisText::Evaluation, the line in White's view), `analysisBar` (AnalysisText::Share as
-    /// a number; 0 while the evaluation is off, an even bar while it has no line) and `analysisEvaluationOn` ("true" / "false", the value the toggle compares). With no game: off
+    /// a number; 0 while the evaluation is off, an even bar while it has no line) and `analysisEvaluationOn` ("true" / "false", the value the toggle compares) and `analysisRatingsOn` (the same for
+    /// the ratings' toggle). With no game: both off
     void PublishAnalysisWords(const ChessGameModel* model, const PositionAnalyst* analyst);
 
     /**

@@ -41,6 +41,7 @@
         <node ref="nodes/ChessPositionSection" />
         <node ref="nodes/ChessPuzzleSection" />
         <node ref="nodes/ChessPromotionPanel" />
+        <node ref="nodes/ChessRatingMark" />
         <node ref="nodes/ChessResult" />
         <node ref="nodes/ChessSound" />
 

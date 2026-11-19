@@ -357,4 +357,82 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(ShownRows(panel), 3u);
     }
 
+    // ---- The suffix of a brilliant move ----
+
+    TEST(MovePanelTest, TheSuffixIsTheChessBookSign) {
+        EXPECT_EQ(kMovePanelBrilliantSuffix, "!!");
+    }
+
+    TEST(MovePanelTest, AFlaggedWhiteAndBlackCellGetTheSuffixAndNothingElseChanges) {
+        Vector<MovePanelRow> panel = BuildMovePanelRows(RowsOf(2), 2);
+        const Vector<MovePanelRow> before = panel;
+        MarkMovePanelRows(panel, Vector<bool>{false, true, true, false});
+        EXPECT_EQ(panel[0].white.text, "w1");
+        EXPECT_EQ(panel[0].black.text, "b1!!");
+        EXPECT_EQ(panel[1].white.text, "w2!!");
+        EXPECT_EQ(panel[1].black.text, "b2");
+        for (size_t i = 0; i < panel.size(); ++i) {
+            EXPECT_EQ(panel[i].number, before[i].number);
+            EXPECT_EQ(panel[i].shown, before[i].shown);
+            EXPECT_EQ(panel[i].white.ply, before[i].white.ply);
+            EXPECT_EQ(panel[i].black.ply, before[i].black.ply);
+            EXPECT_EQ(panel[i].white.current, before[i].white.current);
+            EXPECT_EQ(panel[i].black.current, before[i].black.current);
+        }
+    }
+
+    TEST(MovePanelTest, TheLastRowCanBeMarkedAndTheCurrentCellKeepsItsFlag) {
+        Vector<MovePanelRow> panel = BuildMovePanelRows(RowsOf(3), 5);
+        MarkMovePanelRows(panel, Vector<bool>{false, false, false, false, false, true});
+        EXPECT_EQ(panel[2].black.text, "b3!!");
+        EXPECT_TRUE(panel[2].black.current);
+    }
+
+    TEST(MovePanelTest, AnAbsentMoveAndAnEmptyCellNeverGetTheSuffix) {
+        Vector<MoveListRow> rows = RowsOf(2);
+        rows[0].white = MoveListEntry{};
+        rows[1].black = MoveListEntry{};
+        Vector<MovePanelRow> panel = BuildMovePanelRows(rows, -1);
+        const Vector<bool> everyPly(8, true);
+        MarkMovePanelRows(panel, everyPly);
+        EXPECT_EQ(panel[0].white.text, "...");
+        EXPECT_EQ(panel[0].black.text, "b1!!");
+        EXPECT_EQ(panel[1].white.text, "w2!!");
+        EXPECT_TRUE(panel[1].black.text.empty());
+        EXPECT_TRUE(panel[2].white.text.empty()) << "an entry the window does not show";
+    }
+
+    TEST(MovePanelTest, ATextOfAnEntryThatIsNotShownStaysEmpty) {
+        Vector<MovePanelRow> panel = BuildMovePanelRows(RowsOf(1), -1);
+        MarkMovePanelRows(panel, Vector<bool>(20, true));
+        EXPECT_EQ(ShownRows(panel), 1u);
+        for (size_t i = 1; i < panel.size(); ++i) {
+            ExpectEmpty(panel[i]);
+        }
+    }
+
+    TEST(MovePanelTest, PliesBeyondTheFlagsAreNotMarkedAndAnEmptyListMarksNothing) {
+        Vector<MovePanelRow> panel = BuildMovePanelRows(RowsOf(2), -1);
+        MarkMovePanelRows(panel, Vector<bool>{true, true});
+        EXPECT_EQ(panel[0].white.text, "w1!!");
+        EXPECT_EQ(panel[0].black.text, "b1!!");
+        EXPECT_EQ(panel[1].white.text, "w2") << "ply 2 is past the two flags";
+        EXPECT_EQ(panel[1].black.text, "b2");
+
+        Vector<MovePanelRow> untouched = BuildMovePanelRows(RowsOf(2), -1);
+        MarkMovePanelRows(untouched, Vector<bool>{});
+        EXPECT_EQ(untouched[0].white.text, "w1");
+        EXPECT_EQ(untouched[1].black.text, "b2");
+    }
+
+    TEST(MovePanelTest, APressOnAMarkedCellStillShowsItsMove) {
+        Vector<MovePanelRow> panel = BuildMovePanelRows(RowsOf(3), -1);
+        MarkMovePanelRows(panel, Vector<bool>{false, false, true});
+        const Optional<MoveListPress> press = ParseMoveListPress("white1");
+        ASSERT_TRUE(press.has_value());
+        const Optional<size_t> shown = ShownMovesAfter(*press, panel, 0, 6);
+        ASSERT_TRUE(shown.has_value());
+        EXPECT_EQ(*shown, 3u);
+    }
+
 }  // namespace BECore::Chess::Tests

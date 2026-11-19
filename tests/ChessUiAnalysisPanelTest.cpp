@@ -1,9 +1,10 @@
 #include <BECore/UI/UIProgressBar.h>
+#include <BECore/UI/UISwitchComponent.h>
 #include <BECore/UI/UIToggleComponent.h>
 #include <tests/ChessUiHarness.h>
 
-/// The analysis controls of the move panel: the Hint button and the evaluation cell of the band MovePanelBandAnalysis in the Wide view and their twins in MovePanelBandButtons in the Tall
-/// view (config/nodes/ChessMovePanel.xml). The scene, the helpers and the fixture ChessUiTest are tests/ChessUiHarness.h.
+/// The analysis controls of the move panel: the Hint button, the evaluation cell and the ratings switch of the band MovePanelBandAnalysis in the Wide view and their twins in MovePanelBandButtons in
+/// the Tall view (config/nodes/ChessMovePanel.xml). The scene, the helpers and the fixture ChessUiTest are tests/ChessUiHarness.h.
 namespace BECore::Chess::Tests {
 
     namespace {
@@ -16,6 +17,7 @@ namespace BECore::Chess::Tests {
         constexpr float kAnalysisControlHeight = 56.0f;  // a touch target at the smallest fit scale of the matrix
         constexpr float kEvaluationBarHeight = 12.0f;
         constexpr float kHintWidth = 96.0f;
+        constexpr float kRatingsWidth = 56.0f;  // the touch target's width: the cell is no wider than it needs
 
         /// The names of the controls of one place: the lowest band in the Wide view, the end of the band of the buttons in the Tall view
         struct AnalysisNames {
@@ -24,10 +26,15 @@ namespace BECore::Chess::Tests {
             const char* eval;
             const char* text;
             const char* bar;
+            const char* ratings;
+            const char* ratingsText;
+            const char* ratingsSwitch;
         };
 
-        constexpr AnalysisNames kWideNames{"MovePanelBandAnalysis", "MovePanelHint", "MovePanelEval", "MovePanelEvalText", "MovePanelEvalBar"};
-        constexpr AnalysisNames kTallNames{"MovePanelBandButtons", "MovePanelTallHint", "MovePanelTallEval", "MovePanelTallEvalText", "MovePanelTallEvalBar"};
+        constexpr AnalysisNames kWideNames{"MovePanelBandAnalysis", "MovePanelHint",    "MovePanelEval",        "MovePanelEvalText",
+                                           "MovePanelEvalBar",      "MovePanelRatings", "MovePanelRatingsText", "MovePanelRatingsSwitch"};
+        constexpr AnalysisNames kTallNames{"MovePanelBandButtons", "MovePanelTallHint",    "MovePanelTallEval",        "MovePanelTallEvalText",
+                                           "MovePanelTallEvalBar", "MovePanelTallRatings", "MovePanelTallRatingsText", "MovePanelTallRatingsSwitch"};
 
         /// Whether the box of the panel lies in the safe area of the view a laid out canvas has
         bool BoxFitsIn(const UICanvasLayout& layout) {
@@ -35,8 +42,8 @@ namespace BECore::Chess::Tests {
             return MovePanelFits(safe.x, safe.y, safe.x + safe.w, safe.y + safe.h, LaidOutForTall(layout) ? MovePanelView::Tall : MovePanelView::Wide);
         }
 
-        /// What is wrong with the controls of the canvas MovePanel as it is laid out with the box shown: the pair of the view in its band, 56 high, apart, inside the box and clear of the bands
-        /// above; the pair of the other view with no room; the words and the bar cut by nothing, the text above the bar
+        /// What is wrong with the controls of the canvas MovePanel as it is laid out with the box shown: the three of the view in its band, 56 high, apart, inside the box and clear of the bands
+        /// above; the three of the other view with no room; the words and the bar cut by nothing, the text above the bar, the ratings cell a touch target that holds its word and its switch
         String AnalysisProblems(const UICanvasLayout& layout) {
             String problems;
             const bool tall = LaidOutForTall(layout);
@@ -59,11 +66,15 @@ namespace BECore::Chess::Tests {
             const UIElement* eval = find(shown.eval);
             const UIElement* text = find(shown.text);
             const UIElement* bar = find(shown.bar);
-            if (box == nullptr || buttons == nullptr || takeBack == nullptr || band == nullptr || hint == nullptr || eval == nullptr || text == nullptr || bar == nullptr) {
+            const UIElement* ratings = find(shown.ratings);
+            const UIElement* ratingsText = find(shown.ratingsText);
+            const UIElement* ratingsSwitch = find(shown.ratingsSwitch);
+            if (box == nullptr || buttons == nullptr || takeBack == nullptr || band == nullptr || hint == nullptr || eval == nullptr || text == nullptr || bar == nullptr || ratings == nullptr ||
+                ratingsText == nullptr || ratingsSwitch == nullptr) {
                 return problems;
             }
 
-            for (const char* name : {hidden.hint, hidden.eval, hidden.text, hidden.bar}) {
+            for (const char* name : {hidden.hint, hidden.eval, hidden.text, hidden.bar, hidden.ratings, hidden.ratingsText, hidden.ratingsSwitch}) {
                 const UIElement* other = find(name);
                 if (other != nullptr && !other->rect.IsEmpty()) {
                     problems += Format("{} is laid out in the {} view, which has its twin\n", name, tall ? "Tall" : "Wide");
@@ -89,7 +100,7 @@ namespace BECore::Chess::Tests {
                 problems += Format("{} is not inside the box\n", shown.band);
             }
 
-            for (const UIElement* control : {hint, eval}) {
+            for (const UIElement* control : {hint, eval, ratings}) {
                 if (std::abs(control->rect.h - kAnalysisControlHeight) > kPixelTolerance) {
                     problems += Format("{} is {:.1f} units high, not {:.0f}\n", control->name.ToStringView(), control->rect.h, kAnalysisControlHeight);
                 }
@@ -102,6 +113,22 @@ namespace BECore::Chess::Tests {
             }
             if (hint->rect.x + hint->rect.w > eval->rect.x + kPixelTolerance) {
                 problems += "the evaluation cell is not after the Hint button\n";
+            }
+            if (eval->rect.x + eval->rect.w > ratings->rect.x + kPixelTolerance) {
+                problems += "the ratings cell is not after the evaluation cell\n";
+            }
+            if (ratings->rect.w < kRatingsWidth - kPixelTolerance) {
+                problems += Format("{} is {:.1f} units wide, under the touch target of {:.0f}\n", shown.ratings, ratings->rect.w, kRatingsWidth);
+            }
+            const UIContentFit ratingsFit = ratingsText->CheckContent(ratingsText->rect.w, ratingsText->rect.h, scale);
+            if (ratingsFit.hasContent && !ratingsFit.fits) {
+                problems += Format("{} cuts '{}': {:.1f} x {:.1f} units at scale {:.3f}\n", shown.ratingsText, ShownText(*ratingsText).c_str(), ratingsText->rect.w, ratingsText->rect.h, scale);
+            }
+            if (!LiesIn(ratingsText->rect, ratings->rect) || !LiesIn(ratingsSwitch->rect, ratings->rect)) {
+                problems += Format("{} or {} is not inside the ratings cell\n", shown.ratingsText, shown.ratingsSwitch);
+            }
+            if (ratingsText->rect.y + ratingsText->rect.h > ratingsSwitch->rect.y + kPixelTolerance) {
+                problems += Format("{} lies on {}\n", shown.ratingsText, shown.ratingsSwitch);
             }
             const UIContentFit hintFit = hint->CheckContent(hint->rect.w - 2.0f * kButtonAir, hint->rect.h, scale);
             if (hintFit.hasContent && !hintFit.fits) {
@@ -144,6 +171,15 @@ namespace BECore::Chess::Tests {
             EXPECT_FLOAT_EQ(progress->minValue, 0.0f);
             EXPECT_FLOAT_EQ(progress->maxValue, 1.0f);
             EXPECT_FALSE(bar.IsInteractive()) << "a press on the bar goes to the cell under it";
+        }
+
+        void ExpectRatingsCell(const UIElement& cell) {
+            const UIToggleComponent* toggle = cell.GetComponent<UIToggleComponent>();
+            ASSERT_NE(toggle, nullptr) << cell.name.CStr();
+            EXPECT_EQ(toggle->bind, "analysisRatingsOn"_intern) << cell.name.CStr();
+            EXPECT_EQ(toggle->action, "ChessSetRatings"_intern) << cell.name.CStr();
+            ASSERT_NE(ClickerOf(cell), nullptr) << cell.name.CStr();
+            EXPECT_TRUE(ClickerOf(cell)->action.Empty()) << "the toggle decides what a click emits";
         }
 
     }  // namespace
@@ -200,6 +236,12 @@ namespace BECore::Chess::Tests {
         Settle();
         ExpectAnalysisControls(MovePanelElement(kWideNames.hint), MovePanelElement(kWideNames.eval), MovePanelElement(kWideNames.bar));
         ExpectAnalysisControls(MovePanelElement(kTallNames.hint), MovePanelElement(kTallNames.eval), MovePanelElement(kTallNames.bar));
+        ExpectRatingsCell(MovePanelElement(kWideNames.ratings));
+        ExpectRatingsCell(MovePanelElement(kTallNames.ratings));
+        EXPECT_EQ(ShownText(MovePanelElement(kWideNames.ratingsText)), "!!");
+        EXPECT_EQ(ShownText(MovePanelElement(kTallNames.ratingsText)), "!!");
+        EXPECT_NE(MovePanelElement(kWideNames.ratingsSwitch).GetComponent<UISwitchComponent>(), nullptr) << "the state is the thumb's side, not a colour alone";
+        EXPECT_NE(MovePanelElement(kTallNames.ratingsSwitch).GetComponent<UISwitchComponent>(), nullptr);
 
         CoreManager::GetUIVars().Set("analysisText"_intern, "+0.35");
         CoreManager::GetUIVars().Set("analysisBar"_intern, "0.25");
@@ -213,10 +255,10 @@ namespace BECore::Chess::Tests {
     TEST_F(ChessUiTest, TheWidePairIsShownOnlyInTheWideViewAndTheTallTwinsOnlyInTheTallView) {
         Settle();
         ASSERT_TRUE(MovePanelElement("MovePanelBox").active.visible);
-        for (const char* name : {kWideNames.band, kWideNames.hint, kWideNames.eval}) {
+        for (const char* name : {kWideNames.band, kWideNames.hint, kWideNames.eval, kWideNames.ratings}) {
             EXPECT_TRUE(MovePanelElement(name).active.visible) << name << " in the Wide view";
         }
-        for (const char* name : {kTallNames.hint, kTallNames.eval}) {
+        for (const char* name : {kTallNames.hint, kTallNames.eval, kTallNames.ratings}) {
             EXPECT_FALSE(MovePanelElement(name).active.visible) << name << " in the Wide view";
             EXPECT_TRUE(MovePanelElement(name).rect.IsEmpty()) << name << " takes no room in the Wide view";
         }
@@ -225,10 +267,10 @@ namespace BECore::Chess::Tests {
         ASSERT_EQ(GetScene().GetActiveView().name, PoolString::Intern(kTallViewName));
         ASSERT_TRUE(MovePanelElement("MovePanelBox").active.visible);
         EXPECT_FALSE(MovePanelElement(kWideNames.band).active.visible) << "the band is hidden in the Tall view";
-        for (const char* name : {kWideNames.band, kWideNames.hint, kWideNames.eval}) {
+        for (const char* name : {kWideNames.band, kWideNames.hint, kWideNames.eval, kWideNames.ratings}) {
             EXPECT_TRUE(MovePanelElement(name).rect.IsEmpty()) << name << " takes no room in the Tall view";
         }
-        for (const char* name : {kTallNames.hint, kTallNames.eval}) {
+        for (const char* name : {kTallNames.hint, kTallNames.eval, kTallNames.ratings}) {
             EXPECT_TRUE(MovePanelElement(name).active.visible) << name << " in the Tall view";
         }
     }
@@ -478,6 +520,56 @@ namespace BECore::Chess::Tests {
         EXPECT_TRUE(Analyst().IsHintRequested(Model()));
         ASSERT_TRUE(ClickControl(MovePanelElement("MovePanelTallEval")).Both());
         EXPECT_FALSE(Analyst().IsEvaluationOn());
+    }
+
+    TEST_F(ChessUiTest, TheRatingsCellSwitchesTheRatingsOnAndOffAndTouchesNothingElse) {
+        ScriptedAnalysis analysis;
+        Analyst().SetEngineFactory(analysis.factory.AsFactory());
+        Settle();
+        EXPECT_FALSE(Analyst().AreRatingsOn()) << "off at the start of a game";
+        EXPECT_EQ(Var("analysisRatingsOn"), "false");
+
+        ASSERT_TRUE(ClickControl(MovePanelElement("MovePanelRatings")).Both());
+        EXPECT_TRUE(Analyst().AreRatingsOn());
+        EXPECT_EQ(Var("analysisRatingsOn"), "true");
+        EXPECT_FALSE(Analyst().IsEvaluationOn());
+        EXPECT_FALSE(Analyst().IsHintRequested(Model()));
+
+        ASSERT_TRUE(ClickControl(MovePanelElement("MovePanelEval")).Both());
+        EXPECT_TRUE(Analyst().IsEvaluationOn());
+        EXPECT_TRUE(Analyst().AreRatingsOn()) << "the evaluation cell leaves the ratings alone";
+        ASSERT_TRUE(ClickControl(MovePanelElement("MovePanelEval")).Both());
+        EXPECT_FALSE(Analyst().IsEvaluationOn());
+
+        ASSERT_TRUE(ClickControl(MovePanelElement("MovePanelRatings")).Both());
+        EXPECT_FALSE(Analyst().AreRatingsOn());
+        EXPECT_EQ(Var("analysisRatingsOn"), "false");
+        EXPECT_FALSE(Analyst().IsHintRequested(Model()));
+    }
+
+    TEST_F(ChessUiTest, AnythingButTrueOrFalseDoesNotSwitchTheRatings) {
+        Settle();
+        PressWith("ChessSetRatings", "maybe");
+        PressWith("ChessSetRatings", "");
+        _manager->UpdateAll();
+        EXPECT_FALSE(Analyst().AreRatingsOn());
+        PressWith("ChessSetRatings", "true");
+        EXPECT_TRUE(Analyst().AreRatingsOn());
+        PressWith("ChessSetRatings", "false");
+        EXPECT_FALSE(Analyst().AreRatingsOn());
+    }
+
+    TEST_F(ChessUiTest, TheTallRatingsTwinAnswersTheSameAction) {
+        ResizeWithoutInsets(kNarrowestWidth, kNarrowestTallHeight);
+        ASSERT_EQ(GetScene().GetActiveView().name, PoolString::Intern(kTallViewName));
+        ASSERT_TRUE(MovePanelElement("MovePanelBox").active.visible);
+
+        ASSERT_TRUE(ClickControl(MovePanelElement("MovePanelTallRatings")).Both());
+        EXPECT_TRUE(Analyst().AreRatingsOn());
+        EXPECT_EQ(Var("analysisRatingsOn"), "true");
+        EXPECT_FALSE(Analyst().IsEvaluationOn());
+        ASSERT_TRUE(ClickControl(MovePanelElement("MovePanelTallRatings")).Both());
+        EXPECT_FALSE(Analyst().AreRatingsOn());
     }
 
     TEST_F(ChessUiTest, TheEvaluationAsksTheEngineThePersonPicked) {

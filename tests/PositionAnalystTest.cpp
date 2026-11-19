@@ -989,6 +989,31 @@ namespace BECore::Chess::Tests {
         EXPECT_TRUE(analyst.AreRatingsOn()) << "a reset keeps the switch";
     }
 
+    TEST_F(PositionAnalystTest, GetRatingForwardsTheRatingOfOnePlyAndAnEarlierPlySurvivesATakeBack) {
+        const auto engine = MakeEngine(kScore, Mv("e2e4"));
+        CountingAnalysisFactory factory{engine};
+        ChessGameModel model;
+        PositionAnalyst analyst;
+        analyst.SetEngineFactory(factory.AsFactory());
+        analyst.SetRatings(true);
+        ASSERT_TRUE(Play(model, "e2e4"));
+        ASSERT_TRUE(Play(model, "e7e5"));
+        EXPECT_FALSE(analyst.GetRating(model, 0).has_value()) << "not rated yet";
+        ASSERT_TRUE(UpdateUntil(analyst, model, OpponentEngine::Own, [&] { return AllRated(analyst, model); }));
+
+        const MoveRatings ratings = analyst.GetRatings(model);
+        ASSERT_EQ(ratings.size(), 2u);
+        for (size_t ply = 0; ply < ratings.size(); ++ply) {
+            ASSERT_TRUE(analyst.GetRating(model, ply).has_value()) << ply;
+            EXPECT_EQ(*analyst.GetRating(model, ply), *ratings[ply]) << ply;
+        }
+        EXPECT_FALSE(analyst.GetRating(model, 2).has_value());
+
+        ASSERT_EQ(model.TakeBack(1), 1u);
+        EXPECT_TRUE(analyst.GetRating(model, 0).has_value()) << "the move that remains keeps its rating at once";
+        EXPECT_FALSE(analyst.GetRating(model, 1).has_value());
+    }
+
     TEST_F(PositionAnalystTest, ShutdownDropsTheRatingsAndSwitchesThemOff) {
         const auto engine = MakeEngine(kScore, Mv("e2e4"));
         CountingAnalysisFactory factory{engine};

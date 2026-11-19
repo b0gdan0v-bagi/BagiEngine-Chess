@@ -16,6 +16,7 @@ namespace BECore::Chess {
         struct Ids {
             static constexpr auto chessHint = "ChessHint"_intern;
             static constexpr auto chessSetEvaluation = "ChessSetEvaluation"_intern;
+            static constexpr auto chessSetRatings = "ChessSetRatings"_intern;
             static constexpr auto chessShowMove = "ChessShowMove"_intern;
             static constexpr auto chessTakeBack = "ChessTakeBack"_intern;
             static constexpr auto movePanelBox = "MovePanelBox"_intern;
@@ -34,6 +35,10 @@ namespace BECore::Chess {
         }
         if (event.action == Ids::chessSetEvaluation) {
             SetEvaluation(event.value.ToStringView());
+            return;
+        }
+        if (event.action == Ids::chessSetRatings) {
+            SetRatings(event.value.ToStringView());
             return;
         }
         const bool takeBack = event.action == Ids::chessTakeBack;
@@ -60,8 +65,8 @@ namespace BECore::Chess {
             LOG_WARNING("ChessShowMove ignored: '{}' is not a press of the move list"_format(event.value.ToStringView()));
             return;
         }
-        // The rows of the press are the ones on the screen: the words were published from the same model in the last draw
-        if (const Optional<size_t> shown = ShownMovesAfter(*press, CurrentMovePanelRows(model), model->GetShownMoveCount(), model->GetMoves().size())) {
+        // The rows of the press are the ones on the screen: the words were published from the same model in the last draw (a press reads the plies, never the text, so no marks are asked for)
+        if (const Optional<size_t> shown = ShownMovesAfter(*press, CurrentMovePanelRows(model, nullptr), model->GetShownMoveCount(), model->GetMoves().size())) {
             model->ShowMoves(*shown);
         }
     }
@@ -95,8 +100,20 @@ namespace BECore::Chess {
         analyst->SetEvaluation(value == "true");
     }
 
+    void ChessMovePanelComponent::SetRatings(StringView value) {
+        PositionAnalyst* analyst = ChessGame::GetActiveAnalyst();
+        if (!analyst) {
+            return;
+        }
+        if (value != "true" && value != "false") {
+            LOG_WARNING("ChessSetRatings ignored: '{}' is neither true nor false"_format(value));
+            return;
+        }
+        analyst->SetRatings(value == "true");
+    }
+
     void ChessMovePanelComponent::Publish(const ChessGameModel* model) {
-        const Vector<MovePanelRow> rows = CurrentMovePanelRows(model);
+        const Vector<MovePanelRow> rows = CurrentMovePanelRows(model, ChessGame::GetActiveAnalyst());
         PublishMovePanelWords(rows);
         if (const auto canvas = GetNode().GetComponent<UICanvasComponent>()) {
             _rows.Show(*canvas, rows);
@@ -128,7 +145,7 @@ namespace BECore::Chess {
 
     void ChessMovePanelComponent::OnDraw() {
         const ChessGameModel* model = ChessGame::GetActiveModel();
-        if (_published.Changed(model)) {
+        if (_published.Changed(model, ChessGame::GetActiveAnalyst())) {
             Publish(model);
         }
         if (_analysisPublished.Changed(model, ChessGame::GetActiveAnalyst())) {
