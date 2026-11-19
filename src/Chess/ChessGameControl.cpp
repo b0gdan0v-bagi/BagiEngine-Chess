@@ -650,7 +650,7 @@ namespace BECore::Chess {
             return std::unexpected(pick.error());
         }
         if (pick->hint.value_or(false)) {
-            if (const Optional<HintRefusal> refusal = HintRefusalFor(_model, _opponent.GetSides())) {
+            if (const Optional<HintRefusal> refusal = HintRefusalFor(_model, HintSeatsFor(_model, _puzzle, _opponent.GetSides()))) {
                 if (*refusal == HintRefusal::GameOver) {
                     return std::unexpected(MakeControlError(ChessControlErrors::kGameOver, Format("the game is over ({}): there is nothing to hint", StatusName(_model.GetStatus()))));
                 }

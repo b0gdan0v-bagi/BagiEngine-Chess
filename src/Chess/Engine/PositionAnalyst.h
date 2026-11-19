@@ -6,6 +6,7 @@
 #include <Chess/Engine/OpponentEngines.h>
 #include <Chess/Engine/OpponentSettings.h>
 #include <Chess/Engine/SearchRequest.h>
+#include <Chess/Game/PuzzleSession.h>
 #include <TaskSystem/Task.h>
 
 namespace BECore::Chess {
@@ -19,6 +20,10 @@ namespace BECore::Chess {
 
     /// The same for a program that plays one color or none
     [[nodiscard]] Optional<HintRefusal> HintRefusalFor(const ChessGameModel& model, Optional<PieceColor> programPlays);
+
+    /// The seats HintRefusalFor() is asked with: while a puzzle is on in @p model every side the solver does not play (the program's reply is not the person's to hint, whatever the opponent is
+    /// picked), else @p opponent unchanged
+    [[nodiscard]] ProgramSides HintSeatsFor(const ChessGameModel& model, const PuzzleSession& puzzle, ProgramSides opponent);
 
     /// How many lines the analyst asks of the engine: the best one (the evaluation and the hint) and the second best, for GetLines()
     inline constexpr int kAnalysisLines = 2;

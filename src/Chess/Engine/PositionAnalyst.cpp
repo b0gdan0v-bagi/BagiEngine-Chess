@@ -22,6 +22,13 @@ namespace BECore::Chess {
         return HintRefusalFor(model, ProgramSides::Of(programPlays));
     }
 
+    ProgramSides HintSeatsFor(const ChessGameModel& model, const PuzzleSession& puzzle, ProgramSides opponent) {
+        if (const Puzzle* current = puzzle.GetCurrent(); current && puzzle.IsActiveFor(model)) {
+            return ProgramSides::Of(Opposite(current->SolverColor()));
+        }
+        return opponent;
+    }
+
     std::expected<ChessEnginePtr, EngineError> MakeAnalysisEngine(OpponentEngine engine, const OpponentSettings& settings) {
         switch (engine) {
             case OpponentEngine::Stockfish: {

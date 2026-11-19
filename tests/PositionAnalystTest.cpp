@@ -250,6 +250,30 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(HintRefusalFor(finished, nobody), HintRefusal::GameOver);
     }
 
+    TEST_F(PositionAnalystTest, TheHintSeatsOfAPuzzleAreTheSideTheSolverDoesNotPlay) {
+        constexpr StringView kRow = "ladder\t7k/8/8/8/8/8/1R6/R6K b - - 0 1\th8g8 a1a7 g8h8 b2b8\t1200\tmateIn2\n";
+        String tsv = "id\tfen\tmoves\trating\tthemes\n";
+        tsv.append(kRow.data(), kRow.size());
+        PuzzleSession session;
+        session.SetPuzzles(PuzzleSet::Parse(StringView(tsv.data(), tsv.size())));
+        ChessGameModel model;
+        const ProgramSides nobody;
+        const ProgramSides both{true, true};
+        const ProgramSides white = ProgramSides::Of(PieceColor::White);
+        const ProgramSides black = ProgramSides::Of(PieceColor::Black);
+
+        EXPECT_EQ(HintSeatsFor(model, session, white), white) << "no puzzle: the opponent's seats";
+        EXPECT_EQ(HintSeatsFor(model, session, both), both);
+
+        ASSERT_TRUE(session.Begin(model, 0));  // White solves
+        for (const ProgramSides opponent : {nobody, both, white, black}) {
+            EXPECT_EQ(HintSeatsFor(model, session, opponent), black) << "whatever the opponent is";
+        }
+
+        model.Reset();
+        EXPECT_EQ(HintSeatsFor(model, session, white), white) << "the puzzle that was picked but is not on";
+    }
+
     TEST_F(PositionAnalystTest, AFailingEngineIsOneErrorForTheVersionNotATryPerFrame) {
         const auto engine = MakeEngine();
         engine->FailWith(EngineError{EngineErrorKind::ProcessDied, "the engine died"});

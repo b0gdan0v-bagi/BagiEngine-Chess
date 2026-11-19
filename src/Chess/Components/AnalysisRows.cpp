@@ -61,7 +61,8 @@ namespace BECore::Chess {
 
     bool HintAllowedNow(const ChessGameModel* model) {
         const OpponentController* opponent = ChessGame::GetActiveOpponent();
-        return model && opponent && !model->IsDrafting() && !HintRefusalFor(*model, opponent->GetSides());
+        const PuzzleSession* puzzle = ChessGame::GetActivePuzzle();
+        return model && opponent && puzzle && !model->IsDrafting() && !HintRefusalFor(*model, HintSeatsFor(*model, *puzzle, opponent->GetSides()));
     }
 
     HintOnCanvas::HintOnCanvas(StringView name) : _name(PoolString::Intern(name)) {}
