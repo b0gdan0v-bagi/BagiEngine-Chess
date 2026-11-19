@@ -177,6 +177,14 @@ namespace BECore::Chess {
         return ResigningColor(_model.GetTurn(), _opponent.GetPlays(), sides.white && sides.black);
     }
 
+    bool ChessGame::ReviewStartAllowedNow() const {
+        if (IsPuzzleOn() || ReviewRefusalFor(_model)) {
+            return false;
+        }
+        const ReviewState state = _analyst.GetReviewState(_model);
+        return state == ReviewState::Idle || state == ReviewState::Failed;
+    }
+
     void ChessGame::BeginEditing(EditStart start) {
         switch (start) {
             case EditStart::Current:

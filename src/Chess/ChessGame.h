@@ -103,6 +103,10 @@ namespace BECore::Chess {
         /// Resign buttons, the HUD's and the menu section's
         [[nodiscard]] Optional<PieceColor> ResigningNow() const;
 
+        /// Whether a review of the game may begin now: no puzzle on, a finished game with moves (ReviewRefusalFor()) and no review that runs or is done (a failed one may be retried).
+        /// The one rule of the Review section's Start and of the result bar's Review button
+        [[nodiscard]] bool ReviewStartAllowedNow() const;
+
         /// The virtual path of the table of opening names that Start() loads
         static constexpr StringView kOpeningsPath = "assets/openings/openings.tsv";
 

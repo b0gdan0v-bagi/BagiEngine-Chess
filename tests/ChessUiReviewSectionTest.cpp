@@ -232,6 +232,58 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(Var("reviewStatus"), "Not started");
     }
 
+    // ---- the rule of a start, ChessGame::ReviewStartAllowedNow(): the section's Start and the result bar's button ask it ----------------
+
+    TEST_F(ChessUiTest, AReviewMayStartOnlyOnAFinishedGameWithMovesAndNoPuzzle) {
+        ChessGame& game = *ChessGame::GetActive();
+        EXPECT_FALSE(game.ReviewStartAllowedNow()) << "a game that is not over";
+
+        ASSERT_TRUE(Model().Resign(PieceColor::White).has_value());
+        EXPECT_FALSE(game.ReviewStartAllowedNow()) << "no moves";
+
+        Model().Reset();
+        game.SetPuzzles(MateInTwoSet());
+        ASSERT_TRUE(game.BeginPuzzle(0));
+        EXPECT_FALSE(game.ReviewStartAllowedNow());
+        ASSERT_TRUE(game.LeavePuzzle());
+
+        ASSERT_TRUE(PlayFoolsMate());
+        EXPECT_TRUE(game.ReviewStartAllowedNow());
+    }
+
+    TEST_F(ChessUiTest, AReviewThatRunsOrIsDoneBlocksAStart) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        ChessGame& game = *ChessGame::GetActive();
+        const auto engine = New<AnalysingEngine>();
+        engine->Gate(true);
+        CountingAnalysisFactory gated{engine};
+        Analyst().SetEngineFactory(gated.AsFactory());
+        ASSERT_TRUE(PlayFoolsMate());
+        ASSERT_TRUE(game.ReviewStartAllowedNow());
+
+        ASSERT_TRUE(Analyst().StartReview(Model()));
+        ASSERT_EQ(Analyst().GetReviewState(Model()), ReviewState::Running);
+        EXPECT_FALSE(game.ReviewStartAllowedNow()) << "a review that runs";
+
+        engine->Open();
+        ASSERT_TRUE(WaitForReview());
+        EXPECT_FALSE(game.ReviewStartAllowedNow()) << "a review that is done";
+
+        Analyst().AbandonReview();
+        EXPECT_TRUE(game.ReviewStartAllowedNow());
+    }
+
+    TEST_F(ChessUiTest, AFailedReviewDoesNotBlockAStart) {
+        SKIP_WITHOUT_WORKER_THREADS();
+        ChessGame& game = *ChessGame::GetActive();
+        CountingAnalysisFactory failing(EngineError{EngineErrorKind::LaunchFailed, "no engine for the review"});
+        Analyst().SetEngineFactory(failing.AsFactory());
+        ASSERT_TRUE(PlayFoolsMate());
+        ASSERT_TRUE(Analyst().StartReview(Model()));
+        ASSERT_TRUE(FramesUntil([&] { return Analyst().GetReviewState(Model()) == ReviewState::Failed; }));
+        EXPECT_TRUE(game.ReviewStartAllowedNow()) << "a failed review is retried";
+    }
+
     TEST_F(ChessUiTest, APuzzleThatIsSolvedStillRefusesTheReviewOfItsFinishedGame) {
         ChessGame& game = *ChessGame::GetActive();
         game.SetPuzzles(MateInTwoSet());

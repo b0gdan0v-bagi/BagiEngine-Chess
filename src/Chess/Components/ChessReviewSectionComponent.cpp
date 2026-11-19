@@ -22,12 +22,6 @@ namespace BECore::Chess {
             static constexpr auto reviewStatus = "reviewStatus"_intern;
         };
 
-        /// The one rule of a start, for the button's grey look and for the action. A start on a review that runs or is done does nothing in the reviewer, so it reads grey as well
-        bool MayStart(const ChessGame& game) {
-            const ReviewState state = game.GetAnalyst().GetReviewState(game.GetModel());
-            return !game.IsPuzzleOn() && !ReviewRefusalFor(game.GetModel()) && (state == ReviewState::Idle || state == ReviewState::Failed);
-        }
-
         /// Writes @p disabled to the button only when it differs from @p known, which then follows it
         void Grey(UICanvasComponent& canvas, PoolString name, bool disabled, bool& known) {
             if (disabled != known) {
@@ -51,7 +45,7 @@ namespace BECore::Chess {
             return;
         }
         if (start) {
-            if (MayStart(*game)) {
+            if (game->ReviewStartAllowedNow()) {
                 game->GetAnalyst().StartReview(game->GetModel());
             }
         } else {
@@ -86,7 +80,7 @@ namespace BECore::Chess {
             const PositionAnalyst& analyst = game->GetAnalyst();
             const ReviewState state = analyst.GetReviewState(*model);
             status = ReviewText::Status(state, analyst.GetReviewProgress(*model), ReviewRefusalFor(*model), puzzleOn);
-            mayStart = MayStart(*game);
+            mayStart = game->ReviewStartAllowedNow();
             mayCancel = state != ReviewState::Idle;
         }
         CoreManager::GetUIVars().Set(Ids::reviewStatus, StringView(status));
