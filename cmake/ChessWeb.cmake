@@ -4,7 +4,10 @@
 # Included by CMakeLists.txt and, alone, by tests/check_web_package.cmake (cmake -P), so the pure functions are checked on a desktop
 # without an Emscripten SDK. The engine's be_web_preload_args (engine/cmake/BagiWeb.cmake) packs every file of config/ and assets/ of the
 # game with no filter; a doc, a person's ChessSettings.local.xml (a Stockfish path), an imgui.ini or the provenance of a generated asset
-# (*.artgen.json: the paths of the machine it was made on) must not be served to others.
+# (*.artgen.json: the paths of the machine it was made on) must not be served to others. The source PNGs of the pieces
+# (assets/artgen/*.png) stay out too: only a repack in the editor reads them, the web build has none, and the game draws the pieces
+# from assets/atlases/pieces.png. Any other sprite file is served, and tests/check_web_package.cmake holds that every texturePath of
+# config/TextureLibrary.xml is in the package, so a pattern cannot hide a sprite the game draws.
 #
 # emcc has --exclude-file <pattern> (a glob, fnmatch against the full path of a file as file_packager walks the folder), and the
 # patterns below are written for that: a leading "*/" stands for the folders above a name. It applies to every --preload-file of the
@@ -35,6 +38,7 @@ function(chess_web_exclude_patterns)
         "*.py"
         "*/__pycache__/*"
         "*.artgen.json"
+        "*/assets/artgen/*.png"
         PARENT_SCOPE)
 endfunction()
 
