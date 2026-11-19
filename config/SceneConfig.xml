@@ -33,6 +33,7 @@
         <node ref="nodes/ChessHud" />
         <node ref="nodes/ChessEditorBar" />
         <node ref="nodes/ChessPuzzleBar" />
+        <node ref="nodes/ChessReviewBar" />
         <node ref="nodes/ChessMenuPanel" />
         <node ref="nodes/ChessOpponentPanel" />
         <node ref="nodes/ChessMovesSection" />

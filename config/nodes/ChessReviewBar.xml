@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<!-- The Review button of the result bar: one button in the middle of the bar that ChessResultComponent draws across the board when the game is over, so the person starts the review of the
+     finished game without the menu. A non-modal canvas of the SceneView space (layer 20, above the board, the dim and the HUD), started hidden: ChessReviewBarComponent (listed before the
+     canvas) shows it exactly while the game is over, its own position is shown (no view, no draft) and ChessGame::ReviewStartAllowedNow() holds (no puzzle, no review running or done),
+     checked on every update and draw like the puzzle bar, and answers no action: the button emits ChessReviewStart, which ChessReviewSectionComponent answers wherever it comes from.
+     The canvas has no safe area: the board stands at fixed scene units (ChessBoard.xml: 640 x 640, a square 80, at (100, 80) in the default and Wide view, at (40, 144) in Portrait and
+     Tall) and an inset must not move the button, as it does not move BoardCoordinates. The bar is one square high across the board, its middle the board's middle (origin + 320), so the
+     button (200 x 56) is centred there: x = 100 + 320 - 100 = 320 and y = 80 + 320 - 28 = 372; the variant for orientation:portrait (the canvas's bounds are the view in units, so it holds in
+     Tall too) has x = 40 + 320 - 100 = 260 and y = 144 + 320 - 28 = 436. A press the button takes is the UI's and never reaches the board (which would start a new game). Every name starts
+     with ReviewBar because elements are found by name in every canvas of the scene. -->
+<node name="ReviewBar" layer="20" contentVersion="5">
+  <components>
+    <component type="ChessReviewBarComponent" />
+    <component type="UICanvasComponent" space="SceneView" useSafeArea="false" visible="false">
+      <elements>
+        <element type="UIElement" name="ReviewBarStart" anchor="TopLeft" x="320" y="372" width="200" height="56" fontSize="28" color="50,115,85,255">
+          <components>
+            <component type="UITextComponent" text="Review" align="Center" verticalAlign="Center" wrap="false"/>
+            <component type="UIInputClicker" action="ChessReviewStart"/>
+          </components>
+        </element>
+      </elements>
+      <variants>
+        <variant when="orientation:portrait">
+          <overrides>
+            <set element="ReviewBarStart" x="260" y="436" />
+          </overrides>
+        </variant>
+      </variants>
+    </component>
+  </components>
+</node>
