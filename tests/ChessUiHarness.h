@@ -1218,6 +1218,27 @@ namespace BECore::Chess::Tests {
             return PuzzleSection() && PuzzleSection()->_visible;
         }
 
+        /// The canvas of the menu section "Review": the node `ReviewSection`
+        IntrusivePtr<UICanvasComponent> ReviewSection() const {
+            return CanvasOf("ReviewSection");
+        }
+
+        /// A click on a control of the Review section, by name
+        Taken ClickReviewSection(const char* name) {
+            return ClickControl(ElementOf("ReviewSection", name));
+        }
+
+        /// The Menu button of the HUD and then the Review button of the list, clicked where they are drawn; whether the section is shown afterwards
+        bool OpenTheReviewSection() {
+            if (!ClickButton(kMenuColor)) {
+                return false;
+            }
+            if (!MenuList() || !MenuList()->_visible || !ClickMenuList("MenuSectionReview").Both()) {
+                return false;
+            }
+            return ReviewSection() && ReviewSection()->_visible;
+        }
+
         /// The canvas of the promotion panel: the node `PromotionPanel`
         IntrusivePtr<UICanvasComponent> Promotion() const {
             return CanvasOf("PromotionPanel");

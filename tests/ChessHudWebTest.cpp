@@ -105,11 +105,12 @@ namespace BECore::Tests {
   <button id="MenuSectionSound" data-action="ChessOpenSection" data-value="sound">Sound</button>
   <button id="MenuSectionPosition" data-action="ChessOpenSection" data-value="position">Position</button>
   <button id="MenuSectionPuzzles" data-action="ChessOpenSection" data-value="puzzles">Puzzles</button>
+  <button id="MenuSectionReview" data-action="ChessOpenSection" data-value="review">Review</button>
   <button id="MenuClose" data-action="ChessCloseMenu">Close</button>
 </div>)";
 
         constexpr const char* kChessMenuCss = R"(
-#MenuPlate           { anchor: center; display: flex; flex-direction: column; align-items: stretch; gap: 12px; padding: 16px; width: 94%; max-width: 640px; height: 564px; background: rgb(36, 40, 52); }
+#MenuPlate           { anchor: center; display: flex; flex-direction: column; align-items: stretch; gap: 12px; padding: 16px; width: 94%; max-width: 640px; height: 632px; background: rgb(36, 40, 52); }
 #MenuTitle           { height: 44px; font-size: 30px; text-align: center; }
 #MenuSectionOpponent { height: 56px; font-size: 26px; background: rgb(70, 70, 100); }
 #MenuSectionMoves    { height: 56px; font-size: 26px; background: rgb(70, 70, 100); }
@@ -117,11 +118,12 @@ namespace BECore::Tests {
 #MenuSectionSound    { height: 56px; font-size: 26px; background: rgb(70, 70, 100); }
 #MenuSectionPosition { height: 56px; font-size: 26px; background: rgb(70, 70, 100); }
 #MenuSectionPuzzles  { height: 56px; font-size: 26px; background: rgb(70, 70, 100); }
+#MenuSectionReview   { height: 56px; font-size: 26px; background: rgb(70, 70, 100); }
 #MenuClose           { height: 56px; font-size: 26px; background: rgb(110, 60, 60); }
 )";
 
-        constexpr const char* kMenuNames[] = {"MenuPlate",        "MenuTitle",           "MenuSectionOpponent", "MenuSectionMoves", "MenuSectionGame",
-                                              "MenuSectionSound", "MenuSectionPosition", "MenuSectionPuzzles",  "MenuClose"};
+        constexpr const char* kMenuNames[] = {"MenuPlate",        "MenuTitle",           "MenuSectionOpponent", "MenuSectionMoves",  "MenuSectionGame",
+                                              "MenuSectionSound", "MenuSectionPosition", "MenuSectionPuzzles",  "MenuSectionReview", "MenuClose"};
 
         constexpr const char* kPanelNames[] = {"Plate",        "Title",      "ModeRow",    "ModeCaption", "ModeGroup",     "ModeTwo",     "ModeComputer",    "ColorRow",        "ColorCaption",
                                                "ColorGroup",   "ColorWhite", "ColorBlack", "EngineRow",   "EngineCaption", "EngineGroup", "EngineStockfish", "EngineOwn",       "LevelRow",
@@ -455,13 +457,10 @@ namespace BECore::Tests {
             const char* name;
             const char* action;
             const char* value;
-        } buttons[] = {{"MenuSectionOpponent", "ChessOpenSection", "opponent"},
-                       {"MenuSectionMoves", "ChessOpenSection", "moves"},
-                       {"MenuSectionGame", "ChessOpenSection", "game"},
-                       {"MenuSectionSound", "ChessOpenSection", "sound"},
-                       {"MenuSectionPosition", "ChessOpenSection", "position"},
-                       {"MenuSectionPuzzles", "ChessOpenSection", "puzzles"},
-                       {"MenuClose", "ChessCloseMenu", ""}};
+        } buttons[] = {{"MenuSectionOpponent", "ChessOpenSection", "opponent"}, {"MenuSectionMoves", "ChessOpenSection", "moves"},
+                       {"MenuSectionGame", "ChessOpenSection", "game"},         {"MenuSectionSound", "ChessOpenSection", "sound"},
+                       {"MenuSectionPosition", "ChessOpenSection", "position"}, {"MenuSectionPuzzles", "ChessOpenSection", "puzzles"},
+                       {"MenuSectionReview", "ChessOpenSection", "review"},     {"MenuClose", "ChessCloseMenu", ""}};
         for (const auto& [name, action, value] : buttons) {
             SCOPED_TRACE(name);
             const UIElement* element = compiled->Element(name);
@@ -492,7 +491,7 @@ namespace BECore::Tests {
         // The list has the sizes the XML says, so the comparison above is not between two empty rects
         web.At(1280.0f, 720.0f);
         ASSERT_NE(web.Find("MenuPlate"), nullptr);
-        EXPECT_FLOAT_EQ(web.Find("MenuPlate")->rect.h, 564.0f);
+        EXPECT_FLOAT_EQ(web.Find("MenuPlate")->rect.h, 632.0f);
         EXPECT_FLOAT_EQ(web.Find("MenuClose")->rect.h, 56.0f);
     }
 

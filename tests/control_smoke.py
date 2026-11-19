@@ -1297,7 +1297,7 @@ def check_the_menu_list_is_shown(tree: dict) -> None:
 
 
 def check_the_menu_buttons(tree: dict) -> None:
-    """The buttons of the list: one per section the build has (Opponent, Moves, Resign / Draw, Sound, Position, Puzzles), Close and the dim that closes it like Close."""
+    """The buttons of the list: one per section the build has (Opponent, Moves, Resign / Draw, Sound, Position, Puzzles, Review), Close and the dim that closes it like Close."""
     names = []
 
     def collect(element: dict) -> None:
@@ -1308,7 +1308,7 @@ def check_the_menu_buttons(tree: dict) -> None:
 
     for element in find_ui_canvas(tree, "MenuPanel")["elements"]:
         collect(element)
-    check(sorted(names) == ["MenuClose", "MenuDim", "MenuSectionGame", "MenuSectionMoves", "MenuSectionOpponent", "MenuSectionPosition", "MenuSectionPuzzles", "MenuSectionSound"], f"the buttons of the list: {names}")
+    check(sorted(names) == ["MenuClose", "MenuDim", "MenuSectionGame", "MenuSectionMoves", "MenuSectionOpponent", "MenuSectionPosition", "MenuSectionPuzzles", "MenuSectionReview", "MenuSectionSound"], f"the buttons of the list: {names}")
     dim = find_ui_element({"canvases": [find_ui_canvas(tree, "MenuPanel")]}, "MenuDim")
     check(dim["action"] == "ChessCloseMenu", f"the dim of the list: {dim}")
     found = find_ui_element({"canvases": [find_ui_canvas(tree, "MenuPanel")]}, "MenuSectionOpponent")
