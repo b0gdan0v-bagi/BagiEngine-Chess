@@ -8,7 +8,7 @@ which it finds through the environment variable BAGI_ENGINE_DIR (set by ctest), 
 on the real clock and with --manual-clock; one scenario plays moves before the first frame.
 
 The scenarios of the own engine, the watch (two own engines), the analysis and the ratings, the opponent panel, the captured
-material, the takeback and "without Stockfish" are base ones: the own engine runs inside the game, so they need nothing from the environment.
+material, the takeback, the puzzles and "without Stockfish" are base ones: the own engine runs inside the game, so they need nothing from the environment.
 Stockfish ("opponent" scenarios) is replaced by tests/fake_uci_engine.py: main() writes a wrapper script that starts it into a
 temporary directory and puts the script in STOCKFISH of the environment, which the game inherits. STOCKFISH comes before PATH in
 the game's search for an engine and the committed config has no path, so a Stockfish installed on this machine is never used. A
@@ -927,13 +927,15 @@ def board_band(image) -> list:
     return image.rows[first:last]
 
 
-def board_squares_band(image) -> list:
-    """The squares of the board and nothing else: `board_band` cut to the columns of the board, so the move panel beside it (its evaluation cell and its Hint button change with the analysis) and the margins stay out."""
+def board_squares_band(image, rows: list | None = None) -> list:
+    """The squares of the board and nothing else: `board_band` cut to the columns of the board, so the move panel beside it (its evaluation cell and its Hint button change with the analysis) and the margins stay out.
+    `rows` are the rows of the picture after `without_squares`, when some squares are left out of the comparison."""
     scale, left, _ = view_in_picture(image)
     first_column = int(left + BOARD_LEFT * scale) + BOARD_BAND_INSET
     last_column = int(left + (BOARD_LEFT + BOARD_SIZE) * scale) - BOARD_BAND_INSET
     check(0 <= first_column < last_column <= image.width, f"the board columns {first_column}..{last_column} are outside a picture {image.width}x{image.height}")
-    return [row[first_column * image.channels : last_column * image.channels] for row in board_band(image)]
+    first_row, last_row = board_rows(image)
+    return [row[first_column * image.channels : last_column * image.channels] for row in (image.rows if rows is None else rows)[first_row:last_row]]
 
 
 def check_the_board_turns_with_the_program(client: BagiControlClient) -> None:
@@ -1436,6 +1438,150 @@ def run_without_stockfish_scenario(client: BagiControlClient, headless: bool) ->
     play_against_the_own_engine(client)
 
 
+PUZZLES_FILE = REPO_ROOT / "assets" / "puzzles" / "puzzles.tsv"
+PUZZLE_BAR = "PuzzleBar"
+PUZZLE_PICK = {"engine": "own", "plays": "black", "level": "easy"}  # a pick a puzzle keeps and a leave gives back; Black, so a reset leaves the program with nothing to play
+
+
+def get_puzzle(client: BagiControlClient) -> dict | None:
+    return client.call("get_state")["state"]["puzzle"]
+
+
+def puzzle_line(puzzle_id: str) -> list:
+    """The moves of a row of the shipped set: the program's setup move, then the person's move and the program's answer in turn."""
+    for row in PUZZLES_FILE.read_text(encoding="utf-8").splitlines()[1:]:
+        columns = row.split("\t")
+        if columns[0] == puzzle_id:
+            return columns[2].split()
+    raise AssertionError(f"no puzzle {puzzle_id} in {PUZZLES_FILE}")
+
+
+def check_the_puzzle_bar(client: BagiControlClient, shown: bool, when: str) -> None:
+    """The bar is a canvas of its own that is visible exactly while a puzzle is on."""
+    bar = find_ui_canvas(client.call("ui_tree"), PUZZLE_BAR)
+    check(bar["visible"] is shown and bar["modal"] is False, f"{when}: the puzzle bar should be {'shown' if shown else 'hidden'} and not modal: {bar}")
+
+
+def begin_a_puzzle_by_clicks(client: BagiControlClient) -> None:
+    """Menu, Puzzles, Start (the section's Next button): the way a person begins one; the click on Start closes the menu."""
+    click_named(client, "Menu", "ChessOpenMenu")
+    click_named(client, "MenuSectionPuzzles", "ChessOpenSection", "puzzles")
+    click_named(client, "PuzzleSectionNext", "ChessPuzzleNext")
+    let_the_pieces_settle(client)
+
+
+def begin_the_puzzle(client: BagiControlClient, index: int) -> dict:
+    client.call("set_state", {"puzzle": {"index": index}})
+    let_the_pieces_settle(client)
+    puzzle = get_puzzle(client)
+    check(puzzle is not None and puzzle["index"] == index, f"puzzle {index} did not begin: {puzzle}")
+    return puzzle
+
+
+def setup_move_squares(client: BagiControlClient) -> list:
+    """The two squares of the program's setup move, which the board marks and a position set from a FEN does not mark."""
+    setup = get_moves(client)[0]
+    return [setup[:2], setup[2:4]]
+
+
+def check_the_puzzle_is_drawn_as_its_position(client: BagiControlClient, plays: str | None, turned: bool, when: str) -> None:
+    """The board of the puzzle on the screen (taken now) holds the pieces the same position has in a plain game with `plays` picked, but for the marked setup move."""
+    squares = setup_move_squares(client)
+    fen = client.call("get_state")["state"]["fen"]
+    by_the_puzzle = take_screenshot(client)
+    client.call("set_state", {"fen": fen})  # a plain game: the puzzle is off, nothing is marked
+    client.call("set_state", {"opponent": {"plays": plays}})
+    let_frames_pass(client, 2)
+    plain = take_screenshot(client)
+    client.call("set_state", {"opponent": {"plays": None}})
+    check(get_puzzle(client) is None, f"{when}: the position set from a FEN is still a puzzle")
+    check(by_the_puzzle.rows != plain.rows, f"{when}: a puzzle looks like the plain game in its position (the bar, the status)")
+    puzzle_squares = board_squares_band(by_the_puzzle, without_squares(by_the_puzzle, squares, turned=turned))
+    check(puzzle_squares == board_squares_band(plain, without_squares(plain, squares, turned=turned)), f"{when}: the board of the puzzle is not the board of the plain game in its position")
+
+
+def run_puzzle_scenario(client: BagiControlClient, headless: bool) -> None:
+    """The Puzzles section and the bar in the real window: a puzzle begun by clicks, the board drawn as the same position is (turned for a Black solver) and the bar's three buttons.
+    The state and the judge are `tests/scenarios/puzzle.jsonl`; the pictures come before the next click, whose pointer leaves a hover look."""
+    if client.call("status")["manualClock"]:
+        client.call("step")  # the scene registers its pieces in the first frame
+    client.call("reset")
+    client.call("set_state", {"opponent": {"plays": None}})
+    let_frames_pass(client, 2)
+    check(get_puzzle(client) is None, "a puzzle is on in a new game")
+    check_the_puzzle_bar(client, False, "a new game")
+
+    begin_a_puzzle_by_clicks(client)
+    first = get_puzzle(client)
+    check(first is not None and first["index"] == 0 and first["state"] == "your_move" and first["solver"] == "white", f"Start began {first}")
+    tree = client.call("ui_tree")
+    check(find_ui_canvas(tree, "MenuPanel")["visible"] is False and find_ui_canvas(tree, "PuzzleSection")["visible"] is False, "Start left the menu or the section open")
+    check_the_puzzle_bar(client, True, "puzzle 0")
+    if headless:
+        check_the_puzzle_is_drawn_as_its_position(client, plays=None, turned=False, when="a White solver")
+
+    # A Black solver sits at the top of the screen: the board is turned the way it is for the person who plays Black against the program
+    solvers = []
+    black_index = None
+    for index in range(first["count"]):
+        puzzle = begin_the_puzzle(client, index)
+        solvers.append(puzzle["solver"])
+        if puzzle["solver"] == "black":
+            black_index = index
+            break
+    check(black_index is not None, f"no puzzle of the shipped set has a Black solver: {solvers}")
+    if headless:
+        squares = setup_move_squares(client)
+        fen = client.call("get_state")["state"]["fen"]
+        check(fen.split()[1] == "b", f"a Black solver is not to move after the setup move: {fen}")
+        turned = take_screenshot(client)
+        client.call("set_state", {"fen": fen})
+        let_frames_pass(client, 2)
+        white_at_the_bottom = take_screenshot(client)
+        check(board_squares_band(turned) != board_squares_band(white_at_the_bottom), "the board of a Black solver is not turned")
+        client.call("set_state", {"opponent": {"plays": "white"}})  # the program as White: Black is at the bottom and White has nothing to answer
+        let_frames_pass(client, 2)
+        black_at_the_bottom = take_screenshot(client)
+        client.call("set_state", {"opponent": {"plays": None}})
+        check(
+            board_squares_band(turned, without_squares(turned, squares, turned=True)) == board_squares_band(black_at_the_bottom, without_squares(black_at_the_bottom, squares, turned=True)),
+            "the board of a Black solver is not the board of Black at the bottom in the same position",
+        )
+        begin_the_puzzle(client, black_index)
+        check(board_squares_band(take_screenshot(client)) == board_squares_band(turned), "the turned board of a puzzle is not the same after a round trip")
+    else:
+        begin_the_puzzle(client, black_index)
+
+    # The bar: Next goes on, Retry takes the mistake back, Leave ends it and gives the opponent back
+    client.call("set_state", {"opponent": PUZZLE_PICK})
+    check(get_puzzle(client)["index"] == black_index, f"a pick of the opponent ended the puzzle: {get_puzzle(client)}")
+    click_named(client, "PuzzleBarNext", "ChessPuzzleNext")
+    puzzle = get_puzzle(client)
+    check(puzzle is not None and puzzle["index"] == (black_index + 1) % puzzle["count"] and puzzle["step"] == 0, f"the bar's Next gave {puzzle}")
+
+    right = puzzle_line(puzzle["id"])[1 + 2 * puzzle["step"]]
+    wrong = next(action["uci"] for action in client.call("list_actions")["actions"] if action["uci"] != right)
+    client.call("perform_action", move(wrong))
+    let_frames_pass(client, 2)
+    puzzle = get_puzzle(client)
+    check(puzzle["mistakes"] == 1 and puzzle["wrong"] is True, f"{wrong} instead of {right} was not counted as a mistake: {puzzle}")
+    click_named(client, "PuzzleBarRetry", "ChessPuzzleRetry")
+    puzzle = get_puzzle(client)
+    check(puzzle is not None and puzzle["mistakes"] == 0 and puzzle["wrong"] is False and puzzle["step"] == 0, f"the bar's Retry gave {puzzle}")
+    check_the_puzzle_bar(client, True, "after Retry")
+
+    click_named(client, "PuzzleBarLeave", "ChessPuzzleLeave")
+    state = client.call("get_state")["state"]
+    opponent = state["opponent"]
+    check(state["puzzle"] is None and state["moves"] == [] and state["fen"] == START_FEN, f"the bar's Leave left {state['puzzle']} with the moves {state['moves']}")
+    check(
+        opponent["plays"] == PUZZLE_PICK["plays"] and opponent["engine"] == PUZZLE_PICK["engine"] and opponent["level"] == PUZZLE_PICK["level"],
+        f"the opponent is not the one picked before the puzzle: {opponent}",
+    )
+    check_the_puzzle_bar(client, False, "after Leave")
+    client.call("set_state", {"opponent": {"plays": None}})
+
+
 def local_settings_exist() -> bool:
     return LOCAL_SETTINGS.exists()
 
@@ -1470,6 +1616,8 @@ BASE_SCENARIOS = [
     ("takeback, manual clock", ["--manual-clock"], run_takeback_scenario),
     ("position editor, real clock", [], run_editor_scenario),
     ("position editor, manual clock", ["--manual-clock"], run_editor_scenario),
+    ("puzzles, real clock", [], run_puzzle_scenario),
+    ("puzzles, manual clock", ["--manual-clock"], run_puzzle_scenario),
 ]
 
 OPPONENT_SCENARIOS = [
