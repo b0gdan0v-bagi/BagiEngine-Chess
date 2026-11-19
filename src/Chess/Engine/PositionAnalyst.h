@@ -140,6 +140,11 @@ namespace BECore::Chess {
             return _rater.GetRatings(model);
         }
 
+        /// The rating of move @p ply of @p model, without building the list (MoveRater::GetRating()); for a display that asks once per frame
+        [[nodiscard]] Optional<MoveRating> GetRating(const ChessGameModel& model, size_t ply) const {
+            return _rater.GetRating(model, ply);
+        }
+
         /// Why the rating of a move failed (MoveRater::GetError()); apart from GetError(), which is the analysis's
         [[nodiscard]] const Optional<EngineError>& GetRatingError() const noexcept {
             return _rater.GetError();

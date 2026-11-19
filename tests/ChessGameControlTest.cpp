@@ -2617,6 +2617,30 @@ namespace BECore::Chess::Tests {
 
     }  // namespace
 
+    TEST_F(ChessGameControlTest, ATakebackKeepsTheRatingsOfTheMovesThatRemainAndRatesTheNewOnes) {
+        const auto engine = Analyser(kPawnUp, Mv("e2e4"));
+        CountingAnalysisFactory factory{engine};
+        analyst.SetEngineFactory(factory.AsFactory());
+        ASSERT_TRUE(control.SetState(RatingsRequest(true)).has_value());
+        for (const char* uci : {"e2e4", "e7e5", "g1f3", "b8c6"}) {
+            Perform(uci);
+        }
+        ASSERT_TRUE(FrameUntil([&] { return AllRated(AnalysisMember("ratings"), 4); })) << AnalysisOfState().dump().c_str();
+        const int searches = engine->Calls();
+
+        ASSERT_TRUE(control.SetState(TakeBackRequest(2)).has_value());
+
+        EXPECT_TRUE(AllRated(AnalysisMember("ratings"), 2)) << "the moves that remain are rated at the next get_state, not null";
+        EXPECT_EQ(ReasonsOfRatings(AnalysisMember("ratings")), (Vector<String>{"brilliant", "not_best"}));
+        Frames();
+        EXPECT_EQ(engine->Calls(), searches) << "nothing of them is rated again";
+        Perform("f1c4");
+        Perform("g8f6");
+        EXPECT_TRUE(AnalysisMember("ratings")[0].is_object());
+        ASSERT_TRUE(FrameUntil([&] { return AllRated(AnalysisMember("ratings"), 4); })) << AnalysisOfState().dump().c_str();
+        EXPECT_EQ(engine->Calls(), searches + 2) << "only the two new moves were asked";
+    }
+
     TEST_F(ChessGameControlTest, TheStateHasTheSanOfTheMovesAndWhatATakebackWouldTake) {
         EXPECT_EQ(Joined(State()["sanMoves"]), "");
         EXPECT_EQ(GetJsonInt(State(), "takeBackPlies"), 0);

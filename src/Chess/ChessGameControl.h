@@ -75,9 +75,9 @@ namespace BECore::Chess {
      * order: null while the move is not rated, else {"brilliant": bool, "reason": "brilliant"|"not_best"|"forced"|"obvious"} (MoveRater, MoveRating.h). A move is brilliant when it is the
      * best move of the own engine at depth 5 in the position it was played in (the engine's first line before the move) and it was a choice: "forced" is a position with one legal move,
      * "obvious" one where the second line is 200 centipawns or more behind (a forced recapture, a mate in one); "not_best" is any other move. Rated in the background, the oldest move first, always by
-     * the own engine, whatever opponent.engine is, so the same game gets the same ratings twice; the ratings of earlier moves stay after a new move and go with a reset or a set_state of a fen.
-     * Independent of hintRequested, of the evaluation and of the turn of the person. The rater's failure (an engine that cannot be made, a search
-     * that fails) is not in analysis.error: it is logged, and the move stays null.
+     * the own engine, whatever opponent.engine is, so the same game gets the same ratings twice; the ratings of earlier moves stay after a new move, and after a takeback those of the moves that
+     * remain stay; they go with a reset or a set_state of a fen. Independent of hintRequested, of the evaluation and of the turn of the person. The rater's failure (an engine that cannot be made, a
+     * search that fails) is not in analysis.error: it is logged, and the move stays null.
      *
      * Actions: {"type": "move", "uci": "e2e4"}, every legal move once; none once the game is over. The list does not change with the opponent: the program's
      * side is listed and accepted like the other (a controller may play for it; a search that the move makes stale is dropped). Castling is the king's move

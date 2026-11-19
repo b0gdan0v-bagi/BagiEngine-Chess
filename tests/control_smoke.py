@@ -708,6 +708,16 @@ def check_the_ratings(client: BagiControlClient) -> None:
     first = play_and_wait_for_the_ratings(client, game)
     check([rating["reason"] for rating in first] == PINNED_GAME_REASONS, f"the own engine rated the game differently from the pinned list {PINNED_GAME_REASONS}: {first}")
 
+    # A takeback keeps the ratings of the moves that remain, at once, and only the new moves are rated
+    client.call("set_state", {"takeBack": {"plies": 2}})
+    kept = get_analysis(client)["ratings"]
+    check(kept == first[:2], f"a takeback did not keep the ratings of the moves that remain: {kept}")
+    for uci in ("f1c4", "g8f6"):
+        client.call("perform_action", move(uci))
+    after_takeback = wait_for_the_analysis(client, lambda a: len(a["ratings"]) == 4 and all(rating is not None for rating in a["ratings"]), "the ratings after a takeback and two new moves")
+    check_the_ratings_are_complete(after_takeback["ratings"], 4, "the game after a takeback")
+    check(after_takeback["ratings"][:2] == first[:2], f"the ratings that remained changed: {after_takeback['ratings']}")
+
     # A reset drops the ratings and keeps the switch; the same game gets the same ratings (a fixed depth, no clock). A frame passes before the moves are replayed: the rater
     # drops the old ratings when it sees the empty game, and a replay before that frame would be taken for the same game going on and keep them
     client.call("reset")

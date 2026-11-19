@@ -51,7 +51,7 @@ namespace BECore::Chess {
 
     void MoveRater::Shutdown() {
         SetOn(false);
-        DropHistory();
+        DropHistoryFrom(0);
         _startFen.clear();
         _engine.Reset();
     }
@@ -61,12 +61,17 @@ namespace BECore::Chess {
     }
 
     MoveRatings MoveRater::GetRatings(const ChessGameModel& model) const {
-        const Vector<Move>& moves = model.GetMoves();
-        MoveRatings ratings(moves.size());
-        if (Extends(model)) {
-            eastl::copy(_ratings.begin(), _ratings.end(), ratings.begin());
-        }
+        MoveRatings ratings(model.GetMoves().size());
+        const size_t common = CommonPrefix(model);
+        eastl::copy(_ratings.begin(), _ratings.begin() + common, ratings.begin());
         return ratings;
+    }
+
+    Optional<MoveRating> MoveRater::GetRating(const ChessGameModel& model, size_t ply) const {
+        if (ply >= CommonPrefix(model)) {
+            return std::nullopt;
+        }
+        return _ratings[ply];
     }
 
     Task<void> MoveRater::RunSearch(IntrusivePtrAtomic<Search> search, SearchRequest request) {
@@ -81,8 +86,9 @@ namespace BECore::Chess {
 
     void MoveRater::SyncHistory(const ChessGameModel& model) {
         const Vector<Move>& moves = model.GetMoves();
-        if (!Extends(model)) {
-            DropHistory();
+        const size_t common = CommonPrefix(model);
+        if (common < _moves.size() || _startFen != model.GetStartFen()) {
+            DropHistoryFrom(common);
             _startFen = model.GetStartFen();
         }
         for (size_t ply = _moves.size(); ply < moves.size(); ++ply) {
@@ -92,20 +98,30 @@ namespace BECore::Chess {
         _failed.resize(_moves.size(), false);
     }
 
-    bool MoveRater::Extends(const ChessGameModel& model) const {
+    size_t MoveRater::CommonPrefix(const ChessGameModel& model) const {
+        if (_startFen != model.GetStartFen()) {
+            return 0;
+        }
         const Vector<Move>& moves = model.GetMoves();
-        return _startFen == model.GetStartFen() && moves.size() >= _moves.size() && eastl::equal(_moves.begin(), _moves.end(), moves.begin());
+        const size_t limit = eastl::min(_moves.size(), moves.size());
+        size_t common = 0;
+        while (common < limit && _moves[common] == moves[common]) {
+            ++common;
+        }
+        return common;
     }
 
-    void MoveRater::DropHistory() {
-        ++_generation;
-        if (_search) {
+    void MoveRater::DropHistoryFrom(size_t keep) {
+        if (_search && _searchPly >= keep) {
+            ++_generation;
             _search->token.Cancel();
         }
-        const bool hadRatings = eastl::any_of(_ratings.begin(), _ratings.end(), [](const Optional<MoveRating>& rating) { return rating.has_value(); });
-        _moves.clear();
-        _ratings.clear();
-        _failed.clear();
+        const bool hadRatings = eastl::any_of(_ratings.begin() + eastl::min(keep, _ratings.size()), _ratings.end(), [](const Optional<MoveRating>& rating) { return rating.has_value(); });
+        if (keep < _moves.size()) {
+            _moves.resize(keep);
+            _ratings.resize(keep);
+            _failed.resize(keep);
+        }
         if (hadRatings) {
             ++_revision;
         }
