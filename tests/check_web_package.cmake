@@ -21,13 +21,31 @@ function(check_equal NAME ACTUAL EXPECTED)
     endif()
 endfunction()
 
-# The files the game needs: without the first four it does not start, without the opening table it plays and names no opening; a package
-# that lacks one is broken, whatever else is in it
+# Every sprite of config/TextureLibrary.xml is drawn from its texturePath, so that file must be in the package whatever the patterns say. The
+# source of a packed sprite (<atlas><source texturePath=...>) is only read by a repack in the editor and may stay out, so only the
+# texturePath of a <sprite> itself counts. FILES are the game's files of the package, relative to the game root.
+function(check_library_sprites WHERE)
+    file(READ "${GAME_ROOT}/config/TextureLibrary.xml" _library)
+    string(REGEX MATCHALL "<sprite[^>]*texturePath=\"[^\"]*\"" _sprites "${_library}")
+    if(NOT _sprites)
+        message(FATAL_ERROR "no <sprite texturePath=...> in config/TextureLibrary.xml: the library is empty or its format changed")
+    endif()
+    foreach(_sprite IN LISTS _sprites)
+        string(REGEX REPLACE "^.*texturePath=\"([^\"]*)\"$" "\\1" _path "${_sprite}")
+        if(NOT _path IN_LIST ARGN)
+            message(FATAL_ERROR "${WHERE}: config/TextureLibrary.xml draws a sprite from ${_path}, which the web package lacks (a pattern of cmake/ChessWeb.cmake hides it?)")
+        endif()
+    endforeach()
+endfunction()
+
+# The files the game needs: without the first four it does not start, without the atlas it draws no piece, without the opening table it
+# plays and names no opening; a package that lacks one is broken, whatever else is in it
 set(CORE_FILES
     config/ApplicationConfig.xml
     config/SceneConfig.xml
     config/ChessSettings.xml
     config/TextureLibrary.xml
+    assets/atlases/pieces.png
     assets/openings/openings.tsv)
 
 if(PACKAGE_JS)
@@ -62,6 +80,7 @@ if(PACKAGE_JS)
     # What the game's tree says the package takes is what the package holds: a file that stayed out by mistake or got in by mistake
     chess_web_package_files(OUT _tree_files GAME_ROOT "${GAME_ROOT}")
     check_equal("the game's files in the web package against the tree" "${_game_files}" "${_tree_files}")
+    check_library_sprites("the web package" ${_game_files})
     list(LENGTH _entries _count)
     list(LENGTH _game_files _game_count)
     message(STATUS "web package: ${_count} files, ${_game_count} of the game, as the tree says")
@@ -73,13 +92,14 @@ endif()
 foreach(_name
         config/CLAUDE.md config/README.md assets/notes.md
         config/ChessSettings.local.xml config/imgui.ini config/.DS_Store assets/.DS_Store
-        assets/tool.py assets/__pycache__/tool.cpython-312.pyc config/sub/CLAUDE.md assets/sounds/move.artgen.json assets/artgen/WhiteKing.artgen.json)
+        assets/tool.py assets/__pycache__/tool.cpython-312.pyc config/sub/CLAUDE.md assets/sounds/move.artgen.json assets/artgen/WhiteKing.artgen.json
+        assets/artgen/WhiteKing.png assets/artgen/sub/x.png)
     chess_web_excluded("${_name}" OUT _excluded)
     check_equal("excluded: ${_name}" "${_excluded}" "TRUE")
 endforeach()
 foreach(_name
         config/ApplicationConfig.xml config/ChessSettings.xml config/SceneConfig.xml config/TextureLibrary.xml
-        assets/artgen/WhiteKing.png config/localxml.xml assets/imgui.png config/nodes/ChessHud.xml assets/artgen.json)
+        assets/atlases/pieces.png assets/sprites/x.png config/localxml.xml assets/imgui.png config/nodes/ChessHud.xml assets/artgen.json)
     chess_web_excluded("${_name}" OUT _excluded)
     check_equal("not excluded: ${_name}" "${_excluded}" "FALSE")
 endforeach()
@@ -101,6 +121,9 @@ foreach(_core IN LISTS CORE_FILES)
         message(FATAL_ERROR "the package lacks ${_core} of the game")
     endif()
 endforeach()
+
+# The sprites the game draws are in the package; a pattern that would hide one fails here
+check_library_sprites("the tree" ${tree_files})
 
 # --- stray files of a developer's machine do not change the list. A scratch copy of the layout in CHECK_DIR (the checkout is not
 # touched): the shipped names are the files of the real tree, so the check follows the assets of the game
