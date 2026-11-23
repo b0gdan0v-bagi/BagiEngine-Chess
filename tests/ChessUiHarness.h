@@ -382,17 +382,6 @@ namespace BECore::Chess::Tests {
             return problems;
         }
 
-        bool HasIssue(const Vector<UIMatrixFailure>& failures, UILayoutIssueKind kind) {
-            for (const auto& failure : failures) {
-                for (const UILayoutIssue& issue : failure.issues) {
-                    if (issue.kind == kind) {
-                        return true;
-                    }
-                }
-            }
-            return false;
-        }
-
         /// A segment of the panel as the tables of the game say it must be: the element, its group and action, the word on it and the id it emits
         struct PanelSegment {
             String name;

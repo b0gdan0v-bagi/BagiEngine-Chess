@@ -120,6 +120,8 @@ if(ENGINE_BUILD_TESTS)
     endif()
     # One ctest entry per recorded control scenario of tests/scenarios/ (BagiChessScenario.<file>), played on the manual clock
     be_add_game_scenario_tests(BagiChess DIR tests/scenarios)
+    # BagiChessCookVerify: cooks the game's content and reads it back against the XML
+    be_add_game_cook_test(BagiChess)
 
     if(Python3_FOUND)
         if(NOT ENGINE_TARGET_WEB)
