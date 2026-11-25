@@ -149,7 +149,7 @@ namespace BECore::Chess::Tests {
 
         EXPECT_EQ(MaterialCount("Bottom", "Pawn"), "x1") << "White is at the bottom, and White has taken a pawn";
         EXPECT_EQ(ShownMaterialRows(), "BottomPawn");
-        EXPECT_EQ(MaterialSprite("Bottom", "Pawn"), "BlackPawn") << "the piece that was taken is Black's";
+        EXPECT_EQ(MaterialSprite("Bottom", "Pawn"), "ClassicBlackPawn") << "the piece that was taken is Black's";
         EXPECT_EQ(MaterialWords(), "||||||||||x1|+1|") << "only the pawn count and the lead of White: the other ten words are empty";
         EXPECT_EQ(Var("materialTopBalance"), "");
         EXPECT_EQ(Var("materialBottomBalance"), "+1");
@@ -159,7 +159,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(MaterialCount("Top", "Pawn"), "x1");
         EXPECT_EQ(MaterialCount("Bottom", "Pawn"), "x1");
         EXPECT_EQ(ShownMaterialRows(), "TopPawn BottomPawn");
-        EXPECT_EQ(MaterialSprite("Top", "Pawn"), "WhitePawn");
+        EXPECT_EQ(MaterialSprite("Top", "Pawn"), "ClassicWhitePawn");
         EXPECT_EQ(Var("materialTopBalance"), "");
         EXPECT_EQ(Var("materialBottomBalance"), "") << "an equal material leads for nobody";
     }
@@ -168,7 +168,7 @@ namespace BECore::Chess::Tests {
         StartFrom(kBlackTookTheQueen);
         Settle();
         EXPECT_EQ(MaterialCount("Top", "Queen"), "x1") << "Black has taken the queen: the upper group, because White is at the bottom";
-        EXPECT_EQ(MaterialSprite("Top", "Queen"), "WhiteQueen");
+        EXPECT_EQ(MaterialSprite("Top", "Queen"), "ClassicWhiteQueen");
         EXPECT_EQ(ShownMaterialRows(), "TopQueen");
         EXPECT_EQ(Var("materialTopBalance"), "+9");
         EXPECT_EQ(Var("materialBottomBalance"), "");
@@ -217,8 +217,8 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(MaterialCount("Top", "Pawn"), "x1") << "Black is at the bottom now: White's captures are in the upper group";
         EXPECT_EQ(MaterialCount("Bottom", "Pawn"), "");
         EXPECT_EQ(ShownMaterialRows(), "TopPawn");
-        EXPECT_EQ(MaterialSprite("Top", "Pawn"), "BlackPawn") << "the sprite is the piece that was taken: the upper group is White's, so the pieces are Black's";
-        EXPECT_EQ(MaterialSprite("Bottom", "Pawn"), "WhitePawn") << "the icons of the lower group were given the other color too";
+        EXPECT_EQ(MaterialSprite("Top", "Pawn"), "ClassicBlackPawn") << "the sprite is the piece that was taken: the upper group is White's, so the pieces are Black's";
+        EXPECT_EQ(MaterialSprite("Bottom", "Pawn"), "ClassicWhitePawn") << "the icons of the lower group were given the other color too";
         EXPECT_EQ(Var("materialTopBalance"), "+1") << "the lead goes with the group";
         EXPECT_EQ(Var("materialBottomBalance"), "");
 
@@ -226,7 +226,7 @@ namespace BECore::Chess::Tests {
         _manager->UpdateAll();
         Settle();
         EXPECT_EQ(ShownMaterialRows(), "BottomPawn") << "nobody plays: White is at the bottom again";
-        EXPECT_EQ(MaterialSprite("Bottom", "Pawn"), "BlackPawn");
+        EXPECT_EQ(MaterialSprite("Bottom", "Pawn"), "ClassicBlackPawn");
         EXPECT_EQ(Var("materialBottomBalance"), "+1");
     }
 
@@ -262,7 +262,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(BlackIsAtTheBottom());
         Settle();
         EXPECT_EQ(ShownMaterialRows(), "BottomQueen") << "Black's capture is in the lower group now";
-        EXPECT_EQ(MaterialSprite("Bottom", "Queen"), "WhiteQueen");
+        EXPECT_EQ(MaterialSprite("Bottom", "Queen"), "ClassicWhiteQueen");
         EXPECT_EQ(Var("materialBottomBalance"), "+9");
         EXPECT_EQ(Var("materialTopBalance"), "");
     }
@@ -321,7 +321,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(FramesUntil([&] { return Model().GetMoves().size() == 1; })) << "the program took the pawn";
         Settle();
         EXPECT_EQ(MaterialCount("Top", "Pawn"), "x1") << "Black is the program and has taken a pawn: the upper group, White is at the bottom";
-        EXPECT_EQ(MaterialSprite("Top", "Pawn"), "WhitePawn");
+        EXPECT_EQ(MaterialSprite("Top", "Pawn"), "ClassicWhitePawn");
         EXPECT_EQ(Var("materialTopBalance"), "+1");
         EXPECT_EQ(ShownMaterialRows(), "TopPawn");
     }
@@ -760,7 +760,7 @@ namespace BECore::Chess::Tests {
         EXPECT_TRUE(SameRect(MaterialElement("MaterialPanelBottomBalance").rect, Rect{1040.0f, kPanelBottomListY, 32.0f, 40.0f}));
         EXPECT_TRUE(SameRect(MaterialElement("MaterialPanelTopBalance").rect, Rect{1040.0f, kPanelTopListY, 32.0f, 40.0f}));
         EXPECT_EQ(ShownText(MaterialElement("MaterialPanelBottomBalance")), "+8");
-        EXPECT_EQ(MaterialSprite("Bottom", "Pawn"), "BlackPawn");
+        EXPECT_EQ(MaterialSprite("Bottom", "Pawn"), "ClassicBlackPawn");
 
         StartFrom(kWhiteTookAPawn);
         Settle();
@@ -824,7 +824,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(ShownMaterialRows(), "TopPawn");
         EXPECT_TRUE(RowShownIn(kMaterialPanelSet, "Top", "Pawn")) << "Black at the bottom: White's capture goes to the top band, the side at the top of the board";
         EXPECT_TRUE(LiesIn(MaterialRow("Top", "Pawn", kMaterialPanelSet).rect, kPanelTopBand));
-        EXPECT_EQ(MaterialSprite("Top", "Pawn"), "BlackPawn");
+        EXPECT_EQ(MaterialSprite("Top", "Pawn"), "ClassicBlackPawn");
         EXPECT_EQ(ShownText(MaterialElement("MaterialPanelTopBalance")), "+1");
         EXPECT_EQ(ShownText(MaterialElement("MaterialPanelBottomBalance")), "");
     }

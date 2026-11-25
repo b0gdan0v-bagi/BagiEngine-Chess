@@ -108,6 +108,12 @@ namespace BECore::Chess::Tests {
         EXPECT_TRUE(CostIs(MeasureFrame(), kOpeningFrame));
     }
 
+    TEST_F(ChessUiAllocTest, AFrameAfterTheLookChangedAllocatesNothingNew) {
+        ChessGame::GetActive()->GetGraphics().Set(GraphicsPreset::Beer);
+        WarmUp();
+        EXPECT_TRUE(CostIs(MeasureFrame(), kOpeningFrame));
+    }
+
     TEST_F(ChessUiAllocTest, AFrameWithTheLastMoveAndASelectedPieceAllocatesNothingNew) {
         ClickMove("e2", "e4");
         ASSERT_EQ(Model().GetMoves().size(), 1u);

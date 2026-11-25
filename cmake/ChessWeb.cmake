@@ -6,7 +6,7 @@
 # game with no filter; a doc, a person's ChessSettings.local.xml (a Stockfish path), an imgui.ini or the provenance of a generated asset
 # (*.artgen.json: the paths of the machine it was made on) must not be served to others. The source PNGs of the pieces
 # (assets/artgen/*.png) stay out too: only a repack in the editor reads them, the web build has none, and the game draws the pieces
-# from assets/atlases/pieces.png. Any other sprite file is served, and tests/check_web_package.cmake holds that every texturePath of
+# from assets/chess_test.png (Classic) or assets/atlases/pieces.png (Beer). Any other sprite file is served, and tests/check_web_package.cmake holds that every texturePath of
 # config/TextureLibrary.xml is in the package, so a pattern cannot hide a sprite the game draws.
 #
 # emcc has --exclude-file <pattern> (a glob, fnmatch against the full path of a file as file_packager walks the folder), and the

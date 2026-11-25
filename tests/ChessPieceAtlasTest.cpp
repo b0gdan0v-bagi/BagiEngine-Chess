@@ -42,7 +42,7 @@ namespace BECore::Chess::Tests {
         /// rewritten entries on success
         std::expected<AtlasWritten, String> PackPiecesAtlas(TextureLibrary& library, const Path& assetsDir) {
             for (const Piece piece : AllPieces()) {
-                const PoolString name = PieceSpriteId(piece);
+                const PoolString name = PieceSpriteId(piece, GraphicsPreset::Beer);
                 const SpriteEntry* entry = library.GetSprite(name);
                 if (entry == nullptr) {
                     return std::unexpected(Format("the library has no sprite {}", name.ToStringView()));
@@ -93,6 +93,13 @@ namespace BECore::Chess::Tests {
         for (const SpriteEntry& entry : library.GetAll()) {
             namesBefore.push_back(entry.name);
         }
+        ASSERT_EQ(namesBefore.size(), 2 * kPieceCount) << "the library holds the Beer set and the Classic set";
+        Vector<SpriteEntry> classicBefore;
+        for (const PoolString name : SpriteNamesOf(GraphicsPreset::Classic)) {
+            const SpriteEntry* entry = library.GetSprite(name);
+            ASSERT_NE(entry, nullptr);
+            classicBefore.push_back(*entry);
+        }
 
         const TempDirectory temp;
         const auto written = PackPiecesAtlas(library, temp.Path() / "assets");
@@ -111,10 +118,15 @@ namespace BECore::Chess::Tests {
         for (size_t i = 0; i < namesBefore.size(); ++i) {
             EXPECT_EQ(library.GetAll()[i].name, namesBefore[i]) << "packing reorders the library";
         }
+        for (const SpriteEntry& before : classicBefore) {
+            const SpriteEntry* after = library.GetSprite(before.name);
+            ASSERT_NE(after, nullptr);
+            EXPECT_TRUE(SameEntry(before, *after)) << "the packer touched a classic sprite: " << String(before.name.ToStringView()).c_str();
+        }
 
         Vector<Rect> placed;
         for (const Piece piece : AllPieces()) {
-            const PoolString name = PieceSpriteId(piece);
+            const PoolString name = PieceSpriteId(piece, GraphicsPreset::Beer);
             SCOPED_TRACE(String(name.ToStringView()).c_str());
             const SpriteEntry* entry = library.GetSprite(name);
             ASSERT_NE(entry, nullptr);

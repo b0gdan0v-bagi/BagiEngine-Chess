@@ -214,6 +214,7 @@ namespace BECore::Chess::Tests {
                                  {"MovesSection", "MovesSectionDim", "ChessCloseMenu"},
                                  {"GameSection", "GameSectionDim", "ChessCloseMenu"},
                                  {"SoundPanel", "SoundPanelDim", "ChessCloseMenu"},
+                                 {"GraphicsPanel", "GraphicsPanelDim", "ChessCloseMenu"},
                                  {"PositionSection", "PositionSectionDim", "ChessCloseMenu"},
                                  {"PuzzleSection", "PuzzleSectionDim", "ChessCloseMenu"},
                                  {"ReviewSection", "ReviewSectionDim", "ChessCloseMenu"},
@@ -260,6 +261,9 @@ namespace BECore::Chess::Tests {
             }
             if (StringView(node) == "SoundPanel") {
                 return ClickButton(kMenuColor) && ClickMenuList("MenuSectionSound").Both();
+            }
+            if (StringView(node) == "GraphicsPanel") {
+                return ClickButton(kMenuColor) && ClickMenuList("MenuSectionGraphics").Both();
             }
             if (StringView(node) == "PositionSection") {
                 return ClickButton(kMenuColor) && ClickMenuList("MenuSectionPosition").Both();
@@ -439,7 +443,7 @@ namespace BECore::Chess::Tests {
 
         const auto sprite = node->GetNode().GetComponent<SpriteRendererComponent>();
         ASSERT_TRUE(sprite);
-        EXPECT_EQ(sprite->_spriteId, "WhiteBishop"_intern);
+        EXPECT_EQ(sprite->_spriteId, "ClassicWhiteBishop"_intern);
     }
 
     // ---- the promotion panel: the layout ---------------------------------------------------------------------------------------------

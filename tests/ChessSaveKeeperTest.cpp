@@ -8,6 +8,7 @@
 #include <BECore/Save/SaveStorage.h>
 #include <BECore/Time/Time.h>
 #include <Chess/Engine/OpponentSettings.h>
+#include <Chess/Save/ChessGraphicsState.h>
 #include <Chess/Save/ChessSaveKeeper.h>
 #include <Chess/Save/ChessSaveState.h>
 #include <Chess/Save/SaveSettings.h>
@@ -188,11 +189,12 @@ namespace BECore::Chess::Tests {
 
     // ---- The keeper ----
 
-    /// A game, its controller (every engine a double: no process) and the choice, as ChessGame holds them, with the keeper over them
+    /// A game, its controller (every engine a double: no process) and the choice and the look, as ChessGame holds them, with the keeper over them
     struct KeptGame {
         ChessGameModel model;
         OpponentController controller;
         OpponentChoice choice;
+        GraphicsChoice graphics;
         CountingFactory factory;
         ChessSaveKeeper keeper;
 
@@ -201,7 +203,7 @@ namespace BECore::Chess::Tests {
         }
 
         void Start() {
-            keeper.Start(model, controller, choice);
+            keeper.Start(model, controller, choice, graphics);
         }
         void Update() {
             keeper.Update(model, controller, choice, false);
@@ -283,6 +285,34 @@ namespace BECore::Chess::Tests {
                 return std::nullopt;
             }
             return levels;
+        }
+
+        Path GraphicsFile() const {
+            return _saves / "graphics.save";
+        }
+
+        /// The look the graphics file holds; nothing when there is none or it cannot be read
+        Optional<ChessGraphicsState> SavedLook() const {
+            FileSystem fileSystem;
+            SaveGameService service(fileSystem);
+            if (!service.Initialize(_saves)) {
+                return std::nullopt;
+            }
+            ChessGraphicsState look;
+            if (!service.Load(kChessGraphicsSlot, kChessGraphicsSchema, look)) {
+                return std::nullopt;
+            }
+            return look;
+        }
+
+        /// A graphics file as an earlier run left it
+        void MakeGraphicsFile(StringView preset) {
+            FileSystem fileSystem;
+            SaveGameService service(fileSystem);
+            ASSERT_TRUE(service.Initialize(_saves));
+            ChessGraphicsState look;
+            look.preset = String(preset.data(), preset.size());
+            ASSERT_TRUE(service.Save(kChessGraphicsSlot, kChessGraphicsSchema, look).has_value());
         }
 
         /// An audio file as an earlier run left it; the manager is left at the same levels
@@ -785,6 +815,173 @@ namespace BECore::Chess::Tests {
         game.Flush();
 
         EXPECT_TRUE(SavedLevels()->_master._muted);
+    }
+
+    // ---- The person's look ----
+
+    TEST_F(ChessSaveKeeperTest, APickOfTheLookIsWrittenAtOnceAndComesBackAtTheNextStart) {
+        SetCommandLine({});
+        {
+            KeptGame first;
+            first.Start();
+            first.graphics.Set(GraphicsPreset::Beer);
+            first.Update();
+            ASSERT_TRUE(SavedLook().has_value()) << "the first write of a run waits for nothing";
+            EXPECT_EQ(SavedLook()->preset, "beer");
+        }
+        KeptGame second;
+
+        second.Start();
+
+        EXPECT_EQ(second.graphics.Get(), GraphicsPreset::Beer);
+    }
+
+    TEST_F(ChessSaveKeeperTest, ARestoredLookIsNotWrittenBack) {
+        SetCommandLine({});
+        ::BECore::Tests::MakeDirectory(_saves);
+        MakeGraphicsFile("beer");
+        KeptGame game;
+
+        game.Start();
+        ::BECore::Tests::RemoveFileIfPresent(GraphicsFile());
+        for (int frame = 0; frame < 3; ++frame) {
+            AdvancePastTheDebounce();
+            game.Update();
+        }
+        game.Flush();
+
+        EXPECT_EQ(game.graphics.Get(), GraphicsPreset::Beer);
+        EXPECT_FALSE(::BECore::Tests::PathExists(GraphicsFile())) << "the restored look was written back";
+    }
+
+    TEST_F(ChessSaveKeeperTest, TwoPicksInsideTheDebounceMakeOneWriteAndAFlushWritesTheLastOne) {
+        SetCommandLine({});
+        KeptGame game;
+        game.Start();
+        game.graphics.Set(GraphicsPreset::Beer);
+        game.Update();
+        ASSERT_TRUE(SavedLook().has_value());
+        ASSERT_EQ(SavedLook()->preset, "beer");
+
+        game.graphics.Set(GraphicsPreset::Classic);
+        CoreManager::GetTime().Advance(1.0 / 32);
+        game.Update();
+        EXPECT_EQ(SavedLook()->preset, "beer") << "written inside the debounce";
+
+        game.Flush();
+        EXPECT_EQ(SavedLook()->preset, "classic");
+    }
+
+    TEST_F(ChessSaveKeeperTest, TheLookIsWrittenWhileAPuzzleIsOn) {
+        SetCommandLine({});
+        KeptGame game;
+        game.Start();
+
+        game.graphics.Set(GraphicsPreset::Beer);
+        game.UpdateDuringAPuzzle();
+
+        ASSERT_TRUE(SavedLook().has_value());
+        EXPECT_EQ(SavedLook()->preset, "beer");
+    }
+
+    TEST_F(ChessSaveKeeperTest, ARefusedLookFileKeepsClassicOneWarningAndStaysAloneWhileTheGameComesBack) {
+        SetCommandLine({});
+        {
+            KeptGame first;
+            first.Start();
+            PlayLine(first.model, kOpening);
+            first.Flush();
+        }
+        WriteBytes(GraphicsFile(), "this is not a look");
+        const Vector<uint8_t> before = BytesOfFile(GraphicsFile());
+        const ::BECore::Tests::LogRecorder recorder;
+        KeptGame game;
+
+        game.Start();
+        for (int frame = 0; frame < 3; ++frame) {
+            AdvancePastTheDebounce();
+            game.Update();
+        }
+        game.Flush();
+        LogEvent::Flush();
+
+        EXPECT_EQ(game.graphics.Get(), GraphicsPreset::Classic);
+        EXPECT_EQ(game.model.GetMoves().size(), 2u);
+        EXPECT_EQ(recorder.Count(LogLevel::Warning, {"slot 'graphics'"}), 1u);
+        EXPECT_EQ(recorder.Count(LogLevel::Warning, {"slot 'game'"}), 0u);
+        EXPECT_EQ(BytesOfFile(GraphicsFile()), before);
+    }
+
+    TEST_F(ChessSaveKeeperTest, AnUnknownPresetIdIsRefusedLikeADamagedFile) {
+        SetCommandLine({});
+        ::BECore::Tests::MakeDirectory(_saves);
+        MakeGraphicsFile("sepia");
+        const Vector<uint8_t> before = BytesOfFile(GraphicsFile());
+        const ::BECore::Tests::LogRecorder recorder;
+        KeptGame game;
+
+        game.Start();
+        game.Flush();
+        LogEvent::Flush();
+
+        EXPECT_EQ(game.graphics.Get(), GraphicsPreset::Classic);
+        EXPECT_EQ(recorder.Count(LogLevel::Warning, {"slot 'graphics'"}), 1u);
+        EXPECT_EQ(BytesOfFile(GraphicsFile()), before);
+    }
+
+    TEST_F(ChessSaveKeeperTest, ARunThatSavesNothingNeitherReadsNorWritesTheLook) {
+        SetCommandLine({}, false);  // no flag and no folder: config/ is not mounted, so rememberGame is false
+        KeptGame game;
+
+        game.Start();
+        game.graphics.Set(GraphicsPreset::Beer);
+        AdvancePastTheDebounce();
+        game.Update();
+        game.Flush();
+
+        EXPECT_FALSE(game.keeper.IsOn());
+        EXPECT_FALSE(::BECore::Tests::PathExists(GraphicsFile()));
+    }
+
+    TEST_F(ChessSaveKeeperTest, NoSaveReadsAndWritesNotTheLookEvenWithASaveDir) {
+        SetCommandLine({"--no-save"});
+        ::BECore::Tests::MakeDirectory(_saves);
+        MakeGraphicsFile("beer");
+        const Vector<uint8_t> before = BytesOfFile(GraphicsFile());
+        KeptGame game;
+
+        game.Start();
+        EXPECT_EQ(game.graphics.Get(), GraphicsPreset::Classic);
+        game.graphics.Set(GraphicsPreset::Beer);
+        game.graphics.Set(GraphicsPreset::Classic);
+        game.Flush();
+
+        EXPECT_EQ(BytesOfFile(GraphicsFile()), before);
+    }
+
+    TEST_F(ChessSaveKeeperTest, AFailedWriteOfTheLookIsLoggedOnceAndTriedAgainAtTheNextPick) {
+        SetCommandLine({});
+        KeptGame game;
+        game.Start();
+        ::BECore::Tests::RemoveDirectory(_saves);  // the folder is replaced by a file: the write fails
+        WriteBytes(_saves, "in the way");
+        const ::BECore::Tests::LogRecorder recorder;
+
+        game.graphics.Set(GraphicsPreset::Beer);
+        game.Update();
+        AdvancePastTheDebounce();
+        game.Update();
+        LogEvent::Flush();
+        EXPECT_EQ(recorder.Count(LogLevel::Warning, {"slot 'graphics'"}), 1u) << "the same failed revision is not tried again";
+
+        ::BECore::Tests::RemoveFileIfPresent(_saves);
+        ::BECore::Tests::MakeDirectory(_saves);
+        game.graphics.Set(GraphicsPreset::Classic);
+        AdvancePastTheDebounce();
+        game.Update();
+
+        ASSERT_TRUE(SavedLook().has_value());
+        EXPECT_EQ(SavedLook()->preset, "classic");
     }
 
 }  // namespace BECore::Chess::Tests

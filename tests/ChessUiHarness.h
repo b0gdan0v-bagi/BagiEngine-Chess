@@ -922,7 +922,7 @@ namespace BECore::Chess::Tests {
             CoreManager::GetFontAtlasLibrary().Clear();
             CoreManager::GetUIVars().Clear();
             ASSERT_TRUE(LoadShippedThemes(CoreManager::GetUIThemes()));          // the board and its labels draw tokens
-            ASSERT_TRUE(CoreManager::GetUIThemes().SetTheme("classic"_intern));  // the constants of this file are classic's, the shipped default is another theme
+            ASSERT_TRUE(CoreManager::GetUIThemes().SetTheme("classic"_intern));  // the constants of this file are classic's
             _renderer = New<RecordingRenderer>();
             _renderer->width = 1280.0f;
             _renderer->height = 720.0f;
@@ -993,6 +993,12 @@ namespace BECore::Chess::Tests {
             ChessGameModel* model = ChessGame::GetActiveModel();
             EXPECT_NE(model, nullptr);
             return *model;
+        }
+
+        GraphicsChoice& Graphics() const {
+            GraphicsChoice* graphics = ChessGame::GetActiveGraphics();
+            EXPECT_NE(graphics, nullptr);
+            return *graphics;
         }
 
         Scene& GetScene() const {

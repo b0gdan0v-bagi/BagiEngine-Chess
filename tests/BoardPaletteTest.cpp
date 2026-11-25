@@ -1,4 +1,5 @@
 #include <Chess/Components/BoardPalette.h>
+#include <Chess/Graphics/GraphicsChoice.h>
 #include <Common/Printers.h>
 #include <Common/UIThemeTestSupport.h>
 #include <cmath>
@@ -142,13 +143,20 @@ namespace BECore::Chess::Tests {
         UIThemes _themes;
     };
 
-    TEST_F(BoardPaletteTest, TheShippedFileHasClassicSlateAndTavernAndTavernIsTheDefault) {
-        EXPECT_EQ(_themes.GetDefaultTheme(), Themes::tavern);
+    TEST_F(BoardPaletteTest, TheShippedFileHasClassicSlateAndTavernAndClassicIsTheDefault) {
+        EXPECT_EQ(_themes.GetDefaultTheme(), Themes::classic);
         ASSERT_EQ(_themes.GetThemes().size(), 3u);
         EXPECT_TRUE(_themes.HasTheme(Themes::classic));
         EXPECT_TRUE(_themes.HasTheme(Themes::slate));
         EXPECT_TRUE(_themes.HasTheme(Themes::tavern));
-        EXPECT_EQ(_themes.GetTheme(), Themes::tavern);
+        EXPECT_EQ(_themes.GetTheme(), Themes::classic);
+    }
+
+    TEST_F(BoardPaletteTest, EveryGraphicsPresetHasItsThemeInTheFileAndTheFileDefaultsToTheDefaultPresetsTheme) {
+        for (const GraphicsPreset preset : EnumUtils<GraphicsPreset>::Values()) {
+            EXPECT_TRUE(_themes.HasTheme(PoolString::Intern(ThemeOf(preset)))) << PresetId(preset).data();
+        }
+        EXPECT_EQ(_themes.GetDefaultTheme(), PoolString::Intern(ThemeOf(GraphicsChoice().Get())));
     }
 
     TEST_F(BoardPaletteTest, EveryThemeDefinesEveryTokenAndNoTokenOfThePaletteIsMissing) {

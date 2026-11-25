@@ -39,6 +39,7 @@
         <node ref="nodes/ChessMovesSection" />
         <node ref="nodes/ChessGameSection" />
         <node ref="nodes/ChessSoundPanel" />
+        <node ref="nodes/ChessGraphicsPanel" />
         <node ref="nodes/ChessPositionSection" />
         <node ref="nodes/ChessPuzzleSection" />
         <node ref="nodes/ChessReviewSection" />
@@ -50,49 +51,49 @@
         <!-- White back rank (rank 0) -->
         <node ref="nodes/ChessPiece" name="WhiteRook_a1">
           <components>
-            <component type="SpriteRendererComponent" spriteId="WhiteRook" />
+            <component type="SpriteRendererComponent" spriteId="ClassicWhiteRook" />
             <component type="ChessPieceComponent" file="0" rank="0" />
           </components>
         </node>
         <node ref="nodes/ChessPiece" name="WhiteKnight_b1">
           <components>
-            <component type="SpriteRendererComponent" spriteId="WhiteKnight" />
+            <component type="SpriteRendererComponent" spriteId="ClassicWhiteKnight" />
             <component type="ChessPieceComponent" file="1" rank="0" />
           </components>
         </node>
         <node ref="nodes/ChessPiece" name="WhiteBishop_c1">
           <components>
-            <component type="SpriteRendererComponent" spriteId="WhiteBishop" />
+            <component type="SpriteRendererComponent" spriteId="ClassicWhiteBishop" />
             <component type="ChessPieceComponent" file="2" rank="0" />
           </components>
         </node>
         <node ref="nodes/ChessPiece" name="WhiteQueen_d1">
           <components>
-            <component type="SpriteRendererComponent" spriteId="WhiteQueen" />
+            <component type="SpriteRendererComponent" spriteId="ClassicWhiteQueen" />
             <component type="ChessPieceComponent" file="3" rank="0" />
           </components>
         </node>
         <node ref="nodes/ChessPiece" name="WhiteKing_e1">
           <components>
-            <component type="SpriteRendererComponent" spriteId="WhiteKing" />
+            <component type="SpriteRendererComponent" spriteId="ClassicWhiteKing" />
             <component type="ChessPieceComponent" file="4" rank="0" />
           </components>
         </node>
         <node ref="nodes/ChessPiece" name="WhiteBishop_f1">
           <components>
-            <component type="SpriteRendererComponent" spriteId="WhiteBishop" />
+            <component type="SpriteRendererComponent" spriteId="ClassicWhiteBishop" />
             <component type="ChessPieceComponent" file="5" rank="0" />
           </components>
         </node>
         <node ref="nodes/ChessPiece" name="WhiteKnight_g1">
           <components>
-            <component type="SpriteRendererComponent" spriteId="WhiteKnight" />
+            <component type="SpriteRendererComponent" spriteId="ClassicWhiteKnight" />
             <component type="ChessPieceComponent" file="6" rank="0" />
           </components>
         </node>
         <node ref="nodes/ChessPiece" name="WhiteRook_h1">
           <components>
-            <component type="SpriteRendererComponent" spriteId="WhiteRook" />
+            <component type="SpriteRendererComponent" spriteId="ClassicWhiteRook" />
             <component type="ChessPieceComponent" file="7" rank="0" />
           </components>
         </node>
@@ -100,49 +101,49 @@
         <!-- White pawns (rank 1) -->
         <node ref="nodes/ChessPiece" name="WhitePawn_a2">
           <components>
-            <component type="SpriteRendererComponent" spriteId="WhitePawn" />
+            <component type="SpriteRendererComponent" spriteId="ClassicWhitePawn" />
             <component type="ChessPieceComponent" file="0" rank="1" />
           </components>
         </node>
         <node ref="nodes/ChessPiece" name="WhitePawn_b2">
           <components>
-            <component type="SpriteRendererComponent" spriteId="WhitePawn" />
+            <component type="SpriteRendererComponent" spriteId="ClassicWhitePawn" />
             <component type="ChessPieceComponent" file="1" rank="1" />
           </components>
         </node>
         <node ref="nodes/ChessPiece" name="WhitePawn_c2">
           <components>
-            <component type="SpriteRendererComponent" spriteId="WhitePawn" />
+            <component type="SpriteRendererComponent" spriteId="ClassicWhitePawn" />
             <component type="ChessPieceComponent" file="2" rank="1" />
           </components>
         </node>
         <node ref="nodes/ChessPiece" name="WhitePawn_d2">
           <components>
-            <component type="SpriteRendererComponent" spriteId="WhitePawn" />
+            <component type="SpriteRendererComponent" spriteId="ClassicWhitePawn" />
             <component type="ChessPieceComponent" file="3" rank="1" />
           </components>
         </node>
         <node ref="nodes/ChessPiece" name="WhitePawn_e2">
           <components>
-            <component type="SpriteRendererComponent" spriteId="WhitePawn" />
+            <component type="SpriteRendererComponent" spriteId="ClassicWhitePawn" />
             <component type="ChessPieceComponent" file="4" rank="1" />
           </components>
         </node>
         <node ref="nodes/ChessPiece" name="WhitePawn_f2">
           <components>
-            <component type="SpriteRendererComponent" spriteId="WhitePawn" />
+            <component type="SpriteRendererComponent" spriteId="ClassicWhitePawn" />
             <component type="ChessPieceComponent" file="5" rank="1" />
           </components>
         </node>
         <node ref="nodes/ChessPiece" name="WhitePawn_g2">
           <components>
-            <component type="SpriteRendererComponent" spriteId="WhitePawn" />
+            <component type="SpriteRendererComponent" spriteId="ClassicWhitePawn" />
             <component type="ChessPieceComponent" file="6" rank="1" />
           </components>
         </node>
         <node ref="nodes/ChessPiece" name="WhitePawn_h2">
           <components>
-            <component type="SpriteRendererComponent" spriteId="WhitePawn" />
+            <component type="SpriteRendererComponent" spriteId="ClassicWhitePawn" />
             <component type="ChessPieceComponent" file="7" rank="1" />
           </components>
         </node>
@@ -150,49 +151,49 @@
         <!-- Black pawns (rank 6) -->
         <node ref="nodes/ChessPiece" name="BlackPawn_a7">
           <components>
-            <component type="SpriteRendererComponent" spriteId="BlackPawn" />
+            <component type="SpriteRendererComponent" spriteId="ClassicBlackPawn" />
             <component type="ChessPieceComponent" file="0" rank="6" />
           </components>
         </node>
         <node ref="nodes/ChessPiece" name="BlackPawn_b7">
           <components>
-            <component type="SpriteRendererComponent" spriteId="BlackPawn" />
+            <component type="SpriteRendererComponent" spriteId="ClassicBlackPawn" />
             <component type="ChessPieceComponent" file="1" rank="6" />
           </components>
         </node>
         <node ref="nodes/ChessPiece" name="BlackPawn_c7">
           <components>
-            <component type="SpriteRendererComponent" spriteId="BlackPawn" />
+            <component type="SpriteRendererComponent" spriteId="ClassicBlackPawn" />
             <component type="ChessPieceComponent" file="2" rank="6" />
           </components>
         </node>
         <node ref="nodes/ChessPiece" name="BlackPawn_d7">
           <components>
-            <component type="SpriteRendererComponent" spriteId="BlackPawn" />
+            <component type="SpriteRendererComponent" spriteId="ClassicBlackPawn" />
             <component type="ChessPieceComponent" file="3" rank="6" />
           </components>
         </node>
         <node ref="nodes/ChessPiece" name="BlackPawn_e7">
           <components>
-            <component type="SpriteRendererComponent" spriteId="BlackPawn" />
+            <component type="SpriteRendererComponent" spriteId="ClassicBlackPawn" />
             <component type="ChessPieceComponent" file="4" rank="6" />
           </components>
         </node>
         <node ref="nodes/ChessPiece" name="BlackPawn_f7">
           <components>
-            <component type="SpriteRendererComponent" spriteId="BlackPawn" />
+            <component type="SpriteRendererComponent" spriteId="ClassicBlackPawn" />
             <component type="ChessPieceComponent" file="5" rank="6" />
           </components>
         </node>
         <node ref="nodes/ChessPiece" name="BlackPawn_g7">
           <components>
-            <component type="SpriteRendererComponent" spriteId="BlackPawn" />
+            <component type="SpriteRendererComponent" spriteId="ClassicBlackPawn" />
             <component type="ChessPieceComponent" file="6" rank="6" />
           </components>
         </node>
         <node ref="nodes/ChessPiece" name="BlackPawn_h7">
           <components>
-            <component type="SpriteRendererComponent" spriteId="BlackPawn" />
+            <component type="SpriteRendererComponent" spriteId="ClassicBlackPawn" />
             <component type="ChessPieceComponent" file="7" rank="6" />
           </components>
         </node>
@@ -200,49 +201,49 @@
         <!-- Black back rank (rank 7) -->
         <node ref="nodes/ChessPiece" name="BlackRook_a8">
           <components>
-            <component type="SpriteRendererComponent" spriteId="BlackRook" />
+            <component type="SpriteRendererComponent" spriteId="ClassicBlackRook" />
             <component type="ChessPieceComponent" file="0" rank="7" />
           </components>
         </node>
         <node ref="nodes/ChessPiece" name="BlackKnight_b8">
           <components>
-            <component type="SpriteRendererComponent" spriteId="BlackKnight" />
+            <component type="SpriteRendererComponent" spriteId="ClassicBlackKnight" />
             <component type="ChessPieceComponent" file="1" rank="7" />
           </components>
         </node>
         <node ref="nodes/ChessPiece" name="BlackBishop_c8">
           <components>
-            <component type="SpriteRendererComponent" spriteId="BlackBishop" />
+            <component type="SpriteRendererComponent" spriteId="ClassicBlackBishop" />
             <component type="ChessPieceComponent" file="2" rank="7" />
           </components>
         </node>
         <node ref="nodes/ChessPiece" name="BlackQueen_d8">
           <components>
-            <component type="SpriteRendererComponent" spriteId="BlackQueen" />
+            <component type="SpriteRendererComponent" spriteId="ClassicBlackQueen" />
             <component type="ChessPieceComponent" file="3" rank="7" />
           </components>
         </node>
         <node ref="nodes/ChessPiece" name="BlackKing_e8">
           <components>
-            <component type="SpriteRendererComponent" spriteId="BlackKing" />
+            <component type="SpriteRendererComponent" spriteId="ClassicBlackKing" />
             <component type="ChessPieceComponent" file="4" rank="7" />
           </components>
         </node>
         <node ref="nodes/ChessPiece" name="BlackBishop_f8">
           <components>
-            <component type="SpriteRendererComponent" spriteId="BlackBishop" />
+            <component type="SpriteRendererComponent" spriteId="ClassicBlackBishop" />
             <component type="ChessPieceComponent" file="5" rank="7" />
           </components>
         </node>
         <node ref="nodes/ChessPiece" name="BlackKnight_g8">
           <components>
-            <component type="SpriteRendererComponent" spriteId="BlackKnight" />
+            <component type="SpriteRendererComponent" spriteId="ClassicBlackKnight" />
             <component type="ChessPieceComponent" file="6" rank="7" />
           </components>
         </node>
         <node ref="nodes/ChessPiece" name="BlackRook_h8">
           <components>
-            <component type="SpriteRendererComponent" spriteId="BlackRook" />
+            <component type="SpriteRendererComponent" spriteId="ClassicBlackRook" />
             <component type="ChessPieceComponent" file="7" rank="7" />
           </components>
         </node>

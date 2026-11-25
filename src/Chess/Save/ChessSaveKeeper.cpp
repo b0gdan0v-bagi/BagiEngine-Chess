@@ -4,6 +4,7 @@
 #include <BECore/Audio/AudioPreferences.h>
 #include <BECore/GameManager/CoreManager.h>
 #include <BECore/Time/Time.h>
+#include <Chess/Save/ChessGraphicsState.h>
 #include <Chess/Save/ChessSaveState.h>
 #include <Chess/Save/SaveSettings.h>
 
@@ -16,12 +17,14 @@ namespace BECore::Chess {
         return Key{model.GetVersion(), controller.GetRevision(), choice.Color()};
     }
 
-    void ChessSaveKeeper::Start(ChessGameModel& model, OpponentController& controller, OpponentChoice& choice) {
+    void ChessSaveKeeper::Start(ChessGameModel& model, OpponentController& controller, OpponentChoice& choice, GraphicsChoice& graphics) {
         _service.reset();
+        _graphics = nullptr;
         _attemptFailed = false;
         _hasWritten = false;
         _failureLogged = false;
-        _audio = AudioWrite{};
+        _audio = SlotWrite{};
+        _look = SlotWrite{};
 
         const Optional<Path> directory = ResolveSaveDirectory(CoreManager::GetCommandLine(), SaveSettings::Load().rememberGame);
         if (!directory) {
@@ -52,8 +55,23 @@ namespace BECore::Chess {
             LOG_WARNING("Save: slot '{}' was not restored, the levels stay as they are: {}"_format(kAudioPreferencesSlot, levels.error().detail));
         }
 
+        ChessGraphicsState look;
+        const std::expected<SaveInfo, SaveError> loadedLook = service->Load(kChessGraphicsSlot, kChessGraphicsSchema, look);
+        if (loadedLook) {
+            const std::expected<GraphicsPreset, SaveError> preset = Validate(look);
+            if (preset) {
+                Apply(*preset, graphics);
+            } else {
+                LOG_WARNING("Save: slot '{}' was not restored, the look stays as it is: {}"_format(kChessGraphicsSlot, preset.error().detail));
+            }
+        } else if (loadedLook.error().kind != SaveErrorKind::NotFound) {
+            LOG_WARNING("Save: slot '{}' was not restored, the look stays as it is: {}"_format(kChessGraphicsSlot, loadedLook.error().detail));
+        }
+
         _written = KeyOf(model, controller, choice);
         _audio.written = audio.GetLevelsRevision();
+        _look.written = graphics.GetRevision();
+        _graphics = &graphics;
         _service = std::move(service);
     }
 
@@ -61,7 +79,7 @@ namespace BECore::Chess {
         if (!_service) {
             return;
         }
-        UpdateAudio();
+        UpdateSlots();
         if (puzzleOn) {
             return;
         }
@@ -79,7 +97,7 @@ namespace BECore::Chess {
         if (!_service) {
             return;
         }
-        FlushAudio();
+        FlushSlots();
         if (puzzleOn) {
             return;
         }
@@ -89,39 +107,47 @@ namespace BECore::Chess {
         }
     }
 
-    void ChessSaveKeeper::UpdateAudio() {
-        const uint64_t revision = CoreManager::GetAudio().GetLevelsRevision();
-        if (revision == _audio.written || (_audio.attemptFailed && revision == _audio.attempted)) {
-            return;
-        }
-        if (_audio.hasWritten && CoreManager::GetTime().GetTotalTime() - _audio.lastTime < kSaveDebounceSeconds) {
-            return;
-        }
-        WriteAudio(revision);
+    void ChessSaveKeeper::UpdateSlots() {
+        UpdateSlot(_audio, CoreManager::GetAudio().GetLevelsRevision(), kAudioPreferencesSlot, [this] { return SaveAudioPreferences(*_service, CoreManager::GetAudio()); });
+        UpdateSlot(_look, _graphics->GetRevision(), kChessGraphicsSlot, [this] { return _service->Save(kChessGraphicsSlot, kChessGraphicsSchema, Capture(*_graphics)); });
     }
 
-    void ChessSaveKeeper::FlushAudio() {
-        const uint64_t revision = CoreManager::GetAudio().GetLevelsRevision();
-        if (revision != _audio.written) {
-            WriteAudio(revision);
+    void ChessSaveKeeper::FlushSlots() {
+        FlushSlot(_audio, CoreManager::GetAudio().GetLevelsRevision(), kAudioPreferencesSlot, [this] { return SaveAudioPreferences(*_service, CoreManager::GetAudio()); });
+        FlushSlot(_look, _graphics->GetRevision(), kChessGraphicsSlot, [this] { return _service->Save(kChessGraphicsSlot, kChessGraphicsSchema, Capture(*_graphics)); });
+    }
+
+    void ChessSaveKeeper::UpdateSlot(SlotWrite& slot, uint64_t revision, StringView name, SlotSaver save) {
+        if (revision == slot.written || (slot.attemptFailed && revision == slot.attempted)) {
+            return;
+        }
+        if (slot.hasWritten && CoreManager::GetTime().GetTotalTime() - slot.lastTime < kSaveDebounceSeconds) {
+            return;
+        }
+        WriteSlot(slot, revision, name, save);
+    }
+
+    void ChessSaveKeeper::FlushSlot(SlotWrite& slot, uint64_t revision, StringView name, SlotSaver save) {
+        if (revision != slot.written) {
+            WriteSlot(slot, revision, name, save);
         }
     }
 
-    void ChessSaveKeeper::WriteAudio(uint64_t revision) {
-        _audio.hasWritten = true;
-        _audio.lastTime = CoreManager::GetTime().GetTotalTime();
-        const std::expected<void, SaveError> saved = SaveAudioPreferences(*_service, CoreManager::GetAudio());
+    void ChessSaveKeeper::WriteSlot(SlotWrite& slot, uint64_t revision, StringView name, SlotSaver save) {
+        slot.hasWritten = true;
+        slot.lastTime = CoreManager::GetTime().GetTotalTime();
+        const std::expected<void, SaveError> saved = save();
         if (saved) {
-            _audio.written = revision;
-            _audio.attemptFailed = false;
-            _audio.failureLogged = false;
+            slot.written = revision;
+            slot.attemptFailed = false;
+            slot.failureLogged = false;
             return;
         }
-        _audio.attempted = revision;
-        _audio.attemptFailed = true;
-        if (!_audio.failureLogged) {
-            _audio.failureLogged = true;
-            LOG_WARNING("Save: slot '{}' was not written: {}"_format(kAudioPreferencesSlot, saved.error().detail));
+        slot.attempted = revision;
+        slot.attemptFailed = true;
+        if (!slot.failureLogged) {
+            slot.failureLogged = true;
+            LOG_WARNING("Save: slot '{}' was not written: {}"_format(name, saved.error().detail));
         }
     }
 

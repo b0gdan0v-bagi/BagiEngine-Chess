@@ -79,11 +79,13 @@ namespace BECore::Chess {
             return;
         }
         const EditorTool tool = game->GetEditor().GetTool();
-        if (_synced && game == _syncedGame && tool.type == _syncedTool.type && tool.color == _syncedTool.color) {
+        const GraphicsChoice& graphics = game->GetGraphics();
+        if (_synced && game == _syncedGame && tool.type == _syncedTool.type && tool.color == _syncedTool.color && graphics.GetRevision() == _syncedGraphics) {
             return;
         }
         _synced = true;
         _syncedGame = game;
+        _syncedGraphics = graphics.GetRevision();
         _syncedTool = tool;
 
         CoreManager::GetUIVars().Set(Ids::editorColor, EnumUtils<PieceColor>::ToString(tool.color));
@@ -94,7 +96,7 @@ namespace BECore::Chess {
             }
             button->selected = !tool.IsEraser() && tool.type == type;
             if (UIImageComponent* icon = button->GetComponent<UIImageComponent>()) {
-                icon->sprite = PieceSpriteId(Piece{type, tool.color});
+                icon->sprite = PieceSpriteId(Piece{type, tool.color}, graphics.Get());
             }
         }
         if (UIElement* eraser = canvas->GetRoot().FindByName(Ids::editorBarErase)) {

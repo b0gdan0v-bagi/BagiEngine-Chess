@@ -1,0 +1,69 @@
+<?xml version="1.0"?>
+<!-- The menu section "Graphics": the look of the game, Classic or Beer. A modal canvas over everything (layer 20, above the HUD and the end-of-game bar), started hidden, built like the
+     sound panel: the Graphics button of the menu list shows it (ChessOpenSection, value graphics: the row of Game/MenuSections.cpp); the one button, Back, returns to the list
+     (ChessOpenMenu) and fills its row; the dim is a button of its own that hides both (ChessCloseMenu) with stateLook="false", always the first child. The one choice group (UISegmented)
+     emits ChessSetGraphics with the preset id as the value (the ids of Graphics/GraphicsPreset.h and of the control API); the group owns no choice: it shows the variable graphicsPreset,
+     which ChessGraphicsPanelComponent (listed before the canvas) writes from the game's GraphicsChoice, and that component also sets the board theme of UIThemes to the preset's, so
+     a pick by this group, by the control API or from a save recolours the board alike.
+     Every name starts with GraphicsPanel because elements are found by name in every canvas of the scene. The rows are 56 units, the touch size of every control, and the caption is as
+     wide as the opponent panel's captions. The plate is 94% of the safe area up to 640 units, centered:
+     16 + 44 (title) + 56 (Look) + 56 (Back) + 2 x 12 (spacing) + 16 = 212 units high. The two segments "Classic" and "Beer" fit beside the caption of 150 in the 555 units of the
+     narrowest Portrait window (94% of 590 safe units), so the panel needs no variant. -->
+<node name="GraphicsPanel" layer="20" contentVersion="5">
+  <components>
+    <component type="ChessGraphicsPanelComponent" />
+    <component type="UICanvasComponent" space="SceneView" useSafeArea="true" modal="true" visible="false">
+      <elements>
+        <element type="UIElement" name="GraphicsPanelDim" anchor="Stretch" ignoreSafeArea="true" color="0,0,0,150" blocksInput="true">
+          <components>
+            <component type="UIInputClicker" action="ChessCloseMenu" stateLook="false"/>
+          </components>
+        </element>
+        <element type="UIStack" name="GraphicsPanelPlate" anchor="Center" width="94%" maxWidth="640" height="212" direction="Vertical" spacing="12" padding="16" crossAlign="Stretch" color="36,40,52,255" blocksInput="true">
+          <children>
+            <element type="UIElement" name="GraphicsPanelTitle" height="44" fontSize="30">
+              <components>
+                <component type="UITextComponent" text="Graphics" align="Center"/>
+              </components>
+            </element>
+            <element type="UIStack" name="GraphicsPanelLookRow" height="56" direction="Horizontal" spacing="8" crossAlign="Stretch">
+              <children>
+                <element type="UIElement" name="GraphicsPanelLookCaption" width="150" height="56" fontSize="24">
+                  <components>
+                    <component type="UITextComponent" text="Look" verticalAlign="Center" wrap="false"/>
+                  </components>
+                </element>
+                <element type="UISegmented" name="GraphicsPanelLookGroup" bind="graphicsPreset" flex="1" height="56" direction="Horizontal" spacing="4" color="30,30,30,255">
+                  <children>
+                    <element type="UIElement" name="GraphicsPanelClassic" flex="1" height="56" fontSize="24" color="70,70,100,255">
+                      <components>
+                        <component type="UITextComponent" text="Classic" align="Center" verticalAlign="Center" wrap="false"/>
+                        <component type="UIInputClicker" action="ChessSetGraphics" value="classic"/>
+                      </components>
+                    </element>
+                    <element type="UIElement" name="GraphicsPanelBeer" flex="1" height="56" fontSize="24" color="70,70,100,255">
+                      <components>
+                        <component type="UITextComponent" text="Beer" align="Center" verticalAlign="Center" wrap="false"/>
+                        <component type="UIInputClicker" action="ChessSetGraphics" value="beer"/>
+                      </components>
+                    </element>
+                  </children>
+                </element>
+              </children>
+            </element>
+            <element type="UIStack" name="GraphicsPanelButtons" height="56" direction="Horizontal" spacing="8" crossAlign="Stretch">
+              <children>
+                <element type="UIElement" name="GraphicsPanelBack" flex="1" height="56" fontSize="26" color="50,115,85,255">
+                  <components>
+                    <component type="UITextComponent" text="Back" align="Center" verticalAlign="Center" wrap="false"/>
+                    <component type="UIInputClicker" action="ChessOpenMenu"/>
+                  </components>
+                </element>
+              </children>
+            </element>
+          </children>
+        </element>
+      </elements>
+    </component>
+  </components>
+</node>

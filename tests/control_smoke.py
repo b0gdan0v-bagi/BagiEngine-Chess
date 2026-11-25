@@ -1308,7 +1308,7 @@ def check_the_menu_buttons(tree: dict) -> None:
 
     for element in find_ui_canvas(tree, "MenuPanel")["elements"]:
         collect(element)
-    check(sorted(names) == ["MenuClose", "MenuDim", "MenuSectionGame", "MenuSectionMoves", "MenuSectionOpponent", "MenuSectionPosition", "MenuSectionPuzzles", "MenuSectionReview", "MenuSectionSound"], f"the buttons of the list: {names}")
+    check(sorted(names) == ["MenuClose", "MenuDim", "MenuSectionGame", "MenuSectionGraphics", "MenuSectionMoves", "MenuSectionOpponent", "MenuSectionPosition", "MenuSectionPuzzles", "MenuSectionReview", "MenuSectionSound"], f"the buttons of the list: {names}")
     dim = find_ui_element({"canvases": [find_ui_canvas(tree, "MenuPanel")]}, "MenuDim")
     check(dim["action"] == "ChessCloseMenu", f"the dim of the list: {dim}")
     found = find_ui_element({"canvases": [find_ui_canvas(tree, "MenuPanel")]}, "MenuSectionOpponent")
@@ -1659,6 +1659,10 @@ SAVED_VOLUME = 0.4
 VOLUME_TOLERANCE = 1e-6  # the level is a float32, the wire a double
 
 
+def look_of(client: BagiControlClient) -> str:
+    return client.call("get_state")["state"]["graphics"]["preset"]
+
+
 class RestartPhase:
     """A game that is closed with `quit` and started again on the same `--save-dir` comes back: the position and the opponent choice (the flag turns the save on despite --control and --headless).
 
@@ -1692,7 +1696,9 @@ class RestartPhase:
         self.before = self.read(client)
         check(len(self.before["moves"]) == 2, f"unexpected game {self.before}")
         client.call("audio_set", {"bus": "master", "volume": SAVED_VOLUME})
-        # quit (by play()) goes through ChessGame::Stop(), which writes the game and the levels
+        client.call("set_state", {"graphics": {"preset": "beer"}})
+        check(look_of(client) == "beer", f"set_state graphics did not show: {look_of(client)}")
+        # quit (by play()) goes through ChessGame::Stop(), which writes the game, the levels and the look
 
     def come_back(self, client: BagiControlClient, headless: bool) -> None:
         if client.call("status")["manualClock"]:
@@ -1700,8 +1706,9 @@ class RestartPhase:
         after = self.read(client)
         check(after == self.before, f"the game did not come back after a restart: {self.before} then {after}")
         check(abs(master_level(client)["volume"] - SAVED_VOLUME) < VOLUME_TOLERANCE, f"the master volume did not come back after a restart: {master_level(client)}")
+        check(look_of(client) == "beer", f"the look did not come back after a restart: {look_of(client)}")
         client.call("audio_set", {"bus": "master", "volume": 1})  # the exit writes the levels: the next start finds the defaults
-        client.call("reset")  # the exit writes the new game
+        client.call("reset")  # the exit writes the new game; the look is no part of it
 
     def keep_the_fresh_game(self, client: BagiControlClient, headless: bool) -> None:
         if client.call("status")["manualClock"]:
@@ -1712,6 +1719,7 @@ class RestartPhase:
             opponent["plays"] == SAVED_CHOICE["plays"] and opponent["engine"] == SAVED_CHOICE["engine"] and opponent["level"] == SAVED_CHOICE["level"],
             f"a reset and a restart lost the opponent choice: {opponent}",
         )
+        check(look_of(client) == "beer", f"a reset or a restart lost the look: {look_of(client)}")
 
 
 def run_without_a_save_folder(client: BagiControlClient, headless: bool) -> None:
@@ -1722,6 +1730,7 @@ def run_without_a_save_folder(client: BagiControlClient, headless: bool) -> None
     opponent = get_opponent(client)
     check(opponent["plays"] is None and opponent["error"] is None, f"a game started with no save folder has an opponent: {opponent}")
     check(master_level(client) == {"volume": 1.0, "muted": False}, f"a game started with no save folder read the levels of a save: {master_level(client)}")
+    check(look_of(client) == "classic", f"a game started with no save folder shows another look than the default: {look_of(client)}")
 
 
 def main() -> int:

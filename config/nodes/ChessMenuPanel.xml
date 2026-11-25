@@ -7,8 +7,8 @@
      does not exist yet has no button. Every name starts with Menu because elements are found by name in every canvas of the scene (the HUD button is the only one called
      exactly Menu). The sections are one 56-unit button MenuSection<Name> each, in the order of MenuSections(). To add a section: a row in Game/MenuSections.cpp, a
      MenuSection<Name> button here (and 68 units more in the height of MenuPlate: 56 for the button and 12 for the gap) and the panel node of the row. The plate is 94% of
-     the safe area up to 640 units: 16 + 44 (title) + 56 (Opponent) + 56 (Moves) + 56 (Resign / Draw) + 56 (Sound) + 56 (Position) + 56 (Puzzles) + 56 (Review) + 56 (Close) + 9 x 12 (spacing) + 16 = 632 units high.
-     The plate is centered in the safe area of every view and needs no variant: it is 632 units high, and the buttons fit the 555 units of the
+     the safe area up to 640 units: 16 + 44 (title) + 56 (Opponent) + 56 (Moves) + 56 (Resign / Draw) + 56 (Sound) + 56 (Graphics) + 56 (Position) + 56 (Puzzles) + 56 (Review) + 56 (Close) + 10 x 12 (spacing) + 16 = 700 units high.
+     The plate is centered in the safe area of every view and needs no variant: it is 700 units high, and the buttons fit the 555 units of the
      narrowest Portrait window (94% of its 590 safe units) as well as the 640 of the default view. -->
 <node name="MenuPanel" layer="20" contentVersion="5">
   <components>
@@ -20,7 +20,7 @@
             <component type="UIInputClicker" action="ChessCloseMenu" stateLook="false"/>
           </components>
         </element>
-        <element type="UIStack" name="MenuPlate" anchor="Center" width="94%" maxWidth="640" height="632" direction="Vertical" spacing="12" padding="16" crossAlign="Stretch" color="36,40,52,255" blocksInput="true">
+        <element type="UIStack" name="MenuPlate" anchor="Center" width="94%" maxWidth="640" height="700" direction="Vertical" spacing="12" padding="16" crossAlign="Stretch" color="36,40,52,255" blocksInput="true">
           <children>
             <element type="UIElement" name="MenuTitle" height="44" fontSize="30">
               <components>
@@ -49,6 +49,12 @@
               <components>
                 <component type="UITextComponent" text="Sound" align="Center" verticalAlign="Center" wrap="false"/>
                 <component type="UIInputClicker" action="ChessOpenSection" value="sound"/>
+              </components>
+            </element>
+            <element type="UIElement" name="MenuSectionGraphics" height="56" fontSize="26" color="70,70,100,255">
+              <components>
+                <component type="UITextComponent" text="Graphics" align="Center" verticalAlign="Center" wrap="false"/>
+                <component type="UIInputClicker" action="ChessOpenSection" value="graphics"/>
               </components>
             </element>
             <element type="UIElement" name="MenuSectionPosition" height="56" fontSize="26" color="70,70,100,255">

@@ -81,7 +81,7 @@ namespace BECore::Chess::Tests {
                 ::BECore::Tests::EngineEnvironment::EnsureCoreServices();  // TaskManager, which the searches run on
             }
 
-            ChessGameControlTest() : opponent(model), adapter(model, opponent, analyst, drawJudge, openings, editor, puzzle), control(adapter) {
+            ChessGameControlTest() : opponent(model), adapter(model, opponent, analyst, drawJudge, openings, editor, puzzle, graphics), control(adapter) {
 #if CHESS_NO_STOCKFISH
                 // The cases below are a world of doubles in which "stockfish" is a name a test factory answers. A build without Stockfish starts with the own engine, so the
                 // fixture picks the name first, through a factory that makes any double. The cases of a real game of that build are those that say `WithoutStockfish`
@@ -238,6 +238,7 @@ namespace BECore::Chess::Tests {
             OpeningBook openings;  ///< empty, like a game whose file is missing; a case that wants names copies the shipped book in
             PositionEditor editor;
             PuzzleSession puzzle;
+            GraphicsChoice graphics;
             ChessGameControl adapter;
             DomControl control;  ///< the adapter with a Json tree in and out
         };
@@ -264,6 +265,122 @@ namespace BECore::Chess::Tests {
         ASSERT_NE(moves, nullptr);
         ASSERT_TRUE(moves->is_array());
         EXPECT_TRUE(moves->empty());
+    }
+
+    // ---- The look ----
+
+    namespace {
+
+        Json GraphicsRequest(const Json& preset) {
+            Json graphics = Json::object();
+            graphics["preset"] = preset;
+            Json request = Json::object();
+            request["graphics"] = std::move(graphics);
+            return request;
+        }
+
+    }  // namespace
+
+    TEST_F(ChessGameControlTest, AFreshGameShowsTheClassicLook) {
+        const Json state = State();
+
+        const Json* graphics = FindJsonMember(state, "graphics");
+        ASSERT_NE(graphics, nullptr);
+        ASSERT_TRUE(graphics->is_object());
+        EXPECT_EQ(graphics->size(), 1u);
+        EXPECT_EQ(StringMember(*graphics, "preset"), "classic");
+    }
+
+    TEST_F(ChessGameControlTest, ThePickOfALookIsShownAndMovesTheVersionByOneAndNotTwice) {
+        const uint64_t before = control.GetStateVersion();
+
+        ASSERT_TRUE(control.SetState(GraphicsRequest(Json("beer"))).has_value());
+
+        EXPECT_EQ(graphics.Get(), GraphicsPreset::Beer);
+        EXPECT_EQ(StringMember(*FindJsonMember(State(), "graphics"), "preset"), "beer");
+        EXPECT_EQ(control.GetStateVersion(), before + 1);
+
+        ASSERT_TRUE(control.SetState(GraphicsRequest(Json("beer"))).has_value());
+        EXPECT_EQ(control.GetStateVersion(), before + 1) << "the preset that is on changes nothing";
+
+        ASSERT_TRUE(control.SetState(GraphicsRequest(Json("classic"))).has_value());
+        EXPECT_EQ(StringMember(*FindJsonMember(State(), "graphics"), "preset"), "classic");
+        EXPECT_EQ(control.GetStateVersion(), before + 2);
+    }
+
+    TEST_F(ChessGameControlTest, TheLookIsNotPartOfTheGame) {
+        ASSERT_TRUE(control.SetState(GraphicsRequest(Json("beer"))).has_value());
+        Perform("e2e4");
+
+        model.Reset();
+        SetFen(kMateInOneFen);
+        ASSERT_TRUE(control.SetState(OpponentRequest("black", "easy")).has_value());
+
+        EXPECT_EQ(StringMember(*FindJsonMember(State(), "graphics"), "preset"), "beer");
+    }
+
+    TEST_F(ChessGameControlTest, ABadLookRequestIsInvalidParamsAndChangesNothing) {
+        graphics.Set(GraphicsPreset::Beer);
+        Perform("e2e4");
+        const uint64_t version = control.GetStateVersion();
+        for (const Json& preset : {Json("sepia"), Json("Beer"), Json("BEER"), Json(" beer"), Json(""), Json(), Json(1), Json(true), Json::object(), Json::array()}) {
+            EXPECT_EQ(SetStateError(GraphicsRequest(preset)), "invalid_params") << DumpJson(preset).c_str();
+        }
+        Json extra = GraphicsRequest(Json("classic"));
+        extra["graphics"]["theme"] = "tavern";
+        EXPECT_EQ(SetStateError(extra), "invalid_params");
+        Json other = Json::object();
+        other["graphics"] = Json::object();
+        other["graphics"]["theme"] = "classic";
+        EXPECT_EQ(SetStateError(other), "invalid_params") << "no preset member";
+        Json empty = Json::object();
+        empty["graphics"] = Json::object();
+        EXPECT_EQ(SetStateError(empty), "invalid_params");
+        for (const Json& notAnObject : {Json("classic"), Json(), Json(true), Json::array()}) {
+            Json request = Json::object();
+            request["graphics"] = notAnObject;
+            EXPECT_EQ(SetStateError(request), "invalid_params") << DumpJson(notAnObject).c_str();
+        }
+
+        EXPECT_EQ(graphics.Get(), GraphicsPreset::Beer);
+        EXPECT_EQ(MoveCount(), 1u);
+        EXPECT_EQ(control.GetStateVersion(), version);
+    }
+
+    TEST_F(ChessGameControlTest, ALookCannotBeCombinedWithAnotherMember) {
+        const uint64_t version = control.GetStateVersion();
+        const Json members[] = {FenState(kMateInOneFen), OpponentRequest("black", "easy"), AnalysisRequest(true, std::nullopt), Json::object()};
+        const char* const names[] = {"fen", "opponent", "analysis", "takeBack"};
+        for (size_t index = 0; index < 4; ++index) {
+            Json request = GraphicsRequest(Json("beer"));
+            if (index == 3) {
+                request["takeBack"] = Json::object();
+            } else {
+                request[names[index]] = members[index][names[index]];
+            }
+            EXPECT_EQ(SetStateError(request), "invalid_params") << names[index];
+        }
+        for (const char* name : {"resign", "draw", "puzzle", "review"}) {
+            Json request = GraphicsRequest(Json("beer"));
+            request[name] = Json::object();
+            EXPECT_EQ(SetStateError(request), "invalid_params") << name;
+        }
+
+        EXPECT_EQ(graphics.Get(), GraphicsPreset::Classic);
+        EXPECT_EQ(control.GetStateVersion(), version);
+        EXPECT_EQ(StringMember(State(), "fen"), String(Position::kStartFen.data(), Position::kStartFen.size()));
+    }
+
+    TEST_F(ChessGameControlTest, TheLookIsWrittenBetweenFenAndInCheckSoEveryOtherAnswerKeepsItsBytes) {
+        String text;
+        JsonWriter writer(text);
+        ASSERT_TRUE(adapter.WriteState(writer).has_value());
+
+        const size_t fen = text.find("\"fen\":");
+        const size_t look = text.find("\"graphics\":{\"preset\":\"classic\"},\"inCheck\":");
+        ASSERT_NE(fen, String::npos);
+        ASSERT_NE(look, String::npos) << "the look sits right before inCheck";
+        EXPECT_LT(fen, look);
     }
 
     // ---- The material ----
@@ -736,7 +853,8 @@ namespace BECore::Chess::Tests {
         const OpeningBook freshOpenings;
         const PositionEditor freshEditor;
         PuzzleSession freshPuzzle;
-        ChessGameControl freshAdapter(freshModel, freshOpponent, freshAnalyst, freshJudge, freshOpenings, freshEditor, freshPuzzle);
+        GraphicsChoice freshGraphics;
+        ChessGameControl freshAdapter(freshModel, freshOpponent, freshAnalyst, freshJudge, freshOpenings, freshEditor, freshPuzzle, freshGraphics);
         const auto freshState = DomControl(freshAdapter).GetState();
         ASSERT_TRUE(freshState.has_value());
         const Json* freshOpponentState = FindJsonMember(*freshState, "opponent");
@@ -3200,7 +3318,7 @@ namespace BECore::Chess::Tests {
 
         /// A control adapter over a controller of its own, with the default factory and the default engine of this build
         struct RealDefaults {
-            RealDefaults() : opponent(model), adapter(model, opponent, analyst, drawJudge, openings, editor, puzzle), control(adapter) {}
+            RealDefaults() : opponent(model), adapter(model, opponent, analyst, drawJudge, openings, editor, puzzle, graphics), control(adapter) {}
 
             Json OpponentState() const {
                 const auto state = control.GetState();
@@ -3215,6 +3333,7 @@ namespace BECore::Chess::Tests {
             OpeningBook openings;
             PositionEditor editor;
             PuzzleSession puzzle;
+            GraphicsChoice graphics;
             ChessGameControl adapter;
             DomControl control;  ///< the adapter with a Json tree in and out
         };

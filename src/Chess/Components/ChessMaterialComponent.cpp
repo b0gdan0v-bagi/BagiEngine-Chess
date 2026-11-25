@@ -81,7 +81,7 @@ namespace BECore::Chess {
 
     }  // namespace
 
-    void ChessMaterialComponent::Publish(const ChessGameModel* model, PieceColor bottom, bool iconsToo) {
+    void ChessMaterialComponent::Publish(const ChessGameModel* model, PieceColor bottom, GraphicsPreset preset, bool iconsToo) {
         const MaterialNames& names = GetNames();
         const auto types = CapturableTypes();
         // No game: a summary with nothing gone and no points, so one path writes the empty words
@@ -100,7 +100,7 @@ namespace BECore::Chess {
                 const String word = count > 0 ? Format("x{}", count) : String();
                 vars.Set(names.vars[row], StringView(word));
                 if (iconsToo && canvas) {
-                    const PoolString sprite = PieceSpriteId(Piece{types[index], taken});
+                    const PoolString sprite = PieceSpriteId(Piece{types[index], taken}, preset);
                     for (size_t set = 0; set < kMaterialSetCount; ++set) {
                         if (UIElement* element = canvas->GetRoot().FindByName(names.icons[set][row])) {
                             if (UIImageComponent* icon = element->GetComponent<UIImageComponent>()) {
@@ -160,12 +160,15 @@ namespace BECore::Chess {
         // The orientation the board draws with, read on every draw like the board does: it follows the panel, a set_state, a puzzle and a Reset
         const PieceColor bottom = game ? game->BoardBottomColor() : PieceColor::White;
         const uint64_t version = model ? model->GetVersion() : 0;
-        const bool bottomChanged = _publishedBottom != bottom;
-        if (bottomChanged || model != _publishedModel || version != _publishedVersion) {
+        const GraphicsChoice* graphics = ChessGame::GetActiveGraphics();
+        const uint64_t graphicsRevision = graphics ? graphics->GetRevision() : 0;
+        const bool iconsChanged = _publishedBottom != bottom || graphicsRevision != _publishedGraphics;
+        if (iconsChanged || model != _publishedModel || version != _publishedVersion) {
             _publishedBottom = bottom;
+            _publishedGraphics = graphicsRevision;
             _publishedModel = model;
             _publishedVersion = version;
-            Publish(model, bottom, bottomChanged);
+            Publish(model, bottom, graphics ? graphics->Get() : GraphicsPreset::Classic, iconsChanged);
         }
         SyncRows();
     }

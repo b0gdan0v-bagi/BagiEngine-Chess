@@ -1,5 +1,6 @@
 #include <BECore/File/File.h>
 #include <BECore/Reflection/XmlDeserializer.h>
+#include <Chess/Components/PieceSprite.h>
 #include <Chess/Game/ChessTypes.h>
 #include <Chess/Game/Position.h>
 #include <Common/TestFiles.h>
@@ -24,9 +25,9 @@ namespace BECore::Chess::Tests {
 
         /// The nodes before the pieces, in the order of the scene
         constexpr UiNode kUiNodes[] = {
-            {"Board", -1},         {"BoardCoordinates", -1}, {"Material", 5},        {"MovePanel", 4},     {"Hud", 10},         {"EditorBar", 20},  {"PuzzleBar", 20},
-            {"ReviewBar", 20},     {"MenuPanel", 20},        {"OpponentPanel", 20},  {"MovesSection", 20}, {"GameSection", 20}, {"SoundPanel", 20}, {"PositionSection", 20},
-            {"PuzzleSection", 20}, {"ReviewSection", 20},    {"PromotionPanel", 20}, {"RatingMark", 1},    {"Result", 1},       {"Sound", 0},
+            {"Board", -1},           {"BoardCoordinates", -1}, {"Material", 5},       {"MovePanel", 4},       {"Hud", 10},         {"EditorBar", 20},  {"PuzzleBar", 20},
+            {"ReviewBar", 20},       {"MenuPanel", 20},        {"OpponentPanel", 20}, {"MovesSection", 20},   {"GameSection", 20}, {"SoundPanel", 20}, {"GraphicsPanel", 20},
+            {"PositionSection", 20}, {"PuzzleSection", 20},    {"ReviewSection", 20}, {"PromotionPanel", 20}, {"RatingMark", 1},   {"Result", 1},      {"Sound", 0},
         };
         constexpr size_t kUiCount = std::size(kUiNodes);
 
@@ -46,15 +47,15 @@ namespace BECore::Chess::Tests {
             return node.child("components").find_child_by_attribute("component", "type", type);
         }
 
-        /// The sprite of the piece the starting position has on the square: `WhiteRook`
+        /// The sprite of the piece the starting position has on the square, in the default preset the scene files name: `ClassicWhiteRook`
         String ExpectedSpriteId(Square square) {
-            const Piece piece = Position::Start().GetPieceAt(square);
-            return Format("{}{}", EnumUtils<PieceColor>::ToString(piece.color), EnumUtils<PieceType>::ToString(piece.type));
+            return String(PieceSpriteId(Position::Start().GetPieceAt(square), GraphicsPreset::Classic).CStr());
         }
 
-        /// The name of its node: `WhiteRook_a1`
+        /// The name of its node, which is not the sprite's (it stays the same under every preset): `WhiteRook_a1`
         String ExpectedPieceName(Square square) {
-            return Format("{}_{}{}", ExpectedSpriteId(square), static_cast<char>('a' + square.file), square.rank + 1);
+            const Piece piece = Position::Start().GetPieceAt(square);
+            return Format("{}{}_{}{}", EnumUtils<PieceColor>::ToString(piece.color), EnumUtils<PieceType>::ToString(piece.type), static_cast<char>('a' + square.file), square.rank + 1);
         }
 
     }  // namespace

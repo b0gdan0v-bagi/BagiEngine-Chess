@@ -3,9 +3,10 @@
      (ExpectThemesComplete), so a new theme is a new <theme> with the same eleven names; BoardPaletteTest checks each theme for marks that cannot be seen or told apart.
      boardLight / boardDark are the two squares; the labels of the board use boardDark on a light cell and boardLight on a dark one. The other nine are drawn over a square with their
      alpha: the selection and its legal targets, a capture target, the check and the mate, the hint (the square the piece leaves, the square it goes to), the last move and the premoves.
-     `classic` is the look the board had before the themes; `slate` has cool grey-blue squares with marks chosen to be seen on them; `tavern` (the default) is a pale cream table and dark
-     oak, chosen so that the golden beer pieces stand out on the light squares and the near-black ones on the dark squares. -->
-<UIThemes default="tavern">
+     `classic` (the default) is the look the board had before the themes and belongs to the graphics preset Classic; `tavern` is a pale cream table and dark oak, chosen so that the
+     golden beer pieces stand out on the light squares and the near-black ones on the dark squares, and belongs to the preset Beer (ThemeOf() of Graphics/GraphicsPreset.h); `slate` has
+     cool grey-blue squares with marks chosen to be seen on them and belongs to no preset. -->
+<UIThemes default="classic">
   <theme id="classic">
     <color name="boardLight" value="240,217,181,255"/>
     <color name="boardDark" value="181,136,99,255"/>

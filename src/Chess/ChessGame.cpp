@@ -70,6 +70,11 @@ namespace BECore::Chess {
         return chess ? &chess->GetChoice() : nullptr;
     }
 
+    GraphicsChoice* ChessGame::GetActiveGraphics() {
+        ChessGame* chess = GetActive();
+        return chess ? &chess->GetGraphics() : nullptr;
+    }
+
     PositionAnalyst* ChessGame::GetActiveAnalyst() {
         ChessGame* chess = GetActive();
         return chess ? &chess->GetAnalyst() : nullptr;
@@ -95,7 +100,7 @@ namespace BECore::Chess {
         return chess ? &chess->GetPuzzle() : nullptr;
     }
 
-    ChessGame::ChessGame() : _opponent(_model), _choice(_opponent), _control(_model, _opponent, _analyst, _drawJudge, _openings, _editor, _puzzle) {
+    ChessGame::ChessGame() : _opponent(_model), _choice(_opponent), _control(_model, _opponent, _analyst, _drawJudge, _openings, _editor, _puzzle, _graphics) {
         // A new game draws a new seed; a device per draw because the source has to be copyable and a Reset is rare
         _model.SetSeedSource([]() -> uint32_t {
             //-NoStd: the operating system's randomness is the real boundary of the seed
@@ -129,11 +134,12 @@ namespace BECore::Chess {
         [[maybe_unused]] const auto side = _opponent.SetSide(std::nullopt);
         [[maybe_unused]] const auto level = _opponent.SetLevel(kDefaultOpponentLevel);
         [[maybe_unused]] const auto engine = _opponent.SetEngine(_opponent.DefaultEngine());
+        _graphics.Set(GraphicsPreset::Classic);
         _choice.Reset();      // a new game starts with White remembered as the person's color
         _analyst.Shutdown();  // nothing is analysed or rated until the evaluation or the ratings are switched on or a hint is asked for
         _drawJudge.Shutdown();
         // Last: the game it restores goes into the fresh model and choice above, and the key it takes is that of the game it leaves
-        _keeper.Start(_model, _opponent, _choice);
+        _keeper.Start(_model, _opponent, _choice, _graphics);
         _stopped = false;
     }
 

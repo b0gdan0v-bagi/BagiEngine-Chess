@@ -476,8 +476,8 @@ namespace BECore::Chess::Tests {
         Settle();
         StartFrom(kPromotionFen);
         const auto pawn = PlayAndShow("a7", "a7a8q");
-        const PoolString pawnSprite = "WhitePawn"_intern;
-        const PoolString queenSprite = "WhiteQueen"_intern;
+        const PoolString pawnSprite = "ClassicWhitePawn"_intern;
+        const PoolString queenSprite = "ClassicWhiteQueen"_intern;
         EXPECT_EQ(SpriteOf(pawn), pawnSprite);
 
         Frames(kStepsToEnd - 1);
@@ -792,18 +792,18 @@ namespace BECore::Chess::Tests {
         StartFrom(kPromotionFen);
         const auto pawn = PlayAndShow("a7", "a7a8q");
         Frames(kStepsToEnd);
-        ASSERT_EQ(SpriteOf(pawn), "WhiteQueen"_intern);
+        ASSERT_EQ(SpriteOf(pawn), "ClassicWhiteQueen"_intern);
 
         ASSERT_TRUE(Model().ShowMoves(0));
         Frame();
         ExpectOn(pawn, "a7");
-        EXPECT_EQ(SpriteOf(pawn), "WhitePawn"_intern) << "a pawn before it promoted";
+        EXPECT_EQ(SpriteOf(pawn), "ClassicWhitePawn"_intern) << "a pawn before it promoted";
 
         // One more move and one more version than the last frame saw, but the view in between jumped: the pieces snap to the game
         ASSERT_TRUE(Play(Model(), "h8g7"));
         Frame();
         ExpectOn(pawn, "a8", "not slid from a7");
-        EXPECT_EQ(SpriteOf(pawn), "WhiteQueen"_intern);
+        EXPECT_EQ(SpriteOf(pawn), "ClassicWhiteQueen"_intern);
     }
 
 }  // namespace BECore::Chess::Tests

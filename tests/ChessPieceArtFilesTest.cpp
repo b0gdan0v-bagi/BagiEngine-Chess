@@ -4,8 +4,9 @@
 #include <tests/ChessTestUtil.h>
 #include <tests/ShippedScene.h>
 
-/// The shipped piece art held to `config/TextureLibrary.xml`: the atlas `assets/atlases/pieces.png` and the sources it was packed from, files of the source tree whose PNG headers are
-/// read and never decoded (that the pieces look right is for the eye, `artgen/presets/chess_piece.json`; that the atlas is what the packer makes of the sources is `ChessPieceAtlasTest`)
+/// The shipped piece art held to `config/TextureLibrary.xml`: the Classic atlas `assets/chess_test.png`, the Beer atlas `assets/atlases/pieces.png` and the sources it was packed from, files
+/// of the source tree whose PNG headers are read and never decoded (that the pieces look right is for the eye, `artgen/presets/chess_piece.json`; that the atlas is what the packer makes of the
+/// sources is `ChessPieceAtlasTest`)
 namespace BECore::Chess::Tests {
 
     namespace {
@@ -55,6 +56,17 @@ namespace BECore::Chess::Tests {
             return SpriteRect{rect.attribute("x").as_float(), rect.attribute("y").as_float(), rect.attribute("w").as_float(), rect.attribute("h").as_float()};
         }
 
+        /// The classic grid is written with two decimals (116.67 for 116.666...), so neighbours may overlap by a hundredth of a pixel
+        constexpr float kClassicRectTolerance = 0.5F;
+
+        size_t CountSprites(const pugi::xml_document& document, const String& name) {
+            size_t count = 0;
+            for (const pugi::xml_node sprite : document.select_node("/root/sprites").node().children("sprite")) {
+                count += String(sprite.attribute("name").as_string()) == name ? 1 : 0;
+            }
+            return count;
+        }
+
         struct PngHeader {
             bool valid = false;
             uint32_t width = 0;
@@ -93,18 +105,72 @@ namespace BECore::Chess::Tests {
 
     }  // namespace
 
-    TEST(ChessPieceArtFilesTest, EveryPieceIsOneSpriteOfTheAtlasGroup) {
+    TEST(ChessPieceArtFilesTest, EveryPresetNamesItsTwelveSpritesOnceAndTheirFilesExist) {
         pugi::xml_document library;
         ASSERT_TRUE(LoadLibrary(library));
-        const pugi::xml_node sprites = library.select_node("/root/sprites").node();
-        for (const Piece piece : AllPieces()) {
-            const String name = String(PieceSpriteId(piece).ToStringView());
-            SCOPED_TRACE(name.c_str());
-            size_t count = 0;
-            for (const pugi::xml_node sprite : sprites.children("sprite")) {
-                count += String(sprite.attribute("name").as_string()) == name ? 1 : 0;
+        for (const GraphicsPreset preset : EnumUtils<GraphicsPreset>::Values()) {
+            const Vector<PoolString> names = SpriteNamesOf(preset);
+            ASSERT_EQ(names.size(), 12u);
+            for (const PoolString name : names) {
+                const String text(name.ToStringView());
+                SCOPED_TRACE(text.c_str());
+                EXPECT_EQ(CountSprites(library, text), 1u) << "the library names the sprite once";
+                const String texturePath(SpriteOf(library, text).attribute("texturePath").as_string());
+                EXPECT_TRUE(::BECore::Tests::PathExists(FileOfTexturePath(texturePath))) << texturePath.c_str();
             }
-            EXPECT_EQ(count, 1u) << "the library names the sprite once";
+        }
+    }
+
+    TEST(ChessPieceArtFilesTest, EveryClassicPieceIsAPlainSpriteOfTheClassicAtlas) {
+        pugi::xml_document library;
+        ASSERT_TRUE(LoadLibrary(library));
+        for (const PoolString name : SpriteNamesOf(GraphicsPreset::Classic)) {
+            const String text(name.ToStringView());
+            SCOPED_TRACE(text.c_str());
+            const pugi::xml_node sprite = SpriteOf(library, text);
+            EXPECT_EQ(String(sprite.attribute("texturePath").as_string()), String(kClassicAtlasPath));
+            EXPECT_FALSE(sprite.child("atlas")) << "the packer leaves the classic sprites alone";
+        }
+    }
+
+    TEST(ChessPieceArtFilesTest, EveryClassicRectLiesInTheClassicAtlasWithoutOverlapAndAllShareOneSize) {
+        pugi::xml_document library;
+        ASSERT_TRUE(LoadLibrary(library));
+        const PngHeader atlas = ReadPngHeader(FileOfTexturePath(kClassicAtlasPath));
+        ASSERT_TRUE(atlas.valid);
+        EXPECT_EQ(atlas.colorType, kColorTypeRgba) << "the cut-out needs an alpha channel";
+        Vector<SpriteRect> rects;
+        for (const PoolString name : SpriteNamesOf(GraphicsPreset::Classic)) {
+            const String text(name.ToStringView());
+            SCOPED_TRACE(text.c_str());
+            const SpriteRect rect = SrcRectOf(SpriteOf(library, text));
+            EXPECT_GE(rect.x, 0.0F);
+            EXPECT_GE(rect.y, 0.0F);
+            EXPECT_GT(rect.w, 0.0F);
+            EXPECT_GT(rect.h, 0.0F);
+            EXPECT_LE(rect.x + rect.w, static_cast<float>(atlas.width) + kClassicRectTolerance);
+            EXPECT_LE(rect.y + rect.h, static_cast<float>(atlas.height) + kClassicRectTolerance);
+            if (!rects.empty()) {
+                EXPECT_EQ(rect.w, rects.front().w) << "one set, one frame";
+                EXPECT_EQ(rect.h, rects.front().h) << "one set, one frame";
+            }
+            rects.push_back(rect);
+        }
+        for (size_t i = 0; i < rects.size(); ++i) {
+            for (size_t j = i + 1; j < rects.size(); ++j) {
+                const SpriteRect a{rects[i].x + kClassicRectTolerance, rects[i].y + kClassicRectTolerance, rects[i].w - 2 * kClassicRectTolerance, rects[i].h - 2 * kClassicRectTolerance};
+                const SpriteRect b{rects[j].x + kClassicRectTolerance, rects[j].y + kClassicRectTolerance, rects[j].w - 2 * kClassicRectTolerance, rects[j].h - 2 * kClassicRectTolerance};
+                EXPECT_FALSE(Overlap(a, b)) << "pieces " << i << " and " << j << " share pixels of the atlas";
+            }
+        }
+    }
+
+    TEST(ChessPieceArtFilesTest, EveryBeerPieceIsOneSpriteOfTheAtlasGroup) {
+        pugi::xml_document library;
+        ASSERT_TRUE(LoadLibrary(library));
+        for (const Piece piece : AllPieces()) {
+            const String name = String(PieceSpriteId(piece, GraphicsPreset::Beer).ToStringView());
+            SCOPED_TRACE(name.c_str());
             const pugi::xml_node sprite = SpriteOf(library, name);
             EXPECT_EQ(String(sprite.attribute("texturePath").as_string()), String(kPiecesAtlasPath));
             EXPECT_EQ(String(sprite.child("atlas").attribute("name").as_string()), String(kPiecesGroup));
@@ -128,7 +194,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(atlas.valid);
         Vector<SpriteRect> rects;
         for (const Piece piece : AllPieces()) {
-            const String name = String(PieceSpriteId(piece).ToStringView());
+            const String name = String(PieceSpriteId(piece, GraphicsPreset::Beer).ToStringView());
             SCOPED_TRACE(name.c_str());
             const SpriteRect rect = SrcRectOf(SpriteOf(library, name));
             EXPECT_GE(rect.x, 0.0F);
@@ -155,7 +221,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(LoadLibrary(library));
         PngHeader first;
         for (const Piece piece : AllPieces()) {
-            const String name = String(PieceSpriteId(piece).ToStringView());
+            const String name = String(PieceSpriteId(piece, GraphicsPreset::Beer).ToStringView());
             SCOPED_TRACE(name.c_str());
             const String source = SourcePathOf(SpriteOf(library, name));
             EXPECT_EQ(source, Format("{}{}.png", kSourceFolder, name)) << "the sprite is not packed from the file of its name";

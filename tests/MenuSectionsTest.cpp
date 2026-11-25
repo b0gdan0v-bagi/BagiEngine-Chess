@@ -13,9 +13,9 @@ namespace BECore::Chess::Tests {
 
     }  // namespace
 
-    TEST(MenuSectionsTest, HoldsTheOpponentTheMovesTheGameTheSoundThePositionThePuzzlesAndTheReviewSectionsAndNothingElse) {
+    TEST(MenuSectionsTest, HoldsTheOpponentTheMovesTheGameTheSoundTheGraphicsThePositionThePuzzlesAndTheReviewSectionsAndNothingElse) {
         const auto sections = MenuSections();
-        ASSERT_EQ(sections.size(), 7u);
+        ASSERT_EQ(sections.size(), 8u);
         EXPECT_EQ(Text(sections[0].id), "opponent");
         EXPECT_EQ(Text(sections[0].node), "OpponentPanel");
         EXPECT_EQ(Text(sections[0].label), "Opponent");
@@ -28,15 +28,18 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(Text(sections[3].id), "sound");
         EXPECT_EQ(Text(sections[3].node), "SoundPanel");
         EXPECT_EQ(Text(sections[3].label), "Sound");
-        EXPECT_EQ(Text(sections[4].id), "position");
-        EXPECT_EQ(Text(sections[4].node), "PositionSection");
-        EXPECT_EQ(Text(sections[4].label), "Position");
-        EXPECT_EQ(Text(sections[5].id), "puzzles");
-        EXPECT_EQ(Text(sections[5].node), "PuzzleSection");
-        EXPECT_EQ(Text(sections[5].label), "Puzzles");
-        EXPECT_EQ(Text(sections[6].id), "review");
-        EXPECT_EQ(Text(sections[6].node), "ReviewSection");
-        EXPECT_EQ(Text(sections[6].label), "Review");
+        EXPECT_EQ(Text(sections[4].id), "graphics");
+        EXPECT_EQ(Text(sections[4].node), "GraphicsPanel");
+        EXPECT_EQ(Text(sections[4].label), "Graphics");
+        EXPECT_EQ(Text(sections[5].id), "position");
+        EXPECT_EQ(Text(sections[5].node), "PositionSection");
+        EXPECT_EQ(Text(sections[5].label), "Position");
+        EXPECT_EQ(Text(sections[6].id), "puzzles");
+        EXPECT_EQ(Text(sections[6].node), "PuzzleSection");
+        EXPECT_EQ(Text(sections[6].label), "Puzzles");
+        EXPECT_EQ(Text(sections[7].id), "review");
+        EXPECT_EQ(Text(sections[7].node), "ReviewSection");
+        EXPECT_EQ(Text(sections[7].label), "Review");
     }
 
     TEST(MenuSectionsTest, IdsAreLowerCaseAndUnique) {
@@ -78,9 +81,9 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(MenuSectionsTest, MatchingIsExact) {
-        for (const char* text :
-             {"",      "Opponent", "OPPONENT",   "opponen", "opponent ", " opponent",     "OpponentPanel", "Moves",  "move",   "MovesSection",  "Game",   "GameSection", "Resign / Draw",
-              "Sound", "sound ",   "SoundPanel", "puzzle",  "Puzzles",   "PuzzleSection", "resign",        "editor", "Review", "ReviewSection", "reviews"}) {
+        for (const char* text : {"",        "Opponent",      "OPPONENT",      "opponen", "opponent ", " opponent",     "OpponentPanel", "Moves",   "move",          "MovesSection",
+                                 "Game",    "GameSection",   "Resign / Draw", "Sound",   "sound ",    "SoundPanel",    "Graphics",      "graphic", "GraphicsPanel", "puzzle",
+                                 "Puzzles", "PuzzleSection", "resign",        "editor",  "Review",    "ReviewSection", "reviews"}) {
             EXPECT_FALSE(FindMenuSection(text).has_value()) << "\"" << text << "\"";
         }
     }
