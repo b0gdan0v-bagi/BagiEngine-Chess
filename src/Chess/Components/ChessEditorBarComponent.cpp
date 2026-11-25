@@ -59,7 +59,7 @@ namespace BECore::Chess {
         } else if (const Optional<PieceType> type = FindEditorTool(event.value.ToStringView())) {
             tool.type = *type;
         } else {
-            LOG_WARNING("ChessEditPick ignored: '{}' is not a tool"_format(event.value.ToStringView()));
+            LOG_WARNING("ChessEditPick ignored: '{}' is not a tool", event.value.ToStringView());
             return;
         }
         editor.SetTool(tool);

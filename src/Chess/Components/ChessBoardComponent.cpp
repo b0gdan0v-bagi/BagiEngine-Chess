@@ -25,9 +25,9 @@ namespace BECore::Chess {
         void LogResult(const ChessGameModel& model) {
             const auto status = EnumUtils<GameStatus>::ToString(model.GetStatus());
             if (const auto winner = model.GetWinner()) {
-                LOG_INFO("{}, {} wins"_format(status, EnumUtils<PieceColor>::ToString(*winner)));
+                LOG_INFO("{}, {} wins", status, EnumUtils<PieceColor>::ToString(*winner));
             } else {
-                LOG_INFO("Game over: {}"_format(status));
+                LOG_INFO("Game over: {}", status);
             }
         }
 

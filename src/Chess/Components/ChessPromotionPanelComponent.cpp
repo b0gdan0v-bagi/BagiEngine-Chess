@@ -82,7 +82,7 @@ namespace BECore::Chess {
             // Nothing pending (a press that came late) is an IllegalMove of the model and changes nothing; a game this move ended is logged by the board's next update
             static_cast<void>(model->ChoosePromotion(*piece));
         } else {
-            LOG_WARNING("ChessPromote ignored: '{}' is not a piece a pawn can become"_format(event.value.ToStringView()));
+            LOG_WARNING("ChessPromote ignored: '{}' is not a piece a pawn can become", event.value.ToStringView());
         }
         Sync();
     }

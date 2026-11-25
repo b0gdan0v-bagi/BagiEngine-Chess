@@ -37,7 +37,7 @@ namespace BECore::Chess {
             graphics->Set(*preset);
             return;
         }
-        LOG_WARNING("ChessSetGraphics ignored: '{}' is not a preset"_format(event.value.ToStringView()));
+        LOG_WARNING("ChessSetGraphics ignored: '{}' is not a preset", event.value.ToStringView());
     }
 
     void ChessGraphicsPanelComponent::OnUpdate(const SceneEvents::SceneUpdateEvent&) {
@@ -48,7 +48,7 @@ namespace BECore::Chess {
         _themeRevision = graphics->GetRevision();
         const StringView theme = ThemeOf(graphics->Get());
         if (!CoreManager::GetUIThemes().SetTheme(PoolString::Intern(theme))) {
-            LOG_WARNING("The theme '{}' of the graphics preset '{}' is not in UIThemes.xml"_format(theme, PresetId(graphics->Get())));
+            LOG_WARNING("The theme '{}' of the graphics preset '{}' is not in UIThemes.xml", theme, PresetId(graphics->Get()));
         }
     }
 

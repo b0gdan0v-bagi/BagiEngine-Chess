@@ -54,7 +54,7 @@ namespace BECore::Chess {
 
     void EngineOpponent::CancelWhenStale(const ChessGameModel& model) {
         if (_searchVersion != model.GetVersion() && !_search->token.IsCancelled()) {
-            LOG_INFO("Engine opponent ({}): the game moved on while the engine was thinking, the search is cancelled"_format(EnumUtils<PieceColor>::ToString(_side)));
+            LOG_INFO("Engine opponent ({}): the game moved on while the engine was thinking, the search is cancelled", EnumUtils<PieceColor>::ToString(_side));
             _search->token.Cancel();
         }
     }
@@ -70,7 +70,7 @@ namespace BECore::Chess {
 
         const StringView side = EnumUtils<PieceColor>::ToString(_side);
         if (!wanted) {
-            LOG_INFO("Engine opponent ({}): the answer of a cancelled or out-of-date search is dropped"_format(side));
+            LOG_INFO("Engine opponent ({}): the answer of a cancelled or out-of-date search is dropped", side);
             return;
         }
         if (!answer) {
@@ -83,7 +83,7 @@ namespace BECore::Chess {
     }
 
     void EngineOpponent::Fail(EngineError error) {
-        LOG_ERROR("Engine opponent ({}): no move, {}: {}"_format(EnumUtils<PieceColor>::ToString(_side), EnumUtils<EngineErrorKind>::ToString(error.kind), error.detail));
+        LOG_ERROR("Engine opponent ({}): no move, {}: {}", EnumUtils<PieceColor>::ToString(_side), EnumUtils<EngineErrorKind>::ToString(error.kind), error.detail);
         _lastError = std::move(error);
     }
 

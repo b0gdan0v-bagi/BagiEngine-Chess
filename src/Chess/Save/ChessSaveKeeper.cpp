@@ -32,7 +32,7 @@ namespace BECore::Chess {
         }
         UniquePtr<SaveGameService> service = MakeUnique<SaveGameService>(CoreManager::GetFileSystem());
         if (!service->Initialize(*directory)) {
-            LOG_WARNING("Save: the folder '{}' cannot be made or is not a folder, the game is not remembered"_format(directory->CStr()));
+            LOG_WARNING("Save: the folder '{}' cannot be made or is not a folder, the game is not remembered", directory->CStr());
             return;
         }
 
@@ -43,16 +43,16 @@ namespace BECore::Chess {
             if (plan) {
                 Apply(*plan, model, controller, choice);
             } else {
-                LOG_WARNING("Save: slot '{}' was not restored, the game starts new: {}"_format(kChessSaveSlot, plan.error().detail));
+                LOG_WARNING("Save: slot '{}' was not restored, the game starts new: {}", kChessSaveSlot, plan.error().detail);
             }
         } else if (loaded.error().kind != SaveErrorKind::NotFound) {
-            LOG_WARNING("Save: slot '{}' was not restored, the game starts new: {}"_format(kChessSaveSlot, loaded.error().detail));
+            LOG_WARNING("Save: slot '{}' was not restored, the game starts new: {}", kChessSaveSlot, loaded.error().detail);
         }
 
         AudioManager& audio = CoreManager::GetAudio();
         const std::expected<SaveInfo, SaveError> levels = LoadAudioPreferences(*service, audio);
         if (!levels && levels.error().kind != SaveErrorKind::NotFound) {
-            LOG_WARNING("Save: slot '{}' was not restored, the levels stay as they are: {}"_format(kAudioPreferencesSlot, levels.error().detail));
+            LOG_WARNING("Save: slot '{}' was not restored, the levels stay as they are: {}", kAudioPreferencesSlot, levels.error().detail);
         }
 
         ChessGraphicsState look;
@@ -62,10 +62,10 @@ namespace BECore::Chess {
             if (preset) {
                 Apply(*preset, graphics);
             } else {
-                LOG_WARNING("Save: slot '{}' was not restored, the look stays as it is: {}"_format(kChessGraphicsSlot, preset.error().detail));
+                LOG_WARNING("Save: slot '{}' was not restored, the look stays as it is: {}", kChessGraphicsSlot, preset.error().detail);
             }
         } else if (loadedLook.error().kind != SaveErrorKind::NotFound) {
-            LOG_WARNING("Save: slot '{}' was not restored, the look stays as it is: {}"_format(kChessGraphicsSlot, loadedLook.error().detail));
+            LOG_WARNING("Save: slot '{}' was not restored, the look stays as it is: {}", kChessGraphicsSlot, loadedLook.error().detail);
         }
 
         _written = KeyOf(model, controller, choice);
@@ -147,7 +147,7 @@ namespace BECore::Chess {
         slot.attemptFailed = true;
         if (!slot.failureLogged) {
             slot.failureLogged = true;
-            LOG_WARNING("Save: slot '{}' was not written: {}"_format(name, saved.error().detail));
+            LOG_WARNING("Save: slot '{}' was not written: {}", name, saved.error().detail);
         }
     }
 
@@ -165,7 +165,7 @@ namespace BECore::Chess {
         _attemptFailed = true;
         if (!_failureLogged) {
             _failureLogged = true;
-            LOG_WARNING("Save: slot '{}' was not written: {}"_format(kChessSaveSlot, saved.error().detail));
+            LOG_WARNING("Save: slot '{}' was not written: {}", kChessSaveSlot, saved.error().detail);
         }
     }
 

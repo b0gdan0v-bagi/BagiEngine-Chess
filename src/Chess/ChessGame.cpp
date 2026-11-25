@@ -15,18 +15,18 @@ namespace BECore::Chess {
     OpeningBook ChessGame::LoadOpeningBook(StringView virtualPath) {
         const Path file = CoreManager::GetFileSystem().ResolvePath(virtualPath);
         if (file.Empty()) {
-            LOG_WARNING("Opening names: '{}' not found, no opening is named"_format(virtualPath));
+            LOG_WARNING("Opening names: '{}' not found, no opening is named", virtualPath);
             return {};
         }
         const std::expected<String, String> text = ReadTextFile(file.View());
         if (!text) {
-            LOG_WARNING("Opening names: '{}' cannot be read, no opening is named"_format(virtualPath));
+            LOG_WARNING("Opening names: '{}' cannot be read, no opening is named", virtualPath);
             return {};
         }
         Vector<String> problems;
         OpeningBook book = OpeningBook::Parse(StringView(*text), &problems);
         for (const String& problem : problems) {
-            LOG_WARNING("Opening names: {}"_format(problem));
+            LOG_WARNING("Opening names: {}", problem);
         }
         return book;
     }
@@ -34,18 +34,18 @@ namespace BECore::Chess {
     PuzzleSet ChessGame::LoadPuzzles(StringView virtualPath) {
         const Path file = CoreManager::GetFileSystem().ResolvePath(virtualPath);
         if (file.Empty()) {
-            LOG_WARNING("Puzzles: '{}' not found, there are no puzzles"_format(virtualPath));
+            LOG_WARNING("Puzzles: '{}' not found, there are no puzzles", virtualPath);
             return {};
         }
         const std::expected<String, String> text = ReadTextFile(file.View());
         if (!text) {
-            LOG_WARNING("Puzzles: '{}' cannot be read, there are no puzzles"_format(virtualPath));
+            LOG_WARNING("Puzzles: '{}' cannot be read, there are no puzzles", virtualPath);
             return {};
         }
         Vector<String> problems;
         PuzzleSet puzzles = PuzzleSet::Parse(StringView(*text), &problems);
         for (const String& problem : problems) {
-            LOG_WARNING("Puzzles: {}"_format(problem));
+            LOG_WARNING("Puzzles: {}", problem);
         }
         return puzzles;
     }

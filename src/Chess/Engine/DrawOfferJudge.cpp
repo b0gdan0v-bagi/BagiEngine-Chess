@@ -119,7 +119,7 @@ namespace BECore::Chess {
     }
 
     void DrawOfferJudge::Fail(EngineError error) {
-        LOG_ERROR("Draw offer: the program could not judge the position and declines, {}: {}"_format(EnumUtils<EngineErrorKind>::ToString(error.kind), error.detail));
+        LOG_ERROR("Draw offer: the program could not judge the position and declines, {}: {}", EnumUtils<EngineErrorKind>::ToString(error.kind), error.detail);
         _error = std::move(error);
         Resolve(DrawVerdict::Declined);
     }
