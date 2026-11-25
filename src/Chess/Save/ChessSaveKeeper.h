@@ -1,8 +1,10 @@
 #pragma once
 
 #include <BECore/Save/SaveGame.h>
+#include <BECore/Utils/FunctionRef.h>
 #include <Chess/Engine/OpponentChoice.h>
 #include <Chess/Game/ChessGameModel.h>
+#include <Chess/Graphics/GraphicsChoice.h>
 
 namespace BECore::Chess {
 
@@ -24,6 +26,9 @@ namespace BECore::Chess {
      * The player's audio levels (the engine's `audio` slot, AudioPreferences.h) go through the same folder and gate: Start() reads them into the audio manager, Update() writes them when
      * GetLevelsRevision() moved, with a debounce of their own that neither delays nor is delayed by the game's, and Flush() writes them too. A refused `audio` file is one warning and is left alone.
      *
+     * The person's look (ChessGraphicsState, the slot `graphics`) is kept the same way by the revision of the GraphicsChoice that Start() is given: read in Start(), written by Update() with a
+     * debounce and a retry state of its own (so are the levels') and by Flush(). A refused `graphics` file is one warning, the file is left alone and the look stays Classic.
+     *
      * While a puzzle is on nothing of the game is written, so a restart brings back the game from before it. Not saved: see ChessSaveState.
      */
     class ChessSaveKeeper {
@@ -36,8 +41,9 @@ namespace BECore::Chess {
         ChessSaveKeeper(const ChessSaveKeeper&) = delete;
         ChessSaveKeeper& operator=(const ChessSaveKeeper&) = delete;
 
-        /// Decides whether this run saves, and restores a good save into the three. Call it last in the start of the game, with the game fresh (nobody plays); calling it again starts over
-        void Start(ChessGameModel& model, OpponentController& controller, OpponentChoice& choice);
+        /// Decides whether this run saves, and restores a good save into the four. Call it last in the start of the game, with the game fresh (nobody plays); calling it again starts over.
+        /// @p graphics is kept (a reference that outlives the keeper) for Update() and Flush()
+        void Start(ChessGameModel& model, OpponentController& controller, OpponentChoice& choice, GraphicsChoice& graphics);
 
         /// Once per frame, on the main thread, never from a draw: writes the game when it changed and the debounce has passed. @p puzzleOn: a puzzle is the game on the board, which is
         /// not the person's game, so the game is not written (the levels still are); the key is not marked as written, so the first frame after the puzzle writes what the game became
@@ -64,8 +70,8 @@ namespace BECore::Chess {
         [[nodiscard]] static Key KeyOf(const ChessGameModel& model, const OpponentController& controller, const OpponentChoice& choice);
         void Write(const ChessGameModel& model, const OpponentController& controller, const OpponentChoice& choice, const Key& key);
 
-        /// The write state of the audio levels: the game's, with the audio manager's GetLevelsRevision() in place of a Key
-        struct AudioWrite {
+        /// The write state of a slot kept by a revision number (the audio levels, the look): the game's, with the revision in place of a Key
+        struct SlotWrite {
             uint64_t written = 0;    ///< the revision the file holds (or Start() found)
             uint64_t attempted = 0;  ///< the revision of the last write that failed; not retried until it moves
             bool attemptFailed = false;
@@ -74,9 +80,13 @@ namespace BECore::Chess {
             bool failureLogged = false;
         };
 
-        void UpdateAudio();
-        void FlushAudio();
-        void WriteAudio(uint64_t revision);
+        using SlotSaver = FunctionRef<std::expected<void, SaveError>()>;
+
+        void UpdateSlot(SlotWrite& slot, uint64_t revision, StringView name, SlotSaver save);
+        void FlushSlot(SlotWrite& slot, uint64_t revision, StringView name, SlotSaver save);
+        void WriteSlot(SlotWrite& slot, uint64_t revision, StringView name, SlotSaver save);
+        void UpdateSlots();
+        void FlushSlots();
 
         UniquePtr<SaveGameService> _service;  ///< null when this run saves nothing
         Key _written;                         ///< the game as the file holds it (or as Start() found it)
@@ -85,7 +95,9 @@ namespace BECore::Chess {
         bool _hasWritten = false;
         double _lastWriteTime = 0.0;  ///< game time of the last write, meaningful when _hasWritten
         bool _failureLogged = false;
-        AudioWrite _audio;
+        SlotWrite _audio;
+        SlotWrite _look;
+        GraphicsChoice* _graphics = nullptr;  ///< set by Start(); the choice outlives the keeper
     };
 
 }  // namespace BECore::Chess

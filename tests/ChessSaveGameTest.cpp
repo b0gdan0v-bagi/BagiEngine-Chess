@@ -14,6 +14,7 @@
 #include <Chess/ChessGame.h>
 #include <Chess/Components/ChessBoardComponent.h>
 #include <Chess/Components/ChessPieceComponent.h>
+#include <Chess/Save/ChessGraphicsState.h>
 #include <Chess/Save/ChessSaveState.h>
 #include <Common/EngineEnvironment.h>
 #include <Common/RecordingRenderer.h>
@@ -213,6 +214,10 @@ namespace BECore::Chess::Tests {
             ASSERT_TRUE(service.Save(kChessSaveSlot, kChessSaveSchema, state).has_value());
         }
 
+        Path GraphicsFile() const {
+            return _saves / "graphics.save";
+        }
+
         Optional<ChessSaveState> Saved() const {
             FileSystem fileSystem;
             SaveGameService service(fileSystem);
@@ -404,6 +409,47 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(Game().GetModel().GetMoves().size(), 2u);
     }
 
+    TEST_F(ChessSaveGameTest, TheLookPickedInTheLastFrameSurvivesAStopAndAStartAndAReset) {
+        SetCommandLine({"--control", "--headless"}, true);
+        StartManager();
+        Frames(2);
+        Game().GetGraphics().Set(GraphicsPreset::Beer);
+
+        Restart();
+
+        EXPECT_EQ(Game().GetGraphics().Get(), GraphicsPreset::Beer) << "Start() sets Classic, then the save restores the pick";
+        Game().GetModel().Reset();
+        EXPECT_EQ(Game().GetGraphics().Get(), GraphicsPreset::Beer) << "a new game is not a new look";
+    }
+
+    TEST_F(ChessSaveGameTest, ASaveFromBeforeTheLookWasKeptStartsAsClassic) {
+        SetCommandLine({"--control", "--headless"}, true);
+        MakeSave(SavedGameOf(kGameInProgress, "none"));
+        ASSERT_FALSE(::BECore::Tests::PathExists(GraphicsFile()));
+
+        StartManager();
+        Frames(4);
+        Game().Stop();
+
+        EXPECT_EQ(Game().GetGraphics().Get(), GraphicsPreset::Classic);
+        EXPECT_EQ(Game().GetModel().GetMoves().size(), 4u) << "the game of the same folder is restored as before";
+        EXPECT_FALSE(::BECore::Tests::PathExists(GraphicsFile())) << "a look nobody picked is not written";
+    }
+
+    TEST_F(ChessSaveGameTest, TheLookIsNeitherReadNorWrittenWithoutASaveDir) {
+        SetCommandLine({"--control", "--headless", "--manual-clock"}, false);
+        StartManager();
+
+        EXPECT_FALSE(Game().GetKeeper().IsOn());
+        Game().GetGraphics().Set(GraphicsPreset::Beer);
+        Frames(4);
+        Game().Stop();
+        Game().Start();
+
+        EXPECT_EQ(Game().GetGraphics().Get(), GraphicsPreset::Classic);
+        EXPECT_TRUE(IsEmptyFolder(_directory));
+    }
+
     TEST_F(ChessSaveGameTest, AControlRunWithNoSaveDirNeitherReadsNorWritesTheLevels) {
         SetCommandLine({"--control", "--headless", "--manual-clock"}, false);
         CoreManager::GetAudio().SetMasterVolume(0.3f);
@@ -458,7 +504,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(Game().GetChoice().SetEngine("own").has_value());
         Frames(2);
 
-        Game().Reset();
+        Game().GetModel().Reset();
         Restart();
 
         EXPECT_TRUE(Game().GetModel().GetMoves().empty());

@@ -26,7 +26,7 @@ namespace BECore::Chess {
      * controller holds), the judge of the person's draw offers (DrawOfferJudge, which makes its engine through the analyst's factory, so a factory given to the analyst reaches it too), the
      * save keeper and the adapter of the control API (ChessGameControl). A game starts with nobody as the opponent (it is made when a side is picked) and the analysis off.
      *
-     * Owns the GraphicsChoice, the look the person picked: Start() sets Classic, Reset() leaves it alone.
+     * Owns the GraphicsChoice, the look the person picked: Start() sets Classic (the save, when the run has one, then restores the person's pick), Reset() leaves it alone.
      *
      * Owns the PositionEditor, the draft of a position the person builds on the board. The game is edited without being changed: BeginEditing() has the model show the draft
      * (ChessGameModel::ShowDraft(), IsEditing() is its IsDrafting()), CancelEditing() puts the game back as it was, and PlayFromHere() starts a new game from the draft through
@@ -42,8 +42,8 @@ namespace BECore::Chess {
      * and takeback, resignation, draw offers and the save are off. The opponent's pick is left as it was; LeavePuzzle() is a plain Reset().
      *
      * IGame has no per-frame hook, so ChessBoardComponent runs GetOpponent().Update(), GetAnalyst().Update(), GetDrawJudge().Update() and UpdateKeeper() every frame. Start() ends by restoring
-     * the saved game, the opponent choice and the player's audio levels (ChessSaveKeeper, when the run asks for it). Stop() starts by writing them, then destroys the opponent and shuts the analyst
-     * and the judge down, which happens before the task system goes down (Application::Cleanup()): a search that nobody cancelled would hold the join of the pool.
+     * the saved game, the opponent choice, the player's audio levels and the look (ChessSaveKeeper, when the run asks for it). Stop() starts by writing them, then destroys the opponent and shuts the
+     * analyst and the judge down, which happens before the task system goes down (Application::Cleanup()): a search that nobody cancelled would hold the join of the pool.
      */
     class ChessGame : public IGame {
         BE_CLASS(ChessGame)
@@ -270,7 +270,7 @@ namespace BECore::Chess {
         PuzzleSession _puzzle;         ///< after the model (it judges it) and before the adapter and the keeper
         PositionEditor _editor;
         String _editorMessage;
-        ChessSaveKeeper _keeper;  ///< after everything it reads (it is handed the model, the controller and the choice in each call, and destroyed first)
+        ChessSaveKeeper _keeper;  ///< after everything it reads (it is handed the model, the controller and the choice in each call and keeps the graphics choice from Start(); destroyed first)
         ChessGameControl _control;
         bool _stopped = false;  ///< between Stop() and the next Start(): UpdateKeeper() writes nothing
     };

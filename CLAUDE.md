@@ -16,7 +16,7 @@ src/Chess/
 ├── ChessGameControl.{h,cpp}  the control API adapter
 ├── Game/                     the rules, plain C++: board, moves, FEN, legal moves, status, ChessGameModel, pure UI helpers
 ├── Engine/                   the opponent: IChessEngine, Stockfish over UCI, the own engine, levels, controller, analyst, MoveRater
-├── Save/                     the game and the opponent choice kept between runs
+├── Save/                     the game, the opponent choice, the audio levels and the look kept between runs
 ├── Sound/                    the sounds of the board and the buttons, the Sound section
 ├── Graphics/                 the look: the preset Classic / Beer, its sprite prefix and board theme, the person's choice
 ├── Uci/                      the own engine as the UCI program BagiChessUci

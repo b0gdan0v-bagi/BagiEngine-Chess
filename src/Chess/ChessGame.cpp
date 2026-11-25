@@ -139,7 +139,7 @@ namespace BECore::Chess {
         _analyst.Shutdown();  // nothing is analysed or rated until the evaluation or the ratings are switched on or a hint is asked for
         _drawJudge.Shutdown();
         // Last: the game it restores goes into the fresh model and choice above, and the key it takes is that of the game it leaves
-        _keeper.Start(_model, _opponent, _choice);
+        _keeper.Start(_model, _opponent, _choice, _graphics);
         _stopped = false;
     }
 
