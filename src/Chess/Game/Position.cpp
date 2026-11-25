@@ -58,12 +58,13 @@ namespace BECore::Chess {
             return Piece{static_cast<PieceType>(found + 1), isWhite ? PieceColor::White : PieceColor::Black};
         }
 
-        bool ParseNumber(StringView text, int& out) noexcept {
-            if (text.empty()) {
+        bool ParseNonNegative(StringView text, int& out) noexcept {
+            const Optional<int> value = StringUtils::ParseNumber<int>(text);
+            if (!value || *value < 0) {
                 return false;
             }
-            const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), out);
-            return error == std::errc{} && end == text.data() + text.size() && out >= 0;
+            out = *value;
+            return true;
         }
 
         void AppendSquareName(String& text, int sq) {
@@ -223,10 +224,10 @@ namespace BECore::Chess {
             }
         }
 
-        if (fieldCount > 4 && !ParseNumber(fields[4], pos._halfmoveClock)) {
+        if (fieldCount > 4 && !ParseNonNegative(fields[4], pos._halfmoveClock)) {
             return std::unexpected(FenError::BadClock);
         }
-        if (fieldCount > 5 && (!ParseNumber(fields[5], pos._fullmoveNumber) || pos._fullmoveNumber < 1)) {
+        if (fieldCount > 5 && (!ParseNonNegative(fields[5], pos._fullmoveNumber) || pos._fullmoveNumber < 1)) {
             return std::unexpected(FenError::BadClock);
         }
 

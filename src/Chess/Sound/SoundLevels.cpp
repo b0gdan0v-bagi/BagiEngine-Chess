@@ -12,15 +12,11 @@ namespace BECore::Chess {
     }  // namespace
 
     Optional<float> ParseVolume(StringView text) {
-        if (text.empty()) {
+        const Optional<float> value = StringUtils::ParseNumber<float>(text);
+        if (!value || !std::isfinite(*value)) {
             return std::nullopt;
         }
-        float value = 0.0f;
-        const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), value);
-        if (error != std::errc{} || end != text.data() + text.size() || !std::isfinite(value)) {
-            return std::nullopt;
-        }
-        return std::clamp(value, 0.0f, 1.0f);
+        return std::clamp(*value, 0.0f, 1.0f);
     }
 
     Optional<bool> ParseMuted(StringView text) {
