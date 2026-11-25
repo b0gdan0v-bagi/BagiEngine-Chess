@@ -4,7 +4,7 @@ can do whatever you want with this stuff. If we meet some day, and you think
 this stuff is worth it, you can buy me a beer in return.
 
 This licence covers the code of the game written for it (the Chess module, the
-tools, the tests and the scripts) and its own art (assets/artgen/,
+tools, the tests and the scripts) and its own art (assets/chess_test.png, assets/artgen/,
 assets/atlases/). The BagiEngine in the engine/ folder is a git submodule with its own LICENSE
 (Beerware too); the libraries, fonts and other files of other authors that the
 engine or this repository carries keep their own licences: THIRD_PARTY_NOTICES.md

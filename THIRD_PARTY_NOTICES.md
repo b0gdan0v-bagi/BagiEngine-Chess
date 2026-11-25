@@ -25,6 +25,7 @@ game.
 
 | Path | What | Licence | Licence file | In a game |
 |------|------|---------|--------------|-----------|
+| `assets/chess_test.png` | the piece atlas of the Classic look, 700x381, six pieces in two colors (`config/TextureLibrary.xml`, the sprites `Classic*`) | Beerware, by the owner's decision of 2026-11-15 | `LICENSE` | ships (desktop and web) |
 | `assets/atlases/pieces.png` | the twelve beer pieces below packed into one atlas by the engine's atlas packer (1 px padding, 1024x1024; `config/TextureLibrary.xml` holds the rects), the same pixels as the sources | Beerware; the model's output under the CreativeML OpenRAIL++-M licence of SDXL base 1.0 (use restrictions of its attachment A; the output may be used commercially, `engine/tools/artgen/comfyui/manifest.json`) | `LICENSE` | ships (desktop and web) |
 | `assets/artgen/WhiteKing.png` | the white king of the beer set (a large beer mug with a crown of foam, light golden beer), 244x256, generated with SDXL base 1.0 and BiRefNet (`/artgen`, preset `chess_piece`, seed 1627044267), picked by eye | Beerware; the model's output under the CreativeML OpenRAIL++-M licence of SDXL base 1.0 (use restrictions of its attachment A; the output may be used commercially, `engine/tools/artgen/comfyui/manifest.json`) | `LICENSE` | desktop only (kept out of the web package; the atlas holds them) |
 | `assets/artgen/WhiteKing.artgen.json` | the provenance of `WhiteKing.png`: model files, prompt, seed, preset, the processing at Accept | Beerware | `LICENSE` | desktop only (kept out of the web package) |
@@ -83,7 +84,7 @@ owner's reading of the licence, not legal advice.
 
 ## The web package
 
-What `cmake/ChessWeb.cmake` lets into the browser package from the game is `config/` (four XML files), the pieces' atlas `assets/atlases/pieces.png` (the twelve `assets/artgen/*.png` sources it is packed from stay out), the seven `assets/sounds/*.wav`, `assets/openings/openings.tsv` and `assets/puzzles/puzzles.tsv`; the
+What `cmake/ChessWeb.cmake` lets into the browser package from the game is `config/` (four XML files), the two piece atlases, `assets/chess_test.png` (Classic) and `assets/atlases/pieces.png` (Beer; the twelve `assets/artgen/*.png` sources it is packed from stay out), the seven `assets/sounds/*.wav`, `assets/openings/openings.tsv` and `assets/puzzles/puzzles.tsv`; the
 `.md` files, `*.local.xml` (a Stockfish path), `imgui.ini`, `.py` files and the `*.artgen.json` provenance files (paths of the owner's machine, no use to a player) stay out (`tests/check_web_package.cmake` checks it in ctest and after every web link).
 Beside them the engine's `config/`, `assets/` (its fonts with their licence texts) and the `web/config` overlay are packaged, and the wasm module
 contains the engine's libraries: their notices are in `engine/THIRD_PARTY_NOTICES.md`. Stockfish, the own UCI program and the control
@@ -92,3 +93,4 @@ API are not in the web build.
 ## Open points for the owner
 
 - **The generated pieces** carry the licence terms that the model manifest states for SDXL base 1.0, BiRefNet and the VAE (`engine/tools/artgen/comfyui/manifest.json`, `engine/THIRD_PARTY_NOTICES.md`, "Generated content"); this file repeats them and is not a legal reading of an image's output. That is the owner's to confirm.
+- **The Classic atlas `assets/chess_test.png`** has no record of where the pictures came from: the file carries no author or licence metadata, and its history starts with the commit "Chess tests" of the engine repository (2026-03-23), moved into this repository on 2026-10-31 with the game. The owner decided on 2026-11-15 that it is the game's own art and covers it by `LICENSE`; if the pictures were drawn by someone else or taken from a source, this row and `LICENSE` must say so and carry that source's terms.

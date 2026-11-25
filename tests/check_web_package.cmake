@@ -38,13 +38,14 @@ function(check_library_sprites WHERE)
     endforeach()
 endfunction()
 
-# The files the game needs: without the first four it does not start, without the atlas it draws no piece, without the opening table it
+# The files the game needs: without the first four it does not start, without the two atlases it draws no piece, without the opening table it
 # plays and names no opening; a package that lacks one is broken, whatever else is in it
 set(CORE_FILES
     config/ApplicationConfig.xml
     config/SceneConfig.xml
     config/ChessSettings.xml
     config/TextureLibrary.xml
+    assets/chess_test.png
     assets/atlases/pieces.png
     assets/openings/openings.tsv)
 

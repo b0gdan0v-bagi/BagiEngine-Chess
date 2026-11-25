@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Chess/Components/PieceSprite.h>
 #include <Chess/Game/ChessTypes.h>
 #include <tests/ShippedScene.h>
 
@@ -8,6 +9,7 @@ namespace BECore::Chess::Tests {
 
     inline constexpr const char* kPiecesAtlasPath = "assets/atlases/pieces.png";
     inline constexpr const char* kPiecesGroup = "pieces";
+    inline constexpr const char* kClassicAtlasPath = "assets/chess_test.png";
     // Four of the twelve pieces to a row make 1024 x 1024; the packer's default cap of 4096 would pick a 256 x 4096 strip of the same area (the smaller width wins a tie)
     inline constexpr uint32_t kMaxAtlasSide = 1024;
 
@@ -25,6 +27,15 @@ namespace BECore::Chess::Tests {
             }
         }
         return pieces;
+    }
+
+    /// The twelve sprite names of a preset's set, in the order of AllPieces()
+    inline Vector<PoolString> SpriteNamesOf(GraphicsPreset preset) {
+        Vector<PoolString> names;
+        for (const Piece piece : AllPieces()) {
+            names.push_back(PieceSpriteId(piece, preset));
+        }
+        return names;
     }
 
     /// True when the two rectangles (anything with x, y, w, h) share pixels

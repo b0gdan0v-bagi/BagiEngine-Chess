@@ -1,10 +1,13 @@
 <?xml version="1.0"?>
 <!--
-  The 12 piece sprites are the atlas group "pieces", packed into assets/atlases/pieces.png. Each entry's <atlas><source> is the PNG it came from, written by
-  Accept of the Generate panel from artgen/presets/chess_piece.json (assets/artgen/<Name>.png, with its <Name>.artgen.json beside it); the background is
-  transparent (alpha 0), so the square under a piece shows through. The sources stay out of the web package.
-  The entries are written by the packer, never by hand: Accept of a member in the Generate panel and the Texture editor's Pack repack the group, and so does
-  the disabled test ChessPieceAtlasTest.DISABLED_RewriteTheShippedAtlas (config/CLAUDE.md). Only this comment is edited by hand.
+  Two sets of piece sprites, one per graphics preset (src/Chess/Graphics/CLAUDE.md).
+  Beer: the 12 sprites WhiteKing ... BlackPawn are the atlas group "pieces", packed into assets/atlases/pieces.png. Each entry's <atlas><source> is the PNG it came
+  from, written by Accept of the Generate panel from artgen/presets/chess_piece.json (assets/artgen/<Name>.png, with its <Name>.artgen.json beside it); the
+  background is transparent (alpha 0), so the square under a piece shows through. The sources stay out of the web package.
+  The Beer entries are written by the packer, never by hand: Accept of a member in the Generate panel and the Texture editor's Pack repack the group, and so does
+  the disabled test ChessPieceAtlasTest.DISABLED_RewriteTheShippedAtlas (config/CLAUDE.md).
+  Classic: the 12 sprites ClassicWhiteKing ... ClassicBlackPawn are plain sprites of assets/chess_test.png (700x381, a 6x2 uniform grid: columns King, Queen, Rook,
+  Bishop, Knight, Pawn; top row White, bottom row Black; cell about 116.67 x 190.5), written by hand; the packer leaves them as they are.
 -->
 <root>
   <sprites>
@@ -116,6 +119,43 @@
         </source>
         <pack padding="1" sizeMode="PowerOfTwo" maxSide="1024" />
       </atlas>
+    </sprite>
+    <sprite name="ClassicWhiteKing" texturePath="assets/chess_test.png">
+      <srcRect x="0" y="0" w="116.67" h="190.5" />
+    </sprite>
+    <sprite name="ClassicWhiteQueen" texturePath="assets/chess_test.png">
+      <srcRect x="116.67" y="0" w="116.67" h="190.5" />
+    </sprite>
+    <sprite name="ClassicWhiteRook" texturePath="assets/chess_test.png">
+      <srcRect x="233.33" y="0" w="116.67" h="190.5" />
+    </sprite>
+    <sprite name="ClassicWhiteBishop" texturePath="assets/chess_test.png">
+      <srcRect x="350" y="0" w="116.67" h="190.5" />
+    </sprite>
+    <sprite name="ClassicWhiteKnight" texturePath="assets/chess_test.png">
+      <srcRect x="466.67" y="0" w="116.67" h="190.5" />
+    </sprite>
+    <sprite name="ClassicWhitePawn" texturePath="assets/chess_test.png">
+      <srcRect x="583.33" y="0" w="116.67" h="190.5" />
+    </sprite>
+
+    <sprite name="ClassicBlackKing" texturePath="assets/chess_test.png">
+      <srcRect x="0" y="190.5" w="116.67" h="190.5" />
+    </sprite>
+    <sprite name="ClassicBlackQueen" texturePath="assets/chess_test.png">
+      <srcRect x="116.67" y="190.5" w="116.67" h="190.5" />
+    </sprite>
+    <sprite name="ClassicBlackRook" texturePath="assets/chess_test.png">
+      <srcRect x="233.33" y="190.5" w="116.67" h="190.5" />
+    </sprite>
+    <sprite name="ClassicBlackBishop" texturePath="assets/chess_test.png">
+      <srcRect x="350" y="190.5" w="116.67" h="190.5" />
+    </sprite>
+    <sprite name="ClassicBlackKnight" texturePath="assets/chess_test.png">
+      <srcRect x="466.67" y="190.5" w="116.67" h="190.5" />
+    </sprite>
+    <sprite name="ClassicBlackPawn" texturePath="assets/chess_test.png">
+      <srcRect x="583.33" y="190.5" w="116.67" h="190.5" />
     </sprite>
   </sprites>
 </root>
