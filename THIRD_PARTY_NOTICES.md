@@ -26,6 +26,8 @@ game.
 | Path | What | Licence | Licence file | In a game |
 |------|------|---------|--------------|-----------|
 | `assets/chess_test.png` | the piece atlas of the Classic look, 700x381, six pieces in two colors (`config/TextureLibrary.xml`, the sprites `Classic*`) | Beerware, by the owner's decision of 2026-11-15 | `LICENSE` | ships (desktop and web) |
+| `web/icons/icon-192.png` | the 192x192 icon of the web app: the Classic white king of `assets/chess_test.png` on the Classic dark board color, made by `tools/make_web_icons.py` | Beerware | `LICENSE` | web page only (linked by `web/app.json`, not in the .data package) |
+| `web/icons/icon-512.png` | the 512x512 icon of the web app: the Classic white king of `assets/chess_test.png` on the Classic dark board color, made by `tools/make_web_icons.py` | Beerware | `LICENSE` | web page only (linked by `web/app.json`, not in the .data package) |
 | `assets/atlases/pieces.png` | the twelve beer pieces below packed into one atlas by the engine's atlas packer (1 px padding, 1024x1024; `config/TextureLibrary.xml` holds the rects), the same pixels as the sources | Beerware; the model's output under the CreativeML OpenRAIL++-M licence of SDXL base 1.0 (use restrictions of its attachment A; the output may be used commercially, `engine/tools/artgen/comfyui/manifest.json`) | `LICENSE` | ships (desktop and web) |
 | `assets/artgen/WhiteKing.png` | the white king of the beer set (a large beer mug with a crown of foam, light golden beer), 244x256, generated with SDXL base 1.0 and BiRefNet (`/artgen`, preset `chess_piece`, seed 1627044267), picked by eye | Beerware; the model's output under the CreativeML OpenRAIL++-M licence of SDXL base 1.0 (use restrictions of its attachment A; the output may be used commercially, `engine/tools/artgen/comfyui/manifest.json`) | `LICENSE` | desktop only (kept out of the web package; the atlas holds them) |
 | `assets/artgen/WhiteKing.artgen.json` | the provenance of `WhiteKing.png`: model files, prompt, seed, preset, the processing at Accept | Beerware | `LICENSE` | desktop only (kept out of the web package) |
@@ -89,6 +91,7 @@ What `cmake/ChessWeb.cmake` lets into the browser package from the game is `conf
 Beside them the engine's `config/`, `assets/` (its fonts with their licence texts) and the `web/config` overlay are packaged, and the wasm module
 contains the engine's libraries: their notices are in `engine/THIRD_PARTY_NOTICES.md`. Stockfish, the own UCI program and the control
 API are not in the web build.
+The `web/` folder (`app.json`, the two icons, the Railway partial) is not in the `.data` package: `package.py` reads the web app file and copies its icons next to the page.
 
 ## Open points for the owner
 
