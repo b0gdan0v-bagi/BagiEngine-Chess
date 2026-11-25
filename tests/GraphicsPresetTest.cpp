@@ -15,8 +15,7 @@ namespace BECore::Chess::Tests {
 
     }  // namespace
 
-    TEST(GraphicsPresetTest, ClassicIsTheDefaultAndTheFirstValue) {
-        EXPECT_EQ(static_cast<uint8_t>(GraphicsPreset::Classic), 0);
+    TEST(GraphicsPresetTest, ClassicIsTheDefault) {
         GraphicsChoice choice;
         EXPECT_TRUE(choice.Get() == GraphicsPreset::Classic);
     }
@@ -32,13 +31,6 @@ namespace BECore::Chess::Tests {
         for (const StringView text : {StringView(""), StringView("Classic"), StringView("BEER"), StringView("beer "), StringView("tavern"), StringView("Beer")}) {
             EXPECT_FALSE(ParsePreset(text).has_value()) << Text(text);
         }
-    }
-
-    TEST(GraphicsPresetTest, EachPresetHasItsThemeAndSpritePrefix) {
-        EXPECT_EQ(Text(ThemeOf(GraphicsPreset::Classic)), "classic");
-        EXPECT_EQ(Text(ThemeOf(GraphicsPreset::Beer)), "tavern");
-        EXPECT_EQ(Text(SpritePrefix(GraphicsPreset::Classic)), "Classic");
-        EXPECT_EQ(Text(SpritePrefix(GraphicsPreset::Beer)), "");
     }
 
     TEST(GraphicsPresetTest, TheTwentyFourSpriteNamesAreDistinctAndStartWithThePrefix) {

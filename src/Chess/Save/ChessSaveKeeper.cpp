@@ -107,14 +107,22 @@ namespace BECore::Chess {
         }
     }
 
+    std::expected<void, SaveError> ChessSaveKeeper::SaveAudio() {
+        return SaveAudioPreferences(*_service, CoreManager::GetAudio());
+    }
+
+    std::expected<void, SaveError> ChessSaveKeeper::SaveLook() {
+        return _service->Save(kChessGraphicsSlot, kChessGraphicsSchema, Capture(*_graphics));
+    }
+
     void ChessSaveKeeper::UpdateSlots() {
-        UpdateSlot(_audio, CoreManager::GetAudio().GetLevelsRevision(), kAudioPreferencesSlot, [this] { return SaveAudioPreferences(*_service, CoreManager::GetAudio()); });
-        UpdateSlot(_look, _graphics->GetRevision(), kChessGraphicsSlot, [this] { return _service->Save(kChessGraphicsSlot, kChessGraphicsSchema, Capture(*_graphics)); });
+        UpdateSlot(_audio, CoreManager::GetAudio().GetLevelsRevision(), kAudioPreferencesSlot, [this] { return SaveAudio(); });
+        UpdateSlot(_look, _graphics->GetRevision(), kChessGraphicsSlot, [this] { return SaveLook(); });
     }
 
     void ChessSaveKeeper::FlushSlots() {
-        FlushSlot(_audio, CoreManager::GetAudio().GetLevelsRevision(), kAudioPreferencesSlot, [this] { return SaveAudioPreferences(*_service, CoreManager::GetAudio()); });
-        FlushSlot(_look, _graphics->GetRevision(), kChessGraphicsSlot, [this] { return _service->Save(kChessGraphicsSlot, kChessGraphicsSchema, Capture(*_graphics)); });
+        FlushSlot(_audio, CoreManager::GetAudio().GetLevelsRevision(), kAudioPreferencesSlot, [this] { return SaveAudio(); });
+        FlushSlot(_look, _graphics->GetRevision(), kChessGraphicsSlot, [this] { return SaveLook(); });
     }
 
     void ChessSaveKeeper::UpdateSlot(SlotWrite& slot, uint64_t revision, StringView name, SlotSaver save) {

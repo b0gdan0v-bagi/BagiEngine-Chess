@@ -85,6 +85,8 @@ namespace BECore::Chess {
         void UpdateSlot(SlotWrite& slot, uint64_t revision, StringView name, SlotSaver save);
         void FlushSlot(SlotWrite& slot, uint64_t revision, StringView name, SlotSaver save);
         void WriteSlot(SlotWrite& slot, uint64_t revision, StringView name, SlotSaver save);
+        std::expected<void, SaveError> SaveAudio();
+        std::expected<void, SaveError> SaveLook();
         void UpdateSlots();
         void FlushSlots();
 

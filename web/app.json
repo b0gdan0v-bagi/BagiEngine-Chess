@@ -1,0 +1,11 @@
+{
+  "name": "Chess",
+  "short_name": "Chess",
+  "orientation": "any",
+  "theme_color": "#b58863",
+  "background_color": "#f0d9b5",
+  "icons": [
+    {"src": "icons/icon-192.png", "sizes": "192x192", "purpose": "any maskable"},
+    {"src": "icons/icon-512.png", "sizes": "512x512", "purpose": "any maskable"}
+  ]
+}

@@ -175,6 +175,10 @@ if(ENGINE_BUILD_TESTS)
         add_test(NAME BagiChessWebSmokeUnit COMMAND ${Python3_EXECUTABLE} -m unittest discover -s ${CMAKE_CURRENT_SOURCE_DIR}/tests -p "test_web_chess_smoke.py" WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
         set_tests_properties(BagiChessWebSmokeUnit PROPERTIES TIMEOUT 60)
 
+        # What the game hands to the engine's web deploy: web/app.json and its icons through the engine's package.py, the Railway partial, no address or secret in web/ (standard library unittest; skipped without the engine's tools/web)
+        add_test(NAME BagiChessWebDeployFiles COMMAND ${Python3_EXECUTABLE} -m unittest discover -s ${CMAKE_CURRENT_SOURCE_DIR}/tests -p "test_web_deploy.py" WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+        set_tests_properties(BagiChessWebDeployFiles PROPERTIES TIMEOUT 60)
+
         # LICENSE and THIRD_PARTY_NOTICES.md hold to the tree (tests/check_notices.py): a row for every asset, the Stockfish section, no Stockfish file in the repository
         add_test(NAME BagiChessThirdPartyNotices COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_notices.py)
         set_tests_properties(BagiChessThirdPartyNotices PROPERTIES TIMEOUT 60)
