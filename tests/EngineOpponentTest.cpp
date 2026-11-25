@@ -68,7 +68,7 @@ namespace BECore::Chess::Tests {
         }
 
         /// The fake UCI engine with @p flags, as the engine of an opponent
-        IntrusivePtrAtomic<UciEngine> MakeFakeEngine(std::initializer_list<StringView> flags) {
+        IntrusivePtr<UciEngine> MakeFakeEngine(std::initializer_list<StringView> flags) {
             UciEngineSettings settings;
             settings.launch = FakeEngineLaunch(flags);
             return New<UciEngine>(std::move(settings));
@@ -128,7 +128,7 @@ namespace BECore::Chess::Tests {
             std::atomic<bool> _open;
         };
 
-        IntrusivePtrAtomic<ScriptedEngine> MakeScripted(std::initializer_list<StringView> moves, bool gated = false) {
+        IntrusivePtr<ScriptedEngine> MakeScripted(std::initializer_list<StringView> moves, bool gated = false) {
             return New<ScriptedEngine>(moves, gated);
         }
 

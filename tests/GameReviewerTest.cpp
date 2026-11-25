@@ -190,7 +190,7 @@ namespace BECore::Chess::Tests {
         };
 
         /// An engine that scripts the fool's mate: f3 is a small slip (the best was e4), e5 is the best move, g4 allows the mate in one, Qh4 is the mate
-        IntrusivePtrAtomic<ScriptedEngine> MakeFoolsMateEngine() {
+        IntrusivePtr<ScriptedEngine> MakeFoolsMateEngine() {
             auto engine = New<ScriptedEngine>();
             engine->Script(0, Mv("e2e4"), Cp(20));
             engine->Script(1, Mv("e7e5"), Cp(10));

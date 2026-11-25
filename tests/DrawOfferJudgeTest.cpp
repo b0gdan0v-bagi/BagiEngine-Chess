@@ -49,7 +49,7 @@ namespace BECore::Chess::Tests {
             return false;
         }
 
-        IntrusivePtrAtomic<AnalysingEngine> MakeEngine(AnalysisScore score) {
+        IntrusivePtr<AnalysingEngine> MakeEngine(AnalysisScore score) {
             return New<AnalysingEngine>(score);
         }
 
