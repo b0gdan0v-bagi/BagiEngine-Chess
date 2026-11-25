@@ -1,6 +1,7 @@
 #pragma once
 
 #include <BECore/Audio/AudioManager.h>
+#include <BECore/Config/StringXmlWriter.h>
 #include <BECore/GameManager/CoreManager.h>
 #include <BECore/Reflection/XmlDeserializer.h>
 #include <BECore/Renderer/RendererManager.h>
@@ -260,14 +261,14 @@ namespace BECore::Chess::Tests {
             if (!elements) {
                 return {};
             }
-            std::ostringstream out;
-            out << "<ui>";
-            elements.print(out, "", pugi::format_raw);
+            StringXmlWriter writer;
+            writer.text = "<ui>";
+            elements.print(writer, "", pugi::format_raw);
             if (const pugi::xml_node variants = node.select_node(".//component[@type='UICanvasComponent']/variants").node()) {
-                variants.print(out, "", pugi::format_raw);
+                variants.print(writer, "", pugi::format_raw);
             }
-            out << "</ui>";
-            return FromStdString(out.str());
+            writer.text += "</ui>";
+            return std::move(writer.text);
         }
 
         /// A canvas of the SceneView space laid out on its own, for the copies of the panel that a test breaks on purpose: the elements come from the text of the shipped file
@@ -2139,7 +2140,7 @@ namespace BECore::Chess::Tests {
         }
 
         IntrusivePtr<RecordingRenderer> _renderer;
-        IntrusivePtrAtomic<SceneManager> _manager;
+        IntrusivePtr<SceneManager> _manager;
         Path _stockfishDirectory;
         Optional<ScopedEnvironment> _stockfishEnvironment;
     };

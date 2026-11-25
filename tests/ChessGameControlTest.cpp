@@ -395,10 +395,9 @@ namespace BECore::Chess::Tests {
         }
 
         int CountOf(const Json& side, const char* piece) {
-            const Json* found = FindJsonMember(side, piece);
-            EXPECT_NE(found, nullptr) << piece;
-            EXPECT_TRUE(found && found->is_number_integer()) << piece;
-            return found && found->is_number_integer() ? found->get<int>() : -1;
+            const Optional<int64_t> count = GetJsonInt(side, piece);
+            EXPECT_TRUE(count.has_value()) << piece << ": missing or not an integer";
+            return count ? static_cast<int>(*count) : -1;
         }
 
         void ExpectCaptured(const Json& material, const char* key, int queen, int rook, int bishop, int knight, int pawn) {
@@ -1504,7 +1503,7 @@ namespace BECore::Chess::Tests {
 
         constexpr AnalysisScore kPawnUp{AnalysisScoreKind::Centipawns, 35};
 
-        IntrusivePtrAtomic<AnalysingEngine> Analyser(AnalysisScore score = kPawnUp, Optional<Move> move = std::nullopt) {
+        IntrusivePtr<AnalysingEngine> Analyser(AnalysisScore score = kPawnUp, Optional<Move> move = std::nullopt) {
             return New<AnalysingEngine>(score, move);
         }
 
