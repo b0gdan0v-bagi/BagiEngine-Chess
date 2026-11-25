@@ -47,7 +47,7 @@ Order inside the board's `OnDraw()`: squares, the last move (castling marks the 
 ## The pieces
 
 - A piece node is a reference of the prefab `config/nodes/ChessPiece.xml` (`config/CLAUDE.md`): the piece component, a sprite and a transform.
-- **The look:** the scene files name the Classic sprites (the default preset), so a start loads one atlas. `ChessPieceComponent`, `ChessMaterialComponent` (the icons) and `ChessEditorBarComponent` follow `ChessGame::GetActiveGraphics()`: each remembers what it showed (the piece its type and preset, the other two the choice's revision) and sets a sprite only when that differs, so a steady frame builds no name. A piece that is sliding or off the board takes the new sprite when it is shown next.
+- **The look:** the scene files name the Classic sprites, so a start loads one atlas; the piece, the material icons and the editor bar follow `ChessGame::GetActiveGraphics()` and set a sprite only when it differs from what they show (a steady frame builds no name).
 - A piece stands on `GetShownSquareOf()`: the viewed position's square while viewing; a view that begins or ends places them at once.
 - **A played move slides**. Only a change of exactly one move and one version with time in the frame slides; everything else snaps (first sighting, reset, `set_state`, several moves, a frame with `deltaTime` 0). A captured piece leaves when the slide ends.
 
@@ -96,7 +96,7 @@ Node `RatingMark` (`ChessRatingMark.xml`, layer 1, before `Result`, so the dim o
 
 ## The menu
 
-Node `MenuPanel` (`ChessMenuPanel.xml`, layer 20, modal, `visible="false"`): `MenuDim`, `MenuPlate`, `MenuTitle`, one 56-unit button `MenuSection<Name>` per section (`ChessOpenSection`, the section id as `value`) and `MenuClose`; names start with `Menu`. `ChessOpenMenu` shows the list and hides every section, `ChessOpenSection` swaps the list for the section's canvas, `ChessCloseMenu` hides all. **Escape** (the raw `KeyDownEvent`, `EscapeKey.h`) emits `ChessCloseMenu` while the list or a section is shown and `ChessCancelPromotion` while a promotion is pending, the button's own action. `MenuDim`, the dim of every section and `PromotionDim` are buttons that close the list (`ChessCancelPromotion` for the picker), the first child of their canvas, so a click on a plate never reaches them. The menu is no state; its sections are the table `Game/MenuSections.*`: `Opponent`, `Moves` ("The move panel"), `Game` ("The Game section"; label "Resign / Draw"), `Sound` (`Sound/CLAUDE.md`), `Position` ("The position editor"), `Puzzles` ("The Puzzles section") and `Review` ("The Review section"). **A new section:** a table row, a button, a panel whose bottom button is `Back`, 68 units more in `MenuPlate`.
+Node `MenuPanel` (`ChessMenuPanel.xml`, layer 20, modal, `visible="false"`): `MenuDim`, `MenuPlate`, `MenuTitle`, one 56-unit button `MenuSection<Name>` per section (`ChessOpenSection`, the section id as `value`) and `MenuClose`; names start with `Menu`. `ChessOpenMenu` shows the list and hides every section, `ChessOpenSection` swaps the list for the section's canvas, `ChessCloseMenu` hides all. **Escape** (the raw `KeyDownEvent`, `EscapeKey.h`) emits `ChessCloseMenu` while the list or a section is shown and `ChessCancelPromotion` while a promotion is pending, the button's own action. `MenuDim`, the dim of every section and `PromotionDim` are buttons that close the list (`ChessCancelPromotion` for the picker), the first child of their canvas, so a click on a plate never reaches them. Its sections are the table `Game/MenuSections.*`: `Opponent`, `Moves` ("The move panel"), `Game` ("The Game section"; label "Resign / Draw"), `Sound` (`Sound/CLAUDE.md`), `Graphics`, `Position` ("The position editor"), `Puzzles` ("The Puzzles section") and `Review` ("The Review section"). **A new section:** a table row, a button, a panel whose bottom button is `Back`, 68 units more in `MenuPlate`.
 
 ## The Game section
 
@@ -108,7 +108,7 @@ Node `PuzzleSection` (`ChessPuzzleSection.xml`, layer 20, modal, hidden), built 
 
 ## The Review section
 
-Node `ReviewSection` (`ChessReviewSection.xml`, layer 20, modal, hidden), built like `PuzzleSection`. `ChessReviewSectionComponent` answers `ChessReviewStart` and `ChessReviewCancel` **wherever they come from**, each asking its rule again: Start needs a finished game with moves, no puzzle and no review running or done (else its button is grey); Cancel any held review, a done one too (its marks go). `{reviewStatus}` and the greys are written only when the game, its model's version, the analyst's revision or the puzzle changed, never per frame (every review read compares the whole move list). Start leaves the menu open: the person watches the progress.
+Node `ReviewSection` (`ChessReviewSection.xml`, layer 20, modal, hidden), built like `PuzzleSection`. `ChessReviewSectionComponent` answers `ChessReviewStart` and `ChessReviewCancel` **wherever they come from**, each asking its rule again: Start needs a finished game with moves, no puzzle and no review running or done (else its button is grey); Cancel any held review, a done one too (its marks go). `{reviewStatus}` and the greys are written only when the game, its model's version, the analyst's revision or the puzzle changed, never per frame. Start leaves the menu open: the person watches the progress.
 
 ## The review bar
 
@@ -122,9 +122,8 @@ Node `PuzzleBar` (`ChessPuzzleBar.xml`, layer 20, non-modal): Retry, Next and Le
 
 Node `OpponentPanel` (`ChessOpponentPanel.xml`, layer 20, modal, `visible="false"`), after the engine's choice-panel template (`engine/src/Modules/BECore/UI/CLAUDE.md`, "Choice panels"): four `UISegmented` rows with the control API ids as segment values (`ModeGroup` / `ChessSetMode`, `ColorGroup` / `ChessSetColor`, `EngineGroup`, `LevelGroup`: "Node anatomy" of `config/CLAUDE.md`).
 
-- The group owns no choice: a press emits the action, `ChessOpponentPanelComponent` picks through `ChessGame::GetActiveChoice()` and `ChessHudComponent` publishes the variable, so the panel shows what the game has. An id in no table logs one warning.
+- The group owns no choice: a press emits the action, `ChessOpponentPanelComponent` picks through `ChessGame::GetActiveChoice()` and `ChessHudComponent` publishes the variable, so the panel shows what the game has.
 - A pick applies at once and the panel stays open. No group is greyed (it read as a dead button): a pick made while two people play is kept and applies when Computer is picked.
-- No name may be in two canvases, hence `ModeGroup`, not `Mode`.
 
 ## The position editor
 
@@ -133,9 +132,9 @@ While `ChessGame::IsEditing()` (the model shows a draft, `Game/CLAUDE.md`) the s
 - **Board:** a left press puts the picked piece (the same piece again or the eraser takes it off), a right press takes the piece off, each then `EditChanged()`. No select, drag, premove or promotion; squares and coordinates only, no mark. `OnUpdate` skips the opponent's and the draw judge's `Update()` (a move of the program would end the draft), the analyst runs.
 - **Pieces** snap, as under a view (`ShowsOtherPosition`). No result dim; the material's sets and the move panel's box are hidden; `ChessShowMove` and Hint do nothing (they would end the draft).
 - **The section `Position`** (node `PositionSection`, layer 20, modal, built like `GameSection`): the three starts (each closes the menu), the side and four castling switches (greyed while the king or rook is off its square), Copy / Paste FEN, Play from here (a refusal keeps the menu open, its reason in `{editorMessage}`), Cancel. Play, Cancel and the switches are grey with no editor.
-- **Copy / Paste:** Copy writes the draft's FEN (else the game's) to `CoreManager::GetClipboard()`. Paste and Ctrl+V (`PasteEvent`, taken only while editing or with the section shown) call `ChessGame::PasteFen`: it begins the editor when none is open and loads the text, a bad one changes nothing. What the clipboard or the rules say is the message (`EditorText`, also with no editor: it is dropped when the menu closes or returns to the list). The read's callback holds no pointer: the game is found at the answer.
+- **Copy / Paste:** Copy writes the draft's FEN (else the game's) to `CoreManager::GetClipboard()`. Paste and Ctrl+V (`PasteEvent`, taken only while editing or with the section shown) call `ChessGame::PasteFen`: it begins the editor when none is open and loads the text, a bad one changes nothing. What the clipboard or the rules say is the message (`EditorText`, also with no editor: it is dropped when the menu closes or returns to the list).
 - **The bar** (node `EditorBar`, layer 20, non-modal; shown exactly while editing, checked on every update and draw): Play emits the section's `ChessEditPlay`, More opens the section. Places and limit: `config/CLAUDE.md`, "The bars".
 
 ## Draw order
 
-By layer, not by place among the references of `SceneConfig.xml` (`engine/src/Modules/BECore/Scene/CLAUDE.md`, "Draw order"); the same layer draws in scene order. `Board` and then `BoardCoordinates` -1, pieces 0, `RatingMark` and `Result` 1 (the mark first), `MovePanel` 4, `Material` 5, a dragged piece 6, `Hud` 10, the panels, the menu and the two bars 20 (a bar is listed before the menu, so a panel draws over it).
+By layer, not by place among the references of `SceneConfig.xml` (`engine/src/Modules/BECore/Scene/CLAUDE.md`, "Draw order"); the same layer draws in scene order. `Board` and then `BoardCoordinates` -1, pieces 0, `RatingMark` and `Result` 1, `MovePanel` 4, `Material` 5, a dragged piece 6, `Hud` 10, the panels, the menu and the two bars 20 (a bar is listed before the menu, so a panel draws over it).

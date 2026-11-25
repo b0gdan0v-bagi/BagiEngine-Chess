@@ -1,3 +1,4 @@
+#include <BECore/Animation/TweenManager.h>
 #include <BECore/UI/UIImageComponent.h>
 #include <Chess/Components/PieceSprite.h>
 #include <tests/ChessUiHarness.h>
@@ -9,6 +10,8 @@ namespace BECore::Chess::Tests {
     namespace {
 
         constexpr const char* kEditorBarNode = "EditorBar";
+        constexpr double kStepSeconds = 0.25;         ///< longer than the slide of a move
+        constexpr int kFramesToShowThePromotion = 3;  ///< one frame starts the slide, one ends it, one shows the new type
 
         PoolString SpriteName(Piece piece, GraphicsPreset preset) {
             return PieceSpriteId(piece, preset);
@@ -18,10 +21,11 @@ namespace BECore::Chess::Tests {
 
     class ChessUiGraphicsTest : public ChessUiTest {
     protected:
-        GraphicsChoice& Graphics() const {
-            GraphicsChoice* graphics = ChessGame::GetActiveGraphics();
-            EXPECT_NE(graphics, nullptr);
-            return *graphics;
+        /// A frame with time in it: the slide of a played move runs on the tween manager, which the scene's update does not advance
+        void StepGameTime() {
+            CoreManager::GetTime().Advance(kStepSeconds);
+            CoreManager::GetTweens().Advance(CoreManager::GetTime().GetDeltaTime());
+            Frame();
         }
 
         /// A frame as the loop makes it: the update, then the draw (the material and the editor bar publish in either)
@@ -81,6 +85,8 @@ namespace BECore::Chess::Tests {
     }
 
     TEST_F(ChessUiGraphicsTest, APromotionUnderBeerShowsTheBeerQueenAndSwitchingBackTheClassicOne) {
+        CoreManager::GetTime().Reset();  // the clock is the process's: a case before this one may have left a frame time in it
+        CoreManager::GetTweens().Clear();
         StartFrom(kPromotionFen);
         const auto* node = PieceNodeAt("a7");
         ASSERT_NE(node, nullptr);
@@ -93,7 +99,10 @@ namespace BECore::Chess::Tests {
 
         ClickMove("a7", "a8");
         ASSERT_TRUE(ClickPromotion("PromoteQueen").Both());
-        Frame();
+        for (int frame = 0; frame < kFramesToShowThePromotion; ++frame) {
+            StepGameTime();
+        }
+        Draw();
         EXPECT_EQ(sprite->_spriteId, "WhiteQueen"_intern) << "a promotion shows the type in the picked preset, not the scene's";
 
         Graphics().Set(GraphicsPreset::Classic);

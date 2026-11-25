@@ -121,7 +121,7 @@ namespace BECore::Chess::Tests {
         for (const PoolString& name : names) {
             EXPECT_TRUE(name.ToStringView().starts_with(kSectionNode)) << name.CStr() << ": elements are found by name in every canvas";
         }
-        for (const char* other : {"Hud", "BoardCoordinates", "Material", "MovePanel", "MenuPanel", "OpponentPanel", "MovesSection", "GameSection", "SoundPanel", "PromotionPanel"}) {
+        for (const char* other : {"Hud", "BoardCoordinates", "Material", "MovePanel", "MenuPanel", "OpponentPanel", "MovesSection", "GameSection", "SoundPanel", "GraphicsPanel", "PromotionPanel"}) {
             const auto otherCanvas = CanvasOf(other);
             ASSERT_TRUE(otherCanvas) << other;
             for (const PoolString& name : names) {

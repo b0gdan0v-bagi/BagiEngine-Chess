@@ -541,6 +541,7 @@ namespace BECore::Chess::Tests {
                                                        {"MovesSection", "TheMovesSectionPassesTheSizeMatrixWithTheLongestMoves"},
                                                        {"GameSection", "TheGameSectionPassesTheSizeMatrixWithEveryWord"},
                                                        {"SoundPanel", "TheSoundPanelPassesTheSizeMatrix"},
+                                                       {"GraphicsPanel", "TheGraphicsPanelPassesTheSizeMatrix"},
                                                        {"PositionSection", "ThePositionSectionPassesTheSizeMatrixWithEveryWord"},
                                                        {"PuzzleSection", "ThePuzzleSectionPassesTheSizeMatrixWithEveryWord"},
                                                        {"ReviewSection", "TheReviewSectionPassesTheSizeMatrixWithEveryWord"},

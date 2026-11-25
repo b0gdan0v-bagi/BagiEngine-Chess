@@ -39,6 +39,7 @@
         <node ref="nodes/ChessMovesSection" />
         <node ref="nodes/ChessGameSection" />
         <node ref="nodes/ChessSoundPanel" />
+        <node ref="nodes/ChessGraphicsPanel" />
         <node ref="nodes/ChessPositionSection" />
         <node ref="nodes/ChessPuzzleSection" />
         <node ref="nodes/ChessReviewSection" />
