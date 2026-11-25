@@ -96,7 +96,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(UciCommandTest, PositionFenWithMovesAndNothingAfterItHasNoMoves) {
-        const UciCommand command = Parse("position fen 6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1 moves 	 ");
+        const UciCommand command = Parse("position fen 6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1 moves \t ");
 
         ASSERT_EQ(command.kind, UciCommandKind::Position);
         EXPECT_EQ(command.position.startFen, kMateInOneFen);
@@ -193,7 +193,7 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(UciCommandTest, TabsAndRunsOfSpacesInASetOptionAreOneSpaceInTheResult) {
-        const UciCommand command = Parse("setoption	 name  Blunder	 Percent   value	 very 	 hard");
+        const UciCommand command = Parse("setoption\t name  Blunder\t Percent   value\t very \t hard");
 
         EXPECT_EQ(command.setOption.name, "Blunder Percent");
         EXPECT_EQ(command.setOption.value, "very hard");
