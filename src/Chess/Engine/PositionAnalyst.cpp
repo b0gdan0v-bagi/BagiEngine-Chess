@@ -68,7 +68,7 @@ namespace BECore::Chess {
 
     void PositionAnalyst::SetPicked(OpponentEngine picked) {
         if (_search && _searchEngine != picked && !_search->token.IsCancelled()) {
-            LOG_INFO("Position analyst ({}): the engine pick changed while the engine was analysing, the search is cancelled"_format(OpponentEngineId(_searchEngine)));
+            LOG_INFO("Position analyst ({}): the engine pick changed while the engine was analysing, the search is cancelled", OpponentEngineId(_searchEngine));
             _search->token.Cancel();
         }
         if (_engine && _engineKind != picked) {
@@ -193,7 +193,7 @@ namespace BECore::Chess {
         return lines;
     }
 
-    Task<void> PositionAnalyst::RunSearch(IntrusivePtrAtomic<Search> search, SearchRequest request) {
+    Task<void> PositionAnalyst::RunSearch(IntrusivePtr<Search> search, SearchRequest request) {
         std::expected<Analysis, EngineError> answer = AnswerOfTask(co_await search->engine->AnalyseAsync(request, search->token));
         {
             const LockGuard lock(search->mutex);
@@ -219,7 +219,7 @@ namespace BECore::Chess {
         _search.Reset();
 
         if (!wanted) {
-            LOG_INFO("Position analyst ({}): the answer of a cancelled or out-of-date search is dropped"_format(OpponentEngineId(engine)));
+            LOG_INFO("Position analyst ({}): the answer of a cancelled or out-of-date search is dropped", OpponentEngineId(engine));
             return;
         }
         if (!answer) {
@@ -242,7 +242,7 @@ namespace BECore::Chess {
             return;
         }
         if (_searchVersion != model.GetVersion() || _searchEngine != picked) {
-            LOG_INFO("Position analyst ({}): the game or the engine moved on while the engine was analysing, the search is cancelled"_format(OpponentEngineId(_searchEngine)));
+            LOG_INFO("Position analyst ({}): the game or the engine moved on while the engine was analysing, the search is cancelled", OpponentEngineId(_searchEngine));
             _search->token.Cancel();
         } else if (!IsWantedAt(_searchVersion)) {
             _search->token.Cancel();  // nobody wants the answer any more (the evaluation went off, the hint was dropped): not worth a log line
@@ -285,7 +285,7 @@ namespace BECore::Chess {
     }
 
     void PositionAnalyst::Fail(uint64_t version, OpponentEngine engine, EngineError error) {
-        LOG_ERROR("Position analyst ({}): no analysis, {}: {}"_format(OpponentEngineId(engine), EnumUtils<EngineErrorKind>::ToString(error.kind), error.detail));
+        LOG_ERROR("Position analyst ({}): no analysis, {}: {}", OpponentEngineId(engine), EnumUtils<EngineErrorKind>::ToString(error.kind), error.detail);
         _error = std::move(error);
         _errorVersion = version;
         _errorEngine = engine;

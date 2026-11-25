@@ -1192,7 +1192,7 @@ namespace BECore::Chess::Tests {
 
         /// The person (White) has played e2e4 against a program that plays Black through the double and the program's search is held at the gate
         struct PremoveGame {
-            explicit PremoveGame(IntrusivePtrAtomic<GatedEngine> gate) : engine(std::move(gate)), factory({engine}), controller(model) {
+            explicit PremoveGame(IntrusivePtr<GatedEngine> gate) : engine(std::move(gate)), factory({engine}), controller(model) {
                 controller.SetEngineFactory(factory.AsFactory());
                 EXPECT_TRUE(controller.SetSide(PieceColor::Black).has_value());
                 EXPECT_TRUE(Play(model, "e2e4"));
@@ -1207,7 +1207,7 @@ namespace BECore::Chess::Tests {
             }
 
             ChessGameModel model;
-            IntrusivePtrAtomic<GatedEngine> engine;
+            IntrusivePtr<GatedEngine> engine;
             CountingFactory factory;
             OpponentController controller;
         };

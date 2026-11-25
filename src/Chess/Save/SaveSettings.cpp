@@ -51,7 +51,7 @@ namespace BECore::Chess {
     Path DefaultSaveDirectory() {
         char* prefPath = SDL_GetPrefPath(kSaveOrganization, kSaveApplication);
         if (prefPath == nullptr) {
-            LOG_WARNING("Save: no per-user folder, the game is not remembered: {}"_format(SDL_GetError()));
+            LOG_WARNING("Save: no per-user folder, the game is not remembered: {}", SDL_GetError());
             return {};
         }
         const Path directory(prefPath);

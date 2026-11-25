@@ -130,7 +130,7 @@ namespace BECore::Chess {
         return reviewed;
     }
 
-    Task<void> GameReviewer::RunSearch(IntrusivePtrAtomic<Search> search, SearchRequest request) {
+    Task<void> GameReviewer::RunSearch(IntrusivePtr<Search> search, SearchRequest request) {
         std::expected<Analysis, EngineError> answer = AnswerOfTask(co_await search->engine->AnalyseAsync(request, search->token));
         {
             const LockGuard lock(search->mutex);
@@ -215,7 +215,7 @@ namespace BECore::Chess {
     }
 
     void GameReviewer::Fail(EngineError error) {
-        LOG_ERROR("Game review: stopped at position {} of {}, {}: {}"_format(_done + 1, _total, EnumUtils<EngineErrorKind>::ToString(error.kind), error.detail));
+        LOG_ERROR("Game review: stopped at position {} of {}, {}: {}", _done + 1, _total, EnumUtils<EngineErrorKind>::ToString(error.kind), error.detail);
         _error = std::move(error);
         _state = ReviewState::Failed;
         ++_revision;

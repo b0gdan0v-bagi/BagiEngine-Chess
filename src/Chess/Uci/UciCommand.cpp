@@ -1,5 +1,6 @@
 #include "UciCommand.h"
 
+#include <BECore/File/TextReader.h>
 #include <Chess/Engine/UciProtocol.h>
 #include <Chess/Game/Position.h>
 
@@ -7,7 +8,6 @@ namespace BECore::Chess::Uci {
 
     namespace {
 
-        constexpr StringView kLineSeparators = " \t";
         constexpr StringView kUciToken = "uci";
         constexpr StringView kIsReadyToken = "isready";
         constexpr StringView kNewGameToken = "ucinewgame";
@@ -31,27 +31,6 @@ namespace BECore::Chess::Uci {
         constexpr StringView kMovesToGoToken = "movestogo";
         constexpr StringView kInfiniteToken = "infinite";
         constexpr StringView kPonderToken = "ponder";
-
-        using Tokens = Vector<StringView>;
-
-        /// The words of @p line, views into it
-        Tokens Split(StringView line) {
-            Tokens tokens;
-            size_t start = 0;
-            while (start < line.size()) {
-                const size_t begin = line.find_first_not_of(kLineSeparators, start);
-                if (begin == StringView::npos) {
-                    break;
-                }
-                size_t end = line.find_first_of(kLineSeparators, begin);
-                if (end == StringView::npos) {
-                    end = line.size();
-                }
-                tokens.push_back(line.substr(begin, end - begin));
-                start = end;
-            }
-            return tokens;
-        }
 
         Optional<int>* GoField(GoParams& params, StringView token) {
             if (token == kDepthToken) {
@@ -78,70 +57,67 @@ namespace BECore::Chess::Uci {
             return nullptr;
         }
 
-        /// The tokens after `go`. A number is taken only when it follows its keyword, so a keyword after a missing value (`go depth wtime 5`) is still seen;
-        /// the words of a keyword we do not know (`nodes 1000`, `searchmoves e2e4`) are skipped one by one
-        GoParams ParseGo(const Tokens& tokens) {
+        /// The tokens after `go`. A number is taken only when it follows its keyword (`Read<int>` leaves a token that is none), so a keyword after a missing value
+        /// (`go depth wtime 5`) is still seen; the words of a keyword we do not know (`nodes 1000`, `searchmoves e2e4`) are skipped one by one
+        GoParams ParseGo(TextReader& reader) {
             GoParams params;
-            for (size_t i = 1; i < tokens.size(); ++i) {
-                const StringView token = tokens[i];
-                if (token == kInfiniteToken || token == kPonderToken) {
+            while (const Optional<StringView> token = reader.ReadToken()) {
+                if (*token == kInfiniteToken || *token == kPonderToken) {
                     params.infinite = true;
-                } else if (Optional<int>* field = GoField(params, token)) {
-                    if (i + 1 < tokens.size()) {
-                        if (const Optional<int> value = ParseInt(tokens[i + 1])) {
-                            *field = value;
-                            ++i;
-                        }
+                } else if (Optional<int>* field = GoField(params, *token)) {
+                    if (const Optional<int> value = reader.Read<int>()) {
+                        *field = value;
                     }
                 }
             }
             return params;
         }
 
+        /// Appends @p word to @p text after one space, so the words of a field come back with single spaces
+        void AppendWord(String& text, StringView word) {
+            if (!text.empty()) {
+                text.push_back(' ');
+            }
+            text.append(word.data(), word.size());
+        }
+
         /// `startpos` or `fen <fields>`, then optionally `moves ...`. False when the first word is neither
-        bool ParsePosition(const Tokens& tokens, PositionParams& params) {
-            if (tokens.size() < 2) {
+        bool ParsePosition(TextReader& reader, PositionParams& params) {
+            const Optional<StringView> source = reader.ReadToken();
+            if (!source) {
                 return false;
             }
-            size_t next = 2;
-            if (tokens[1] == kStartPosToken) {
+            Optional<StringView> next;
+            if (*source == kStartPosToken) {
                 params.startFen = String(Position::kStartFen);
-            } else if (tokens[1] == kFenToken) {
-                for (; next < tokens.size() && tokens[next] != kMovesToken; ++next) {
-                    if (!params.startFen.empty()) {
-                        params.startFen.push_back(' ');
-                    }
-                    params.startFen.append(tokens[next].data(), tokens[next].size());
+                next = reader.ReadToken();
+            } else if (*source == kFenToken) {
+                for (next = reader.ReadToken(); next && *next != kMovesToken; next = reader.ReadToken()) {
+                    AppendWord(params.startFen, *next);
                 }
             } else {
                 return false;
             }
-            if (next < tokens.size() && tokens[next] == kMovesToken) {
-                for (++next; next < tokens.size(); ++next) {
-                    params.moves.push_back(String(tokens[next]));
+            if (next == kMovesToken) {
+                while (const Optional<StringView> move = reader.ReadToken()) {
+                    params.moves.push_back(String(*move));
                 }
             }
             return true;
         }
 
         /// `name <words> value <words>`: the words between the two keywords are the name, the rest of the line is the value
-        SetOptionParams ParseSetOption(const Tokens& tokens) {
+        SetOptionParams ParseSetOption(TextReader& reader) {
             SetOptionParams params;
-            size_t i = 1;
-            if (i < tokens.size() && tokens[i] == kNameToken) {
-                for (++i; i < tokens.size() && tokens[i] != kValueToken; ++i) {
-                    if (!params.name.empty()) {
-                        params.name.push_back(' ');
-                    }
-                    params.name.append(tokens[i].data(), tokens[i].size());
+            Optional<StringView> token = reader.ReadToken();
+            if (token == kNameToken) {
+                for (token = reader.ReadToken(); token && *token != kValueToken; token = reader.ReadToken()) {
+                    AppendWord(params.name, *token);
                 }
             }
-            if (i < tokens.size() && tokens[i] == kValueToken) {
-                for (++i; i < tokens.size(); ++i) {
-                    if (!params.value.empty()) {
-                        params.value.push_back(' ');
-                    }
-                    params.value.append(tokens[i].data(), tokens[i].size());
+            if (token == kValueToken) {
+                while (const Optional<StringView> word = reader.ReadToken()) {
+                    AppendWord(params.value, *word);
                 }
             }
             return params;
@@ -150,24 +126,17 @@ namespace BECore::Chess::Uci {
     }  // namespace
 
     Optional<int> ParseInt(StringView text) {
-        int value = 0;
-        if (text.empty()) {
-            return std::nullopt;
-        }
-        const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), value);
-        if (error != std::errc{} || end != text.data() + text.size()) {
-            return std::nullopt;
-        }
-        return value;
+        return StringUtils::ParseNumber<int>(text);
     }
 
     UciCommand ParseCommand(StringView line) {
         UciCommand command;
-        const Tokens tokens = Split(UciProtocol::TrimLine(line));
-        if (tokens.empty()) {
+        TextReader reader(UciProtocol::TrimLine(line));
+        const Optional<StringView> token = reader.ReadToken();
+        if (!token) {
             return command;
         }
-        const StringView first = tokens.front();
+        const StringView first = *token;
         if (first == kUciToken) {
             command.kind = UciCommandKind::Uci;
         } else if (first == kIsReadyToken) {
@@ -176,14 +145,14 @@ namespace BECore::Chess::Uci {
             command.kind = UciCommandKind::NewGame;
         } else if (first == kSetOptionToken) {
             command.kind = UciCommandKind::SetOption;
-            command.setOption = ParseSetOption(tokens);
+            command.setOption = ParseSetOption(reader);
         } else if (first == kPositionToken) {
-            if (ParsePosition(tokens, command.position)) {
+            if (ParsePosition(reader, command.position)) {
                 command.kind = UciCommandKind::Position;
             }
         } else if (first == kGoToken) {
             command.kind = UciCommandKind::Go;
-            command.go = ParseGo(tokens);
+            command.go = ParseGo(reader);
         } else if (first == kStopToken) {
             command.kind = UciCommandKind::Stop;
         } else if (first == kPonderHitToken) {

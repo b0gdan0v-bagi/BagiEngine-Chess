@@ -35,7 +35,7 @@ namespace BECore::Chess::Tests {
 
     /// The SceneManager of the shipped scene, built the way the application builds it: LoadSceneManager gets the raw root and expands the references itself (so `sourceRef` is set).
     /// The expansion is checked first, because LoadSceneManager only logs its errors; empty (and a failed test) when the scene does not expand
-    inline IntrusivePtrAtomic<SceneManager> LoadShippedSceneManager() {
+    inline IntrusivePtr<SceneManager> LoadShippedSceneManager() {
         pugi::xml_document expanded;
         if (!LoadShippedSceneDocument(expanded)) {
             return {};

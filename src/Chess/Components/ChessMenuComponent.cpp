@@ -63,7 +63,7 @@ namespace BECore::Chess {
         } else if (event.action == MenuActions::openSection) {
             const Optional<MenuSection> section = FindMenuSection(event.value.ToStringView());
             if (!section) {
-                LOG_WARNING("ChessOpenSection ignored: '{}' is not a section of the menu"_format(event.value.ToStringView()));
+                LOG_WARNING("ChessOpenSection ignored: '{}' is not a section of the menu", event.value.ToStringView());
                 return;
             }
             UICanvasComponent::SetVisibleByName(GetScene(), menuNode, false);

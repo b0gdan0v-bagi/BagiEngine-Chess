@@ -78,7 +78,7 @@ namespace BECore::Chess {
         }
         // A refused pick (no Stockfish found) is kept by the controller and shown through the variables, so only an id that is in no table (a hand-made press) is said here
         if (!picked && picked.error().kind == ChoiceErrorKind::BadId) {
-            LOG_WARNING("{} ignored: {}"_format(event.action.ToStringView(), picked.error().detail));
+            LOG_WARNING("{} ignored: {}", event.action.ToStringView(), picked.error().detail);
         }
     }
 

@@ -206,7 +206,7 @@ namespace BECore::Chess::Tests {
             return position && MoveGenerator::ParseUci(*position, StringView(uci)).has_value();
         }
 
-        IntrusivePtrAtomic<ScriptedEngine> MakeScripted() {
+        IntrusivePtr<ScriptedEngine> MakeScripted() {
             return New<ScriptedEngine>();
         }
 

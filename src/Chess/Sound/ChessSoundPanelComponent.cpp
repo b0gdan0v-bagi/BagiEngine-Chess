@@ -41,7 +41,7 @@ namespace BECore::Chess {
             audio.SetMasterMuted(*muted);
             return;
         }
-        LOG_WARNING("{} ignored: '{}' is not a level"_format(event.action.ToStringView(), text));
+        LOG_WARNING("{} ignored: '{}' is not a level", event.action.ToStringView(), text);
     }
 
     void ChessSoundPanelComponent::OnDraw() {

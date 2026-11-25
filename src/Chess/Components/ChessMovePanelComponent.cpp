@@ -62,7 +62,7 @@ namespace BECore::Chess {
         }
         const Optional<MoveListPress> press = ParseMoveListPress(event.value.ToStringView());
         if (!press) {
-            LOG_WARNING("ChessShowMove ignored: '{}' is not a press of the move list"_format(event.value.ToStringView()));
+            LOG_WARNING("ChessShowMove ignored: '{}' is not a press of the move list", event.value.ToStringView());
             return;
         }
         // The rows of the press are the ones on the screen: the words were published from the same model in the last draw (a press reads the plies, never the text, so no marks are asked for)
@@ -93,7 +93,7 @@ namespace BECore::Chess {
             return;
         }
         if (value != "true" && value != "false") {
-            LOG_WARNING("ChessSetEvaluation ignored: '{}' is neither true nor false"_format(value));
+            LOG_WARNING("ChessSetEvaluation ignored: '{}' is neither true nor false", value);
             return;
         }
         analyst->SetPicked(opponent->GetEngine());
@@ -106,7 +106,7 @@ namespace BECore::Chess {
             return;
         }
         if (value != "true" && value != "false") {
-            LOG_WARNING("ChessSetRatings ignored: '{}' is neither true nor false"_format(value));
+            LOG_WARNING("ChessSetRatings ignored: '{}' is neither true nor false", value);
             return;
         }
         analyst->SetRatings(value == "true");

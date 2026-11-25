@@ -69,7 +69,7 @@ namespace BECore::Chess {
         _engine.Reset();
     }
 
-    Task<void> DrawOfferJudge::RunSearch(IntrusivePtrAtomic<Search> search, SearchRequest request) {
+    Task<void> DrawOfferJudge::RunSearch(IntrusivePtr<Search> search, SearchRequest request) {
         std::expected<Analysis, EngineError> answer = AnswerOfTask(co_await search->engine->AnalyseAsync(request, search->token));
         {
             const LockGuard lock(search->mutex);
@@ -119,7 +119,7 @@ namespace BECore::Chess {
     }
 
     void DrawOfferJudge::Fail(EngineError error) {
-        LOG_ERROR("Draw offer: the program could not judge the position and declines, {}: {}"_format(EnumUtils<EngineErrorKind>::ToString(error.kind), error.detail));
+        LOG_ERROR("Draw offer: the program could not judge the position and declines, {}: {}", EnumUtils<EngineErrorKind>::ToString(error.kind), error.detail);
         _error = std::move(error);
         Resolve(DrawVerdict::Declined);
     }

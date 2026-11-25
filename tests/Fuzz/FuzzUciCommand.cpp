@@ -18,8 +18,8 @@ namespace BECore::Chess::Fuzzing {
         using Text::WithoutEdges;
         using Text::Words;
 
-        /// The two blanks `go` and `position` split words on
-        constexpr StringView kWordSeparators = " \t";
+        /// The C locale's white space, which `TextReader` splits words on
+        constexpr StringView kWordSeparators = " \t\n\v\f\r";
 
         /// A `position` command with more moves than this replays only the first ones, so a line of many tokens stays cheap
         constexpr size_t kMostReplayedMoves = 64;
@@ -192,7 +192,7 @@ namespace BECore::Chess::Fuzzing {
         CHESS_FUZZ_CHECK(SameCommand(command, Uci::ParseCommand(line)));
         CHESS_FUZZ_CHECK(SameCommand(command, ExpectedCommand(Text::WordsOf(WithoutEdges(line), kWordSeparators))));
 
-        // The tolerance of the header: spaces at both ends and a `\r` change nothing. A tab is no edge for the trimming, so it goes around the trimmed line only
+        // The tolerance of the header: spaces at both ends and a `\r` change nothing. Tabs around the trimmed line change nothing either
         String padded = "  ";
         padded.append(line.data(), line.size());
         padded.append("  \r");

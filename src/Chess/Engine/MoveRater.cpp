@@ -74,7 +74,7 @@ namespace BECore::Chess {
         return _ratings[ply];
     }
 
-    Task<void> MoveRater::RunSearch(IntrusivePtrAtomic<Search> search, SearchRequest request) {
+    Task<void> MoveRater::RunSearch(IntrusivePtr<Search> search, SearchRequest request) {
         std::expected<Analysis, EngineError> answer = AnswerOfTask(co_await search->engine->AnalyseAsync(request, search->token));
         {
             const LockGuard lock(search->mutex);
@@ -190,7 +190,7 @@ namespace BECore::Chess {
 
     void MoveRater::Fail(Optional<size_t> ply, EngineError error) {
         const String which = ply ? Format(" of ply {}", *ply + 1) : String();
-        LOG_ERROR("Move rater: no rating{}, {}: {}"_format(which, EnumUtils<EngineErrorKind>::ToString(error.kind), error.detail));
+        LOG_ERROR("Move rater: no rating{}, {}: {}", which, EnumUtils<EngineErrorKind>::ToString(error.kind), error.detail);
         _error = std::move(error);
         if (ply) {
             _failed[*ply] = true;

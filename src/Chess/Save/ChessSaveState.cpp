@@ -198,7 +198,7 @@ namespace BECore::Chess {
         // The sides first and the person's color after, only when the program plays no single side: SetColor() on a program that plays would remake its opponent and write one seat's
         // choice into the other, and with one side played the color follows from it
         if (const std::expected<void, EngineError> picked = controller.ChooseSeats(plan.plays, white, black); !picked) {
-            LOG_WARNING("Save: the saved opponent was not restored, the game goes on as two people: {}"_format(picked.error().detail));
+            LOG_WARNING("Save: the saved opponent was not restored, the game goes on as two people: {}", picked.error().detail);
         }
         if (!controller.GetPlays()) {
             [[maybe_unused]] const auto colored = choice.SetColor(PieceColorId(plan.person));

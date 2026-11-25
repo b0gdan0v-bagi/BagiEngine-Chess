@@ -36,15 +36,7 @@ namespace BECore::Chess {
         }
 
         Optional<int32_t> ParseRating(StringView text) {
-            int32_t value = 0;
-            if (text.empty()) {
-                return std::nullopt;
-            }
-            const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), value);
-            if (error != std::errc{} || end != text.data() + text.size()) {
-                return std::nullopt;
-            }
-            return value;
+            return StringUtils::ParseNumber<int32_t>(text);
         }
 
         /// The first @p kColumnCount columns of a line; nothing when it has fewer (more are ignored)

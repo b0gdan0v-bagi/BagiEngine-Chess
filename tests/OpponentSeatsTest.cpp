@@ -119,7 +119,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(OpponentSeatsTest, TwoSeatsOfOnePickAreTwoEngineObjects) {
         ChessGameModel model;
-        Vector<IntrusivePtrAtomic<InstantEngine>> made;
+        Vector<IntrusivePtr<InstantEngine>> made;
         OpponentController controller(model);
         controller.SetEngineFactory([&](OpponentEngine, const OpponentLevel&) -> MadeEngine {
             made.push_back(New<InstantEngine>());

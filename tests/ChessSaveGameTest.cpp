@@ -291,7 +291,7 @@ namespace BECore::Chess::Tests {
         Path _saves;
         Path _stockfishDirectory;
         IntrusivePtr<RecordingRenderer> _renderer;
-        IntrusivePtrAtomic<SceneManager> _manager;
+        IntrusivePtr<SceneManager> _manager;
         UniquePtr<CountingFactory> _factory;
         bool _started = false;
     };

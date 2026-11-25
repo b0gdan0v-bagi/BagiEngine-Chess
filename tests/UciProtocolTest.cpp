@@ -281,6 +281,26 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(info->firstPvMove, "e2e4");
     }
 
+    TEST(UciProtocolTest, AMateWithoutANumberLeavesTheNextKeyword) {
+        const auto info = ParsedInfo("info score mate lowerbound pv e2e4");
+
+        ASSERT_TRUE(info.has_value());
+        EXPECT_FALSE(info->score.has_value());
+        EXPECT_TRUE(info->lowerBound);
+        EXPECT_EQ(info->firstPvMove, "e2e4");
+    }
+
+    TEST(UciProtocolTest, AnyWhiteSpaceSeparatesTheWords) {
+        const auto info = ParsedInfo("info\tdepth\t7  score\tcp\t-12\tpv\te2e4");
+
+        ASSERT_TRUE(info.has_value());
+        EXPECT_EQ(info->depth, 7);
+        ASSERT_TRUE(info->score.has_value());
+        EXPECT_EQ(*info->score, Cp(-12));
+        EXPECT_EQ(info->firstPvMove, "e2e4");
+        ExpectBestMove("bestmove\te2e4", "e2e4", false);
+    }
+
     TEST(UciProtocolTest, ABrokenDepthOrMultiPvKeepsTheDefault) {
         const auto info = ParsedInfo("info depth x multipv -3 score cp 1");
 

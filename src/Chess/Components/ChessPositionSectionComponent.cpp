@@ -190,7 +190,7 @@ namespace BECore::Chess {
             game->EditChanged();
             return;
         }
-        LOG_WARNING("{} ignored: '{}' is not one of its values"_format(action.ToStringView(), value));
+        LOG_WARNING("{} ignored: '{}' is not one of its values", action.ToStringView(), value);
     }
 
     void ChessPositionSectionComponent::OnDraw() {

@@ -64,7 +64,7 @@ namespace BECore::Chess {
      * program plays.
      *
      * **Threads and shutdown.** Main thread only, as EngineOpponent. The worker sees a copy of the request and a state of its own (the engine, a CancellationToken, the answer behind a mutex, an
-     * atomic `done`) shared through an IntrusivePtrAtomic, so nothing dangles whichever side ends first. The destructor, Cancel() and Shutdown() cancel the token and return at once; a search that
+     * atomic `done`) shared through an IntrusivePtr, so nothing dangles whichever side ends first. The destructor, Cancel() and Shutdown() cancel the token and return at once; a search that
      * ignores its token keeps the engine alive until it returns, and its answer is thrown away. Call Shutdown() (or destroy the analyst) before TaskManager::Shutdown(), which joins the pool and
      * would wait for a search nobody cancelled; a search started after that is dropped by the scheduler and never raises `done`, so Shutdown() also switches the evaluation off and drops the hint:
      * a later Update() starts nothing until a switch or a request. The destructor does not touch TaskManager.
@@ -240,7 +240,7 @@ namespace BECore::Chess {
         };
 
         /// Runs on the pool: asks the engine and leaves the answer in @p search. Its arguments are by value, so the frame owns everything it uses
-        static Task<void> RunSearch(IntrusivePtrAtomic<Search> search, SearchRequest request);
+        static Task<void> RunSearch(IntrusivePtr<Search> search, SearchRequest request);
 
         /// Update() without the rater and the reviewer
         void UpdateSearch(const ChessGameModel& model, OpponentEngine picked);
@@ -260,8 +260,8 @@ namespace BECore::Chess {
         bool _evaluationOn = false;
         Optional<uint64_t> _hintVersion;  ///< the version of the model a hint was asked at
 
-        IntrusivePtrAtomic<Search> _search;  ///< the search under way, null when none; main thread only
-        uint64_t _searchVersion = 0;         ///< the version of the model when _search was asked
+        IntrusivePtr<Search> _search;  ///< the search under way, null when none; main thread only
+        uint64_t _searchVersion = 0;   ///< the version of the model when _search was asked
         OpponentEngine _searchEngine = kDefaultOpponentEngine;
 
         Optional<AnalysisLine> _result;  ///< the answer, for _resultVersion and _resultEngine

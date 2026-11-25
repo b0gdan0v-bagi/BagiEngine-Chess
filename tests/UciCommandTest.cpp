@@ -95,6 +95,21 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(command.position.moves[0], "a1a8");
     }
 
+    TEST(UciCommandTest, PositionFenWithMovesAndNothingAfterItHasNoMoves) {
+        const UciCommand command = Parse("position fen 6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1 moves 	 ");
+
+        ASSERT_EQ(command.kind, UciCommandKind::Position);
+        EXPECT_EQ(command.position.startFen, kMateInOneFen);
+        EXPECT_TRUE(command.position.moves.empty());
+    }
+
+    TEST(UciCommandTest, AWordOtherThanMovesAfterStartposEndsTheLine) {
+        const UciCommand command = Parse("position startpos e2e4 moves e7e5");
+
+        ASSERT_EQ(command.kind, UciCommandKind::Position);
+        EXPECT_TRUE(command.position.moves.empty());
+    }
+
     TEST(UciCommandTest, AFenWithFewerFieldsIsPassedOnAsItIs) {
         const UciCommand command = Parse("position fen 6k1/5ppp/8/8/8/8/5PPP/R5K1 w moves a1a8");
 
@@ -175,6 +190,22 @@ namespace BECore::Chess::Tests {
 
         EXPECT_EQ(command.setOption.name, "Blunder Percent");
         EXPECT_EQ(command.setOption.value, "5");
+    }
+
+    TEST(UciCommandTest, TabsAndRunsOfSpacesInASetOptionAreOneSpaceInTheResult) {
+        const UciCommand command = Parse("setoption	 name  Blunder	 Percent   value	 very 	 hard");
+
+        EXPECT_EQ(command.setOption.name, "Blunder Percent");
+        EXPECT_EQ(command.setOption.value, "very hard");
+    }
+
+    TEST(UciCommandTest, ParseIntTakesTheWholeTextAndTheRangeOfInt) {
+        EXPECT_EQ(Uci::ParseInt("2147483647"), 2147483647);
+        EXPECT_EQ(Uci::ParseInt("-2147483648"), std::numeric_limits<int>::min());
+        EXPECT_FALSE(Uci::ParseInt("2147483648").has_value());
+        EXPECT_FALSE(Uci::ParseInt("").has_value());
+        EXPECT_FALSE(Uci::ParseInt(" 5").has_value());
+        EXPECT_FALSE(Uci::ParseInt("+5").has_value());
     }
 
     TEST(UciCommandTest, TheValueIsTheRestOfTheLine) {

@@ -1,3 +1,4 @@
+#include <BECore/Config/StringXmlWriter.h>
 #include <BECore/GameManager/CoreManager.h>
 #include <BECore/Reflection/XmlDeserializer.h>
 #include <BECore/Resource/ResourceManager.h>
@@ -147,11 +148,11 @@ namespace BECore::Tests {
             if (!elements) {
                 return {};
             }
-            std::ostringstream out;
-            out << "<ui>";
-            elements.print(out, "", pugi::format_raw);
-            out << "</ui>";
-            return FromStdString(out.str());
+            StringXmlWriter writer;
+            writer.text = "<ui>";
+            elements.print(writer, "", pugi::format_raw);
+            writer.text += "</ui>";
+            return std::move(writer.text);
         }
 
         /// The plate named @p plateName of the canvas on the node @p nodeName of the shipped scene (without the dim), as the content of a screen, with ONE difference from the file: every
@@ -171,11 +172,11 @@ namespace BECore::Tests {
             for (pugi::xpath_node group : plate.select_nodes(".//element[@type='UISegmented']")) {
                 group.node().append_attribute("blocksInput") = "true";
             }
-            std::ostringstream out;
-            out << "<ui><elements>";
-            plate.print(out, "", pugi::format_raw);
-            out << "</elements></ui>";
-            return FromStdString(out.str());
+            StringXmlWriter writer;
+            writer.text = "<ui><elements>";
+            plate.print(writer, "", pugi::format_raw);
+            writer.text += "</elements></ui>";
+            return std::move(writer.text);
         }
 
         /// The plate of the opponent panel

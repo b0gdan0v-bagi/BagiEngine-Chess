@@ -172,7 +172,7 @@ namespace BECore::Chess::Tests {
             std::atomic<int> _answered{0};
         };
 
-        IntrusivePtrAtomic<PlyEngine> MakeEngine(Vector<Move> best = {}, int gap = 25) {
+        IntrusivePtr<PlyEngine> MakeEngine(Vector<Move> best = {}, int gap = 25) {
             return New<PlyEngine>(std::move(best), gap);
         }
 

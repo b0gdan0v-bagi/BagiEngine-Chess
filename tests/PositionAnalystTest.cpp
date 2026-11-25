@@ -40,7 +40,7 @@ namespace BECore::Chess::Tests {
             }
         }
 
-        IntrusivePtrAtomic<AnalysingEngine> MakeEngine(AnalysisScore score = kScore, Optional<Move> move = std::nullopt) {
+        IntrusivePtr<AnalysingEngine> MakeEngine(AnalysisScore score = kScore, Optional<Move> move = std::nullopt) {
             return New<AnalysingEngine>(score, move);
         }
 

@@ -87,6 +87,6 @@ namespace BECore::Chess {
     };
 
     /// The shared owner of an engine; New<OwnEngine>() makes one
-    using ChessEnginePtr = IntrusivePtrAtomic<IChessEngine>;
+    using ChessEnginePtr = IntrusivePtr<IChessEngine>;
 
 }  // namespace BECore::Chess

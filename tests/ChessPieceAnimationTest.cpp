@@ -337,7 +337,7 @@ namespace BECore::Chess::Tests {
         }
 
         IntrusivePtr<RecordingRenderer> _renderer;
-        IntrusivePtrAtomic<SceneManager> _manager;
+        IntrusivePtr<SceneManager> _manager;
         CountingFactory _factory{New<GatedEngine>(true)};
     };
 

@@ -811,7 +811,7 @@ namespace BECore::Chess::Tests {
             uint64_t slices = 0;
         };
 
-        Task<void> DriveOnThePool(IntrusivePtrAtomic<OwnEngine> engine, SearchRequest request, CancellationToken token, SharedPtr<CoroutineAnswer> out) {
+        Task<void> DriveOnThePool(IntrusivePtr<OwnEngine> engine, SearchRequest request, CancellationToken token, SharedPtr<CoroutineAnswer> out) {
             auto search = engine->BeginFindMove(request, token);
             if (!search) {
                 out->answer = std::unexpected(std::move(search.error()));
@@ -1100,7 +1100,7 @@ namespace BECore::Chess::Tests {
         // A single-thread build resumes a yielded task only in TaskManager::Update, which only CoreManager calls; this test polls and never pumps (OpponentOverFramesTest does, with PumpTaskFrame)
         GTEST_SKIP() << "needs worker threads (BE_SINGLE_THREAD)";
 #else
-        const IntrusivePtrAtomic<OwnEngine> engine = New<OwnEngine>();
+        const IntrusivePtr<OwnEngine> engine = New<OwnEngine>();
         const SearchRequest request = RequestFor(kKiwipeteFen, kGoldenDepth);
         const auto expected = engine->FindMove(request, CancellationToken::Create());
         ASSERT_TRUE(expected.has_value());
@@ -1119,7 +1119,7 @@ namespace BECore::Chess::Tests {
 #if BE_SINGLE_THREAD
         GTEST_SKIP() << "needs worker threads (BE_SINGLE_THREAD)";
 #else
-        const IntrusivePtrAtomic<OwnEngine> engine = New<OwnEngine>();
+        const IntrusivePtr<OwnEngine> engine = New<OwnEngine>();
         CancellationToken token = CancellationToken::Create();
         auto out = MakeShared<CoroutineAnswer>();
         TaskManager::GetInstance().Run(DriveOnThePool(engine, RequestFor(kKiwipeteFen, kGoldenForeverDepth), token, out));
