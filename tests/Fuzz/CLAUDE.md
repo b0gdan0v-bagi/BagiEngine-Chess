@@ -15,8 +15,7 @@ Library `ChessFuzzTargets` (namespace `BECore::Chess::Fuzzing`, headers `<tests/
 | `UciCommand` | `uci_command` | `Uci::ParseCommand` against a token model, `Uci::ParseInt`, the tolerance of edges, and a `position` through `SearchRequest::FinalPosition` (at most 64 moves) |
 | `UciOutput` | `uci_output` | `UciProtocol::TrimLine`, `ParseInfo`, `ParseBestMove` against a token model, and `LineCollector` (lines in order, latest exact score per `multipv`, a bound only when no exact one) over the text split at `\n` (at most 256 lines) |
 
-- The parsers split words at the C locale's white space (`TextReader`); the edges they trim first are spaces, `` and `
-` (`TrimLine`).
+- The parsers split words at the C locale's white space (`TextReader`); the edges they trim first are spaces, `\r` and `\n` (`TrimLine`).
 - `position fen` with no fields is a `Position` command with an empty `startFen`; `UciServer` refuses it later in `FromFen`, so a `Position` is not promised a non-empty FEN.
 - `ChessFuzzText.h` is the reading all four targets share (`ViewOf`, edges, words, `ReadInt`); `ChessFuzzBoard.h` is the board walked cell by cell for `Fen`.
 
