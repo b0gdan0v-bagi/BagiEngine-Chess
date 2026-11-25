@@ -172,7 +172,7 @@ namespace BECore::Chess {
         if (!sprite) {
             return;
         }
-        sprite->_spriteId = PieceSpriteId(piece);
+        sprite->_spriteId = PieceSpriteId(piece, GraphicsPreset::Beer);
         sprite->ReloadTexture();
         _shownType = piece.type;
     }

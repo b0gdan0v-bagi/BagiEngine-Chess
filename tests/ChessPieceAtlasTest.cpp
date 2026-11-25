@@ -42,7 +42,7 @@ namespace BECore::Chess::Tests {
         /// rewritten entries on success
         std::expected<AtlasWritten, String> PackPiecesAtlas(TextureLibrary& library, const Path& assetsDir) {
             for (const Piece piece : AllPieces()) {
-                const PoolString name = PieceSpriteId(piece);
+                const PoolString name = PieceSpriteId(piece, GraphicsPreset::Beer);
                 const SpriteEntry* entry = library.GetSprite(name);
                 if (entry == nullptr) {
                     return std::unexpected(Format("the library has no sprite {}", name.ToStringView()));
@@ -114,7 +114,7 @@ namespace BECore::Chess::Tests {
 
         Vector<Rect> placed;
         for (const Piece piece : AllPieces()) {
-            const PoolString name = PieceSpriteId(piece);
+            const PoolString name = PieceSpriteId(piece, GraphicsPreset::Beer);
             SCOPED_TRACE(String(name.ToStringView()).c_str());
             const SpriteEntry* entry = library.GetSprite(name);
             ASSERT_NE(entry, nullptr);

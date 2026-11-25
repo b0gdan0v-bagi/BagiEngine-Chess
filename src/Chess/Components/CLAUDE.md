@@ -21,7 +21,7 @@ ChessReviewSectionComponent on ReviewSection ("Review"), before its canvas: Ches
 ChessEditorBarComponent on EditorBar, before its canvas: shown while a position is edited; ChessEditPick, ChessEditColor
 ChessPuzzleBarComponent on PuzzleBar, before its canvas: shown while a puzzle is on
 ChessReviewBarComponent on ReviewBar, before its canvas: the Review button of the result bar
-PieceSprite             `PieceSpriteId(Piece)`: the one table of the piece sprites (pieces, material icons, the editor bar)
+PieceSprite             `PieceSpriteId(Piece, GraphicsPreset)`: the one table of piece sprites
 AnalysisRows            the move panel's analysis band: the words and bar from the analyst, the grey of the Hint buttons
 MoveRows                the part both share: the game's rows, their words, the rows and marks of one canvas, the takeback
 ClickerDisabled         `SetClickerDisabled()`: the one place a button's clicker is greyed

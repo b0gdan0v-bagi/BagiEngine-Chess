@@ -100,7 +100,7 @@ namespace BECore::Chess {
                 const String word = count > 0 ? Format("x{}", count) : String();
                 vars.Set(names.vars[row], StringView(word));
                 if (iconsToo && canvas) {
-                    const PoolString sprite = PieceSpriteId(Piece{types[index], taken});
+                    const PoolString sprite = PieceSpriteId(Piece{types[index], taken}, GraphicsPreset::Beer);
                     for (size_t set = 0; set < kMaterialSetCount; ++set) {
                         if (UIElement* element = canvas->GetRoot().FindByName(names.icons[set][row])) {
                             if (UIImageComponent* icon = element->GetComponent<UIImageComponent>()) {

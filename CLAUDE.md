@@ -18,6 +18,7 @@ src/Chess/
 ├── Engine/                   the opponent: IChessEngine, Stockfish over UCI, the own engine, levels, controller, analyst, MoveRater
 ├── Save/                     the game and the opponent choice kept between runs
 ├── Sound/                    the sounds of the board and the buttons, the Sound section
+├── Graphics/                 the look: the preset Classic / Beer, its sprite prefix and board theme, the person's choice
 ├── Uci/                      the own engine as the UCI program BagiChessUci
 └── Components/               scene glue: board, pieces, result, material, move panel, HUD, panels
 cmake/ChessWeb.cmake          what of config/ and assets/ stays out of the web package

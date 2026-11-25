@@ -94,7 +94,7 @@ namespace BECore::Chess {
             }
             button->selected = !tool.IsEraser() && tool.type == type;
             if (UIImageComponent* icon = button->GetComponent<UIImageComponent>()) {
-                icon->sprite = PieceSpriteId(Piece{type, tool.color});
+                icon->sprite = PieceSpriteId(Piece{type, tool.color}, GraphicsPreset::Beer);
             }
         }
         if (UIElement* eraser = canvas->GetRoot().FindByName(Ids::editorBarErase)) {

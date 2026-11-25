@@ -98,7 +98,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(LoadLibrary(library));
         const pugi::xml_node sprites = library.select_node("/root/sprites").node();
         for (const Piece piece : AllPieces()) {
-            const String name = String(PieceSpriteId(piece).ToStringView());
+            const String name = String(PieceSpriteId(piece, GraphicsPreset::Beer).ToStringView());
             SCOPED_TRACE(name.c_str());
             size_t count = 0;
             for (const pugi::xml_node sprite : sprites.children("sprite")) {
@@ -128,7 +128,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(atlas.valid);
         Vector<SpriteRect> rects;
         for (const Piece piece : AllPieces()) {
-            const String name = String(PieceSpriteId(piece).ToStringView());
+            const String name = String(PieceSpriteId(piece, GraphicsPreset::Beer).ToStringView());
             SCOPED_TRACE(name.c_str());
             const SpriteRect rect = SrcRectOf(SpriteOf(library, name));
             EXPECT_GE(rect.x, 0.0F);
@@ -155,7 +155,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(LoadLibrary(library));
         PngHeader first;
         for (const Piece piece : AllPieces()) {
-            const String name = String(PieceSpriteId(piece).ToStringView());
+            const String name = String(PieceSpriteId(piece, GraphicsPreset::Beer).ToStringView());
             SCOPED_TRACE(name.c_str());
             const String source = SourcePathOf(SpriteOf(library, name));
             EXPECT_EQ(source, Format("{}{}.png", kSourceFolder, name)) << "the sprite is not packed from the file of its name";
