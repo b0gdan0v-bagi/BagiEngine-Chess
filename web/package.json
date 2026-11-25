@@ -1,0 +1,8 @@
+{
+  "private": true,
+  "type": "module",
+  "description": "Only the Railway IaC SDK for .railway/railway.ts; the service itself is Python",
+  "devDependencies": {
+    "railway": "3.16.0"
+  }
+}

@@ -70,7 +70,12 @@ class WebDeployFilesTest(unittest.TestCase):
         self.assertIn("DOCKERFILE", text)
 
     def test_web_holds_no_address_and_no_secret(self):
-        files = [path for path in WEB.rglob("*") if path.is_file() and path.suffix in (".ts", ".json")]
+        # npm install of the Railway SDK writes registry addresses into node_modules and the lock file; neither is committed
+        files = [
+            path
+            for path in WEB.rglob("*")
+            if path.is_file() and path.suffix in (".ts", ".json") and "node_modules" not in path.parts and path.name != "package-lock.json"
+        ]
         self.assertIn(RAILWAY_FILE, files)
         for path in files:
             text = path.read_text(encoding="utf-8")

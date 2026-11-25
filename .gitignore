@@ -16,6 +16,10 @@
 __pycache__/
 *.pyc
 
+# The Railway IaC SDK of web/ (npm install)
+web/node_modules/
+web/package-lock.json
+
 # Per-machine files
 .env
 CMakeUserPresets.json

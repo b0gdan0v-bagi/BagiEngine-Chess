@@ -1,18 +1,27 @@
-// The settings of the Chess web service on Railway, as code. The upload of `railway up` does not carry them: the service is made once by
-// the owner (README.md, "Browser build") and these values are applied to it there. The shape is a best reading of Railway's config as
-// code, to be compared with BagiMahjong's web/.railway/railway.ts before the first use.
-//
-// The image is engine/tools/web/Dockerfile, staged by build_and_deploy.py; its CMD starts serve.py, so there is no start command here.
-// No variable, domain or token belongs in this file (BASIC_AUTH_* are service variables set with the CLI).
-export default {
-  build: {
-    builder: "DOCKERFILE",
-    dockerfilePath: "Dockerfile",
-  },
-  deploy: {
-    healthcheckPath: "/healthz",
+// Railway settings of the bagi-chess service, the web build of the game (Infrastructure as Code; Railway reads no railway.json after
+// 2026-12-01). The partial "chess-web" owns only this service: apply leaves the other services of the project alone. Variables
+// (BASIC_AUTH_*) stay unmanaged: `railway variables`, never here. The domain is set on the service, not in this file.
+//   cd web && npm install && railway config plan && railway config apply
+// The deploy itself: README.md, "Browser build" (engine/tools/web/build_and_deploy.py --deploy). The image is engine/tools/web/Dockerfile,
+// staged by build_and_deploy.py; its CMD starts serve.py, so there is no start command here. No volume: Chess posts no match logs.
+import { defineRailway, project, service } from "railway/iac";
+
+export const partial = "chess-web";
+
+export default defineRailway(() => {
+  const web = service("bagi-chess", {
+    build: { builder: "DOCKERFILE", dockerfilePath: "Dockerfile" },
+    deploy: {
+      restartPolicyType: "ON_FAILURE",
+      restartPolicyMaxRetries: 5,
+    },
+    healthcheck: "/healthz",
     healthcheckTimeout: 60,
-    restartPolicyType: "ON_FAILURE",
-    restartPolicyMaxRetries: 5,
-  },
-};
+    replicas: { sfo: 1 },
+  });
+
+  return project("games and servers", {
+    variables: { managed: false },
+    resources: [web],
+  });
+});
