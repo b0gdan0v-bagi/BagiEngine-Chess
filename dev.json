@@ -28,7 +28,7 @@
       "kind": "web",
       "prefer": "release",
       "target": "BagiChess",
-      "after": [["{python}", "{root}/engine/tools/web/package.py", "{bin}", "{root}/dist", "--game", "BagiChess"]],
+      "after": [["{python}", "{root}/engine/tools/web/package.py", "{bin}", "{root}/dist", "--game", "BagiChess", "--app", "{root}/web/app.json"]],
       "run": ["{python}", "{root}/engine/tools/web/serve.py", "--root", "{root}/dist"],
       "url": "http://localhost:8080"
     }
