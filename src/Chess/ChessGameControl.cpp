@@ -7,6 +7,7 @@
 #include <Chess/Game/GameEnding.h>
 #include <Chess/Game/MoveList.h>
 #include <Chess/Game/TakeBack.h>
+#include <Chess/Graphics/GraphicsPreset.h>
 
 namespace BECore::Chess {
 
@@ -226,6 +227,8 @@ namespace BECore::Chess {
 
         constexpr const char* kReviewUsage = "'review' has to be an object with exactly one member: {\"start\": true} or {\"cancel\": true}";
 
+        constexpr const char* kGraphicsUsage = "'graphics' has to be an object with exactly one member: {\"preset\": \"classic\"} or {\"preset\": \"beer\"}";
+
         constexpr const char* kPuzzleOnUsage = "a puzzle is on: leave it first with {\"puzzle\": {\"end\": true}} (a takeback, a resignation or a draw offer would break its line)";
 
         constexpr const char* kTakeBackUsage = "'takeBack' has to be an object like {} (the button's rule) or {\"plies\": 2} (the member is an optional integer from 1 to the moves played)";
@@ -375,8 +378,8 @@ namespace BECore::Chess {
     }  // namespace
 
     ChessGameControl::ChessGameControl(ChessGameModel& model, OpponentController& opponent, PositionAnalyst& analyst, DrawOfferJudge& drawJudge, const OpeningBook& openings,
-                                       const PositionEditor& editor, PuzzleSession& puzzle)
-        : _model(model), _opponent(opponent), _analyst(analyst), _drawJudge(drawJudge), _openings(openings), _editor(editor), _puzzle(puzzle) {}
+                                       const PositionEditor& editor, PuzzleSession& puzzle, GraphicsChoice& graphics)
+        : _model(model), _opponent(opponent), _analyst(analyst), _drawJudge(drawJudge), _openings(openings), _editor(editor), _puzzle(puzzle), _graphics(graphics) {}
 
     MoveList ChessGameControl::LegalMoves() const {
         return _model.IsGameOver() ? MoveList() : MoveGenerator::GenerateLegal(_model.GetPosition());
@@ -403,6 +406,10 @@ namespace BECore::Chess {
         writer.Key("editor");
         WriteEditor(writer);
         WriteText(writer, "fen", _model.GetPosition().ToFen());
+        writer.Key("graphics");
+        writer.BeginObject();
+        writer.Member("preset", PresetId(_graphics.Get()));
+        writer.EndObject();
         writer.Member("inCheck", _model.IsInCheck());
         writer.Member("legalMoveCount", LegalMoves().size());
         writer.Key("material");
@@ -714,11 +721,19 @@ namespace BECore::Chess {
         const Optional<JsonView> drawMember = FindParam(state, "draw");
         const Optional<JsonView> puzzleMember = FindParam(state, "puzzle");
         const Optional<JsonView> reviewMember = FindParam(state, "review");
-        if (!fenMember && !opponentMember && !analysisMember && !takeBackMember && !resignMember && !drawMember && !puzzleMember && !reviewMember) {
+        const Optional<JsonView> graphicsMember = FindParam(state, "graphics");
+        if (!fenMember && !opponentMember && !analysisMember && !takeBackMember && !resignMember && !drawMember && !puzzleMember && !reviewMember && !graphicsMember) {
             return std::unexpected(MakeControlError(ControlErrors::kInvalidParams,
                                                     "'fen' (a FEN string), 'opponent' ({\"plays\", \"level\", \"engine\", \"white\", \"black\", \"seed\"}), both, or "
                                                     "'analysis' ({\"evaluation\", \"hint\", \"ratings\"}), 'takeBack' ({\"plies\"}), 'resign' ({\"color\"}), 'draw' ({}), 'puzzle' ({\"index\"}) or "
-                                                    "'review' ({\"start\": true}) alone are needed"));
+                                                    "'review' ({\"start\": true}) or 'graphics' ({\"preset\"}) alone are needed"));
+        }
+        if (graphicsMember) {
+            if (fenMember || opponentMember || analysisMember || takeBackMember || resignMember || drawMember || puzzleMember || reviewMember) {
+                return std::unexpected(
+                    MakeControlError(ControlErrors::kInvalidParams, "'graphics' cannot be combined with another member: the look is the person's, not part of the game they change"));
+            }
+            return SetGraphics(*graphicsMember);
         }
         if (reviewMember) {
             if (fenMember || opponentMember || analysisMember || takeBackMember || resignMember || drawMember || puzzleMember) {
@@ -991,8 +1006,21 @@ namespace BECore::Chess {
         return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, kReviewUsage));
     }
 
+    std::expected<void, ControlError> ChessGameControl::SetGraphics(JsonView graphics) {
+        if (!graphics.IsObject() || graphics.Size() != 1 || !FindParam(graphics, "preset")) {
+            return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, kGraphicsUsage));
+        }
+        const auto id = GetParamString(graphics, "preset");
+        const Optional<GraphicsPreset> preset = id ? ParsePreset(StringView(*id)) : std::nullopt;
+        if (!preset) {
+            return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, kGraphicsUsage));
+        }
+        _graphics.Set(*preset);
+        return {};
+    }
+
     uint64_t ChessGameControl::GetStateVersion() const {
-        return _model.GetVersion() + _opponent.GetRevision() + _analyst.GetRevision() + _drawJudge.GetRevision() + _puzzle.GetRevision() + _editor.GetRevision();
+        return _model.GetVersion() + _opponent.GetRevision() + _analyst.GetRevision() + _drawJudge.GetRevision() + _puzzle.GetRevision() + _editor.GetRevision() + _graphics.GetRevision();
     }
 
 }  // namespace BECore::Chess

@@ -56,6 +56,25 @@ namespace BECore::Chess::Tests {
         PoolString EditorIcon(const char* button) const {
             return ElementOf(kEditorBarNode, button).GetComponent<UIImageComponent>()->sprite;
         }
+
+        PoolString SpriteOfPieceNode(const char* name) const {
+            for (const auto& node : GetScene().GetRootNode().GetChildren()) {
+                if (StringView(node->GetName().CStr()) == StringView(name)) {
+                    return node->GetComponent<SpriteRendererComponent>()->_spriteId;
+                }
+            }
+            ADD_FAILURE() << "no piece node " << name;
+            return {};
+        }
+
+        /// set_state {"graphics": {"preset": <id>}} through the control adapter, as a client sends it
+        bool PickByControl(const char* id) {
+            Json graphics = Json::object();
+            graphics["preset"] = id;
+            Json request = Json::object();
+            request["graphics"] = graphics;
+            return DomControl(*ChessGame::GetActive()->AsControllable()).SetState(request).has_value();
+        }
     };
 
     TEST_F(ChessUiGraphicsTest, ThePiecesStartAsClassicAndFollowTheChoiceThereAndBack) {
@@ -137,6 +156,36 @@ namespace BECore::Chess::Tests {
         Graphics().Set(GraphicsPreset::Classic);
         Frame();
         EXPECT_EQ(EditorIcon("EditorBarKing"), "ClassicWhiteKing"_intern);
+    }
+
+    TEST_F(ChessUiGraphicsTest, APickByTheControlApiReachesThePiecesTheIconsAndTheTheme) {
+        Frame();
+        ASSERT_EQ(CoreManager::GetUIThemes().GetTheme(), "classic"_intern);
+        ASSERT_EQ(CountPiecesShowing(GraphicsPreset::Classic), 32u);
+
+        ASSERT_TRUE(PickByControl("beer"));
+        Frame();
+        EXPECT_EQ(CountPiecesShowing(GraphicsPreset::Beer), 32u);
+        EXPECT_EQ(CoreManager::GetUIThemes().GetTheme(), "tavern"_intern);
+
+        // A capture on the way: the icon is published under the preset on, and the editor bar shows the same set
+        ASSERT_TRUE(PlayAll(Model(), {"e2e4", "d7d5", "e4d5"}));
+        Frame();
+        EXPECT_EQ(MaterialSprite("Bottom", "Pawn"), "BlackPawn");
+        ChessGame::GetActive()->BeginEditing(EditStart::Empty);
+        Frame();
+        EXPECT_EQ(EditorIcon("EditorBarQueen"), "WhiteQueen"_intern);
+        ChessGame::GetActive()->CancelEditing();
+        Frame();
+
+        ASSERT_TRUE(PickByControl("classic"));
+        Frame();
+        EXPECT_EQ(MaterialSprite("Bottom", "Pawn"), "ClassicBlackPawn");
+        EXPECT_EQ(CoreManager::GetUIThemes().GetTheme(), "classic"_intern);
+        EXPECT_EQ(SpriteOfPieceNode("WhiteKing_e1"), "ClassicWhiteKing"_intern);
+        ChessGame::GetActive()->BeginEditing(EditStart::Empty);
+        Frame();
+        EXPECT_EQ(EditorIcon("EditorBarQueen"), "ClassicWhiteQueen"_intern);
     }
 
 }  // namespace BECore::Chess::Tests

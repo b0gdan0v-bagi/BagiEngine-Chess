@@ -100,7 +100,7 @@ namespace BECore::Chess {
         return chess ? &chess->GetPuzzle() : nullptr;
     }
 
-    ChessGame::ChessGame() : _opponent(_model), _choice(_opponent), _control(_model, _opponent, _analyst, _drawJudge, _openings, _editor, _puzzle) {
+    ChessGame::ChessGame() : _opponent(_model), _choice(_opponent), _control(_model, _opponent, _analyst, _drawJudge, _openings, _editor, _puzzle, _graphics) {
         // A new game draws a new seed; a device per draw because the source has to be copyable and a Reset is rare
         _model.SetSeedSource([]() -> uint32_t {
             //-NoStd: the operating system's randomness is the real boundary of the seed
