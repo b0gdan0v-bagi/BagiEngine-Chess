@@ -1,3 +1,4 @@
+#include <BECore/UI/UIEnvironment.h>
 #include <Chess/Game/StatusText.h>
 #include <tests/ChessUiHarness.h>
 

@@ -1,6 +1,8 @@
+#include <BECore/File/File.h>
 #include <BECore/Reflection/XmlDeserializer.h>
 #include <Chess/Game/ChessTypes.h>
 #include <Chess/Game/Position.h>
+#include <Common/TestFiles.h>
 #include <tests/ShippedScene.h>
 
 /**
@@ -59,7 +61,7 @@ namespace BECore::Chess::Tests {
 
     TEST(ChessSceneFilesTest, EveryReferenceAndOverrideOfTheSceneLoads) {
         pugi::xml_document document;
-        ASSERT_TRUE(LoadShippedSceneDocument(document)) << ShippedSceneConfig().string();
+        ASSERT_TRUE(LoadShippedSceneDocument(document)) << ShippedSceneConfig().CStr();
     }
 
     TEST(ChessSceneFilesTest, TheExpandedSceneDeserializesWithoutErrors) {
@@ -121,7 +123,7 @@ namespace BECore::Chess::Tests {
 
     TEST(ChessSceneFilesTest, TheSceneFileHoldsOnlyReferencesAndEveryNodeFileIsReferenced) {
         pugi::xml_document raw;
-        ASSERT_TRUE(raw.load_file(ShippedSceneConfig().string().c_str())) << ShippedSceneConfig().string();
+        ASSERT_TRUE(raw.load_file(ShippedSceneConfig().CStr())) << ShippedSceneConfig().CStr();
         Set<String> referenced;
         for (const pugi::xml_node node : NodesOf(SceneNodes(raw))) {
             const pugi::xml_attribute ref = node.attribute("ref");
@@ -131,25 +133,27 @@ namespace BECore::Chess::Tests {
             }
         }
 
-        const std::filesystem::path folder = ShippedConfigFolder() / "nodes";
-        ASSERT_TRUE(std::filesystem::is_directory(folder)) << folder.string();
-        size_t files = 0;
-        //-NoStd: engine-file-layer: the test walks the source tree, which the engine's file layer does not mount
-        for (const auto& entry : std::filesystem::directory_iterator(folder)) {
-            if (entry.path().extension() != ".xml") {
-                continue;
+        const Path folder = ShippedConfigFolder() / "nodes";
+        ASSERT_TRUE(::BECore::Tests::IsFolder(folder)) << folder.CStr();
+        Vector<Path> nodeFiles;
+        const auto walked = WalkDirectory(folder.View(), WalkMode::Folder, [&](StringView name, FileKind kind) {
+            if (kind == FileKind::File && Path(name).Extension().View() == ".xml") {
+                nodeFiles.push_back(folder / name);
             }
-            ++files;
-            const String reference = Format("nodes/{}", entry.path().stem().string());
-            EXPECT_TRUE(referenced.contains(reference)) << "not referenced by the scene: " << entry.path().filename().string();
+            return true;
+        });
+        ASSERT_TRUE(walked.has_value());
+        for (const Path& entry : nodeFiles) {
+            const String reference = Format("nodes/{}", entry.Stem().View());
+            EXPECT_TRUE(referenced.contains(reference)) << "not referenced by the scene: " << entry.Filename().CStr();
 
             pugi::xml_document file;
-            ASSERT_TRUE(file.load_file(entry.path().string().c_str())) << entry.path().string();
+            ASSERT_TRUE(file.load_file(entry.CStr())) << entry.CStr();
             const pugi::xml_node root = file.document_element();
-            EXPECT_STREQ(root.name(), "node") << entry.path().filename().string();
-            EXPECT_TRUE(root.attribute("contentVersion")) << entry.path().filename().string();
+            EXPECT_STREQ(root.name(), "node") << entry.Filename().CStr();
+            EXPECT_TRUE(root.attribute("contentVersion")) << entry.Filename().CStr();
         }
-        EXPECT_GT(files, 0u);
+        EXPECT_GT(nodeFiles.size(), 0u);
     }
 
 }  // namespace BECore::Chess::Tests

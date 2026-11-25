@@ -1,5 +1,6 @@
 #include "SaveSettings.h"
 
+#include <BECore/Config/ConfigManager.h>
 #include <BECore/Control/ControlSettings.h>
 #include <BECore/GameManager/CoreManager.h>
 #include <BECore/Save/SaveStorage.h>
@@ -29,9 +30,7 @@ namespace BECore::Chess {
 
         bool IsControlRun(const CommandLine& commandLine) {
             using namespace ControlArguments;
-            const StringView controlPort = kControlPortPrefix.substr(0, kControlPortPrefix.size() - 1);
-            return commandLine.HasFlag(kControl) || commandLine.HasFlag(kHeadless) || commandLine.HasFlag(kManualClock) || commandLine.HasFlag(controlPort) ||
-                   commandLine.FindValue(controlPort).has_value();
+            return commandLine.HasFlag(kControl) || commandLine.HasFlag(kHeadless) || commandLine.HasFlag(kManualClock) || commandLine.Find(kControlPort).has_value();
         }
 
     }  // namespace
@@ -49,32 +48,32 @@ namespace BECore::Chess {
         return FromConfig(root(OpponentSettings::kSharedConfigName), root(OpponentSettings::kLocalConfigName));
     }
 
-    std::filesystem::path DefaultSaveDirectory() {
+    Path DefaultSaveDirectory() {
         char* prefPath = SDL_GetPrefPath(kSaveOrganization, kSaveApplication);
         if (prefPath == nullptr) {
             LOG_WARNING("Save: no per-user folder, the game is not remembered: {}"_format(SDL_GetError()));
             return {};
         }
-        std::filesystem::path directory(prefPath);
+        const Path directory(prefPath);
         SDL_free(prefPath);
-        return directory / std::filesystem::path(kSaveSubfolder.data(), kSaveSubfolder.data() + kSaveSubfolder.size());
+        return directory / kSaveSubfolder;
     }
 
-    Optional<std::filesystem::path> ResolveSaveDirectory(const CommandLine& commandLine, bool rememberGame, std::filesystem::path (*defaultDirectory)()) {
+    Optional<Path> ResolveSaveDirectory(const CommandLine& commandLine, bool rememberGame, Path (*defaultDirectory)()) {
         if (commandLine.HasFlag(SaveArguments::kNoSave)) {
             return std::nullopt;
         }
         if (const Optional<StringView> explicitFolder = commandLine.FindValue(SaveArguments::kSaveDir); explicitFolder && !explicitFolder->empty()) {
-            return std::filesystem::path(explicitFolder->data(), explicitFolder->data() + explicitFolder->size());
+            return Path(*explicitFolder);
         }
         if (!rememberGame || IsControlRun(commandLine)) {
             return std::nullopt;
         }
-        std::filesystem::path directory = PersistentSaveDirectory();
-        if (directory.empty()) {
+        Path directory = PersistentSaveDirectory();
+        if (directory.Empty()) {
             directory = defaultDirectory();
         }
-        if (directory.empty()) {
+        if (directory.Empty()) {
             return std::nullopt;
         }
         return directory;

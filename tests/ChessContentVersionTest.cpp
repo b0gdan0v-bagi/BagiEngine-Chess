@@ -8,7 +8,7 @@
 namespace BECore::Tests {
 
     TEST(ChessContentVersionTest, EveryContentFileOfTheGameIsAtTheEnginesVersion) {
-        const std::filesystem::path config = std::filesystem::path(__FILE__).parent_path().parent_path() / "config";
+        const Path config = Path(__FILE__).Parent().Parent() / "config";
         ExpectContentFilesAtCurrentVersion(config);
     }
 

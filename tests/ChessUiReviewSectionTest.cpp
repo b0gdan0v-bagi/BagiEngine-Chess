@@ -1,3 +1,4 @@
+#include <BECore/UI/UIEnvironment.h>
 #include <Chess/Components/ChessReviewSectionComponent.h>
 #include <Chess/Components/MoveRows.h>
 #include <Chess/Engine/OpponentText.h>

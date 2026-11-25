@@ -1,6 +1,7 @@
 #pragma once
 
 #include <BECore/Application/CommandLine.h>
+#include <BECore/File/Path.h>
 
 namespace BECore::Chess {
 
@@ -30,7 +31,7 @@ namespace BECore::Chess {
     }  // namespace SaveArguments
 
     /// The per-user folder for the saves: `saves` under the SDL preference folder of BagiEngine / BagiChess; empty, with one warning, when there is none
-    [[nodiscard]] std::filesystem::path DefaultSaveDirectory();
+    [[nodiscard]] Path DefaultSaveDirectory();
 
     /**
      * @brief Where this run reads and writes its save, or nothing when it neither reads nor writes one: the gate of persistence. Pure apart from @p defaultDirectory, so a test passes its own.
@@ -45,6 +46,6 @@ namespace BECore::Chess {
      *
      * A folder that comes back empty from the last step is "nothing".
      */
-    [[nodiscard]] Optional<std::filesystem::path> ResolveSaveDirectory(const CommandLine& commandLine, bool rememberGame, std::filesystem::path (*defaultDirectory)() = &DefaultSaveDirectory);
+    [[nodiscard]] Optional<Path> ResolveSaveDirectory(const CommandLine& commandLine, bool rememberGame, Path (*defaultDirectory)() = &DefaultSaveDirectory);
 
 }  // namespace BECore::Chess

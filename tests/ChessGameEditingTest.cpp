@@ -1,7 +1,7 @@
-#include <BECore/Control/Json.h>
 #include <Chess/ChessGame.h>
 #include <Chess/Game/EditorText.h>
 #include <Common/EngineEnvironment.h>
+#include <tests/ChessTestJson.h>
 #include <tests/ChessTestUtil.h>
 
 /// ChessGame and its position editor, without a scene: the actions of the editor on a game, and what ends a draft.
@@ -168,7 +168,7 @@ namespace BECore::Chess::Tests {
         game.BeginEditing(EditStart::Empty);
         Json request = Json::object();
         request["fen"] = MakeJsonString("4k3/8/8/8/8/8/4P3/4K3 w - - 0 1");
-        ASSERT_TRUE(game.AsControllable()->SetState(request).has_value());
+        ASSERT_TRUE(DomControl(*game.AsControllable()).SetState(request).has_value());
         EXPECT_FALSE(game.IsEditing());
         EXPECT_EQ(game.GetModel().GetPosition().ToFen(), "4k3/8/8/8/8/8/4P3/4K3 w - - 0 1");
     }

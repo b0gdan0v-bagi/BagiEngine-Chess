@@ -1,6 +1,6 @@
-#include <BECore/Control/Json.h>
 #include <Chess/ChessGame.h>
 #include <Common/EngineEnvironment.h>
+#include <tests/ChessTestJson.h>
 #include <tests/ChessTestUtil.h>
 
 /// The "editor" member of the control state and the editor's share of the state version, over a real ChessGame (the adapter is wired by it).
@@ -14,8 +14,8 @@ namespace BECore::Chess::Tests {
                 ::BECore::Tests::EngineEnvironment::EnsureCoreServices();
             }
 
-            IControllableGame& Control() {
-                return *game.AsControllable();
+            DomControl Control() {
+                return DomControl(*game.AsControllable());
             }
 
             Json State() {

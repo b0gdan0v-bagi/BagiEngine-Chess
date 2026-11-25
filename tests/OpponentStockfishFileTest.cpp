@@ -14,8 +14,8 @@ namespace BECore::Chess::Tests {
     namespace {
 
         constexpr const char* kFileName = "stockfish-file";
-        OpponentSettings SettingsAt(const std::filesystem::path& path) {
-            return OpponentSettings{FromStdString(path.string())};
+        OpponentSettings SettingsAt(const Path& path) {
+            return OpponentSettings{String(path.View())};
         }
 
         size_t EasyLevel() {
@@ -48,7 +48,7 @@ namespace BECore::Chess::Tests {
 
         ASSERT_FALSE(refused.has_value());
         EXPECT_EQ(refused.error().kind, EngineErrorKind::LaunchFailed);
-        EXPECT_NE(refused.error().detail.find(FromStdString(directory.File(kFileName).string()).c_str()), String::npos) << "the sentence names the path that was tried";
+        EXPECT_NE(refused.error().detail.find(String(directory.File(kFileName).View()).c_str()), String::npos) << "the sentence names the path that was tried";
         EXPECT_EQ(controller.GetEngine(), OpponentEngine::Own);
         EXPECT_FALSE(controller.GetPlays().has_value());
         ASSERT_TRUE(controller.GetError().has_value());
@@ -130,8 +130,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(controller.GetRevision(), revision) << "what is installed is not the state of the game";
 
         // A pick looks afresh on its own, and the cache learns from it
-        std::error_code ignored;
-        std::filesystem::remove(directory.File(kFileName), ignored);
+        ::BECore::Tests::RemoveFileIfPresent(directory.File(kFileName));
         controller.RefreshStockfish();
         ASSERT_FALSE(controller.OffersStockfish());
         ASSERT_TRUE(controller.SetEngine(OpponentEngine::Own).has_value());

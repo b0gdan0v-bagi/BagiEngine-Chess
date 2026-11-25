@@ -1,9 +1,9 @@
-#include <BECore/Control/Json.h>
 #include <Chess/ChessGameControl.h>
 #include <Chess/Engine/OwnEngine.h>
 #include <Chess/Game/MoveGenerator.h>
 #include <Common/EngineEnvironment.h>
 #include <EASTL/algorithm.h>
+#include <tests/ChessTestJson.h>
 #include <tests/ChessTestUtil.h>
 #include <tests/ShippedOpenings.h>
 #include <tests/TestEngines.h>
@@ -81,7 +81,7 @@ namespace BECore::Chess::Tests {
                 ::BECore::Tests::EngineEnvironment::EnsureCoreServices();  // TaskManager, which the searches run on
             }
 
-            ChessGameControlTest() : opponent(model), control(model, opponent, analyst, drawJudge, openings, editor, puzzle) {
+            ChessGameControlTest() : opponent(model), adapter(model, opponent, analyst, drawJudge, openings, editor, puzzle), control(adapter) {
 #if CHESS_NO_STOCKFISH
                 // The cases below are a world of doubles in which "stockfish" is a name a test factory answers. A build without Stockfish starts with the own engine, so the
                 // fixture picks the name first, through a factory that makes any double. The cases of a real game of that build are those that say `WithoutStockfish`
@@ -221,7 +221,7 @@ namespace BECore::Chess::Tests {
 
             /// The state of the analysis as one string, to see that a refused call changed nothing
             String AnalysisSnapshot() {
-                return FromStdString(AnalysisOfState().dump()) + " v" + ToString(control.GetStateVersion());
+                return AnalysisOfState().dump() + " v" + ToString(control.GetStateVersion());
             }
 
             /// What ChessBoardComponent does with the draw judge in a frame: its step, and an accepted verdict ends the game
@@ -238,7 +238,8 @@ namespace BECore::Chess::Tests {
             OpeningBook openings;  ///< empty, like a game whose file is missing; a case that wants names copies the shipped book in
             PositionEditor editor;
             PuzzleSession puzzle;
-            ChessGameControl control;
+            ChessGameControl adapter;
+            DomControl control;  ///< the adapter with a Json tree in and out
         };
 
     }  // namespace
@@ -415,7 +416,7 @@ namespace BECore::Chess::Tests {
         const Json* moves = FindJsonMember(state, "moves");
         ASSERT_NE(moves, nullptr);
         for (size_t index = 0; index < moves->size(); ++index) {
-            const std::string& uci = (*moves)[index].get_ref<const std::string&>();  //-NoStd: nlohmann string, no engine accessor for it
+            const String& uci = (*moves)[index].Text();
             const auto move = MoveGenerator::ParseUci(*replayed, StringView(uci.c_str(), uci.size()));
             ASSERT_TRUE(move.has_value()) << uci;
             replayed->DoMove(*move);
@@ -735,8 +736,8 @@ namespace BECore::Chess::Tests {
         const OpeningBook freshOpenings;
         const PositionEditor freshEditor;
         PuzzleSession freshPuzzle;
-        ChessGameControl freshControl(freshModel, freshOpponent, freshAnalyst, freshJudge, freshOpenings, freshEditor, freshPuzzle);
-        const auto freshState = freshControl.GetState();
+        ChessGameControl freshAdapter(freshModel, freshOpponent, freshAnalyst, freshJudge, freshOpenings, freshEditor, freshPuzzle);
+        const auto freshState = DomControl(freshAdapter).GetState();
         ASSERT_TRUE(freshState.has_value());
         const Json* freshOpponentState = FindJsonMember(*freshState, "opponent");
         ASSERT_NE(freshOpponentState, nullptr);
@@ -2608,7 +2609,7 @@ namespace BECore::Chess::Tests {
         String Joined(const Json& array) {
             String joined;
             for (const Json& entry : array) {
-                const std::string& text = entry.get_ref<const std::string&>();  //-NoStd: nlohmann string, no engine accessor for it
+                const String& text = entry.Text();
                 joined += joined.empty() ? "" : " ";
                 joined.append(text.c_str(), text.size());
             }
@@ -3199,7 +3200,7 @@ namespace BECore::Chess::Tests {
 
         /// A control adapter over a controller of its own, with the default factory and the default engine of this build
         struct RealDefaults {
-            RealDefaults() : opponent(model), control(model, opponent, analyst, drawJudge, openings, editor, puzzle) {}
+            RealDefaults() : opponent(model), adapter(model, opponent, analyst, drawJudge, openings, editor, puzzle), control(adapter) {}
 
             Json OpponentState() const {
                 const auto state = control.GetState();
@@ -3214,7 +3215,8 @@ namespace BECore::Chess::Tests {
             OpeningBook openings;
             PositionEditor editor;
             PuzzleSession puzzle;
-            ChessGameControl control;
+            ChessGameControl adapter;
+            DomControl control;  ///< the adapter with a Json tree in and out
         };
 
     }  // namespace

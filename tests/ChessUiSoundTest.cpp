@@ -54,7 +54,7 @@ namespace BECore::Chess::Tests {
         Json action = Json::object();
         action["type"] = "move";
         action["uci"] = "d7d5";
-        ASSERT_TRUE(ChessGame::GetActive()->AsControllable()->PerformAction(action).has_value());
+        ASSERT_TRUE(DomControl(*ChessGame::GetActive()->AsControllable()).PerformAction(action).has_value());
         _manager->UpdateAll();
         ExpectOneRequestFor(AudioRequestsSince(before), SoundCue::Move);
     }
@@ -148,7 +148,7 @@ namespace BECore::Chess::Tests {
 
         Json state = Json::object();
         state["fen"] = MakeJsonString(kCaptureFen);
-        ASSERT_TRUE(ChessGame::GetActive()->AsControllable()->SetState(state).has_value());
+        ASSERT_TRUE(DomControl(*ChessGame::GetActive()->AsControllable()).SetState(state).has_value());
         _manager->UpdateAll();
         EXPECT_EQ(AudioRequests(), before) << "set_state with a FEN";
 

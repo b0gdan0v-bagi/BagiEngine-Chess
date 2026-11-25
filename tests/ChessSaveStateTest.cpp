@@ -3,6 +3,7 @@
 #include <Chess/Save/ChessSaveState.h>
 #include <Common/EngineEnvironment.h>
 #include <Common/TempPath.h>
+#include <Common/TestFiles.h>
 #include <tests/ChessTestUtil.h>
 #include <tests/TestEngines.h>
 
@@ -84,17 +85,16 @@ namespace BECore::Chess::Tests {
 
         void SetUp() override {
             _directory = ::BECore::Tests::TestTempDirectory("ChessSaveState");
-            std::filesystem::remove_all(_directory);
+            ::BECore::Tests::MakeEmptyDirectory(_directory);
             ASSERT_TRUE(_service.Initialize(_directory / "saves"));
             // Whether Stockfish is offered decides what a seat nobody plays comes back as, so it must not come from the machine: STOCKFISH names a file for the whole case
-            const std::filesystem::path stockfish = _directory / "stockfish";
+            const Path stockfish = _directory / "stockfish";
             MakeStockfishFile(stockfish);
-            _stockfishEnvironment.emplace("STOCKFISH", FromStdString(stockfish.string()).c_str());
+            _stockfishEnvironment.emplace("STOCKFISH", String(stockfish.View()).c_str());
         }
 
         void TearDown() override {
-            std::error_code ignored;
-            std::filesystem::remove_all(_directory, ignored);
+            ::BECore::Tests::RemoveDirectory(_directory);
         }
 
         /// What the game does at the start: read the slot, check it, apply it. The error of the first step that refused
@@ -173,7 +173,7 @@ namespace BECore::Chess::Tests {
             ASSERT_TRUE(_service.Save(kChessSaveSlot, kChessSaveSchema, state).has_value());
         }
 
-        std::filesystem::path _directory;
+        Path _directory;
         Optional<ScopedEnvironment> _stockfishEnvironment;
         FileSystem _fileSystem;
         SaveGameService _service{_fileSystem};

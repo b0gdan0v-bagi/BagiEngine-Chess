@@ -1,3 +1,5 @@
+#include <BECore/Config/ConfigManager.h>
+#include <BECore/File/Path.h>
 #include <BECore/GameManager/CoreManager.h>
 #include <Chess/Engine/OpponentSettings.h>
 #include <Common/EngineEnvironment.h>
@@ -8,8 +10,8 @@ namespace BECore::Chess::Tests {
 
     namespace {
 
-        std::filesystem::path ShippedSettingsConfig() {
-            return std::filesystem::path(__FILE__).parent_path().parent_path() / "config" / "ChessSettings.xml";
+        Path ShippedSettingsConfig() {
+            return Path(__FILE__).Parent().Parent() / "config" / "ChessSettings.xml";
         }
 
         /// The settings of two files given as text; null means no such file
@@ -104,13 +106,13 @@ namespace BECore::Chess::Tests {
 
     TEST(OpponentSettingsTest, TheTwoConfigsHaveTheNamesTheirFilesGive) {
         // ConfigManager keys a file by its stem: config/ChessSettings.xml and config/ChessSettings.local.xml
-        EXPECT_EQ(FromStdString(std::filesystem::path("ChessSettings.xml").stem().string()), String(OpponentSettings::kSharedConfigName.data(), OpponentSettings::kSharedConfigName.size()));
-        EXPECT_EQ(FromStdString(std::filesystem::path("ChessSettings.local.xml").stem().string()), String(OpponentSettings::kLocalConfigName.data(), OpponentSettings::kLocalConfigName.size()));
+        EXPECT_EQ(String(Path("ChessSettings.xml").Stem().View()), String(OpponentSettings::kSharedConfigName.data(), OpponentSettings::kSharedConfigName.size()));
+        EXPECT_EQ(String(Path("ChessSettings.local.xml").Stem().View()), String(OpponentSettings::kLocalConfigName.data(), OpponentSettings::kLocalConfigName.size()));
     }
 
     TEST(OpponentSettingsTest, TheShippedFileCarriesNoPath) {
         const XmlConfig config = XmlConfig::Create();
-        ASSERT_TRUE(config.LoadFromFile(ShippedSettingsConfig())) << ShippedSettingsConfig().string();
+        ASSERT_TRUE(config.LoadFromFile(ShippedSettingsConfig())) << ShippedSettingsConfig().CStr();
         const XmlNode root = config.GetRoot();
         ASSERT_TRUE(root);
 

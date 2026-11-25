@@ -1,6 +1,6 @@
 #include "ChessGameControl.h"
 
-#include <BECore/Control/Json.h>
+#include <BECore/Control/ControlParams.h>
 #include <Chess/Engine/OpponentChoice.h>
 #include <Chess/Game/CapturedMaterial.h>
 #include <Chess/Game/EditorText.h>
@@ -68,8 +68,13 @@ namespace BECore::Chess {
             return "bad_request";
         }
 
-        Json TextJson(const String& text) {
-            return MakeJsonString(StringView(text));
+        void WriteText(JsonWriter& writer, StringView key, StringView text) {
+            writer.Key(key);
+            writer.Value(text);
+        }
+
+        void WriteText(JsonWriter& writer, StringView key, const String& text) {
+            WriteText(writer, key, StringView(text));
         }
 
         bool IsUciSyntax(StringView text) {
@@ -94,31 +99,50 @@ namespace BECore::Chess {
             return false;
         }
 
-        /// The members that say how the game stands; the state and the outcome of a move both carry them
-        void AddStanding(Json& json, const ChessGameModel& model) {
+        /// "winner" of the state and of the outcome of a move
+        void WriteWinner(JsonWriter& writer, const ChessGameModel& model) {
             const auto winner = model.GetWinner();
-            json["turn"] = MakeJsonString(PieceColorId(model.GetTurn()));
-            json["status"] = MakeJsonString(StatusName(model.GetStatus()));
-            json["winner"] = winner ? MakeJsonString(PieceColorId(*winner)) : Json();
-            json["inCheck"] = model.IsInCheck();
+            writer.Key("winner");
+            if (winner) {
+                writer.Value(PieceColorId(*winner));
+            } else {
+                writer.Null();
+            }
         }
 
-        Json MaterialJson(const Position& position) {
-            const MaterialSummary summary = SummarizeMaterial(position);
-            const auto captured = [&](PieceColor gone) {
-                Json counts = Json::object();
-                for (const PieceType type : CapturableTypes()) {
-                    const StringView id = CapturedId(type);
-                    counts[ToStdString(id)] = summary.GetMissing(gone, type);
-                }
-                return counts;
+        /// One value: the counts of the pieces a side has taken, the ids in byte order
+        void WriteCaptured(JsonWriter& writer, const MaterialSummary& summary, PieceColor gone) {
+            struct Count {
+                StringView id;
+                int count;
             };
+            Count counts[8];
+            size_t used = 0;
+            for (const PieceType type : CapturableTypes()) {
+                ASSERT(used < std::size(counts), "WriteCaptured: more capturable types than room");
+                const Count entry{CapturedId(type), static_cast<int>(summary.GetMissing(gone, type))};
+                size_t at = used++;
+                for (; at > 0 && entry.id < counts[at - 1].id; --at) {
+                    counts[at] = counts[at - 1];
+                }
+                counts[at] = entry;
+            }
+            writer.BeginObject();
+            for (size_t i = 0; i < used; ++i) {
+                writer.Member(counts[i].id, counts[i].count);
+            }
+            writer.EndObject();
+        }
 
-            Json material = Json::object();
-            material["balance"] = summary.GetBalance();
-            material["capturedByWhite"] = captured(PieceColor::Black);  // what White has taken is what Black is missing
-            material["capturedByBlack"] = captured(PieceColor::White);
-            return material;
+        void WriteMaterial(JsonWriter& writer, const Position& position) {
+            const MaterialSummary summary = SummarizeMaterial(position);
+            writer.BeginObject();
+            writer.Member("balance", summary.GetBalance());
+            writer.Key("capturedByBlack");
+            WriteCaptured(writer, summary, PieceColor::White);
+            writer.Key("capturedByWhite");
+            WriteCaptured(writer, summary, PieceColor::Black);  // what White has taken is what Black is missing
+            writer.EndObject();
         }
 
         String LevelIds() {
@@ -147,21 +171,22 @@ namespace BECore::Chess {
             return ids;
         }
 
-        Json ErrorJson(const Optional<EngineError>& error) {
+        void WriteError(JsonWriter& writer, const Optional<EngineError>& error) {
             if (!error) {
-                return Json();
+                writer.Null();
+                return;
             }
-            Json described = Json::object();
-            described["kind"] = MakeJsonString(ErrorKindName(error->kind));
-            described["detail"] = TextJson(error->detail);
-            return described;
+            writer.BeginObject();
+            WriteText(writer, "detail", error->detail);
+            writer.Member("kind", ErrorKindName(error->kind));
+            writer.EndObject();
         }
 
-        Json ScoreJson(const AnalysisScore& score) {
-            Json json = Json::object();
-            json["kind"] = score.kind == AnalysisScoreKind::Mate ? "mate" : "centipawns";
-            json["value"] = score.value;
-            return json;
+        void WriteScore(JsonWriter& writer, const AnalysisScore& score) {
+            writer.BeginObject();
+            writer.Member("kind", score.kind == AnalysisScoreKind::Mate ? "mate" : "centipawns");
+            writer.Member("value", score.value);
+            writer.EndObject();
         }
 
         struct AnalysisPick {
@@ -172,17 +197,21 @@ namespace BECore::Chess {
 
         constexpr const char* kAnalysisUsage = "'analysis' has to be an object like {\"evaluation\": true, \"hint\": true, \"ratings\": true} (the members are optional booleans)";
 
-        std::expected<AnalysisPick, ControlError> ParseAnalysis(const Json& analysis) {
-            if (!analysis.is_object()) {
+        std::expected<AnalysisPick, ControlError> ParseAnalysis(JsonView analysis) {
+            if (!analysis.IsObject()) {
                 return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, kAnalysisUsage));
             }
             AnalysisPick pick;
-            for (const auto& [key, value] : analysis.items()) {
-                Optional<bool>* target = key == "evaluation" ? &pick.evaluation : key == "hint" ? &pick.hint : key == "ratings" ? &pick.ratings : nullptr;
-                if (!target || !value.is_boolean()) {
+            for (const JsonMember member : analysis.Members()) {
+                Optional<bool>* target = member.key.TextEquals("evaluation") ? &pick.evaluation
+                                         : member.key.TextEquals("hint")     ? &pick.hint
+                                         : member.key.TextEquals("ratings")  ? &pick.ratings
+                                                                             : nullptr;
+                const Optional<bool> value = member.value.AsBool();
+                if (!target || !value) {
                     return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, kAnalysisUsage));
                 }
-                *target = value.get<bool>();
+                *target = value;
             }
             return pick;
         }
@@ -201,17 +230,17 @@ namespace BECore::Chess {
 
         constexpr const char* kTakeBackUsage = "'takeBack' has to be an object like {} (the button's rule) or {\"plies\": 2} (the member is an optional integer from 1 to the moves played)";
 
-        /// The SAN of every move of the game, in the order of GetMoves()
-        Json SanMovesJson(const ChessGameModel& model) {
-            Json san = Json::array();
+        /// One value: the SAN of every move of the game, in the order of GetMoves()
+        void WriteSanMoves(JsonWriter& writer, const ChessGameModel& model) {
+            writer.BeginArray();
             for (const MoveListRow& row : BuildMoveList(model.GetStartFen(), model.GetMoves())) {
                 for (const MoveListEntry* entry : {&row.white, &row.black}) {
                     if (entry->ply >= 0) {
-                        san.push_back(TextJson(entry->san));
+                        writer.Value(StringView(entry->san));
                     }
                 }
             }
-            return san;
+            writer.EndArray();
         }
 
         /// The caller answers null for Idle first: an Idle review has no state to name
@@ -243,15 +272,16 @@ namespace BECore::Chess {
         }
 
         /// {"eco", "name"} of the opening of the game, or null
-        Json OpeningJson(const OpeningBook& openings, const ChessGameModel& model) {
+        void WriteOpening(JsonWriter& writer, const OpeningBook& openings, const ChessGameModel& model) {
             const Optional<OpeningEntry> entry = OpeningOf(openings, model.GetStartFen(), model.GetMoves(), model.GetMoves().size());
             if (!entry) {
-                return Json();
+                writer.Null();
+                return;
             }
-            Json opening = Json::object();
-            opening["eco"] = TextJson(entry->eco);
-            opening["name"] = TextJson(entry->name);
-            return opening;
+            writer.BeginObject();
+            WriteText(writer, "eco", entry->eco);
+            WriteText(writer, "name", entry->name);
+            writer.EndObject();
         }
 
         ControlError BadOpponent(String message) {
@@ -259,18 +289,18 @@ namespace BECore::Chess {
         }
 
         /// Reads "level" and "engine" of the opponent or of one of its seat objects (named @p where in a message); a member that is missing keeps what it was
-        std::expected<void, ControlError> ReadChoice(const Json& object, StringView where, SeatChoice& choice) {
-            if (FindJsonMember(object, "level")) {
-                const auto id = GetJsonString(object, "level");
-                const Optional<size_t> level = id ? FindOpponentLevel(StringView(id->data(), id->size())) : std::nullopt;
+        std::expected<void, ControlError> ReadChoice(JsonView object, StringView where, SeatChoice& choice) {
+            if (FindParam(object, "level")) {
+                const auto id = GetParamString(object, "level");
+                const Optional<size_t> level = id ? FindOpponentLevel(StringView(*id)) : std::nullopt;
                 if (!level) {
                     return std::unexpected(BadOpponent(Format("{} 'level' has to be the id of a level: {}", where, LevelIds())));
                 }
                 choice.level = *level;
             }
-            if (FindJsonMember(object, "engine")) {
-                const auto id = GetJsonString(object, "engine");
-                const Optional<OpponentEngine> engine = id ? FindOpponentEngine(StringView(id->data(), id->size())) : std::nullopt;
+            if (FindParam(object, "engine")) {
+                const auto id = GetParamString(object, "engine");
+                const Optional<OpponentEngine> engine = id ? FindOpponentEngine(StringView(*id)) : std::nullopt;
                 if (!engine) {
                     return std::unexpected(BadOpponent(Format("{} 'engine' has to be the id of an engine: {}", where, EngineIds())));
                 }
@@ -280,13 +310,15 @@ namespace BECore::Chess {
         }
 
         /// Nothing but "engine" and "level" is a member of a seat object
-        std::expected<void, ControlError> ReadSeat(const Json& seat, StringView color, SeatChoice& choice) {
+        std::expected<void, ControlError> ReadSeat(JsonView seat, StringView color, SeatChoice& choice) {
             const String where = Format("opponent '{}'", color);
-            if (!seat.is_object()) {
+            if (!seat.IsObject()) {
                 return std::unexpected(BadOpponent(Format("{} has to be an object like {{\"engine\": \"own\", \"level\": \"easy\"}}", where)));
             }
-            for (const auto& [key, value] : seat.items()) {
-                if (key != "engine" && key != "level") {
+            for (const JsonMember member : seat.Members()) {
+                if (!member.key.TextEquals("engine") && !member.key.TextEquals("level")) {
+                    String key;
+                    member.key.ReadText(key);
                     return std::unexpected(BadOpponent(Format("{} has no member '{}': only 'engine' and 'level'", where, key)));
                 }
             }
@@ -295,8 +327,8 @@ namespace BECore::Chess {
 
         /// Reads {"plays", "level", "engine", "white", "black", "seed"}; a member that is missing keeps what @p current says, per seat. "level" and "engine" are for both seats, then the seat objects
         /// override one seat, then "plays" says who plays. Nothing is changed: the pick is applied by the caller once everything is valid
-        std::expected<OpponentPick, ControlError> ParseOpponent(const Json& opponent, OpponentPick current) {
-            if (!opponent.is_object()) {
+        std::expected<OpponentPick, ControlError> ParseOpponent(JsonView opponent, OpponentPick current) {
+            if (!opponent.IsObject()) {
                 return std::unexpected(BadOpponent("'opponent' has to be an object like {\"plays\": \"black\", \"level\": \"easy\"}"));
             }
             for (SeatChoice* seat : {&current.white, &current.black}) {  // one level and one engine for both seats
@@ -304,22 +336,22 @@ namespace BECore::Chess {
                     return std::unexpected(std::move(read.error()));
                 }
             }
-            if (const Json* white = FindJsonMember(opponent, "white")) {
+            if (const Optional<JsonView> white = FindParam(opponent, "white")) {
                 if (auto read = ReadSeat(*white, "white", current.white); !read) {
                     return std::unexpected(std::move(read.error()));
                 }
             }
-            if (const Json* black = FindJsonMember(opponent, "black")) {
+            if (const Optional<JsonView> black = FindParam(opponent, "black")) {
                 if (auto read = ReadSeat(*black, "black", current.black); !read) {
                     return std::unexpected(std::move(read.error()));
                 }
             }
-            if (const Json* plays = FindJsonMember(opponent, "plays")) {
-                if (plays->is_null()) {
+            if (const Optional<JsonView> plays = FindParam(opponent, "plays")) {
+                if (plays->IsNull()) {
                     current.plays = ProgramSides{};
                 } else {
-                    const auto side = GetJsonString(opponent, "plays");
-                    const StringView id = side ? StringView(side->data(), side->size()) : StringView();
+                    const auto side = GetParamString(opponent, "plays");
+                    const StringView id = side ? StringView(*side) : StringView();
                     const Optional<PieceColor> color = side ? ParseColor(id) : std::nullopt;
                     if (side && id == kBothId) {
                         current.plays = ProgramSides{true, true};
@@ -330,8 +362,8 @@ namespace BECore::Chess {
                     }
                 }
             }
-            if (FindJsonMember(opponent, "seed")) {
-                const Optional<int64_t> seed = GetJsonInt(opponent, "seed");
+            if (FindParam(opponent, "seed")) {
+                const Optional<int64_t> seed = GetParamInt(opponent, "seed");
                 if (!seed || *seed < 0 || *seed > static_cast<int64_t>(std::numeric_limits<uint32_t>::max())) {
                     return std::unexpected(BadOpponent(Format("opponent 'seed' has to be an integer from 0 to {} (0 is no variety)", std::numeric_limits<uint32_t>::max())));
                 }
@@ -350,8 +382,12 @@ namespace BECore::Chess {
         return _model.IsGameOver() ? MoveList() : MoveGenerator::GenerateLegal(_model.GetPosition());
     }
 
-    std::expected<Json, ControlError> ChessGameControl::GetState() const {
-        Json board = Json::array();
+    std::expected<void, ControlError> ChessGameControl::WriteState(JsonWriter& writer) const {
+        writer.BeginObject();
+        writer.Key("analysis");
+        WriteAnalysis(writer);
+        writer.Key("board");
+        writer.BeginArray();
         for (int8_t rank = 7; rank >= 0; --rank) {
             String line;
             for (int8_t file = 0; file < 8; ++file) {
@@ -359,239 +395,285 @@ namespace BECore::Chess {
                 const char* letters = piece.color == PieceColor::Black ? kBlackLetters : kWhiteLetters;
                 line.push_back(letters[static_cast<size_t>(piece.type)]);
             }
-            board.push_back(MakeJsonString(line));
+            writer.Value(StringView(line));
         }
-
-        Json moves = Json::array();
+        writer.EndArray();
+        writer.Key("drawOffer");
+        WriteDrawOffer(writer);
+        writer.Key("editor");
+        WriteEditor(writer);
+        WriteText(writer, "fen", _model.GetPosition().ToFen());
+        writer.Member("inCheck", _model.IsInCheck());
+        writer.Member("legalMoveCount", LegalMoves().size());
+        writer.Key("material");
+        WriteMaterial(writer, _model.GetPosition());
+        writer.Key("moves");
+        writer.BeginArray();
         for (const Move move : _model.GetMoves()) {
-            moves.push_back(TextJson(move.ToUci()));
+            writer.Value(StringView(move.ToUci()));
         }
-
-        Json state = Json::object();
-        state["fen"] = TextJson(_model.GetPosition().ToFen());
-        state["board"] = std::move(board);
-        AddStanding(state, _model);
-        state["legalMoveCount"] = LegalMoves().size();
-        state["startFen"] = TextJson(_model.GetStartFen());
-        state["moves"] = std::move(moves);
-        state["sanMoves"] = SanMovesJson(_model);
-        state["opening"] = OpeningJson(_openings, _model);
-        state["takeBackPlies"] = _puzzle.IsActiveFor(_model) ? 0 : TakeBackPlies(_model.GetMoves().size(), _model.GetTurn(), _opponent.GetPlays());
-        state["opponent"] = OpponentJson();
-        state["material"] = MaterialJson(_model.GetPosition());
-        state["analysis"] = AnalysisJson();
-        state["drawOffer"] = DrawOfferJson();
-        state["editor"] = EditorJson();
-        state["puzzle"] = PuzzleJson();
-        state["review"] = ReviewJson();
-        return state;
+        writer.EndArray();
+        writer.Key("opening");
+        WriteOpening(writer, _openings, _model);
+        writer.Key("opponent");
+        WriteOpponent(writer);
+        writer.Key("puzzle");
+        WritePuzzle(writer);
+        writer.Key("review");
+        WriteReview(writer);
+        writer.Key("sanMoves");
+        WriteSanMoves(writer, _model);
+        WriteText(writer, "startFen", _model.GetStartFen());
+        writer.Member("status", StatusName(_model.GetStatus()));
+        writer.Member("takeBackPlies", _puzzle.IsActiveFor(_model) ? 0 : TakeBackPlies(_model.GetMoves().size(), _model.GetTurn(), _opponent.GetPlays()));
+        writer.Member("turn", PieceColorId(_model.GetTurn()));
+        WriteWinner(writer, _model);
+        writer.EndObject();
+        return {};
     }
 
-    Json ChessGameControl::ReviewJson() const {
+    void ChessGameControl::WriteReview(JsonWriter& writer) const {
         const ReviewState reviewState = _analyst.GetReviewState(_model);
         if (reviewState == ReviewState::Idle) {
-            return Json();
+            writer.Null();
+            return;
         }
         const ReviewProgress progress = _analyst.GetReviewProgress(_model);
 
-        Json positions = Json::array();
+        writer.BeginObject();
+        writer.Member("depth", kReviewDepth);
+        writer.Member("done", progress.done);
+        writer.Key("error");
+        WriteError(writer, _analyst.GetReviewError());
+
+        writer.Key("moves");
+        writer.BeginArray();
+        for (const Optional<ReviewedMove>& move : _analyst.GetReviewedMoves(_model)) {
+            if (!move) {
+                writer.Null();
+                continue;
+            }
+            writer.BeginObject();
+            WriteText(writer, "best", move->best.ToUci());
+            writer.Member("loss", move->review.loss);
+            writer.Member("quality", MoveQualityId(move->review.quality));
+            writer.EndObject();
+        }
+        writer.EndArray();
+
+        writer.Key("positions");
+        writer.BeginArray();
         for (const Optional<ReviewedPosition>& position : _analyst.GetReviewedPositions(_model)) {
             if (!position) {
-                positions.push_back(Json());
+                writer.Null();
                 continue;
             }
             const AnalysisScore white = ScoreForWhite(position->score, position->sideToMove);
-            Json described = Json::object();
-            described["score"] = ScoreJson(white);
-            described["text"] = TextJson(ScoreText(white));
-            described["best"] = position->best.IsNull() ? Json() : TextJson(position->best.ToUci());
-            positions.push_back(std::move(described));
-        }
-
-        Json moves = Json::array();
-        for (const Optional<ReviewedMove>& move : _analyst.GetReviewedMoves(_model)) {
-            if (!move) {
-                moves.push_back(Json());
-                continue;
+            writer.BeginObject();
+            writer.Key("best");
+            if (position->best.IsNull()) {
+                writer.Null();
+            } else {
+                writer.Value(StringView(position->best.ToUci()));
             }
-            Json described = Json::object();
-            described["loss"] = move->review.loss;
-            described["quality"] = MakeJsonString(MoveQualityId(move->review.quality));
-            described["best"] = TextJson(move->best.ToUci());
-            moves.push_back(std::move(described));
+            writer.Key("score");
+            WriteScore(writer, white);
+            WriteText(writer, "text", ScoreText(white));
+            writer.EndObject();
         }
+        writer.EndArray();
 
-        Json review = Json::object();
-        review["state"] = MakeJsonString(ReviewStateId(reviewState));
-        review["done"] = progress.done;
-        review["total"] = progress.total;
-        review["depth"] = kReviewDepth;
-        review["positions"] = std::move(positions);
-        review["moves"] = std::move(moves);
-        review["error"] = ErrorJson(_analyst.GetReviewError());
-        return review;
+        writer.Member("state", ReviewStateId(reviewState));
+        writer.Member("total", progress.total);
+        writer.EndObject();
     }
 
-    Json ChessGameControl::PuzzleJson() const {
+    void ChessGameControl::WritePuzzle(JsonWriter& writer) const {
         const Puzzle* puzzle = _puzzle.GetCurrent();
         if (puzzle == nullptr || !_puzzle.IsActiveFor(_model)) {
-            return Json();
+            writer.Null();
+            return;
         }
-        Json themes = Json::array();
+        writer.BeginObject();
+        writer.Member("count", _puzzle.GetPuzzles().Size());
+        WriteText(writer, "id", puzzle->id);
+        writer.Member("index", *_puzzle.GetIndex());
+        writer.Member("mistakes", _puzzle.GetMistakes());
+        writer.Member("rating", puzzle->rating);
+        writer.Member("solver", PieceColorId(puzzle->SolverColor()));
+        writer.Member("state", PuzzlePhaseId(_puzzle.GetPhase(_model)));
+        writer.Member("step", _puzzle.GetStep(_model));
+        writer.Member("steps", _puzzle.GetSteps());
+        writer.Key("themes");
+        writer.BeginArray();
         for (const String& theme : puzzle->themes) {
-            themes.push_back(TextJson(theme));
+            writer.Value(StringView(theme));
         }
-        Json described = Json::object();
-        described["id"] = TextJson(puzzle->id);
-        described["index"] = *_puzzle.GetIndex();
-        described["count"] = _puzzle.GetPuzzles().Size();
-        described["rating"] = puzzle->rating;
-        described["themes"] = std::move(themes);
-        described["solver"] = MakeJsonString(PieceColorId(puzzle->SolverColor()));
-        described["state"] = MakeJsonString(PuzzlePhaseId(_puzzle.GetPhase(_model)));
-        described["mistakes"] = _puzzle.GetMistakes();
-        described["wrong"] = _puzzle.WasWrong();
-        described["step"] = _puzzle.GetStep(_model);
-        described["steps"] = _puzzle.GetSteps();
-        return described;
+        writer.EndArray();
+        writer.Member("wrong", _puzzle.WasWrong());
+        writer.EndObject();
     }
 
-    Json ChessGameControl::EditorJson() const {
+    void ChessGameControl::WriteEditor(JsonWriter& writer) const {
         if (!_model.IsDrafting()) {
-            return Json();
+            writer.Null();
+            return;
         }
         const auto built = _editor.Build();
         const EditorTool tool = _editor.GetTool();
 
-        Json described = Json::object();
-        described["fen"] = TextJson(_editor.ToFen());
-        described["error"] = built ? Json() : MakeJsonString(EditorText::Refusal(built.error()));
-        Json picked = Json::object();
-        picked["piece"] = MakeJsonString(EditorToolId(tool.type));
-        picked["color"] = tool.IsEraser() ? Json() : MakeJsonString(PieceColorId(tool.color));
-        described["tool"] = std::move(picked);
-        return described;
-    }
-
-    Json ChessGameControl::OpponentJson() const {
-        const Optional<PieceColor> plays = _opponent.GetPlays();
-        const Optional<EngineError>& error = _opponent.GetError();
-
-        Json seats = Json::object();
-        for (const PieceColor color : {PieceColor::White, PieceColor::Black}) {
-            const SeatChoice& choice = _opponent.GetSeatChoice(color);
-            Json seat = Json::object();
-            seat["engine"] = MakeJsonString(OpponentEngineId(choice.engine));
-            seat["level"] = MakeJsonString(GetOpponentLevels()[choice.level].id);
-            const StringView id = PieceColorId(color);
-            seats[ToStdString(id)] = std::move(seat);
-        }
-
-        Json opponent = Json::object();
-        if (_opponent.IsWatching()) {
-            opponent["plays"] = MakeJsonString(kBothId);
+        writer.BeginObject();
+        writer.Key("error");
+        if (built) {
+            writer.Null();
         } else {
-            opponent["plays"] = plays ? MakeJsonString(PieceColorId(*plays)) : Json();
+            writer.Value(EditorText::Refusal(built.error()));
         }
-        opponent["level"] = MakeJsonString(GetOpponentLevels()[_opponent.GetLevel()].id);
-        opponent["engine"] = MakeJsonString(OpponentEngineId(_opponent.GetEngine()));
-        opponent["seats"] = std::move(seats);
-        opponent["seed"] = _model.GetSeed();
-        opponent["thinking"] = _opponent.IsThinking();
-        opponent["error"] = ErrorJson(error);
-        return opponent;
+        WriteText(writer, "fen", _editor.ToFen());
+        writer.Key("tool");
+        writer.BeginObject();
+        writer.Key("color");
+        if (tool.IsEraser()) {
+            writer.Null();
+        } else {
+            writer.Value(PieceColorId(tool.color));
+        }
+        writer.Member("piece", EditorToolId(tool.type));
+        writer.EndObject();
+        writer.EndObject();
     }
 
-    Json ChessGameControl::DrawOfferJson() const {
+    void ChessGameControl::WriteOpponent(JsonWriter& writer) const {
+        const Optional<PieceColor> plays = _opponent.GetPlays();
+
+        writer.BeginObject();
+        writer.Member("engine", OpponentEngineId(_opponent.GetEngine()));
+        writer.Key("error");
+        WriteError(writer, _opponent.GetError());
+        writer.Member("level", GetOpponentLevels()[_opponent.GetLevel()].id);
+        writer.Key("plays");
+        if (_opponent.IsWatching()) {
+            writer.Value(kBothId);
+        } else if (plays) {
+            writer.Value(PieceColorId(*plays));
+        } else {
+            writer.Null();
+        }
+        writer.Key("seats");
+        writer.BeginObject();
+        for (const PieceColor color : {PieceColor::Black, PieceColor::White}) {  // the keys in byte order
+            const SeatChoice& choice = _opponent.GetSeatChoice(color);
+            writer.Key(PieceColorId(color));
+            writer.BeginObject();
+            writer.Member("engine", OpponentEngineId(choice.engine));
+            writer.Member("level", GetOpponentLevels()[choice.level].id);
+            writer.EndObject();
+        }
+        writer.EndObject();
+        writer.Member("seed", _model.GetSeed());
+        writer.Member("thinking", _opponent.IsThinking());
+        writer.EndObject();
+    }
+
+    void ChessGameControl::WriteDrawOffer(JsonWriter& writer) const {
         const DrawOfferState offer = _drawJudge.GetState(_model);
         if (offer == DrawOfferState::Idle) {
-            return Json();
+            writer.Null();
+            return;
         }
-        Json described = Json::object();
-        described["state"] = offer == DrawOfferState::Pending ? "pending" : "declined";
-        return described;
+        writer.BeginObject();
+        writer.Member("state", offer == DrawOfferState::Pending ? "pending" : "declined");
+        writer.EndObject();
     }
 
-    Json ChessGameControl::AnalysisJson() const {
-        Json analysis = Json::object();
-        analysis["evaluationOn"] = _analyst.IsEvaluationOn();
-        analysis["hintRequested"] = _analyst.IsHintRequested(_model);
-        analysis["thinking"] = _analyst.IsThinking();
+    void ChessGameControl::WriteAnalysis(JsonWriter& writer) const {
+        writer.BeginObject();
+        writer.Key("error");
+        WriteError(writer, _analyst.GetError());
 
+        writer.Key("evaluation");
         const Optional<AnalysisLine> evaluation = _analyst.GetEvaluation(_model);
         if (evaluation) {
             const AnalysisScore white = ScoreForWhite(evaluation->score, _model.GetTurn());  // a bar needs one fixed side
-            Json line = Json::object();
-            line["score"] = ScoreJson(white);
-            line["text"] = TextJson(ScoreText(white));
-            line["depth"] = evaluation->depth;
-            analysis["evaluation"] = std::move(line);
+            writer.BeginObject();
+            writer.Member("depth", evaluation->depth);
+            writer.Key("score");
+            WriteScore(writer, white);
+            WriteText(writer, "text", ScoreText(white));
+            writer.EndObject();
         } else {
-            analysis["evaluation"] = Json();
+            writer.Null();
         }
+        writer.Member("evaluationOn", _analyst.IsEvaluationOn());
 
+        writer.Key("hint");
         const Optional<AnalysisLine> hint = _analyst.GetHint(_model);
         if (hint) {
-            Json line = Json::object();
-            line["move"] = TextJson(hint->move.ToUci());
-            line["text"] = TextJson(ScoreText(hint->score));  // as the engine gave it: the side to move's view
-            line["depth"] = hint->depth;
-            analysis["hint"] = std::move(line);
+            writer.BeginObject();
+            writer.Member("depth", hint->depth);
+            WriteText(writer, "move", hint->move.ToUci());
+            WriteText(writer, "text", ScoreText(hint->score));  // as the engine gave it: the side to move's view
+            writer.EndObject();
         } else {
-            analysis["hint"] = Json();
+            writer.Null();
         }
+        writer.Member("hintRequested", _analyst.IsHintRequested(_model));
 
-        Json lines = Json::array();
+        writer.Key("lines");
+        writer.BeginArray();
         for (const AnalysisLine& line : _analyst.GetLines(_model)) {
             const AnalysisScore white = ScoreForWhite(line.score, _model.GetTurn());
-            Json described = Json::object();
-            described["move"] = TextJson(line.move.ToUci());
-            described["score"] = ScoreJson(white);
-            described["text"] = TextJson(ScoreText(white));
-            described["depth"] = line.depth;
-            lines.push_back(std::move(described));
+            writer.BeginObject();
+            writer.Member("depth", line.depth);
+            WriteText(writer, "move", line.move.ToUci());
+            writer.Key("score");
+            WriteScore(writer, white);
+            WriteText(writer, "text", ScoreText(white));
+            writer.EndObject();
         }
-        analysis["lines"] = std::move(lines);
+        writer.EndArray();
 
         // One entry per move of "moves", in the same order: null while the move is not rated
-        analysis["ratingsOn"] = _analyst.AreRatingsOn();
-        Json ratings = Json::array();
+        writer.Key("ratings");
+        writer.BeginArray();
         for (const Optional<MoveRating>& rating : _analyst.GetRatings(_model)) {
             if (rating) {
-                Json described = Json::object();
-                described["brilliant"] = rating->IsBrilliant();
-                described["reason"] = MakeJsonString(MoveRatingReasonId(rating->reason));
-                ratings.push_back(std::move(described));
+                writer.BeginObject();
+                writer.Member("brilliant", rating->IsBrilliant());
+                writer.Member("reason", MoveRatingReasonId(rating->reason));
+                writer.EndObject();
             } else {
-                ratings.push_back(Json());
+                writer.Null();
             }
         }
-        analysis["ratings"] = std::move(ratings);
-        analysis["error"] = ErrorJson(_analyst.GetError());
-        return analysis;
+        writer.EndArray();
+        writer.Member("ratingsOn", _analyst.AreRatingsOn());
+        writer.Member("thinking", _analyst.IsThinking());
+        writer.EndObject();
     }
 
-    std::expected<Json, ControlError> ChessGameControl::GetActions() const {
-        Json actions = Json::array();
+    std::expected<void, ControlError> ChessGameControl::WriteActions(JsonWriter& writer) const {
+        writer.BeginArray();
         for (const Move move : LegalMoves()) {
-            Json action = Json::object();
-            action["type"] = MakeJsonString(kMoveType);
-            action["uci"] = TextJson(move.ToUci());
-            actions.push_back(std::move(action));
+            writer.BeginObject();
+            WriteText(writer, "type", kMoveType);
+            WriteText(writer, "uci", move.ToUci());
+            writer.EndObject();
         }
-        return actions;
+        writer.EndArray();
+        return {};
     }
 
-    std::expected<Json, ControlError> ChessGameControl::PerformAction(const Json& action) {
-        const auto type = GetJsonString(action, "type");
-        if (!type || *type != kMoveType) {
+    std::expected<void, ControlError> ChessGameControl::PerformAction(JsonView action, JsonWriter& outcome) {
+        const auto type = GetParamString(action, "type");
+        if (!type || StringView(*type) != kMoveType) {
             return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, "'type' has to be \"move\""));
         }
-        const auto uci = GetJsonString(action, "uci");
-        if (!uci || !IsUciSyntax(StringView(uci->data(), uci->size()))) {
+        const auto uci = GetParamString(action, "uci");
+        if (!uci || !IsUciSyntax(StringView(*uci))) {
             return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, "'uci' has to be a move like \"e2e4\" or, for a promotion, \"e7e8q\" (the piece is n, b, r or q)"));
         }
-        const StringView spelling(uci->data(), uci->size());
+        const StringView spelling(*uci);
 
         if (_model.IsGameOver()) {
             return std::unexpected(MakeControlError(ChessControlErrors::kGameOver, Format("the game is over ({}); reset it or set a position", StatusName(_model.GetStatus()))));
@@ -608,26 +690,30 @@ namespace BECore::Chess {
         const auto played = _model.TryMove(*move);
         EXPECT(played.has_value(), "ChessGameControl: ParseUci and TryMove disagree");
 
-        Json outcome = Json::object();
-        outcome["move"] = TextJson(move->ToUci());
-        AddStanding(outcome, _model);
-        return outcome;
+        outcome.BeginObject();
+        outcome.Member("inCheck", _model.IsInCheck());
+        WriteText(outcome, "move", move->ToUci());
+        outcome.Member("status", StatusName(_model.GetStatus()));
+        outcome.Member("turn", PieceColorId(_model.GetTurn()));
+        WriteWinner(outcome, _model);
+        outcome.EndObject();
+        return {};
     }
 
-    std::expected<void, ControlError> ChessGameControl::Reset(const Json&) {
+    std::expected<void, ControlError> ChessGameControl::Reset(JsonView) {
         _model.Reset();
         return {};
     }
 
-    std::expected<void, ControlError> ChessGameControl::SetState(const Json& state) {
-        const Json* fenMember = FindJsonMember(state, "fen");
-        const Json* opponentMember = FindJsonMember(state, "opponent");
-        const Json* analysisMember = FindJsonMember(state, "analysis");
-        const Json* takeBackMember = FindJsonMember(state, "takeBack");
-        const Json* resignMember = FindJsonMember(state, "resign");
-        const Json* drawMember = FindJsonMember(state, "draw");
-        const Json* puzzleMember = FindJsonMember(state, "puzzle");
-        const Json* reviewMember = FindJsonMember(state, "review");
+    std::expected<void, ControlError> ChessGameControl::SetState(JsonView state) {
+        const Optional<JsonView> fenMember = FindParam(state, "fen");
+        const Optional<JsonView> opponentMember = FindParam(state, "opponent");
+        const Optional<JsonView> analysisMember = FindParam(state, "analysis");
+        const Optional<JsonView> takeBackMember = FindParam(state, "takeBack");
+        const Optional<JsonView> resignMember = FindParam(state, "resign");
+        const Optional<JsonView> drawMember = FindParam(state, "draw");
+        const Optional<JsonView> puzzleMember = FindParam(state, "puzzle");
+        const Optional<JsonView> reviewMember = FindParam(state, "review");
         if (!fenMember && !opponentMember && !analysisMember && !takeBackMember && !resignMember && !drawMember && !puzzleMember && !reviewMember) {
             return std::unexpected(MakeControlError(ControlErrors::kInvalidParams,
                                                     "'fen' (a FEN string), 'opponent' ({\"plays\", \"level\", \"engine\", \"white\", \"black\", \"seed\"}), both, or "
@@ -673,11 +759,11 @@ namespace BECore::Chess {
         // Check everything first: a refused call changes nothing
         Optional<Position> position;
         if (fenMember) {
-            const auto fen = GetJsonString(state, "fen");
+            const auto fen = GetParamString(state, "fen");
             if (!fen) {
                 return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, "'fen' has to be a FEN string"));
             }
-            const auto parsed = Position::FromFen(StringView(fen->data(), fen->size()));
+            const auto parsed = Position::FromFen(StringView(*fen));
             if (!parsed) {
                 return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, Format("not a position this game can play: {}", EnumUtils<FenError>::ToString(parsed.error()))));
             }
@@ -714,7 +800,7 @@ namespace BECore::Chess {
         return {};
     }
 
-    std::expected<void, ControlError> ChessGameControl::SetAnalysis(const Json& analysis) {
+    std::expected<void, ControlError> ChessGameControl::SetAnalysis(JsonView analysis) {
         // Check everything first: a refused call changes nothing, the switch of the evaluation included
         const auto pick = ParseAnalysis(analysis);
         if (!pick) {
@@ -748,22 +834,22 @@ namespace BECore::Chess {
         return {};
     }
 
-    std::expected<void, ControlError> ChessGameControl::SetTakeBack(const Json& takeBack) {
+    std::expected<void, ControlError> ChessGameControl::SetTakeBack(JsonView takeBack) {
         if (_puzzle.IsActiveFor(_model)) {
             return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, kPuzzleOnUsage));
         }
-        if (!takeBack.is_object()) {
+        if (!takeBack.IsObject()) {
             return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, kTakeBackUsage));
         }
-        for (const auto& member : takeBack.items()) {
-            if (member.key() != "plies") {
+        for (const JsonMember member : takeBack.Members()) {
+            if (!member.key.TextEquals("plies")) {
                 return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, kTakeBackUsage));
             }
         }
         const size_t played = _model.GetMoves().size();
         size_t plies = TakeBackPlies(played, _model.GetTurn(), _opponent.GetPlays());
-        if (FindJsonMember(takeBack, "plies")) {
-            const Optional<int64_t> asked = GetJsonInt(takeBack, "plies");
+        if (FindParam(takeBack, "plies")) {
+            const Optional<int64_t> asked = GetParamInt(takeBack, "plies");
             if (!asked || *asked < 1 || static_cast<uint64_t>(*asked) > played) {
                 return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, Format("'plies' has to be an integer from 1 to the {} moves played", played)));
             }
@@ -775,22 +861,22 @@ namespace BECore::Chess {
         return {};
     }
 
-    std::expected<void, ControlError> ChessGameControl::SetResign(const Json& resign) {
+    std::expected<void, ControlError> ChessGameControl::SetResign(JsonView resign) {
         if (_puzzle.IsActiveFor(_model)) {
             return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, kPuzzleOnUsage));
         }
-        if (!resign.is_object()) {
+        if (!resign.IsObject()) {
             return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, kResignUsage));
         }
-        for (const auto& member : resign.items()) {
-            if (member.key() != "color") {
+        for (const JsonMember member : resign.Members()) {
+            if (!member.key.TextEquals("color")) {
                 return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, kResignUsage));
             }
         }
         Optional<PieceColor> named;
-        if (FindJsonMember(resign, "color")) {
-            const auto text = GetJsonString(resign, "color");
-            named = text ? ParseColor(StringView(text->data(), text->size())) : std::nullopt;
+        if (FindParam(resign, "color")) {
+            const auto text = GetParamString(resign, "color");
+            named = text ? ParseColor(StringView(*text)) : std::nullopt;
             if (!named) {
                 return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, kResignUsage));
             }
@@ -808,11 +894,11 @@ namespace BECore::Chess {
         return {};
     }
 
-    std::expected<void, ControlError> ChessGameControl::SetDraw(const Json& draw) {
+    std::expected<void, ControlError> ChessGameControl::SetDraw(JsonView draw) {
         if (_puzzle.IsActiveFor(_model)) {
             return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, kPuzzleOnUsage));
         }
-        if (!draw.is_object() || !draw.empty()) {
+        if (!draw.IsObject() || draw.Size() != 0) {
             return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, kDrawUsage));
         }
         const std::expected<void, DrawOfferRefusal> offered = PersonOffersDraw(_model, _opponent.GetSides(), _drawJudge);
@@ -832,24 +918,25 @@ namespace BECore::Chess {
         return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, kDrawUsage));
     }
 
-    std::expected<void, ControlError> ChessGameControl::SetPuzzle(const Json& puzzle) {
-        if (!puzzle.is_object() || puzzle.size() != 1) {
+    std::expected<void, ControlError> ChessGameControl::SetPuzzle(JsonView puzzle) {
+        if (!puzzle.IsObject() || puzzle.Size() != 1) {
             return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, kPuzzleUsage));
         }
-        const auto member = puzzle.items().begin();
-        const String key = String(member.key().c_str(), member.key().size());
+        const JsonMember member = *puzzle.Members().begin();
+        String key;
+        member.key.ReadText(key);
         const PuzzleSet& puzzles = _puzzle.GetPuzzles();
         if (key == "index" || key == "id") {
             Optional<size_t> index;
             if (key == "index") {
-                const Optional<int64_t> asked = GetJsonInt(puzzle, "index");
+                const Optional<int64_t> asked = GetParamInt(puzzle, "index");
                 if (!asked || *asked < 0 || static_cast<uint64_t>(*asked) >= puzzles.Size()) {
                     return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, Format("'index' has to be an integer below the {} puzzles of the set", puzzles.Size())));
                 }
                 index = static_cast<size_t>(*asked);
             } else {
-                const auto id = GetJsonString(puzzle, "id");
-                index = id ? puzzles.FindIndexById(StringView(id->data(), id->size())) : std::nullopt;
+                const auto id = GetParamString(puzzle, "id");
+                index = id ? puzzles.FindIndexById(StringView(*id)) : std::nullopt;
                 if (!index) {
                     return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, "'id' has to be the id of a puzzle of the set"));
                 }
@@ -858,8 +945,7 @@ namespace BECore::Chess {
             EXPECT(begun, "ChessGameControl: a puzzle of the set does not begin");
             return {};
         }
-        const Json& value = member.value();
-        if ((key != "next" && key != "retry" && key != "end") || !value.is_boolean() || !value.get<bool>()) {
+        if ((key != "next" && key != "retry" && key != "end") || member.value.AsBool() != true) {
             return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, kPuzzleUsage));
         }
         if (!_puzzle.IsActiveFor(_model)) {
@@ -875,17 +961,17 @@ namespace BECore::Chess {
         return {};
     }
 
-    std::expected<void, ControlError> ChessGameControl::SetReview(const Json& review) {
-        if (!review.is_object() || review.size() != 1) {
+    std::expected<void, ControlError> ChessGameControl::SetReview(JsonView review) {
+        if (!review.IsObject() || review.Size() != 1) {
             return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, kReviewUsage));
         }
-        const auto member = review.items().begin();
-        const String key = String(member.key().c_str(), member.key().size());
-        const Json& value = member.value();
-        if ((key != "start" && key != "cancel") || !value.is_boolean() || !value.get<bool>()) {
+        const JsonMember member = *review.Members().begin();
+        const bool isStart = member.key.TextEquals("start");
+        const bool isCancel = member.key.TextEquals("cancel");
+        if ((!isStart && !isCancel) || member.value.AsBool() != true) {
             return std::unexpected(MakeControlError(ControlErrors::kInvalidParams, kReviewUsage));
         }
-        if (key == "cancel") {
+        if (isCancel) {
             _analyst.AbandonReview();
             return {};
         }

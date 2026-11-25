@@ -24,7 +24,7 @@ namespace BECore::Chess::Tests {
         constexpr float kPieceWidth = 244.0F;
         constexpr float kPieceHeight = 256.0F;
 
-        std::filesystem::path ShippedLibraryFile() {
+        Path ShippedLibraryFile() {
             return ShippedConfigFolder() / "TextureLibrary.xml";
         }
 
@@ -40,7 +40,7 @@ namespace BECore::Chess::Tests {
 
         /// Puts the twelve pieces into the group (those already in it stay) and writes the atlas under @p assetsDir; the sources are read from the game's tree. The library holds the
         /// rewritten entries on success
-        std::expected<AtlasWritten, String> PackPiecesAtlas(TextureLibrary& library, const std::filesystem::path& assetsDir) {
+        std::expected<AtlasWritten, String> PackPiecesAtlas(TextureLibrary& library, const Path& assetsDir) {
             for (const Piece piece : AllPieces()) {
                 const PoolString name = PieceSpriteId(piece);
                 const SpriteEntry* entry = library.GetSprite(name);
@@ -56,7 +56,7 @@ namespace BECore::Chess::Tests {
             }
             PackSettings settings;
             settings.maxSide = kMaxAtlasSide;
-            const auto resolve = [](StringView virtualPath) { return GameRoot() / ToStd(virtualPath); };
+            const auto resolve = [](StringView virtualPath) { return GameRoot() / virtualPath; };
             return WriteAtlas(library, kPiecesGroup, settings, AtlasIo{assetsDir, resolve});
         }
 

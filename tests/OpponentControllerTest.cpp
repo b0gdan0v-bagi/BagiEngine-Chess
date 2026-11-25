@@ -27,8 +27,6 @@ namespace BECore::Chess::Tests {
 #endif
         constexpr StringView kMissingPath = "/no/such/file";
         constexpr StringView kTildePath = "~/bin/stockfish";
-        constexpr std::filesystem::perms kScriptPermissions =
-            std::filesystem::perms::owner_all | std::filesystem::perms::group_read | std::filesystem::perms::group_exec | std::filesystem::perms::others_read | std::filesystem::perms::others_exec;
         constexpr StringView kHardLevelId = "hard";
 
         bool Play(ChessGameModel& model, StringView uci) {
@@ -811,25 +809,21 @@ namespace BECore::Chess::Tests {
     namespace {
 
         /// A shell script that runs the fake UCI engine with @p flags, as the "Stockfish" of a test: stockfishPath points at it
-        std::filesystem::path WriteWrapper(const TempDirectory& directory, StringView flags) {
-            const std::filesystem::path script = directory.File(kWrapperName);
-            {
-                //-NoStd: file layer (engine-file-layer)
-                std::ofstream out(script);
+        Path WriteWrapper(const TempDirectory& directory, StringView flags) {
+            const Path script = directory.File(kWrapperName);
 #if defined(_WIN32)
-                // No exec: cmd.exe stays the parent of the fake, and UciProcess's job ends both
-                out << "@\"" << CHESS_TEST_PYTHON << "\" \"" << FakeEngineScript().string() << "\" " << String(flags.data(), flags.size()) << "\r\n";
+            // No exec: cmd.exe stays the parent of the fake, and UciProcess's job ends both
+            const String text = Format("@\"{}\" \"{}\" {}\r\n", CHESS_TEST_PYTHON, FakeEngineScript().View(), flags);
 #else
-                out << "#!/bin/sh\n";
-                out << "exec \"" << CHESS_TEST_PYTHON << "\" \"" << FakeEngineScript().string() << "\" " << String(flags.data(), flags.size()) << "\n";
+            const String text = Format("#!/bin/sh\nexec \"{}\" \"{}\" {}\n", CHESS_TEST_PYTHON, FakeEngineScript().View(), flags);
 #endif
-            }
-            std::filesystem::permissions(script, kScriptPermissions, std::filesystem::perm_options::replace);
+            ::BECore::Tests::WriteFile(script, text);
+            SetExecutable(script, true);
             return script;
         }
 
-        OpponentSettings SettingsFor(const std::filesystem::path& program) {
-            return OpponentSettings{FromStdString(program.string())};
+        OpponentSettings SettingsForFile(const Path& program) {
+            return OpponentSettings{String(program.View())};
         }
 
     }  // namespace
@@ -838,9 +832,9 @@ namespace BECore::Chess::Tests {
         SKIP_WITHOUT_FAKE_ENGINE();
         const TempDirectory directory;
         const String log = directory.FileText(kLogName);
-        const std::filesystem::path wrapper = WriteWrapper(directory, Format("--log \"{}\" --moves e7e5", log));
+        const Path wrapper = WriteWrapper(directory, Format("--log \"{}\" --moves e7e5", log));
         ChessGameModel model;
-        OpponentController controller(model, SettingsFor(wrapper));
+        OpponentController controller(model, SettingsForFile(wrapper));
         const size_t hard = LevelIndex(kHardLevelId);
         const OpponentLevel& level = GetOpponentLevels()[hard];
 
@@ -859,9 +853,9 @@ namespace BECore::Chess::Tests {
         SKIP_WITHOUT_FAKE_ENGINE();
         const TempDirectory directory;
         const String log = directory.FileText(kLogName);
-        const std::filesystem::path wrapper = WriteWrapper(directory, Format("--log \"{}\" --moves e7e5", log));  // every process answers e7e5 to its first search
+        const Path wrapper = WriteWrapper(directory, Format("--log \"{}\" --moves e7e5", log));  // every process answers e7e5 to its first search
         ChessGameModel model;
-        OpponentController controller(model, SettingsFor(wrapper));
+        OpponentController controller(model, SettingsForFile(wrapper));
         // Hard and max: neither blunders (the handicap would answer e2e4 with a random move of its own and the fake would not be asked), and their skills differ
         // (easy and medium have the same Skill Level)
         const size_t hard = LevelIndex(kHardLevelId);
@@ -894,9 +888,9 @@ namespace BECore::Chess::Tests {
         /// than kShutdownBudget (the yardstick)
         void ShutDownWithAStubbornChild(const TempDirectory& directory, bool checkSpeed) {
             const String log = directory.FileText(kLogName);
-            const std::filesystem::path wrapper = WriteWrapper(directory, Format("--log \"{}\" --ignore-quit --moves e7e5", log));
+            const Path wrapper = WriteWrapper(directory, Format("--log \"{}\" --ignore-quit --moves e7e5", log));
             ChessGameModel model;
-            OpponentController controller(model, SettingsFor(wrapper));
+            OpponentController controller(model, SettingsForFile(wrapper));
             ASSERT_TRUE(controller.Choose(PieceColor::Black, LevelIndex(kHardLevelId)).has_value());  // hard never blunders: the child is asked, so there is a child to close
             ASSERT_TRUE(Play(model, "e2e4"));
             ASSERT_TRUE(UpdateUntil(controller, [&] { return model.GetMoves().size() == 2; })) << DescribeError(controller.GetError()).c_str();

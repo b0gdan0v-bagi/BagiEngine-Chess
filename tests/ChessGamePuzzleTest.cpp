@@ -1,3 +1,4 @@
+#include <BECore/Time/Time.h>
 #include <Chess/Components/MoveRows.h>
 #include <tests/ChessUiHarness.h>
 

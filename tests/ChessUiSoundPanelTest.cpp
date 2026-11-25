@@ -1,3 +1,4 @@
+#include <BECore/UI/UIEnvironment.h>
 #include <Chess/Sound/SoundCue.h>
 #include <tests/ChessUiHarness.h>
 

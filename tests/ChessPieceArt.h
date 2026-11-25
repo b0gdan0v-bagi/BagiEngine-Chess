@@ -1,7 +1,6 @@
 #pragma once
 
 #include <Chess/Game/ChessTypes.h>
-#include <filesystem>
 #include <tests/ShippedScene.h>
 
 /// What `ChessPieceArtFilesTest` (headers of the shipped art) and `ChessPieceAtlasTest` (the packer's output) both hold the art to
@@ -12,8 +11,8 @@ namespace BECore::Chess::Tests {
     // Four of the twelve pieces to a row make 1024 x 1024; the packer's default cap of 4096 would pick a 256 x 4096 strip of the same area (the smaller width wins a tie)
     inline constexpr uint32_t kMaxAtlasSide = 1024;
 
-    inline std::filesystem::path GameRoot() {
-        return ShippedConfigFolder().parent_path();
+    inline Path GameRoot() {
+        return ShippedConfigFolder().Parent();
     }
 
     inline Vector<Piece> AllPieces() {

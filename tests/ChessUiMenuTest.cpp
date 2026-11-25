@@ -1,3 +1,4 @@
+#include <BECore/UI/UIEnvironment.h>
 #include <tests/ChessUiHarness.h>
 
 /// The list of the menu: its layout, its table, navigation by real clicks and broken copies of it. The scene, the helpers and the fixture ChessUiTest are tests/ChessUiHarness.h.

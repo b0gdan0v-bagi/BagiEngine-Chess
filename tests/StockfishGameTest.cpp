@@ -45,8 +45,6 @@ namespace BECore::Chess::Tests {
         constexpr StringView kMaxGoCommand = "go movetime 2000";  ///< what the Max level sends (kMaxMoveTimeMs of OpponentLevels.cpp)
         constexpr StringView kStopCommand = "stop";
         constexpr const char* kWrapperName = "stockfish-wrapper.sh";
-        constexpr std::filesystem::perms kScriptPermissions =
-            std::filesystem::perms::owner_all | std::filesystem::perms::group_read | std::filesystem::perms::group_exec | std::filesystem::perms::others_read | std::filesystem::perms::others_exec;
 
         // The yardstick: N games per level of the own engine, the colors alternating. CHESS_YARDSTICK_GAMES in the environment replaces N for a quick look
         constexpr int kYardstickGames = 4;
@@ -85,8 +83,8 @@ namespace BECore::Chess::Tests {
             return OpponentSettings{String(path.data(), path.size())};
         }
 
-        OpponentSettings SettingsFor(const std::filesystem::path& program) {
-            return OpponentSettings{FromStdString(program.string())};
+        OpponentSettings SettingsForFile(const Path& program) {
+            return OpponentSettings{String(program.View())};
         }
 
         /// A Stockfish at @p path at the weakest `Skill Level`, the way the game starts one for the weakest level (but not through the factory: the games ask it directly)
@@ -109,27 +107,23 @@ namespace BECore::Chess::Tests {
         /// A shell script that notes its start in kLaunchLogName and its process id in @p pidFile, then becomes the Stockfish at @p stockfish. Without @p stdinLog it `exec`s the program, so the
         /// id is the engine's. With it the script stays the parent of a pipe `tee | program` that copies every line the game sends into @p stdinLog: the first line of
         /// @p pidFile is then the script's id and the second the program's own
-        std::filesystem::path WriteWrapper(const TempDirectory& directory, const String& stockfish, const char* pidFile, const char* stdinLog = nullptr) {
-            const std::filesystem::path script = directory.File(kWrapperName);
-            {
-                //-NoStd: file layer (engine-file-layer)
-                std::ofstream out(script);
-                out << "#!/bin/sh\n";
-                out << "echo started >> \"" << directory.File(kLaunchLogName).string() << "\"\n";
-                out << "echo $$ >> \"" << directory.File(pidFile).string() << "\"\n";
-                if (stdinLog == nullptr) {
-                    out << "exec \"" << stockfish.c_str() << "\" \"$@\"\n";
-                } else {
-                    out << "tee -a \"" << directory.File(stdinLog).string() << "\" | sh -c 'echo $$ >> \"$1\"; shift; exec \"$@\"' sh \"" << directory.File(pidFile).string() << "\" \""
-                        << stockfish.c_str() << "\" \"$@\"\n";
-                }
+        Path WriteWrapper(const TempDirectory& directory, const String& stockfish, const char* pidFile, const char* stdinLog = nullptr) {
+            const Path script = directory.File(kWrapperName);
+            String text = "#!/bin/sh\n";
+            text += Format("echo started >> \"{}\"\n", directory.File(kLaunchLogName).View());
+            text += Format("echo $$ >> \"{}\"\n", directory.File(pidFile).View());
+            if (stdinLog == nullptr) {
+                text += Format("exec \"{}\" \"$@\"\n", stockfish);
+            } else {
+                text += Format("tee -a \"{}\" | sh -c 'echo $$ >> \"$1\"; shift; exec \"$@\"' sh \"{}\" \"{}\" \"$@\"\n", directory.File(stdinLog).View(), directory.File(pidFile).View(), stockfish);
             }
-            std::filesystem::permissions(script, kScriptPermissions, std::filesystem::perm_options::replace);
+            ::BECore::Tests::WriteFile(script, text);
+            SetExecutable(script, true);
             return script;
         }
 
         /// The process id on line @p index (from 0) of @p pidFile, once the script has written it
-        Optional<int> ProcessIdAt(const std::filesystem::path& pidFile, size_t index) {
+        Optional<int> ProcessIdAt(const Path& pidFile, size_t index) {
             const Vector<String> lines = ReadFileLines(pidFile);
             return index < lines.size() ? ParseInt(lines[index].c_str(), lines[index].size()) : std::nullopt;
         }
@@ -143,9 +137,9 @@ namespace BECore::Chess::Tests {
         /// `stop`, nothing late is played. With @p checkSpeed Shutdown() must also have returned within kShutdownBudget (the yardstick; a normal run decides nothing by a clock)
         void ShutdownDuringAMaxLevelSearch(const String& stockfishPath, bool checkSpeed) {
             const TempDirectory directory;
-            const std::filesystem::path wrapper = WriteWrapper(directory, stockfishPath, kPidLogName, kStdinLogName);
+            const Path wrapper = WriteWrapper(directory, stockfishPath, kPidLogName, kStdinLogName);
             ChessGameModel model;
-            OpponentController controller(model, SettingsFor(wrapper));
+            OpponentController controller(model, SettingsForFile(wrapper));
             ASSERT_TRUE(controller.SetLevel(LevelIndex(kMaxLevelId)).has_value());  // the longest search of the levels: it is still running when Shutdown() comes
             ASSERT_TRUE(controller.SetSide(PieceColor::Black).has_value());
             ASSERT_TRUE(Play(model, "e2e4"));
@@ -309,9 +303,9 @@ namespace BECore::Chess::Tests {
     TEST_F(StockfishGameTest, AChangeOfLevelStartsANewProcessAndItAnswersTheNextMoveToo) {
         SKIP_WITHOUT_STOCKFISH(path);
         const TempDirectory directory;
-        const std::filesystem::path wrapper = WriteWrapper(directory, *path, kPidLogName);  // the real Stockfish behind a script that counts its starts
+        const Path wrapper = WriteWrapper(directory, *path, kPidLogName);  // the real Stockfish behind a script that counts its starts
         ChessGameModel model;
-        OpponentController controller(model, SettingsFor(wrapper));
+        OpponentController controller(model, SettingsForFile(wrapper));
         // Hard and max never blunder, so the real program is asked at both (the handicap of easy and medium would answer some moves without starting it)
         ASSERT_TRUE(controller.SetLevel(LevelIndex(kHardLevelId)).has_value());
         ASSERT_TRUE(controller.SetSide(PieceColor::Black).has_value());

@@ -3,6 +3,7 @@
 #include <BECore/Audio/AudioManager.h>
 #include <BECore/Audio/AudioPreferences.h>
 #include <BECore/GameManager/CoreManager.h>
+#include <BECore/Time/Time.h>
 #include <Chess/Save/ChessSaveState.h>
 #include <Chess/Save/SaveSettings.h>
 
@@ -22,13 +23,13 @@ namespace BECore::Chess {
         _failureLogged = false;
         _audio = AudioWrite{};
 
-        const Optional<std::filesystem::path> directory = ResolveSaveDirectory(CoreManager::GetCommandLine(), SaveSettings::Load().rememberGame);
+        const Optional<Path> directory = ResolveSaveDirectory(CoreManager::GetCommandLine(), SaveSettings::Load().rememberGame);
         if (!directory) {
             return;
         }
         UniquePtr<SaveGameService> service = MakeUnique<SaveGameService>(CoreManager::GetFileSystem());
         if (!service->Initialize(*directory)) {
-            LOG_WARNING("Save: the folder '{}' cannot be made or is not a folder, the game is not remembered"_format(directory->string().c_str()));
+            LOG_WARNING("Save: the folder '{}' cannot be made or is not a folder, the game is not remembered"_format(directory->CStr()));
             return;
         }
 

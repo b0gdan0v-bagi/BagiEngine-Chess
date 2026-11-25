@@ -1,11 +1,16 @@
-#include <BECore/Control/Json.h>
+#include <BECore/Animation/TweenManager.h>
+#include <BECore/Application/CommandLine.h>
+#include <BECore/File/File.h>
 #include <BECore/GameManager/CoreManager.h>
+#include <BECore/Renderer/RendererManager.h>
 #include <BECore/Save/SaveGame.h>
 #include <BECore/Scene/Components/TransformComponent.h>
 #include <BECore/Scene/Scene.h>
 #include <BECore/Scene/SceneManager.h>
 #include <BECore/Scene/SceneNode.h>
 #include <BECore/Text/FontAtlasLibrary.h>
+#include <BECore/Time/Time.h>
+#include <BECore/UI/UIVars.h>
 #include <Chess/ChessGame.h>
 #include <Chess/Components/ChessBoardComponent.h>
 #include <Chess/Components/ChessPieceComponent.h>
@@ -13,8 +18,9 @@
 #include <Common/EngineEnvironment.h>
 #include <Common/RecordingRenderer.h>
 #include <Common/TempPath.h>
+#include <Common/TestFiles.h>
 #include <Games/GameManager.h>
-#include <iterator>
+#include <tests/ChessTestJson.h>
 #include <tests/ChessTestUtil.h>
 #include <tests/ShippedScene.h>
 #include <tests/TestEngines.h>
@@ -52,14 +58,18 @@ namespace BECore::Chess::Tests {
             return true;
         }
 
-        Vector<uint8_t> BytesOfFile(const std::filesystem::path& path) {
-            //-NoStd: file layer (engine-file-layer)
-            std::ifstream file(path, std::ios::binary);
-            Vector<uint8_t> bytes;
-            for (std::istreambuf_iterator<char> it(file), end; it != end; ++it) {
-                bytes.push_back(static_cast<uint8_t>(*it));
-            }
-            return bytes;
+        Vector<uint8_t> BytesOfFile(const Path& path) {
+            return ::BECore::Tests::ReadFileBytes(path);
+        }
+
+        /// A folder with no entry, no file and no folder
+        bool IsEmptyFolder(const Path& folder) {
+            size_t entries = 0;
+            const auto walked = WalkDirectory(folder.View(), WalkMode::Folder, [&entries](StringView, FileKind) {
+                ++entries;
+                return false;
+            });
+            return walked.has_value() && entries == 0;
         }
 
         String Member(const Json& json, StringView key) {
@@ -80,12 +90,10 @@ namespace BECore::Chess::Tests {
                 _savedArguments.push_back(argument);
             }
             _directory = TestTempDirectory("ChessSaveGame");
-            std::filesystem::remove_all(_directory);
-            std::filesystem::create_directories(_directory);
+            ::BECore::Tests::MakeEmptyDirectory(_directory);
             _saves = _directory / "saves";
             _stockfishDirectory = TestTempDirectory("ChessSaveGameStockfish");  // beside _directory, whose emptiness a test checks
-            std::filesystem::remove_all(_stockfishDirectory);
-            std::filesystem::create_directories(_stockfishDirectory);
+            ::BECore::Tests::MakeEmptyDirectory(_stockfishDirectory);
             CoreManager::GetTweens().Clear();
             CoreManager::GetTime().Reset();
             CoreManager::GetFontAtlasLibrary().Clear();
@@ -99,16 +107,15 @@ namespace BECore::Chess::Tests {
             CoreManager::GetTime().Reset();
             CoreManager::GetUIVars().Clear();
             CoreManager::GetFontAtlasLibrary().Clear();
-            std::error_code ignored;
-            std::filesystem::remove_all(_directory, ignored);
-            std::filesystem::remove_all(_stockfishDirectory, ignored);
+            ::BECore::Tests::RemoveDirectory(_directory);
+            ::BECore::Tests::RemoveDirectory(_stockfishDirectory);
         }
 
         /// The command line of the run: the flags, and the folder of the test when @p withFolder
         void SetCommandLine(const Vector<String>& flags, bool withFolder) {
             Vector<String> arguments = flags;
             if (withFolder) {
-                const String path = FromStdString(_saves.string());
+                const String path(_saves.View());
                 arguments.push_back(String("--save-dir=") + path);
             }
             CoreManager::GetCommandLine().Set(arguments);
@@ -175,14 +182,14 @@ namespace BECore::Chess::Tests {
 
         /// A file FindStockfish() accepts, for the STOCKFISH of a test that starts a game (it is never run: nothing plays)
         String FoundStockfishFile() const {
-            const std::filesystem::path file = _stockfishDirectory / "stockfish-found";
+            const Path file = _stockfishDirectory / "stockfish-found";
             MakeStockfishFile(file);
-            return FromStdString(file.string());
+            return String(file.View());
         }
 
         /// A STOCKFISH that names no file: nothing is found, and PATH is not looked at then
         String MissingStockfishFile() const {
-            return FromStdString((_stockfishDirectory / "stockfish-missing").string());
+            return String((_stockfishDirectory / "stockfish-missing").View());
         }
 
         /// set_state {"opponent": {"engine": <engine>}} through the control adapter
@@ -191,10 +198,10 @@ namespace BECore::Chess::Tests {
             opponent["engine"] = MakeJsonString(engine);
             Json request = Json::object();
             request["opponent"] = opponent;
-            return Game().AsControllable()->SetState(request);
+            return DomControl(*Game().AsControllable()).SetState(request);
         }
 
-        std::filesystem::path SaveFile() const {
+        Path SaveFile() const {
             return _saves / "game.save";
         }
 
@@ -217,7 +224,7 @@ namespace BECore::Chess::Tests {
         }
 
         Json State() const {
-            auto state = Game().AsControllable()->GetState();
+            auto state = DomControl(*Game().AsControllable()).GetState();
             EXPECT_TRUE(state.has_value());
             return state ? *state : Json();
         }
@@ -275,9 +282,9 @@ namespace BECore::Chess::Tests {
 
         ScopedAudioLevels _levels;
         Vector<String> _savedArguments;
-        std::filesystem::path _directory;
-        std::filesystem::path _saves;
-        std::filesystem::path _stockfishDirectory;
+        Path _directory;
+        Path _saves;
+        Path _stockfishDirectory;
         IntrusivePtr<RecordingRenderer> _renderer;
         IntrusivePtrAtomic<SceneManager> _manager;
         UniquePtr<CountingFactory> _factory;
@@ -303,7 +310,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(Play(Game().GetModel(), kGameInProgress));
         Frames(4);
         Game().Stop();
-        EXPECT_TRUE(std::filesystem::is_empty(_directory)) << "a folder or a file was made";
+        EXPECT_TRUE(IsEmptyFolder(_directory)) << "a folder or a file was made";
     }
 
     TEST_F(ChessSaveGameTest, AStartLoadsTheOpeningTableOfItsPath) {
@@ -408,7 +415,7 @@ namespace BECore::Chess::Tests {
         Game().Stop();
 
         EXPECT_FLOAT_EQ(CoreManager::GetAudio().GetSettings()._master._volume, 0.6f);
-        EXPECT_TRUE(std::filesystem::is_empty(_directory));
+        EXPECT_TRUE(IsEmptyFolder(_directory));
     }
 
     TEST_F(ChessSaveGameTest, AFrameWritesAChangeWithoutAStop) {
@@ -466,7 +473,7 @@ namespace BECore::Chess::Tests {
         {
             Json request = Json::object();
             request["fen"] = MakeJsonString(kOddStartFen);
-            ASSERT_TRUE(Game().AsControllable()->SetState(request).has_value());
+            ASSERT_TRUE(DomControl(*Game().AsControllable()).SetState(request).has_value());
         }
         ASSERT_TRUE(Play(Game().GetModel(), "e2e4"));
         const String fen = String(Game().GetModel().GetPosition().ToFen().c_str());
@@ -573,13 +580,13 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(Game().GetChoice().EngineId(), "own");
 
         const Json before = State();
-        const uint64_t version = Game().AsControllable()->GetStateVersion();
+        const uint64_t version = DomControl(*Game().AsControllable()).GetStateVersion();
         const auto refused = PickEngine("stockfish");
         ASSERT_FALSE(refused.has_value());
         EXPECT_EQ(refused.error().code, "engine_unavailable");
         EXPECT_EQ(Member(OpponentOfState(), "engine"), "own") << "nothing falls back and nothing changes";
         EXPECT_EQ(Member(State(), "fen"), Member(before, "fen"));
-        EXPECT_GT(Game().AsControllable()->GetStateVersion(), version) << "the error that appeared is a change a client can see";
+        EXPECT_GT(DomControl(*Game().AsControllable()).GetStateVersion(), version) << "the error that appeared is a change a client can see";
         EXPECT_TRUE(PickEngine("own").has_value());
     }
 
@@ -596,7 +603,7 @@ namespace BECore::Chess::Tests {
         Json request = Json::object();
         request["opponent"] = opponent;
         request["fen"] = MakeJsonString(kOddStartFen);
-        const auto refused = Game().AsControllable()->SetState(request);
+        const auto refused = DomControl(*Game().AsControllable()).SetState(request);
 
         ASSERT_FALSE(refused.has_value());
         EXPECT_EQ(refused.error().code, "engine_unavailable");

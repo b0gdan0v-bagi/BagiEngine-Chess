@@ -4,6 +4,7 @@
 #include <BECore/Renderer/IRenderer.h>
 #include <BECore/Scene/Scene.h>
 #include <BECore/Scene/SceneNode.h>
+#include <BECore/UI/UIVars.h>
 #include <Chess/ChessGame.h>
 #include <Chess/Components/ChessPromotionPanelComponent.h>
 #include <Chess/Engine/PositionAnalyst.h>

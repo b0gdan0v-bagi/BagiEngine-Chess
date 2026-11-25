@@ -434,7 +434,7 @@ namespace BECore::Chess::Tests {
 
         Json request = Json::object();
         request["fen"] = kBlackToMoveAfterE4;
-        const auto result = ChessGame::GetActive()->AsControllable()->SetState(request);
+        const auto result = DomControl(*ChessGame::GetActive()->AsControllable()).SetState(request);
         ASSERT_TRUE(result.has_value());
         _manager->UpdateAll();
         EXPECT_TRUE(BlackIsAtTheBottom());
@@ -511,7 +511,7 @@ namespace BECore::Chess::Tests {
 
         Json request = Json::object();
         request["fen"] = kBlackToMoveAfterE4;
-        ASSERT_TRUE(ChessGame::GetActive()->AsControllable()->SetState(request).has_value());
+        ASSERT_TRUE(DomControl(*ChessGame::GetActive()->AsControllable()).SetState(request).has_value());
         _manager->UpdateAll();
         EXPECT_EQ(Coordinates(true), "hgfedcba");
         EXPECT_EQ(Coordinates(false), "12345678");
@@ -1042,7 +1042,7 @@ namespace BECore::Chess::Tests {
         _manager->UpdateAll();
         ASSERT_TRUE(BlackIsAtTheBottom());
 
-        const auto state = ChessGame::GetActive()->AsControllable()->GetState();
+        const auto state = DomControl(*ChessGame::GetActive()->AsControllable()).GetState();
         ASSERT_TRUE(state.has_value());
         const Json* board = FindJsonMember(*state, "board");
         ASSERT_NE(board, nullptr);
@@ -1596,12 +1596,12 @@ namespace BECore::Chess::Tests {
         expectHint(true);
         Json request = Json::object();  // set_state and reset of the control API go through the same version
         request["fen"] = "k7/8/8/8/8/8/4K3/7R w - - 0 1";
-        ASSERT_TRUE(ChessGame::GetActive()->AsControllable()->SetState(request).has_value());
+        ASSERT_TRUE(DomControl(*ChessGame::GetActive()->AsControllable()).SetState(request).has_value());
         expectHint(false);
 
         ASSERT_TRUE(ShowTheHint());
         expectHint(true);
-        ASSERT_TRUE(ChessGame::GetActive()->AsControllable()->Reset(Json::object()).has_value());
+        ASSERT_TRUE(DomControl(*ChessGame::GetActive()->AsControllable()).Reset(Json::object()).has_value());
         expectHint(false);
     }
 
@@ -1658,7 +1658,7 @@ namespace BECore::Chess::Tests {
         Analyst().SetEngineFactory(factory.AsFactory());
         _manager->UpdateAll();
         const auto boardOf = [&] {
-            const auto state = ChessGame::GetActive()->AsControllable()->GetState();
+            const auto state = DomControl(*ChessGame::GetActive()->AsControllable()).GetState();
             EXPECT_TRUE(state.has_value());
             const Json* board = state ? FindJsonMember(*state, "board") : nullptr;
             const Json* fen = state ? FindJsonMember(*state, "fen") : nullptr;
@@ -1729,7 +1729,7 @@ namespace BECore::Chess::Tests {
         Json action = Json::object();
         action["type"] = "move";
         action["uci"] = "g1f3";
-        ASSERT_TRUE(ChessGame::GetActive()->AsControllable()->PerformAction(action).has_value());
+        ASSERT_TRUE(DomControl(*ChessGame::GetActive()->AsControllable()).PerformAction(action).has_value());
         Draw();
         auto fills = LastMoveFills();
         ASSERT_EQ(fills.size(), 2u);
@@ -1781,12 +1781,12 @@ namespace BECore::Chess::Tests {
         expectMarked(true);
         Json request = Json::object();
         request["fen"] = "k7/8/8/8/8/8/4K3/7R w - - 0 1";
-        ASSERT_TRUE(ChessGame::GetActive()->AsControllable()->SetState(request).has_value());
+        ASSERT_TRUE(DomControl(*ChessGame::GetActive()->AsControllable()).SetState(request).has_value());
         expectMarked(false);
 
         ASSERT_TRUE(Play(Model(), "h1h2"));
         expectMarked(true);
-        ASSERT_TRUE(ChessGame::GetActive()->AsControllable()->Reset(Json::object()).has_value());
+        ASSERT_TRUE(DomControl(*ChessGame::GetActive()->AsControllable()).Reset(Json::object()).has_value());
         expectMarked(false);
     }
 

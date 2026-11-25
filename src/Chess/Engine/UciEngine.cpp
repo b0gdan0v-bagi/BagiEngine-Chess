@@ -1,8 +1,10 @@
 #include "UciEngine.h"
 
+#include <BECore/File/File.h>
 #include <Chess/Engine/UciProtocol.h>
 #include <Chess/Game/MoveGenerator.h>
 #include <cstdlib>
+#include <filesystem>  //-NoStd: permissions: the executable bit of the Stockfish file
 
 namespace BECore::Chess {
 
@@ -92,8 +94,8 @@ namespace BECore::Chess {
 
 #if !CHESS_NO_STOCKFISH
         Optional<String> ExistingFile(const String& path) {
-            std::error_code error;
-            if (!std::filesystem::is_regular_file(std::filesystem::path(ToStd(path)), error)) {
+            const Optional<FileInfo> info = GetFileInfo(StringView(path));
+            if (!info || info->kind != FileKind::File) {
                 return std::nullopt;
             }
             return path;
@@ -116,13 +118,14 @@ namespace BECore::Chess {
 #endif
         }
 
-        bool IsExecutableFile(const std::filesystem::path& path) {
-            using std::filesystem::perms;
-            std::error_code error;
-            if (!std::filesystem::is_regular_file(path, error)) {
+        bool IsExecutableFile(const Path& path) {
+            const Optional<FileInfo> info = GetFileInfo(path.View());
+            if (!info || info->kind != FileKind::File) {
                 return false;
             }
-            const perms permissions = std::filesystem::status(path, error).permissions();
+            using std::filesystem::perms;                                                                                //-NoStd: permissions: the file layer has no executable-bit check
+            std::error_code error;                                                                                       //-NoStd: permissions: see above
+            const perms permissions = std::filesystem::status(std::filesystem::path(path.CStr()), error).permissions();  //-NoStd: permissions: see above
             return !error && (permissions & (perms::owner_exec | perms::group_exec | perms::others_exec)) != perms::none;
         }
 
@@ -135,9 +138,9 @@ namespace BECore::Chess {
                     end = directories.size();
                 }
                 if (end > begin) {  // an empty entry would mean the working directory: not looked at
-                    const std::filesystem::path candidate = std::filesystem::path(ToStd(StringView(directories).substr(begin, end - begin))) / kStockfishFileName;
+                    const Path candidate = Path(StringView(directories).substr(begin, end - begin)) / kStockfishFileName;
                     if (IsExecutableFile(candidate)) {
-                        return FromStdString(candidate.string());
+                        return String(candidate.View());
                     }
                 }
                 begin = end + 1;

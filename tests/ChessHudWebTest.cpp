@@ -1,10 +1,13 @@
 #include <BECore/GameManager/CoreManager.h>
 #include <BECore/Reflection/XmlDeserializer.h>
+#include <BECore/Resource/ResourceManager.h>
 #include <BECore/UI/UICanvasComponent.h>
 #include <BECore/UI/UIElement.h>
+#include <BECore/UI/UIEnvironment.h>
 #include <BECore/UI/UIInputClicker.h>
 #include <BECore/UI/UIScreenContent.h>
 #include <BECore/UI/UISegmented.h>
+#include <BECore/UI/UIVars.h>
 #include <BECore/UI/UIWebCompiler.h>
 #include <Common/EngineEnvironment.h>
 #include <Common/Printers.h>
@@ -311,7 +314,7 @@ namespace BECore::Tests {
         EXPECT_FALSE(compiled->report.HasIssues()) << compiled->report.issues[0].message.c_str() << " / " << compiled->xml.c_str();
 
         const String shippedXml = ShippedHudXml();
-        ASSERT_FALSE(shippedXml.empty()) << ShippedSceneConfig().string();
+        ASSERT_FALSE(shippedXml.empty()) << ShippedSceneConfig().CStr();
         const UIScreenContent shipped = ReadXml(shippedXml);
         LaidOut web(compiled->content);
         LaidOut xml(shipped);
@@ -350,7 +353,7 @@ namespace BECore::Tests {
         EXPECT_FALSE(compiled->report.HasIssues()) << compiled->report.issues[0].message.c_str() << " / " << compiled->xml.c_str();
 
         const String shippedXml = ShippedPanelXml();
-        ASSERT_FALSE(shippedXml.empty()) << ShippedSceneConfig().string();
+        ASSERT_FALSE(shippedXml.empty()) << ShippedSceneConfig().CStr();
         pugi::xml_document reference;
         ASSERT_TRUE(reference.load_string(shippedXml.c_str()));
         ExpectSameAttributes(reference.child("ui").child("elements").child("element"), compiled->document.child("ui").child("elements").child("element"));
@@ -388,7 +391,7 @@ namespace BECore::Tests {
         const auto compiled = Compile(kChessPanelHtml, kChessPanelCss);
         ASSERT_FALSE(compiled->deserializeErrors) << compiled->xml.c_str();
         const String shippedXml = ShippedPanelXml();
-        ASSERT_FALSE(shippedXml.empty()) << ShippedSceneConfig().string();
+        ASSERT_FALSE(shippedXml.empty()) << ShippedSceneConfig().CStr();
         const UIScreenContent shipped = ReadXml(shippedXml);
         LaidOut web(compiled->content);
         LaidOut xml(shipped);
@@ -444,7 +447,7 @@ namespace BECore::Tests {
         EXPECT_FALSE(compiled->report.HasIssues()) << compiled->report.issues[0].message.c_str() << " / " << compiled->xml.c_str();
 
         const String shippedXml = ShippedMenuXml();
-        ASSERT_FALSE(shippedXml.empty()) << ShippedSceneConfig().string();
+        ASSERT_FALSE(shippedXml.empty()) << ShippedSceneConfig().CStr();
         pugi::xml_document reference;
         ASSERT_TRUE(reference.load_string(shippedXml.c_str()));
         ExpectSameAttributes(reference.child("ui").child("elements").child("element"), compiled->document.child("ui").child("elements").child("element"));
@@ -476,7 +479,7 @@ namespace BECore::Tests {
         const auto compiled = Compile(kChessMenuHtml, kChessMenuCss);
         ASSERT_FALSE(compiled->deserializeErrors) << compiled->xml.c_str();
         const String shippedXml = ShippedMenuXml();
-        ASSERT_FALSE(shippedXml.empty()) << ShippedSceneConfig().string();
+        ASSERT_FALSE(shippedXml.empty()) << ShippedSceneConfig().CStr();
         const UIScreenContent shipped = ReadXml(shippedXml);
         LaidOut web(compiled->content);
         LaidOut xml(shipped);

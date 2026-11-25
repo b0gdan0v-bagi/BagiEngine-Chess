@@ -1,3 +1,4 @@
+#include <BECore/UI/UIEnvironment.h>
 #include <BECore/UI/UIProgressBar.h>
 #include <BECore/UI/UISwitchComponent.h>
 #include <BECore/UI/UIToggleComponent.h>

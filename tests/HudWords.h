@@ -2,6 +2,7 @@
 
 #include <BECore/GameManager/CoreManager.h>
 #include <BECore/Text/Utf8.h>
+#include <BECore/UI/UIVars.h>
 #include <Chess/Components/ChessHudComponent.h>
 #include <Chess/Engine/OpponentText.h>
 #include <Chess/Engine/ReviewText.h>

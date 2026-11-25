@@ -1,9 +1,12 @@
 #include <BECore/Audio/AudioManager.h>
 #include <BECore/Audio/AudioPreferences.h>
+#include <BECore/Config/ConfigManager.h>
 #include <BECore/Control/ControlSettings.h>
+#include <BECore/File/Path.h>
 #include <BECore/GameManager/CoreManager.h>
 #include <BECore/Logger/LogEvent.h>
 #include <BECore/Save/SaveStorage.h>
+#include <BECore/Time/Time.h>
 #include <Chess/Engine/OpponentSettings.h>
 #include <Chess/Save/ChessSaveKeeper.h>
 #include <Chess/Save/ChessSaveState.h>
@@ -11,7 +14,7 @@
 #include <Common/EngineEnvironment.h>
 #include <Common/LogRecorder.h>
 #include <Common/TempPath.h>
-#include <iterator>
+#include <Common/TestFiles.h>
 #include <tests/ChessTestUtil.h>
 #include <tests/TestEngines.h>
 
@@ -21,8 +24,8 @@ namespace BECore::Chess::Tests {
 
     namespace {
 
-        std::filesystem::path ShippedSettingsConfig() {
-            return std::filesystem::path(__FILE__).parent_path().parent_path() / "config" / "ChessSettings.xml";
+        Path ShippedSettingsConfig() {
+            return Path(__FILE__).Parent().Parent() / "config" / "ChessSettings.xml";
         }
 
         SaveSettings Read(const char* shared, const char* local) {
@@ -43,24 +46,16 @@ namespace BECore::Chess::Tests {
             return line;
         }
 
-        std::filesystem::path StubDefaultDirectory() {
-            return "stub-default-folder";
+        Path StubDefaultDirectory() {
+            return Path("stub-default-folder");
         }
 
-        Vector<uint8_t> BytesOfFile(const std::filesystem::path& path) {
-            //-NoStd: file layer (engine-file-layer)
-            std::ifstream file(path, std::ios::binary);
-            Vector<uint8_t> bytes;
-            for (std::istreambuf_iterator<char> it(file), end; it != end; ++it) {
-                bytes.push_back(static_cast<uint8_t>(*it));
-            }
-            return bytes;
+        Vector<uint8_t> BytesOfFile(const Path& path) {
+            return ::BECore::Tests::ReadFileBytes(path);
         }
 
-        void WriteBytes(const std::filesystem::path& path, const String& bytes) {
-            //-NoStd: file layer (engine-file-layer)
-            std::ofstream file(path, std::ios::binary | std::ios::trunc);
-            file << bytes;
+        void WriteBytes(const Path& path, const String& bytes) {
+            ::BECore::Tests::WriteFile(path, StringView(bytes));
         }
 
         void PlayLine(ChessGameModel& model, StringView line) {
@@ -116,7 +111,7 @@ namespace BECore::Chess::Tests {
 
     TEST(SaveSettingsTest, TheShippedFileRemembersTheGameAndKeepsTheEmptyStockfishPath) {
         const XmlConfig config = XmlConfig::Create();
-        ASSERT_TRUE(config.LoadFromFile(ShippedSettingsConfig())) << ShippedSettingsConfig().string();
+        ASSERT_TRUE(config.LoadFromFile(ShippedSettingsConfig())) << ShippedSettingsConfig().CStr();
 
         EXPECT_TRUE(SaveSettings::FromConfig(config.GetRoot(), XmlNode{}).rememberGame);
         EXPECT_EQ(OpponentSettings::FromConfig(config.GetRoot(), XmlNode{}).stockfishPath, "");
@@ -142,22 +137,22 @@ namespace BECore::Chess::Tests {
     // ---- The policy ----
 
     TEST(SaveSettingsPolicyTest, ARunWithNothingAskedForSavesInTheDefaultFolderOnlyWhenTheGameIsRemembered) {
-        if (!PersistentSaveDirectory().empty()) {
+        if (!PersistentSaveDirectory().Empty()) {
             GTEST_SKIP() << "a browser build: the folder is the page's";
         }
 
-        const Optional<std::filesystem::path> on = ResolveSaveDirectory(LineOf({}), true, &StubDefaultDirectory);
+        const Optional<Path> on = ResolveSaveDirectory(LineOf({}), true, &StubDefaultDirectory);
         ASSERT_TRUE(on.has_value());
         EXPECT_EQ(*on, StubDefaultDirectory());
         EXPECT_FALSE(ResolveSaveDirectory(LineOf({}), false, &StubDefaultDirectory).has_value());
     }
 
     TEST(SaveSettingsPolicyTest, ADefaultFolderThatIsNotThereMeansOff) {
-        if (!PersistentSaveDirectory().empty()) {
+        if (!PersistentSaveDirectory().Empty()) {
             GTEST_SKIP() << "a browser build: the folder is the page's";
         }
 
-        EXPECT_FALSE(ResolveSaveDirectory(LineOf({}), true, [] { return std::filesystem::path(); }).has_value());
+        EXPECT_FALSE(ResolveSaveDirectory(LineOf({}), true, [] { return Path(); }).has_value());
     }
 
     TEST(SaveSettingsPolicyTest, EveryControlFlagSwitchesItOff) {
@@ -172,13 +167,13 @@ namespace BECore::Chess::Tests {
         const Vector<String> control = {"--control", "--headless", "--manual-clock", "--control-port=0", "--save-dir=somewhere"};
 
         for (const bool remembered : {true, false}) {
-            const Optional<std::filesystem::path> folder = ResolveSaveDirectory(LineOf(control), remembered, &StubDefaultDirectory);
+            const Optional<Path> folder = ResolveSaveDirectory(LineOf(control), remembered, &StubDefaultDirectory);
             ASSERT_TRUE(folder.has_value());
-            EXPECT_EQ(*folder, std::filesystem::path("somewhere"));
+            EXPECT_EQ(*folder, Path("somewhere"));
         }
-        const Optional<std::filesystem::path> plain = ResolveSaveDirectory(LineOf({"--save-dir=elsewhere"}), false, &StubDefaultDirectory);
+        const Optional<Path> plain = ResolveSaveDirectory(LineOf({"--save-dir=elsewhere"}), false, &StubDefaultDirectory);
         ASSERT_TRUE(plain.has_value());
-        EXPECT_EQ(*plain, std::filesystem::path("elsewhere"));
+        EXPECT_EQ(*plain, Path("elsewhere"));
     }
 
     TEST(SaveSettingsPolicyTest, NoSaveWinsOverEverything) {
@@ -234,29 +229,27 @@ namespace BECore::Chess::Tests {
             }
             CoreManager::GetTime().Reset();
             _directory = ::BECore::Tests::TestTempDirectory("ChessSaveKeeper");
-            std::filesystem::remove_all(_directory);
-            std::filesystem::create_directories(_directory);
+            ::BECore::Tests::MakeEmptyDirectory(_directory);
             _saves = _directory / "saves";
         }
 
         void TearDown() override {
             CoreManager::GetCommandLine().Set(_savedArguments);
             CoreManager::GetTime().Reset();
-            std::error_code ignored;
-            std::filesystem::remove_all(_directory, ignored);
+            ::BECore::Tests::RemoveDirectory(_directory);
         }
 
         /// The run's command line: the folder of the test and the flags given
         void SetCommandLine(const Vector<String>& flags, bool withFolder = true) {
             Vector<String> arguments = flags;
             if (withFolder) {
-                const String path = FromStdString(_saves.string());
+                const String path = String(_saves.View());
                 arguments.push_back(String("--save-dir=") + path);
             }
             CoreManager::GetCommandLine().Set(arguments);
         }
 
-        std::filesystem::path SaveFile() const {
+        Path SaveFile() const {
             return _saves / "game.save";
         }
 
@@ -274,7 +267,7 @@ namespace BECore::Chess::Tests {
             return state;
         }
 
-        std::filesystem::path AudioFile() const {
+        Path AudioFile() const {
             return _saves / "audio.save";
         }
 
@@ -319,13 +312,13 @@ namespace BECore::Chess::Tests {
 
         ScopedAudioLevels _levels;
         Vector<String> _savedArguments;
-        std::filesystem::path _directory;
-        std::filesystem::path _saves;
+        Path _directory;
+        Path _saves;
     };
 
     TEST_F(ChessSaveKeeperTest, AKeeperThatIsOffTouchesNoFileAndReadsNone) {
         SetCommandLine({}, false);  // no flag, and config/ is not mounted: rememberGame is false
-        std::filesystem::create_directories(_saves);
+        ::BECore::Tests::MakeDirectory(_saves);
         WriteBytes(SaveFile(), "a game of somebody");
         const Vector<uint8_t> before = BytesOfFile(SaveFile());
         KeptGame game;
@@ -351,8 +344,8 @@ namespace BECore::Chess::Tests {
         game.Flush();
 
         EXPECT_FALSE(game.keeper.IsOn());
-        EXPECT_FALSE(std::filesystem::exists(SaveFile()));
-        EXPECT_FALSE(std::filesystem::exists(_saves));
+        EXPECT_FALSE(::BECore::Tests::PathExists(SaveFile()));
+        EXPECT_FALSE(::BECore::Tests::PathExists(_saves));
     }
 
     TEST_F(ChessSaveKeeperTest, ASaveDirTurnsItOnInAControlRun) {
@@ -380,7 +373,7 @@ namespace BECore::Chess::Tests {
         game.Flush();
 
         EXPECT_TRUE(game.keeper.IsOn());
-        EXPECT_FALSE(std::filesystem::exists(SaveFile()));
+        EXPECT_FALSE(::BECore::Tests::PathExists(SaveFile()));
     }
 
     TEST_F(ChessSaveKeeperTest, AChangeThenFlushWrites) {
@@ -488,11 +481,11 @@ namespace BECore::Chess::Tests {
         game.Start();
         PlayLine(game.model, "e2e4");
         game.Update();
-        std::filesystem::remove(SaveFile());
+        ::BECore::Tests::RemoveFileIfPresent(SaveFile());
 
         game.Flush();  // the key did not move since the write: nothing to write
 
-        EXPECT_FALSE(std::filesystem::exists(SaveFile()));
+        EXPECT_FALSE(::BECore::Tests::PathExists(SaveFile()));
     }
 
     TEST_F(ChessSaveKeeperTest, TheRestoredGameIsNotRewrittenAtTheStart) {
@@ -504,7 +497,7 @@ namespace BECore::Chess::Tests {
             ASSERT_TRUE(first.controller.ChooseSeats(ProgramSides::Of(PieceColor::Black), SeatChoice{OpponentEngine::Own, 2}, SeatChoice{OpponentEngine::Own, 2}).has_value());
             first.Flush();
         }
-        ASSERT_TRUE(std::filesystem::exists(SaveFile()));
+        ASSERT_TRUE(::BECore::Tests::PathExists(SaveFile()));
         const Vector<uint8_t> before = BytesOfFile(SaveFile());
 
         KeptGame second;
@@ -513,19 +506,19 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(second.model.GetMoves().size(), 3u);
         EXPECT_EQ(second.controller.GetPlays(), PieceColor::Black);
         EXPECT_EQ(second.controller.GetSeatChoice(PieceColor::Black).level, 2u);
-        std::filesystem::remove(SaveFile());
+        ::BECore::Tests::RemoveFileIfPresent(SaveFile());
         for (int frame = 0; frame < 3; ++frame) {
             AdvancePastTheDebounce();
             second.Update();
         }
         second.Flush();
-        EXPECT_FALSE(std::filesystem::exists(SaveFile())) << "the restored game was written back";
+        EXPECT_FALSE(::BECore::Tests::PathExists(SaveFile())) << "the restored game was written back";
         EXPECT_FALSE(before.empty());
     }
 
     TEST_F(ChessSaveKeeperTest, ADamagedFileLeavesTheGameFreshAndTheFileAloneUntilTheNextChange) {
         SetCommandLine({});
-        std::filesystem::create_directories(_saves);
+        ::BECore::Tests::MakeDirectory(_saves);
         WriteBytes(SaveFile(), "this is not a save file");
         const Vector<uint8_t> before = BytesOfFile(SaveFile());
         KeptGame game;
@@ -571,7 +564,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessSaveKeeperTest, AFolderThatCannotBeMadeTurnsItOffAndTheGameRuns) {
         WriteBytes(_directory / "a-file", "x");
-        CoreManager::GetCommandLine().Set(Vector<String>{String("--save-dir=") + String((_directory / "a-file").string().c_str())});
+        CoreManager::GetCommandLine().Set(Vector<String>{String("--save-dir=") + String((_directory / "a-file").View())});
         KeptGame game;
 
         game.Start();
@@ -588,17 +581,17 @@ namespace BECore::Chess::Tests {
         KeptGame game;
         game.Start();
         // The save folder is replaced by a file: the write fails
-        std::filesystem::remove_all(_saves);
+        ::BECore::Tests::RemoveDirectory(_saves);
         WriteBytes(_saves, "in the way");
 
         PlayLine(game.model, "e2e4");
         game.Update();
         AdvancePastTheDebounce();
         game.Update();  // the same key: not tried again
-        EXPECT_TRUE(std::filesystem::is_regular_file(_saves));
+        EXPECT_TRUE(::BECore::Tests::IsFile(_saves));
 
-        std::filesystem::remove(_saves);
-        std::filesystem::create_directories(_saves);
+        ::BECore::Tests::RemoveFileIfPresent(_saves);
+        ::BECore::Tests::MakeDirectory(_saves);
         PlayLine(game.model, "e7e5");
         AdvancePastTheDebounce();
         game.Update();
@@ -644,13 +637,13 @@ namespace BECore::Chess::Tests {
 
         EXPECT_FLOAT_EQ(CoreManager::GetAudio().GetSettings()._master._volume, 0.4f);
         EXPECT_TRUE(CoreManager::GetAudio().GetSettings()._master._muted);
-        std::filesystem::remove(AudioFile());
+        ::BECore::Tests::RemoveFileIfPresent(AudioFile());
         for (int frame = 0; frame < 3; ++frame) {
             AdvancePastTheDebounce();
             second.Update();
         }
         second.Flush();
-        EXPECT_FALSE(std::filesystem::exists(AudioFile())) << "the restored levels were written back";
+        EXPECT_FALSE(::BECore::Tests::PathExists(AudioFile())) << "the restored levels were written back";
     }
 
     TEST_F(ChessSaveKeeperTest, AStartWithNoAudioFileKeepsTheLevelsAndWritesNothing) {
@@ -666,7 +659,7 @@ namespace BECore::Chess::Tests {
         game.Flush();
 
         EXPECT_FLOAT_EQ(CoreManager::GetAudio().GetSettings()._master._volume, 0.6f);
-        EXPECT_FALSE(std::filesystem::exists(AudioFile()));
+        EXPECT_FALSE(::BECore::Tests::PathExists(AudioFile()));
     }
 
     TEST_F(ChessSaveKeeperTest, ARefusedAudioFileLeavesTheLevelsOneWarningAndTheFileAloneWhileTheGameStillComesBack) {
@@ -701,7 +694,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessSaveKeeperTest, ARunThatSavesNothingNeitherReadsNorWritesTheLevels) {
         SetCommandLine({}, false);  // no flag and no folder: config/ is not mounted, so rememberGame is false
-        std::filesystem::create_directories(_saves);
+        ::BECore::Tests::MakeDirectory(_saves);
         MakeAudioFile(0.9f, true);
         const Vector<uint8_t> before = BytesOfFile(AudioFile());
         SetDefaultLevels();
@@ -721,7 +714,7 @@ namespace BECore::Chess::Tests {
 
     TEST_F(ChessSaveKeeperTest, NoSaveReadsAndWritesNeitherSlotEvenWithASaveDir) {
         SetCommandLine({"--no-save"});
-        std::filesystem::create_directories(_saves);
+        ::BECore::Tests::MakeDirectory(_saves);
         MakeAudioFile(0.9f, true);
         const Vector<uint8_t> before = BytesOfFile(AudioFile());
         SetDefaultLevels();
@@ -735,7 +728,7 @@ namespace BECore::Chess::Tests {
         game.Flush();
 
         EXPECT_EQ(BytesOfFile(AudioFile()), before);
-        EXPECT_FALSE(std::filesystem::exists(SaveFile()));
+        EXPECT_FALSE(::BECore::Tests::PathExists(SaveFile()));
     }
 
     TEST_F(ChessSaveKeeperTest, TwoLevelChangesInsideTheDebounceMakeOneWrite) {

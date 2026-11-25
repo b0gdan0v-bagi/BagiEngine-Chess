@@ -97,7 +97,7 @@ namespace BECore::Chess::Tests {
         /// Cancels a token once the fake has received a line: the moment a search is known to be running on the other side of the pipe
         class CancelOnLogLine {
         public:
-            CancelOnLogLine(CancellationToken token, std::filesystem::path logFile, String line)
+            CancelOnLogLine(CancellationToken token, Path logFile, String line)
                 : _thread([this, token, logFile = std::move(logFile), line = std::move(line)]() mutable {
                       WaitForLogLine(logFile, StringView(line));  // cancels even when the line never came, so that the test fails and does not hang
                       _cancelledAt = Clock::now();
@@ -157,7 +157,7 @@ namespace BECore::Chess::Tests {
             const UciEngine engine(FakeSettings({"--log", log}));
         }
 
-        EXPECT_FALSE(std::filesystem::exists(directory.File(kLogName)));
+        EXPECT_FALSE(::BECore::Tests::PathExists(directory.File(kLogName)));
     }
 
     TEST(UciEngineTest, TheFirstSearchShakesHandsSetsTheOptionsStartsAGameAndSearches) {
@@ -274,7 +274,7 @@ namespace BECore::Chess::Tests {
 
         ExpectError(mated, EngineErrorKind::NoMove);
         ExpectError(stalemated, EngineErrorKind::NoMove);
-        EXPECT_FALSE(std::filesystem::exists(directory.File(kLogName))) << "the fake was started";
+        EXPECT_FALSE(::BECore::Tests::PathExists(directory.File(kLogName))) << "the fake was started";
     }
 
     TEST(UciEngineTest, AnIllegalMoveFromTheEngineIsIllegalMoveAndTheEngineIsKept) {
@@ -452,7 +452,7 @@ namespace BECore::Chess::Tests {
 
         ExpectError(engine.FindMove(MakeRequest({}), token), EngineErrorKind::Cancelled);
 
-        EXPECT_FALSE(std::filesystem::exists(directory.File(kLogName)));
+        EXPECT_FALSE(::BECore::Tests::PathExists(directory.File(kLogName)));
     }
 
     TEST(UciEngineTest, LimitsThatAskForNothingAreBadRequestWithoutAProcess) {
@@ -464,7 +464,7 @@ namespace BECore::Chess::Tests {
         ExpectError(engine.FindMove(MakeRequest({}, SearchLimits{0, 0}), CancellationToken()), EngineErrorKind::BadRequest);
         ExpectError(engine.FindMove(MakeRequest({}, SearchLimits{-1, 5}), CancellationToken()), EngineErrorKind::BadRequest);
 
-        EXPECT_FALSE(std::filesystem::exists(directory.File(kLogName)));
+        EXPECT_FALSE(::BECore::Tests::PathExists(directory.File(kLogName)));
     }
 
     TEST(UciEngineTest, ABrokenRequestIsBadRequestWithoutAProcess) {
@@ -476,7 +476,7 @@ namespace BECore::Chess::Tests {
         ExpectError(engine.FindMove(MakeRequest({}, SearchLimits{kMoveTimeMs, 0}, "not a fen"), CancellationToken()), EngineErrorKind::BadRequest);
         ExpectError(engine.FindMove(MakeRequest({"e2e5"}), CancellationToken()), EngineErrorKind::BadRequest);
 
-        EXPECT_FALSE(std::filesystem::exists(directory.File(kLogName)));
+        EXPECT_FALSE(::BECore::Tests::PathExists(directory.File(kLogName)));
     }
 
     TEST(UciEngineTest, TheDestructorEndsTheChild) {
@@ -625,7 +625,7 @@ namespace BECore::Chess::Tests {
         ExpectAnalysisError(engine.Analyse(MakeRequest({}, SearchLimits{kMoveTimeMs, 0}, mate), CancellationToken()), EngineErrorKind::NoMove);
         ExpectAnalysisError(engine.Analyse(MakeRequest({}, SearchLimits{kMoveTimeMs, 0}, stalemate), CancellationToken()), EngineErrorKind::NoMove);
 
-        EXPECT_FALSE(std::filesystem::exists(directory.File(kLogName))) << "the fake was started";
+        EXPECT_FALSE(::BECore::Tests::PathExists(directory.File(kLogName))) << "the fake was started";
     }
 
     TEST(UciEngineTest, AnalyseWhenTheEngineSaysBestmoveNoneOrZerosIsNoMoveAndTheEngineIsKept) {
@@ -677,7 +677,7 @@ namespace BECore::Chess::Tests {
         ExpectAnalysisError(engine.Analyse(MakeRequest({}, SearchLimits{kMoveTimeMs, 0}, "not a fen"), CancellationToken()), EngineErrorKind::BadRequest);
         ExpectAnalysisError(engine.Analyse(MakeRequest({"e2e5"}), CancellationToken()), EngineErrorKind::BadRequest);
 
-        EXPECT_FALSE(std::filesystem::exists(directory.File(kLogName)));
+        EXPECT_FALSE(::BECore::Tests::PathExists(directory.File(kLogName)));
     }
 
     TEST(UciEngineTest, AnalyseWithATokenCancelledBeforeIsCancelledWithoutAProcess) {
@@ -690,7 +690,7 @@ namespace BECore::Chess::Tests {
 
         ExpectAnalysisError(engine.Analyse(MakeRequest({}), token), EngineErrorKind::Cancelled);
 
-        EXPECT_FALSE(std::filesystem::exists(directory.File(kLogName)));
+        EXPECT_FALSE(::BECore::Tests::PathExists(directory.File(kLogName)));
     }
 
     TEST(UciEngineTest, AnalyseOfAnEngineThatNeverAnswersIsTimeoutAndIsReplaced) {
@@ -966,7 +966,7 @@ namespace BECore::Chess::Tests {
         ExpectAnalysisError(engine.Analyse(WithLines(MakeRequest({}), kMaxAnalysisLines + 1), CancellationToken()), EngineErrorKind::BadRequest);
         ExpectError(engine.FindMove(WithLines(MakeRequest({}), 0), CancellationToken()), EngineErrorKind::BadRequest);
 
-        EXPECT_FALSE(std::filesystem::exists(directory.File(kLogName)));
+        EXPECT_FALSE(::BECore::Tests::PathExists(directory.File(kLogName)));
     }
 
     TEST(UciEngineTest, FindMoveIgnoresTheLinesOfTheRequest) {
@@ -986,13 +986,9 @@ namespace BECore::Chess::Tests {
 
     TEST(UciEngineTest, FindStockfishFindsNothingWithoutStockfishWhateverIsThere) {
         const TempDirectory directory;
-        const std::filesystem::path file = directory.File("stockfish-copy");
-        {
-            //-NoStd: file layer (engine-file-layer)
-            std::ofstream stream(file);
-            stream << "not a program\n";
-        }
-        const String text = FromStdString(file.string());
+        const Path file = directory.File("stockfish-copy");
+        ::BECore::Tests::WriteFile(file, "not a program\n");
+        const String text = String(file.View());
 
         EXPECT_FALSE(FindStockfish(StringView(text)).has_value()) << "an explicit file that is there is not looked at";
         EXPECT_FALSE(FindStockfish({}).has_value());
@@ -1002,13 +998,9 @@ namespace BECore::Chess::Tests {
 
     TEST(UciEngineTest, FindStockfishTakesAnExplicitExistingFile) {
         const TempDirectory directory;
-        const std::filesystem::path file = directory.File("stockfish-copy");
-        {
-            //-NoStd: file layer (engine-file-layer)
-            std::ofstream stream(file);
-            stream << "not a program\n";
-        }
-        const String text = FromStdString(file.string());
+        const Path file = directory.File("stockfish-copy");
+        ::BECore::Tests::WriteFile(file, "not a program\n");
+        const String text = String(file.View());
 
         const Optional<String> found = FindStockfish(StringView(text));
 
@@ -1018,8 +1010,8 @@ namespace BECore::Chess::Tests {
 
     TEST(UciEngineTest, FindStockfishAnswersNothingForAnExplicitFileThatIsNotThere) {
         const TempDirectory directory;
-        const String missing = FromStdString(directory.File("no-such-file").string());
-        const String folder = FromStdString(directory.File("").string());
+        const String missing = String(directory.File("no-such-file").View());
+        const String folder = String(directory.File("").View());
 
         EXPECT_FALSE(FindStockfish(StringView(missing)).has_value());
         EXPECT_FALSE(FindStockfish(StringView(folder)).has_value()) << "a directory is no executable";
@@ -1031,25 +1023,21 @@ namespace BECore::Chess::Tests {
 
     namespace {
 
-        void MakeFile(const std::filesystem::path& file, std::filesystem::perms permissions) {
-            {
-                //-NoStd: file layer (engine-file-layer)
-                std::ofstream stream(file);
-                stream << "#!/bin/sh\nexit 0\n";
-            }
-            std::filesystem::permissions(file, permissions, std::filesystem::perm_options::replace);
+        void MakeFile(const Path& file, bool executable) {
+            ::BECore::Tests::WriteFile(file, "#!/bin/sh\nexit 0\n");
+            SetExecutable(file, executable);
         }
 
-        constexpr std::filesystem::perms kExecutable = std::filesystem::perms::owner_all;
-        constexpr std::filesystem::perms kNotExecutable = std::filesystem::perms::owner_read | std::filesystem::perms::owner_write;
+        constexpr bool kExecutable = true;
+        constexpr bool kNotExecutable = false;
 
     }  // namespace
 
     TEST(UciEngineTest, FindStockfishLooksAtTheEnvironmentVariableWhenThereIsNoExplicitPath) {
         const TempDirectory directory;
         MakeFile(directory.File("from-environment"), kExecutable);
-        const String file = FromStdString(directory.File("from-environment").string());
-        const String missing = FromStdString(directory.File("no-such-file").string());
+        const String file = String(directory.File("from-environment").View());
+        const String missing = String(directory.File("no-such-file").View());
 
         {
             const ScopedEnvironment variable("STOCKFISH", file.c_str());
@@ -1060,32 +1048,32 @@ namespace BECore::Chess::Tests {
         }
         {
             const ScopedEnvironment variable("STOCKFISH", missing.c_str());
-            const ScopedEnvironment path("PATH", directory.File("").string().c_str());
+            const ScopedEnvironment path("PATH", String(directory.File("").View()).c_str());
             EXPECT_FALSE(FindStockfish({}).has_value()) << "a variable that names no file does not fall back to PATH";
         }
     }
 
     TEST(UciEngineTest, FindStockfishSearchesPathForAnExecutableFileCalledStockfish) {
         const TempDirectory directory;
-        const std::filesystem::path withExecutable = directory.File("with-executable");
-        const std::filesystem::path withPlainFile = directory.File("with-plain-file");
-        std::filesystem::create_directories(withExecutable);
-        std::filesystem::create_directories(withPlainFile);
+        const Path withExecutable = directory.File("with-executable");
+        const Path withPlainFile = directory.File("with-plain-file");
+        ::BECore::Tests::MakeDirectory(withExecutable);
+        ::BECore::Tests::MakeDirectory(withPlainFile);
         MakeFile(withExecutable / "stockfish", kExecutable);
         MakeFile(withPlainFile / "stockfish", kNotExecutable);
         const ScopedEnvironment variable("STOCKFISH", nullptr);
 
         {
             // An empty entry and a directory that is not there come first
-            const String search = Format("::{}:{}", directory.File("no-such-directory").string(), withExecutable.string()).c_str();
+            const String search = Format("::{}:{}", directory.File("no-such-directory").View(), withExecutable.View());
             const ScopedEnvironment path("PATH", search.c_str());
             const Optional<String> found = FindStockfish({});
             ASSERT_TRUE(found.has_value());
-            const String expected = FromStdString((withExecutable / "stockfish").string());
+            const String expected = String((withExecutable / "stockfish").View());
             EXPECT_EQ(*found, expected);
         }
         {
-            const ScopedEnvironment path("PATH", withPlainFile.string().c_str());
+            const ScopedEnvironment path("PATH", withPlainFile.CStr());
             EXPECT_FALSE(FindStockfish({}).has_value()) << "a file nobody may execute is not Stockfish";
         }
         {

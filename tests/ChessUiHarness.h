@@ -1,9 +1,9 @@
 #pragma once
 
 #include <BECore/Audio/AudioManager.h>
-#include <BECore/Control/Json.h>
 #include <BECore/GameManager/CoreManager.h>
 #include <BECore/Reflection/XmlDeserializer.h>
+#include <BECore/Renderer/RendererManager.h>
 #include <BECore/Renderer/ViewTransform.h>
 #include <BECore/Scene/Components/SpriteRendererComponent.h>
 #include <BECore/Scene/Components/TransformComponent.h>
@@ -12,8 +12,10 @@
 #include <BECore/Scene/SceneNode.h>
 #include <BECore/Scene/SceneView.h>
 #include <BECore/Text/FontAtlasLibrary.h>
+#include <BECore/Time/Time.h>
 #include <BECore/UI/UICanvasComponent.h>
 #include <BECore/UI/UIElement.h>
+#include <BECore/UI/UIEnvironment.h>
 #include <BECore/UI/UIImageComponent.h>
 #include <BECore/UI/UIInputClicker.h>
 #include <BECore/UI/UIPreview.h>
@@ -38,11 +40,13 @@
 #include <Common/EngineEnvironment.h>
 #include <Common/RecordingRenderer.h>
 #include <Common/TempPath.h>
+#include <Common/TestFiles.h>
 #include <Common/UILayoutMatrix.h>
 #include <CoreSDL/SDLEvents.h>
 #include <Events/InputEvents.h>
 #include <Games/GameManager.h>
 #include <chrono>
+#include <tests/ChessTestJson.h>
 #include <tests/ChessTestUtil.h>
 #include <tests/HudWords.h>
 #include <tests/ShippedScene.h>
@@ -835,7 +839,7 @@ namespace BECore::Chess::Tests {
         bool FenSetsTheState(const char* fen) {
             Json request = Json::object();
             request["fen"] = fen;
-            return ChessGame::GetActive()->AsControllable()->SetState(request).has_value();
+            return DomControl(*ChessGame::GetActive()->AsControllable()).SetState(request).has_value();
         }
         const Color kMaterialChipColor{232, 210, 170, 255};  // the fill of a row (SceneConfig.xml)
         constexpr float kBoardUnits = 640.0f;
@@ -912,8 +916,7 @@ namespace BECore::Chess::Tests {
         void SetUp() override {
             // Whether Stockfish is offered must not depend on the machine: STOCKFISH names a file for the whole case (a test that wants none points it at a missing one)
             _stockfishDirectory = TestTempDirectory("ChessUiStockfish");
-            std::filesystem::remove_all(_stockfishDirectory);
-            std::filesystem::create_directories(_stockfishDirectory);
+            ::BECore::Tests::MakeEmptyDirectory(_stockfishDirectory);
             _stockfishEnvironment.emplace("STOCKFISH", FoundStockfishFile().c_str());
 
             CoreManager::GetFontAtlasLibrary().Clear();
@@ -944,20 +947,19 @@ namespace BECore::Chess::Tests {
             CoreManager::GetRendererManager().SetRenderer({});
             CoreManager::GetFontAtlasLibrary().Clear();
             _stockfishEnvironment.reset();
-            std::error_code ignored;
-            std::filesystem::remove_all(_stockfishDirectory, ignored);
+            ::BECore::Tests::RemoveDirectory(_stockfishDirectory);
         }
 
         /// A file FindStockfish() accepts (it is never run: the doubles of a test play); the same name every time, so it can be made again after it was removed
         String FoundStockfishFile() const {
-            const std::filesystem::path file = _stockfishDirectory / "stockfish-found";
+            const Path file = _stockfishDirectory / "stockfish-found";
             MakeStockfishFile(file);
-            return FromStdString(file.string());
+            return String(file.View());
         }
 
         /// The path of a Stockfish that is not there (yet): handed to the settings it finds nothing, and PATH is not looked at then
         String MissingStockfishFile() const {
-            return FromStdString((_stockfishDirectory / "stockfish-missing").string());
+            return String((_stockfishDirectory / "stockfish-missing").View());
         }
 
         /// Settings with an explicit path for the controller of the game, and a new look at it
@@ -1351,7 +1353,7 @@ namespace BECore::Chess::Tests {
 
         /// The "opponent" object of get_state of the control API, the way a client reads it
         Json ControlOpponent() const {
-            const auto state = ChessGame::GetActive()->AsControllable()->GetState();
+            const auto state = DomControl(*ChessGame::GetActive()->AsControllable()).GetState();
             EXPECT_TRUE(state.has_value());
             const Json* opponent = state ? FindJsonMember(*state, "opponent") : nullptr;
             EXPECT_NE(opponent, nullptr);
@@ -1370,7 +1372,7 @@ namespace BECore::Chess::Tests {
             opponent["plays"] = plays ? Json(plays) : Json();
             Json request = Json::object();
             request["opponent"] = opponent;
-            const auto result = ChessGame::GetActive()->AsControllable()->SetState(request);
+            const auto result = DomControl(*ChessGame::GetActive()->AsControllable()).SetState(request);
             EXPECT_TRUE(result.has_value()) << DumpJson(request).c_str();
         }
 
@@ -2132,7 +2134,7 @@ namespace BECore::Chess::Tests {
 
         IntrusivePtr<RecordingRenderer> _renderer;
         IntrusivePtrAtomic<SceneManager> _manager;
-        std::filesystem::path _stockfishDirectory;
+        Path _stockfishDirectory;
         Optional<ScopedEnvironment> _stockfishEnvironment;
     };
 

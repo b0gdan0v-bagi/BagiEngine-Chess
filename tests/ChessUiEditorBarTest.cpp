@@ -1,3 +1,4 @@
+#include <BECore/UI/UIEnvironment.h>
 #include <BECore/UI/UIImageComponent.h>
 #include <tests/ChessUiHarness.h>
 

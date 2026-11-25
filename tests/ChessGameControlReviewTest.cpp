@@ -1,6 +1,6 @@
-#include <BECore/Control/Json.h>
 #include <Chess/ChessGame.h>
 #include <Common/EngineEnvironment.h>
+#include <tests/ChessTestJson.h>
 #include <tests/ChessTestUtil.h>
 #include <tests/TestEngines.h>
 
@@ -30,8 +30,8 @@ namespace BECore::Chess::Tests {
                 game.SetPuzzles(PuzzleSet::Parse(StringView(tsv.data(), tsv.size())));
             }
 
-            IControllableGame& Control() {
-                return *game.AsControllable();
+            DomControl Control() {
+                return DomControl(*game.AsControllable());
             }
 
             Json State() {
@@ -77,7 +77,7 @@ namespace BECore::Chess::Tests {
                 Vector<String> moves;
                 const Json state = State();
                 for (const Json& move : Member(state, "moves")) {
-                    moves.push_back(FromStdString(move.get<std::string>()));  //-NoStd: nlohmann's string, the JSON boundary
+                    moves.push_back(move.get<String>());
                 }
                 return moves;
             }
@@ -123,11 +123,11 @@ namespace BECore::Chess::Tests {
 
             /// The call is refused as invalid_params and the state, the version included, is what it was
             void ExpectRefused(const Json& request, const char* what) {
-                const String before = FromStdString(State().dump()) + " v" + ToString(Control().GetStateVersion());
+                const String before = State().dump() + " v" + ToString(Control().GetStateVersion());
                 const auto result = Control().SetState(request);
                 ASSERT_FALSE(result.has_value()) << what;
                 EXPECT_EQ(String(result.error().code.c_str(), result.error().code.size()), "invalid_params") << what;
-                EXPECT_EQ(FromStdString(State().dump()) + " v" + ToString(Control().GetStateVersion()), before) << what;
+                EXPECT_EQ(State().dump() + " v" + ToString(Control().GetStateVersion()), before) << what;
             }
 
             CountingAnalysisFactory factory{New<AnalysingEngine>()};

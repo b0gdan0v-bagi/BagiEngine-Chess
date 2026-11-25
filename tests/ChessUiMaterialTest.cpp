@@ -1,3 +1,4 @@
+#include <BECore/UI/UIEnvironment.h>
 #include <tests/ChessUiHarness.h>
 
 /// The captured material: the node Material, the Portrait view and the layout of its rows. The scene, the helpers and the fixture ChessUiTest are tests/ChessUiHarness.h.

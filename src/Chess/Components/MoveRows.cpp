@@ -2,6 +2,7 @@
 
 #include <BECore/GameManager/CoreManager.h>
 #include <BECore/UI/UICanvasComponent.h>
+#include <BECore/UI/UIVars.h>
 #include <Chess/ChessGame.h>
 #include <Chess/Components/ClickerDisabled.h>
 #include <Chess/Engine/OpponentController.h>

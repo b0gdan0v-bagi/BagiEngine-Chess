@@ -25,8 +25,8 @@ namespace BECore::Chess::Tests {
         constexpr uint8_t kPngSignature[kSignatureSize] = {0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n'};
 
         bool LoadLibrary(pugi::xml_document& document) {
-            const std::filesystem::path file = ShippedConfigFolder() / "TextureLibrary.xml";
-            if (!document.load_file(file.c_str())) {
+            const Path file = ShippedConfigFolder() / "TextureLibrary.xml";
+            if (!document.load_file(file.CStr())) {
                 ADD_FAILURE() << "the shipped texture library does not parse";
                 return false;
             }
@@ -68,14 +68,15 @@ namespace BECore::Chess::Tests {
                    static_cast<uint32_t>(bytes[offset + 3]);
         }
 
-        PngHeader ReadPngHeader(const std::filesystem::path& path) {
+        PngHeader ReadPngHeader(const Path& path) {
             Vector<uint8_t> bytes(kHeaderSize, 0);
-            //-NoStd: file layer (engine-file-layer)
-            std::ifstream file(path, std::ios::binary);
-            file.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
             PngHeader header;
-            if (static_cast<size_t>(file.gcount()) != kHeaderSize || !std::equal(std::begin(kPngSignature), std::end(kPngSignature), bytes.begin()) ||
-                std::memcmp(bytes.data() + kIhdrTypeOffset, "IHDR", 4) != 0) {
+            auto file = File::Open(path.View(), FileMode::Read);
+            if (!file) {
+                return header;
+            }
+            const std::expected<size_t, String> got = file->Read(bytes.data(), bytes.size());
+            if (!got || *got != kHeaderSize || !std::equal(std::begin(kPngSignature), std::end(kPngSignature), bytes.begin()) || std::memcmp(bytes.data() + kIhdrTypeOffset, "IHDR", 4) != 0) {
                 return header;
             }
             header.valid = true;
@@ -86,8 +87,8 @@ namespace BECore::Chess::Tests {
             return header;
         }
 
-        std::filesystem::path FileOfTexturePath(const String& texturePath) {
-            return GameRoot() / std::filesystem::path(ToStd(texturePath));
+        Path FileOfTexturePath(const String& texturePath) {
+            return GameRoot() / texturePath;
         }
 
     }  // namespace
@@ -158,8 +159,8 @@ namespace BECore::Chess::Tests {
             SCOPED_TRACE(name.c_str());
             const String source = SourcePathOf(SpriteOf(library, name));
             EXPECT_EQ(source, Format("{}{}.png", kSourceFolder, name)) << "the sprite is not packed from the file of its name";
-            const std::filesystem::path file = FileOfTexturePath(source);
-            ASSERT_TRUE(std::filesystem::exists(file)) << source.c_str();
+            const Path file = FileOfTexturePath(source);
+            ASSERT_TRUE(::BECore::Tests::PathExists(file)) << source.c_str();
             const PngHeader header = ReadPngHeader(file);
             ASSERT_TRUE(header.valid) << "not a PNG: " << source.c_str();
             EXPECT_EQ(header.bitDepth, kBitDepth);
@@ -173,9 +174,8 @@ namespace BECore::Chess::Tests {
             EXPECT_EQ(header.width, first.width) << "one set, one frame";
             EXPECT_EQ(header.height, first.height) << "one set, one frame";
 
-            std::filesystem::path provenance = file;
-            provenance.replace_extension(".artgen.json");
-            EXPECT_TRUE(std::filesystem::exists(provenance)) << provenance.filename().string();
+            const Path provenance = file.ReplaceExtension(".artgen.json");
+            EXPECT_TRUE(::BECore::Tests::PathExists(provenance)) << provenance.Filename().CStr();
         }
     }
 
@@ -184,7 +184,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(LoadLibrary(library));
         for (const pugi::xml_node sprite : library.select_node("/root/sprites").node().children("sprite")) {
             const String texturePath(sprite.attribute("texturePath").as_string());
-            EXPECT_TRUE(std::filesystem::exists(FileOfTexturePath(texturePath))) << sprite.attribute("name").as_string() << ": " << texturePath.c_str();
+            EXPECT_TRUE(::BECore::Tests::PathExists(FileOfTexturePath(texturePath))) << sprite.attribute("name").as_string() << ": " << texturePath.c_str();
         }
     }
 

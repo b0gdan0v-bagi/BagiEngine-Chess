@@ -2,6 +2,7 @@
 
 #include <BECore/Animation/Easing.h>
 #include <BECore/Animation/Lerp.h>
+#include <BECore/Animation/TweenManager.h>
 #include <BECore/GameManager/CoreManager.h>
 #include <BECore/Scene/Components/SpriteRendererComponent.h>
 #include <BECore/Scene/Components/TransformComponent.h>

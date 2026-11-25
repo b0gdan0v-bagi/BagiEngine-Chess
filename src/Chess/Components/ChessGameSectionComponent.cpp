@@ -4,6 +4,7 @@
 #include <BECore/Scene/Scene.h>
 #include <BECore/Scene/SceneNode.h>
 #include <BECore/UI/UICanvasComponent.h>
+#include <BECore/UI/UIVars.h>
 #include <Chess/ChessGame.h>
 #include <Chess/Components/ClickerDisabled.h>
 #include <Chess/Components/MenuActions.h>

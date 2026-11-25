@@ -1,17 +1,18 @@
 #pragma once
 
 #include <BECore/Audio/AudioManager.h>
+#include <BECore/File/Path.h>
 #include <BECore/GameManager/CoreManager.h>
 #include <Chess/Engine/ChessEngine.h>
 #include <Chess/Game/GameStatus.h>
 #include <Chess/Game/Move.h>
 #include <Chess/Game/Position.h>
 #include <Common/Printers.h>
+#include <Common/TestFiles.h>
 #include <TaskSystem/TaskManager.h>
 #include <TaskSystem/TaskScheduler.h>
 #include <cstdlib>
-#include <filesystem>
-#include <fstream>
+#include <filesystem>  //-NoStd: permissions: the execute bit of a made Stockfish file, which the file layer cannot set
 
 // A test that needs a worker thread (a gate that a worker holds while the test thread opens it, a wait for IsThinking()
 // while a search blocks, an engine that only stands in as "never answers") begins with this: under ENGINE_SINGLE_THREAD
@@ -117,15 +118,19 @@ namespace BECore::Chess::Tests {
         bool _hadValue = false;
     };
 
+    /// Sets the permissions of @p path: on, the owner may do everything and the others read and execute; off, the owner may read and write only
+    inline void SetExecutable(const Path& path, bool executable) {
+        using std::filesystem::perms;                     //-NoStd: permissions: the file layer cannot set the execute bit
+        const std::filesystem::path native(path.CStr());  //-NoStd: permissions
+        const perms mode =
+            executable ? perms::owner_all | perms::group_read | perms::group_exec | perms::others_read | perms::others_exec : perms::owner_read | perms::owner_write;  //-NoStd: permissions
+        std::filesystem::permissions(native, mode, std::filesystem::perm_options::replace);                                                                            //-NoStd: permissions
+    }
+
     /// The file FindStockfish() accepts: a regular file with the execute bit (what it holds is never read before a search)
-    inline void MakeStockfishFile(const std::filesystem::path& path) {
-        {
-            //-NoStd: file layer (engine-file-layer)
-            std::ofstream out(path);
-            out << "not an engine\n";
-        }
-        using std::filesystem::perms;
-        std::filesystem::permissions(path, perms::owner_all | perms::group_read | perms::group_exec | perms::others_read | perms::others_exec, std::filesystem::perm_options::replace);
+    inline void MakeStockfishFile(const Path& path) {
+        ::BECore::Tests::WriteFile(path, "not an engine\n");
+        SetExecutable(path, true);
     }
 
     /// Square from its algebraic name ("e4").

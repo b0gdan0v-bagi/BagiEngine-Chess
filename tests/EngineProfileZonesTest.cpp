@@ -6,6 +6,7 @@
 #include <Chess/Game/ChessGameModel.h>
 #include <Common/EngineEnvironment.h>
 #include <Common/TempPath.h>
+#include <Common/TestFiles.h>
 #include <tests/TestEngines.h>
 
 /// The zones and task labels of the opponent, the analysis and the ratings, read back from the Chrome trace of a `ScopedTrace`. Only the names are checked, never a
@@ -24,15 +25,6 @@ namespace BECore::Chess::Tests {
         constexpr StringView kRaterUpdateZone = "\"Chess rater update\"";
         constexpr StringView kReviewZone = "\"Chess review\"";
         constexpr StringView kReviewerUpdateZone = "\"Chess reviewer update\"";
-
-        String ReadFile(const std::filesystem::path& path) {
-            //-NoStd: file layer (a trace file read back as text)
-            std::ifstream stream(path);
-            //-NoStd: file layer (the stream's buffer is copied out through a string stream)
-            std::ostringstream text;
-            text << stream.rdbuf();
-            return FromStdString(text.str());
-        }
 
         bool Contains(const String& text, StringView name) {
             return text.find(name.data(), 0, name.size()) != String::npos;
@@ -61,22 +53,20 @@ namespace BECore::Chess::Tests {
             GTEST_SKIP() << "needs ENGINE_PROFILER: without it the zone macros compile out";
 #endif
             _directory = ::BECore::Tests::TestTempDirectory("EngineProfileZones");
-            std::filesystem::remove_all(_directory);
-            std::filesystem::create_directories(_directory);
+            ::BECore::Tests::MakeEmptyDirectory(_directory);
         }
 
         void TearDown() override {
-            std::error_code ignored;
-            std::filesystem::remove_all(_directory, ignored);
+            ::BECore::Tests::RemoveDirectory(_directory);
         }
 
-        [[nodiscard]] std::filesystem::path TracePath() const {
+        [[nodiscard]] Path TracePath() const {
             return _directory / "trace.json";
         }
 
         /// The trace is written when the `ScopedTrace` ends, so a case ends it before it reads
         [[nodiscard]] String ReadTrace() const {
-            return ReadFile(TracePath());
+            return ::BECore::Tests::ReadFile(TracePath());
         }
 
         /// The tasks of the pool have ended, so every zone of them is closed in the file
@@ -84,12 +74,12 @@ namespace BECore::Chess::Tests {
             return WaitUntil([] { return TaskManager::GetInstance().GetPendingTaskCount() == 0; });
         }
 
-        std::filesystem::path _directory;
+        Path _directory;
     };
 
     TEST_F(EngineProfileZonesTest, ABlockingSearchRunsInSliceZones) {
         {
-            ScopedTrace trace(FromStdString(TracePath().string()));
+            ScopedTrace trace(String(TracePath().View()));
             OwnEngine engine;
             const auto found = engine.FindMove(SearchRequest::FromPosition(Position::Start(), SearchLimits{0, kShallowDepth}), CancellationToken::Create());
             ASSERT_TRUE(found.has_value());
@@ -100,7 +90,7 @@ namespace BECore::Chess::Tests {
     TEST_F(EngineProfileZonesTest, TheOpponentsSearchHasItsLabelAndItsFrameUpdateAZone) {
         ChessGameModel model;
         {
-            ScopedTrace trace(FromStdString(TracePath().string()));
+            ScopedTrace trace(String(TracePath().View()));
             EngineOpponent opponent(New<OwnEngine>(), PieceColor::White, SearchLimits{0, kShallowDepth});
             ASSERT_TRUE(RunFramesUntil([&] { opponent.Update(model); }, [&] { return !model.GetMoves().empty(); })) << "the opponent never played";
             ASSERT_TRUE(PoolIsIdle());
@@ -119,7 +109,7 @@ namespace BECore::Chess::Tests {
             ASSERT_TRUE(model.TryMove(*played).has_value());
         }
         {
-            ScopedTrace trace(FromStdString(TracePath().string()));
+            ScopedTrace trace(String(TracePath().View()));
             PositionAnalyst analyst;
             analyst.SetEngineFactory([](OpponentEngine) -> MadeEngine { return ChessEnginePtr(New<OwnEngine>()); });
             analyst.SetEvaluation(true);
@@ -148,7 +138,7 @@ namespace BECore::Chess::Tests {
         }
         ASSERT_TRUE(model.Resign(PieceColor::White).has_value());
         {
-            ScopedTrace trace(FromStdString(TracePath().string()));
+            ScopedTrace trace(String(TracePath().View()));
             GameReviewer reviewer;
             reviewer.SetEngineFactory([](OpponentEngine) -> MadeEngine { return ChessEnginePtr(New<OwnEngine>()); });
             ASSERT_TRUE(reviewer.Start(model).has_value());

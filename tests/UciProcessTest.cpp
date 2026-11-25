@@ -167,11 +167,7 @@ namespace BECore::Chess::Tests {
 
     TEST(UciProcessTest, AFileThatIsNoProgramIsLaunchFailed) {
         const TempDirectory directory;
-        {
-            //-NoStd: file layer (engine-file-layer)
-            std::ofstream text(directory.File("engine.exe"));
-            text << "not a program\n";
-        }
+        ::BECore::Tests::WriteFile(directory.File("engine.exe"), "not a program\n");
         ProcessLaunch launch;
         launch.path = directory.FileText("engine.exe");
 
@@ -188,9 +184,9 @@ namespace BECore::Chess::Tests {
         SKIP_WITHOUT_FAKE_ENGINE();
         // The command line of Windows is one string: an argument with a space must come back whole from the child's C runtime (the quoting of UciProcessWindows.cpp)
         const TempDirectory directory;
-        const std::filesystem::path folder = directory.File("with space");
-        std::filesystem::create_directories(folder);
-        const String logPath = FromStdString((folder / "fake.log").string());
+        const Path folder = directory.File("with space");
+        ::BECore::Tests::MakeDirectory(folder);
+        const String logPath = String((folder / "fake.log").View());
         const String log(logPath.c_str(), logPath.size());
         const auto process = StartFake({"--log", log, "--moves", "a2a3"});
         ASSERT_NE(process, nullptr);
@@ -221,16 +217,12 @@ namespace BECore::Chess::Tests {
 
     TEST(UciProcessTest, AFileWithoutTheExecuteBitIsLaunchFailed) {
         const TempDirectory directory;
-        const std::filesystem::path program = directory.File("engine.sh");
-        {
-            //-NoStd: file layer (engine-file-layer)
-            std::ofstream script(program);
-            script << "#!/bin/sh\nexit 0\n";
-        }
+        const Path program = directory.File("engine.sh");
+        ::BECore::Tests::WriteFile(program, "#!/bin/sh\nexit 0\n");
         ProcessLaunch launch;
         launch.path = directory.FileText("engine.sh");
 
-        std::filesystem::permissions(program, std::filesystem::perms::owner_read | std::filesystem::perms::owner_write, std::filesystem::perm_options::replace);
+        SetExecutable(program, false);
         const auto refused = UciProcess::Start(launch);
 
         ASSERT_FALSE(refused.has_value());
@@ -238,7 +230,7 @@ namespace BECore::Chess::Tests {
         EXPECT_NE(refused.error().detail.find("Permission denied"), String::npos) << refused.error().detail.c_str();
 
         // With the bit the same file starts, so the refusal above was about the bit
-        std::filesystem::permissions(program, std::filesystem::perms::owner_all, std::filesystem::perm_options::replace);
+        SetExecutable(program, true);
         const auto started = UciProcess::Start(launch);
         EXPECT_TRUE(started.has_value()) << (started ? "" : started.error().detail.c_str());
     }
@@ -585,13 +577,9 @@ namespace BECore::Chess::Tests {
         // A .cmd is the child and the fake its child in turn (no exec on Windows). The fake keeps its log open, and Windows deletes no file a live process has open:
         // once Close() has returned, the file must go, because the job of UciProcess ended the fake too
         const TempDirectory directory;
-        const std::filesystem::path wrapper = directory.File("wrapper.cmd");
-        const std::filesystem::path log = directory.File("fake.log");
-        {
-            //-NoStd: file layer (engine-file-layer)
-            std::ofstream out(wrapper);
-            out << "@\"" << CHESS_TEST_PYTHON << "\" \"" << FakeEngineScript().string() << "\" --ignore-quit --ignore-term --log \"" << log.string() << "\"\r\n";
-        }
+        const Path wrapper = directory.File("wrapper.cmd");
+        const Path log = directory.File("fake.log");
+        ::BECore::Tests::WriteFile(wrapper, Format("@\"{}\" \"{}\" --ignore-quit --ignore-term --log \"{}\"\r\n", CHESS_TEST_PYTHON, FakeEngineScript().View(), log.View()));
         ProcessLaunch launch;
         launch.path = directory.FileText("wrapper.cmd");
         auto started = UciProcess::Start(launch);
@@ -604,8 +592,7 @@ namespace BECore::Chess::Tests {
         bool removed = false;
         const Clock::time_point deadline = Clock::now() + kInheritanceWait;  // the end of a killed process is a moment after the kill
         while (!removed && Clock::now() < deadline) {
-            std::error_code error;
-            removed = std::filesystem::remove(log, error);
+            removed = RemoveFile(log.View()).has_value();
             if (!removed) {
                 std::this_thread::sleep_for(milliseconds{5});
             }
@@ -660,7 +647,7 @@ namespace BECore::Chess::Tests {
         const auto died = first->ReadLine(kMustNotTimeOut);
         ASSERT_FALSE(died.has_value());
         EXPECT_EQ(died.error().kind, EngineErrorKind::ProcessDied);
-        EXPECT_TRUE(std::filesystem::exists(directory.File("died")));
+        EXPECT_TRUE(::BECore::Tests::PathExists(directory.File("died")));
 
         const auto second = StartFake({"--die-once", marker});
         ASSERT_NE(second, nullptr);

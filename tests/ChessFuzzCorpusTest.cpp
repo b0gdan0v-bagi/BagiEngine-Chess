@@ -1,6 +1,7 @@
 // The corpus of every fuzz target of the game replayed, then mutated by the engine's deterministic mutator: the part of fuzzing that runs in every ctest on every platform. The shape is
 // the engine's FuzzCorpusTest; tests/Fuzz/CLAUDE.md
 
+#include <BECore/File/File.h>
 #include <Common/Printers.h>
 #include <Fuzz/FuzzMutator.h>
 #include <tests/Fuzz/ChessFuzzTargets.h>
@@ -27,8 +28,8 @@ namespace BECore::Chess::Tests {
         constexpr uint32_t kMaxStackedMutations = 3;
 
         /// The committed seeds, tests/Fuzz/corpus of the game, found from the source tree like ShippedScene.h does
-        std::filesystem::path CorpusRoot() {
-            return std::filesystem::path(__FILE__).parent_path() / "Fuzz" / "corpus";
+        Path CorpusRoot() {
+            return Path(__FILE__).Parent() / "Fuzz" / "corpus";
         }
 
         struct CorpusFile {
@@ -75,20 +76,23 @@ namespace BECore::Chess::Tests {
         }
 
         /// The files of a corpus folder in the order of their names (the order of a directory listing is not defined)
-        Vector<CorpusFile> LoadCorpus(const std::filesystem::path& folder) {
+        Vector<CorpusFile> LoadCorpus(const Path& folder) {
             Vector<CorpusFile> files;
-            std::error_code error;
-            for (const auto& entry : std::filesystem::directory_iterator(folder, error)) {  //-NoStd: engine-file-layer: the corpus is read from the source tree
-                if (!entry.is_regular_file()) {
-                    continue;
+            // A folder that cannot be listed gives no seeds, which the caller's check of an empty corpus reports
+            [[maybe_unused]] const auto walked = WalkDirectory(folder.View(), WalkMode::Folder, [&](StringView name, FileKind kind) {
+                if (kind != FileKind::File) {
+                    return true;
                 }
-                std::ifstream stream(entry.path(), std::ios::binary);                                             //-NoStd: engine-file-layer
-                std::string content((std::istreambuf_iterator<char>(stream)), std::istreambuf_iterator<char>());  //-NoStd: an eastl::string cannot be built from an istreambuf_iterator
+                auto content = ReadFileBytes(folder / name);
+                if (!content) {
+                    return true;
+                }
                 CorpusFile file;
-                file.name = FromStdString(entry.path().filename().string());
-                file.bytes.assign(reinterpret_cast<const uint8_t*>(content.data()), reinterpret_cast<const uint8_t*>(content.data()) + content.size());
+                file.name = String(name);
+                file.bytes.assign(content->begin(), content->end());
                 files.push_back(std::move(file));
-            }
+                return true;
+            });
             std::sort(files.begin(), files.end(), [](const CorpusFile& a, const CorpusFile& b) { return a.name < b.name; });
             return files;
         }
@@ -127,10 +131,10 @@ namespace BECore::Chess::Tests {
 
     TEST_P(ChessFuzzReplayTest, ReplaysTheCorpusAndMutationsOfIt) {
         const ChessFuzzTarget& target = FindTarget(GetParam().name);
-        const std::filesystem::path folder = CorpusRoot() / target.corpusFolder;
+        const Path folder = CorpusRoot() / target.corpusFolder;
 
         const Vector<CorpusFile> files = LoadCorpus(folder);
-        ASSERT_FALSE(files.empty()) << "no seeds in " << folder.string();
+        ASSERT_FALSE(files.empty()) << "no seeds in " << folder.CStr();
 
         Vector<FuzzBytes> seeds;
         for (const CorpusFile& file : files) {
@@ -166,19 +170,20 @@ namespace BECore::Chess::Tests {
     INSTANTIATE_TEST_SUITE_P(ChessFuzzCorpus, ChessFuzzReplayTest, ::testing::ValuesIn(AllCases()), CaseName);
 
     TEST(ChessFuzzCorpusTest, EveryFolderOfTheCorpusBelongsToATarget) {
-        std::error_code error;
         size_t folders = 0;
-        for (const auto& entry : std::filesystem::directory_iterator(CorpusRoot(), error)) {  //-NoStd: engine-file-layer
-            if (!entry.is_directory()) {
-                continue;
+        const auto walked = WalkDirectory(CorpusRoot().View(), WalkMode::Folder, [&](StringView name, FileKind kind) {
+            if (kind != FileKind::Directory) {
+                return true;
             }
             ++folders;
-            const String folder = FromStdString(entry.path().filename().string());
+            const String folder(name);
             const Span<const ChessFuzzTarget> targets = Fuzzing::ChessFuzzTargetList();
             const bool owned = std::any_of(targets.begin(), targets.end(), [&](const ChessFuzzTarget& target) { return folder == target.corpusFolder; });
             EXPECT_TRUE(owned) << "tests/Fuzz/corpus/" << folder.c_str() << " has no target";
-        }
-        EXPECT_GT(folders, 0U) << "no corpus at " << CorpusRoot().string();
+            return true;
+        });
+        EXPECT_TRUE(walked.has_value());
+        EXPECT_GT(folders, 0U) << "no corpus at " << CorpusRoot().CStr();
     }
 
     TEST(ChessFuzzCorpusTest, EveryTargetHasASeedFolder) {

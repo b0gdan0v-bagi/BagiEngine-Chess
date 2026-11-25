@@ -177,29 +177,30 @@ namespace BECore::Chess {
         ChessGameControl(ChessGameModel& model, OpponentController& opponent, PositionAnalyst& analyst, DrawOfferJudge& drawJudge, const OpeningBook& openings, const PositionEditor& editor,
                          PuzzleSession& puzzle);
 
-        [[nodiscard]] std::expected<Json, ControlError> GetState() const override;
-        [[nodiscard]] std::expected<Json, ControlError> GetActions() const override;
-        std::expected<Json, ControlError> PerformAction(const Json& action) override;
-        std::expected<void, ControlError> Reset(const Json& options) override;
-        std::expected<void, ControlError> SetState(const Json& state) override;
+        [[nodiscard]] std::expected<void, ControlError> WriteState(JsonWriter& writer) const override;
+        [[nodiscard]] std::expected<void, ControlError> WriteActions(JsonWriter& writer) const override;
+        std::expected<void, ControlError> PerformAction(JsonView action, JsonWriter& outcome) override;
+        std::expected<void, ControlError> Reset(JsonView options) override;
+        std::expected<void, ControlError> SetState(JsonView state) override;
         [[nodiscard]] uint64_t GetStateVersion() const override;
 
     private:
         /// Empty once the game is over
         [[nodiscard]] MoveList LegalMoves() const;
 
-        [[nodiscard]] Json OpponentJson() const;
-        [[nodiscard]] Json AnalysisJson() const;
-        [[nodiscard]] Json DrawOfferJson() const;
-        [[nodiscard]] Json EditorJson() const;
-        [[nodiscard]] Json PuzzleJson() const;
-        [[nodiscard]] Json ReviewJson() const;
-        std::expected<void, ControlError> SetAnalysis(const Json& analysis);
-        std::expected<void, ControlError> SetTakeBack(const Json& takeBack);
-        std::expected<void, ControlError> SetResign(const Json& resign);
-        std::expected<void, ControlError> SetDraw(const Json& draw);
-        std::expected<void, ControlError> SetPuzzle(const Json& puzzle);
-        std::expected<void, ControlError> SetReview(const Json& review);
+        /// Each writes one value; the keys go in byte order, as the old tree sorted them, so the bytes of every answer stay
+        void WriteOpponent(JsonWriter& writer) const;
+        void WriteAnalysis(JsonWriter& writer) const;
+        void WriteDrawOffer(JsonWriter& writer) const;
+        void WriteEditor(JsonWriter& writer) const;
+        void WritePuzzle(JsonWriter& writer) const;
+        void WriteReview(JsonWriter& writer) const;
+        std::expected<void, ControlError> SetAnalysis(JsonView analysis);
+        std::expected<void, ControlError> SetTakeBack(JsonView takeBack);
+        std::expected<void, ControlError> SetResign(JsonView resign);
+        std::expected<void, ControlError> SetDraw(JsonView draw);
+        std::expected<void, ControlError> SetPuzzle(JsonView puzzle);
+        std::expected<void, ControlError> SetReview(JsonView review);
 
         ChessGameModel& _model;
         OpponentController& _opponent;

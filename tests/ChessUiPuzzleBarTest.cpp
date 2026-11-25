@@ -1,3 +1,4 @@
+#include <BECore/UI/UIEnvironment.h>
 #include <Chess/Components/ChessPuzzleBarComponent.h>
 #include <tests/ChessUiHarness.h>
 #include <tests/ShippedOpenings.h>

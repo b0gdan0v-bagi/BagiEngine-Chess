@@ -1,12 +1,12 @@
 #pragma once
 
 #include <BECore/Config/XmlNode.h>
+#include <BECore/File/Path.h>
 #include <BECore/RefCounted/IntrusivePtr.h>
 #include <BECore/Scene/SceneLoader.h>
 #include <BECore/Scene/SceneManager.h>
 #include <BECore/Scene/SceneNodeFiles.h>
 #include <BECore/UI/UIThemes.h>
-#include <filesystem>
 #include <gtest/gtest.h>
 #include <pugixml.hpp>
 
@@ -15,11 +15,11 @@
 /// whichever of the nodes sit in a file of their own
 namespace BECore::Chess::Tests {
 
-    inline std::filesystem::path ShippedConfigFolder() {
-        return std::filesystem::path(__FILE__).parent_path().parent_path() / "config";
+    inline Path ShippedConfigFolder() {
+        return Path(__FILE__).Parent().Parent() / "config";
     }
 
-    inline std::filesystem::path ShippedSceneConfig() {
+    inline Path ShippedSceneConfig() {
         return ShippedConfigFolder() / "SceneConfig.xml";
     }
 
@@ -41,7 +41,7 @@ namespace BECore::Chess::Tests {
             return {};
         }
         pugi::xml_document raw;
-        if (!raw.load_file(ShippedSceneConfig().c_str())) {
+        if (!raw.load_file(ShippedSceneConfig().CStr())) {
             ADD_FAILURE() << "the shipped scene does not parse";
             return {};
         }
@@ -51,9 +51,9 @@ namespace BECore::Chess::Tests {
     /// Adds the themes of the shipped `config/UIThemes.xml` to @p themes; the test fails, and false comes back, when the file does not parse or LoadFromXml finds a problem in it
     inline bool LoadShippedThemes(UIThemes& themes) {
         pugi::xml_document document;
-        const std::filesystem::path file = ShippedConfigFolder() / "UIThemes.xml";
-        if (!document.load_file(file.c_str())) {
-            ADD_FAILURE() << "the shipped themes do not parse: " << FromStdString(file.generic_string()).c_str();
+        const Path file = ShippedConfigFolder() / "UIThemes.xml";
+        if (!document.load_file(file.CStr())) {
+            ADD_FAILURE() << "the shipped themes do not parse: " << file.CStr();
             return false;
         }
         const Vector<String> problems = themes.LoadFromXml(XmlNode{document.document_element()});

@@ -1,6 +1,6 @@
-#include <BECore/Control/Json.h>
 #include <Chess/ChessGame.h>
 #include <Common/EngineEnvironment.h>
+#include <tests/ChessTestJson.h>
 #include <tests/ChessTestUtil.h>
 
 /// The "puzzle" member of the control state, set_state {"puzzle": ..} and the puzzle's share of the state version, over a real ChessGame (the adapter is wired by it). The frames are
@@ -30,8 +30,8 @@ namespace BECore::Chess::Tests {
                 game.SetPuzzles(PuzzleSet::Parse(StringView(tsv.data(), tsv.size())));
             }
 
-            IControllableGame& Control() {
-                return *game.AsControllable();
+            DomControl Control() {
+                return DomControl(*game.AsControllable());
             }
 
             Json State() {

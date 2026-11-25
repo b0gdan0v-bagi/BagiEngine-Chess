@@ -1,5 +1,6 @@
 #include "ChessGame.h"
 
+#include <BECore/File/File.h>
 #include <BECore/GameManager/CoreManager.h>
 #include <BECore/UI/UIWebText.h>
 #include <Chess/Game/BoardOrientation.h>
@@ -12,21 +13,18 @@
 namespace BECore::Chess {
 
     OpeningBook ChessGame::LoadOpeningBook(StringView virtualPath) {
-        const std::filesystem::path file = CoreManager::GetFileSystem().ResolvePath(virtualPath);
-        if (file.empty()) {
+        const Path file = CoreManager::GetFileSystem().ResolvePath(virtualPath);
+        if (file.Empty()) {
             LOG_WARNING("Opening names: '{}' not found, no opening is named"_format(virtualPath));
             return {};
         }
-        std::ifstream stream(file, std::ios::binary);  //-NoStd: engine-file-layer: a text file of the content, read whole
-        if (!stream.is_open()) {
+        const std::expected<String, String> text = ReadTextFile(file.View());
+        if (!text) {
             LOG_WARNING("Opening names: '{}' cannot be read, no opening is named"_format(virtualPath));
             return {};
         }
-        std::ostringstream content;  //-NoStd: engine-file-layer: see above
-        content << stream.rdbuf();
-        const std::string text = content.str();  //-NoStd: engine-file-layer: see above
         Vector<String> problems;
-        OpeningBook book = OpeningBook::Parse(StringView(text.data(), text.size()), &problems);
+        OpeningBook book = OpeningBook::Parse(StringView(*text), &problems);
         for (const String& problem : problems) {
             LOG_WARNING("Opening names: {}"_format(problem));
         }
@@ -34,21 +32,18 @@ namespace BECore::Chess {
     }
 
     PuzzleSet ChessGame::LoadPuzzles(StringView virtualPath) {
-        const std::filesystem::path file = CoreManager::GetFileSystem().ResolvePath(virtualPath);
-        if (file.empty()) {
+        const Path file = CoreManager::GetFileSystem().ResolvePath(virtualPath);
+        if (file.Empty()) {
             LOG_WARNING("Puzzles: '{}' not found, there are no puzzles"_format(virtualPath));
             return {};
         }
-        std::ifstream stream(file, std::ios::binary);  //-NoStd: engine-file-layer: a text file of the content, read whole
-        if (!stream.is_open()) {
+        const std::expected<String, String> text = ReadTextFile(file.View());
+        if (!text) {
             LOG_WARNING("Puzzles: '{}' cannot be read, there are no puzzles"_format(virtualPath));
             return {};
         }
-        std::ostringstream content;  //-NoStd: engine-file-layer: see above
-        content << stream.rdbuf();
-        const std::string text = content.str();  //-NoStd: engine-file-layer: see above
         Vector<String> problems;
-        PuzzleSet puzzles = PuzzleSet::Parse(StringView(text.data(), text.size()), &problems);
+        PuzzleSet puzzles = PuzzleSet::Parse(StringView(*text), &problems);
         for (const String& problem : problems) {
             LOG_WARNING("Puzzles: {}"_format(problem));
         }

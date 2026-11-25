@@ -1,4 +1,5 @@
 #include <BECore/Clipboard/FakeClipboard.h>
+#include <BECore/UI/UIEnvironment.h>
 #include <Chess/Game/EditorText.h>
 #include <tests/ChessUiHarness.h>
 

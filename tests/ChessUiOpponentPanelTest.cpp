@@ -1372,7 +1372,7 @@ namespace BECore::Chess::Tests {
         ExpectOnlyTheOwnSegment();
         ASSERT_TRUE(CloseThePanel());
 
-        MakeStockfishFile(std::filesystem::path(path.c_str()));
+        MakeStockfishFile(Path(path));
         const uint64_t revision = Opponent().GetRevision();
         _manager->UpdateAll();
         Draw();
@@ -1389,8 +1389,7 @@ namespace BECore::Chess::Tests {
         ASSERT_TRUE(ClickPanel("EngineStockfish").Both());
         EXPECT_EQ(Var("opponentEngine"), "stockfish");
 
-        std::error_code ignored;
-        std::filesystem::remove(std::filesystem::path(path.c_str()), ignored);
+        ::BECore::Tests::RemoveFileIfPresent(Path(path));
         ASSERT_TRUE(CloseThePanel());
         ASSERT_TRUE(OpenThePanel());
         Draw();

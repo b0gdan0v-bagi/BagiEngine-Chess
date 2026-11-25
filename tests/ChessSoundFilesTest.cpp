@@ -1,9 +1,12 @@
 #include <BECore/Audio/AudioDecode.h>
+#include <BECore/File/File.h>
 #include <Chess/Sound/SoundCue.h>
+#include <Common/TestFiles.h>
 #include <gtest/gtest.h>
 #include <tests/ChessTestUtil.h>
 
-/// The clips the cues name (Sound/SoundCue.h), read from the source tree and decoded the way the engine does; they are generated (src/Chess/Sound/CLAUDE.md, "The clips"), and these checks are their numbers
+/// The clips the cues name (Sound/SoundCue.h), read from the source tree and decoded the way the engine does; they are generated (src/Chess/Sound/CLAUDE.md, "The clips"), and these checks are their
+/// numbers
 namespace BECore::Chess::Tests {
 
     namespace {
@@ -15,22 +18,16 @@ namespace BECore::Chess::Tests {
         constexpr double kEndSeconds = 0.002;  // the stretch at the end that has to be near silence: a tone cut off there clicks
         constexpr float kEndLevel = 0.02f;
 
-        std::filesystem::path GameRoot() {
-            return std::filesystem::path(__FILE__).parent_path().parent_path();
+        Path GameRoot() {
+            return Path(__FILE__).Parent().Parent();
         }
 
-        std::filesystem::path FileOfCue(SoundCue cue) {
-            return GameRoot() / std::filesystem::path(ToStd(ClipPath(cue).ToStringView()));
+        Path FileOfCue(SoundCue cue) {
+            return GameRoot() / ClipPath(cue).ToStringView();
         }
 
-        Vector<uint8_t> BytesOfFile(const std::filesystem::path& path) {
-            //-NoStd: file layer (engine-file-layer)
-            std::ifstream file(path, std::ios::binary);
-            Vector<uint8_t> bytes;
-            for (std::istreambuf_iterator<char> it(file), end; it != end; ++it) {
-                bytes.push_back(static_cast<uint8_t>(*it));
-            }
-            return bytes;
+        Vector<uint8_t> BytesOfFile(const Path& path) {
+            return ::BECore::Tests::ReadFileBytes(path);
         }
 
         AudioDecodeResult DecodeCue(SoundCue cue) {
@@ -47,7 +44,7 @@ namespace BECore::Chess::Tests {
     TEST(ChessSoundFilesTest, EveryCueHasAClipThatDecodes) {
         for (const SoundCue cue : EnumUtils<SoundCue>::Values()) {
             SCOPED_TRACE(NameOf(cue).c_str());
-            ASSERT_TRUE(std::filesystem::exists(FileOfCue(cue))) << String(ClipPath(cue).ToStringView()).c_str();
+            ASSERT_TRUE(::BECore::Tests::PathExists(FileOfCue(cue))) << String(ClipPath(cue).ToStringView()).c_str();
             const AudioDecodeResult decoded = DecodeCue(cue);
             ASSERT_TRUE(decoded.has_value()) << (decoded.has_value() ? "" : decoded.error().c_str());
         }
@@ -94,20 +91,22 @@ namespace BECore::Chess::Tests {
     }
 
     TEST(ChessSoundFilesTest, TheFolderHoldsNoClipThatNoCueNames) {
-        Vector<std::filesystem::path> named;
+        Vector<Path> named;
         for (const SoundCue cue : EnumUtils<SoundCue>::Values()) {
-            named.push_back(FileOfCue(cue).lexically_normal());
+            named.push_back(FileOfCue(cue).LexicallyNormal());
         }
-        const std::filesystem::path folder = GameRoot() / "assets" / "sounds";
-        ASSERT_TRUE(std::filesystem::is_directory(folder));
-        //-NoStd: file layer (engine-file-layer, engine-path-type)
-        for (const auto& entry : std::filesystem::directory_iterator(folder)) {
-            if (entry.path().extension() != ".wav") {
-                continue;
+        const Path folder = GameRoot() / "assets" / "sounds";
+        ASSERT_TRUE(::BECore::Tests::IsFolder(folder));
+        const auto walked = WalkDirectory(folder.View(), WalkMode::Folder, [&](StringView name, FileKind kind) {
+            if (kind != FileKind::File || Path(name).Extension().View() != ".wav") {
+                return true;
             }
-            const auto found = std::find(named.begin(), named.end(), entry.path().lexically_normal());
-            EXPECT_NE(found, named.end()) << "no cue names " << entry.path().filename().string();
-        }
+            const Path entry = (folder / name).LexicallyNormal();
+            const auto found = eastl::find(named.begin(), named.end(), entry);
+            EXPECT_NE(found, named.end()) << "no cue names " << Path(name).CStr();
+            return true;
+        });
+        EXPECT_TRUE(walked.has_value());
     }
 
 }  // namespace BECore::Chess::Tests

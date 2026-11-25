@@ -1,6 +1,9 @@
 #include <BECore/Animation/Easing.h>
 #include <BECore/Animation/Lerp.h>
+#include <BECore/Animation/TweenManager.h>
 #include <BECore/GameManager/CoreManager.h>
+#include <BECore/Input/UIInput.h>
+#include <BECore/Renderer/RendererManager.h>
 #include <BECore/Renderer/ViewTransform.h>
 #include <BECore/Scene/Components/SpriteRendererComponent.h>
 #include <BECore/Scene/Components/TransformComponent.h>
@@ -8,6 +11,8 @@
 #include <BECore/Scene/SceneManager.h>
 #include <BECore/Scene/SceneNode.h>
 #include <BECore/Text/FontAtlasLibrary.h>
+#include <BECore/Time/Time.h>
+#include <BECore/UI/UIVars.h>
 #include <Chess/ChessGame.h>
 #include <Chess/Components/ChessBoardComponent.h>
 #include <Chess/Components/ChessPieceComponent.h>

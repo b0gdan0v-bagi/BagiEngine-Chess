@@ -1,5 +1,6 @@
 #include "OpponentSettings.h"
 
+#include <BECore/Config/ConfigManager.h>
 #include <BECore/GameManager/CoreManager.h>
 
 namespace BECore::Chess {

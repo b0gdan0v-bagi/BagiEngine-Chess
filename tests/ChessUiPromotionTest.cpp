@@ -1,3 +1,4 @@
+#include <BECore/UI/UIEnvironment.h>
 #include <tests/ChessUiHarness.h>
 
 /// The promotion panel: the picker on the board, its layout, its table and broken copies of it. The scene, the helpers and the fixture ChessUiTest are tests/ChessUiHarness.h.

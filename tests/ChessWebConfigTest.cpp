@@ -1,4 +1,6 @@
+#include <BECore/File/File.h>
 #include <Common/Printers.h>
+#include <Common/TestFiles.h>
 #include <gtest/gtest.h>
 
 /// The web build's overlay (engine/web/config/) replaces a config file of the game whole, so a game file with the name of an overlay file
@@ -16,37 +18,38 @@ namespace BECore::Chess::Tests {
         /// Said in every failure: what the test guards and where it is written down
         constexpr const char* kWhy = "the web overlay replaces this file whole in the browser; see CLAUDE.md, 'The web build'";
 
-        std::filesystem::path SourceRoot() {
-            return std::filesystem::path(__FILE__).parent_path().parent_path();
+        Path SourceRoot() {
+            return Path(__FILE__).Parent().Parent();
         }
 
-        std::filesystem::path GameConfigFolder() {
+        Path GameConfigFolder() {
             return SourceRoot() / "config";
         }
 
-        std::filesystem::path OverlayConfigFolder() {
+        Path OverlayConfigFolder() {
             return SourceRoot() / "engine" / "web" / "config";
         }
 
-        Vector<std::filesystem::path> XmlFilesOf(const std::filesystem::path& folder) {
-            Vector<std::filesystem::path> files;
-            //-NoStd: allocates per entry; file layer (engine-file-layer, engine-path-type)
-            for (const auto& entry : std::filesystem::directory_iterator(folder)) {
-                if (entry.is_regular_file() && entry.path().extension() == ".xml") {
-                    files.push_back(entry.path());
+        Vector<Path> XmlFilesOf(const Path& folder) {
+            Vector<Path> files;
+            const auto walked = WalkDirectory(folder.View(), WalkMode::Folder, [&](StringView name, FileKind kind) {
+                if (kind == FileKind::File && Path(name).Extension().View() == ".xml") {
+                    files.push_back(folder / name);
                 }
-            }
-            std::sort(files.begin(), files.end());
+                return true;
+            });
+            EXPECT_TRUE(walked.has_value()) << folder.CStr();
+            std::sort(files.begin(), files.end());  //-NoStd: no eastl sort of Path here
             return files;
         }
 
         using Attributes = Map<String, String>;
 
         /// The attributes of the root element, name to value (empty when the file does not load)
-        Attributes RootAttributes(const std::filesystem::path& file) {
+        Attributes RootAttributes(const Path& file) {
             Attributes attributes;
             pugi::xml_document document;
-            if (!document.load_file(file.string().c_str())) {
+            if (!document.load_file(file.CStr())) {
                 return attributes;
             }
             for (const pugi::xml_attribute attribute : document.document_element().attributes()) {
@@ -84,29 +87,29 @@ namespace BECore::Chess::Tests {
 
     TEST(ChessWebConfigTest, TheOverlayIsFoundAndHasItsFiles) {
         // A moved overlay would make the other cases pass over an empty list
-        ASSERT_TRUE(std::filesystem::is_directory(OverlayConfigFolder())) << OverlayConfigFolder().string();
-        EXPECT_TRUE(std::filesystem::exists(OverlayConfigFolder() / kApplicationConfigName));
+        ASSERT_TRUE(::BECore::Tests::IsFolder(OverlayConfigFolder())) << OverlayConfigFolder().CStr();
+        EXPECT_TRUE(::BECore::Tests::PathExists(OverlayConfigFolder() / kApplicationConfigName));
         EXPECT_FALSE(XmlFilesOf(OverlayConfigFolder()).empty());
-        ASSERT_TRUE(std::filesystem::is_directory(GameConfigFolder())) << GameConfigFolder().string();
-        EXPECT_TRUE(std::filesystem::exists(GameConfigFolder() / kApplicationConfigName));
+        ASSERT_TRUE(::BECore::Tests::IsFolder(GameConfigFolder())) << GameConfigFolder().CStr();
+        EXPECT_TRUE(::BECore::Tests::PathExists(GameConfigFolder() / kApplicationConfigName));
     }
 
     TEST(ChessWebConfigTest, EveryOverlayFileIsAbsentFromChessOrIsTheApplicationConfigThatAgrees) {
-        for (const std::filesystem::path& overlayFile : XmlFilesOf(OverlayConfigFolder())) {
-            const std::string name = overlayFile.filename().string();  //-NoStd: joined to a path and streamed
-            const std::filesystem::path gameFile = GameConfigFolder() / name;
-            if (!std::filesystem::exists(gameFile)) {
+        for (const Path& overlayFile : XmlFilesOf(OverlayConfigFolder())) {
+            const String name(overlayFile.Filename().View());
+            const Path gameFile = GameConfigFolder() / name;
+            if (!::BECore::Tests::PathExists(gameFile)) {
                 continue;
             }
             // Chess has a file the overlay replaces: only ApplicationConfig.xml is known to say the same thing, apart from the renderer
-            ASSERT_EQ(name, kApplicationConfigName) << "config/" << name << " has the name of a file of engine/web/config/: " << kWhy
-                                                    << ". Remove it, or teach the engine a game's web overlay (needs engine change)";
+            ASSERT_EQ(name, String(kApplicationConfigName)) << "config/" << name.c_str() << " has the name of a file of engine/web/config/: " << kWhy
+                                                            << ". Remove it, or teach the engine a game's web overlay (needs engine change)";
             const Attributes game = RootAttributes(gameFile);
             const Attributes overlay = RootAttributes(overlayFile);
-            ASSERT_FALSE(game.empty()) << gameFile.string();
-            ASSERT_FALSE(overlay.empty()) << overlayFile.string();
+            ASSERT_FALSE(game.empty()) << gameFile.CStr();
+            ASSERT_FALSE(overlay.empty()) << overlayFile.CStr();
             const String difference = DifferenceExceptRenderer(game, overlay);
-            EXPECT_TRUE(difference.empty()) << "config/" << name << " differs from engine/web/config/" << name << " in the root attributes:\n" << difference.c_str() << kWhy;
+            EXPECT_TRUE(difference.empty()) << "config/" << name.c_str() << " differs from engine/web/config/" << name.c_str() << " in the root attributes:\n" << difference.c_str() << kWhy;
         }
     }
 

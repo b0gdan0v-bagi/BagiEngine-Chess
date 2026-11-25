@@ -1,3 +1,4 @@
+#include <BECore/UI/UIEnvironment.h>
 #include <BECore/UI/UIToggleComponent.h>
 #include <Chess/Components/ChessMovePanelComponent.h>
 #include <Chess/Components/MoveRows.h>
