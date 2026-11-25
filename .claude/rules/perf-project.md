@@ -14,15 +14,15 @@ Read by the skills `perf` and `perf-investigate` and by the sentinel step of `to
 ```json
 {
   "area": "chess",
-  "preset": "windows-clang-release",
-  "profilePreset": "windows-clang-profile-editor",
+  "preset": {"macos": "macos-release", "windows": "windows-clang-release"},
+  "profilePreset": {"macos": "macos-profile-editor", "windows": "windows-clang-profile-editor"},
   "targets": ["BagiChess", "ChessTests"],
   "repetitions": 5,
   "thresholdPercent": 3,
   "benchmarks": [
     {
       "name": "search-nodes",
-      "about": "The own engine's search speed: the disabled SearchSliceBenchmark.DISABLED_NodesPerSecond (fixed positions and depths, the search in one call and sliced), one JSON line of Mnodes/s per column. own_one_call_mnps and own_slices_mnps are about 7.5 on this machine in the profile build (Release is faster); a run is about 2 s",
+      "about": "The own engine's search speed: the disabled SearchSliceBenchmark.DISABLED_NodesPerSecond (fixed positions and depths, the search in one call and sliced), one JSON line of Mnodes/s per column. own_one_call_mnps and own_slices_mnps are about 7.5 on the Windows benchmark machine in the profile build (Release is faster); a run is about 2 s",
       "fast": false,
       "command": ["{bin}/ChessTests", "--gtest_also_run_disabled_tests", "--gtest_filter=SearchSliceBenchmark.DISABLED_NodesPerSecond"],
       "metrics": {
@@ -63,6 +63,8 @@ Read by the skills `perf` and `perf-investigate` and by the sentinel step of `to
 ## Notes
 
 - Headless, the present of the SDL software renderer is most of a frame whatever the scene draws; `work_ms` (the frame without the present) is the number that moves with scene and UI code.
+- **Both the Mac and Windows measure:** the preset is the running OS's (`macos-release` / `windows-clang-release`, the profile build `macos-profile-editor` / `windows-clang-profile-editor`), and every machine has its own baseline (`perf-baseline-chess-<machine>.md`), so the numbers of one OS are never compared with the other's. The numbers in the `about` lines were measured on Windows.
+- macOS: `python3 engine/tools/perf/perf.py ...` from the root, nothing else.
 - Windows: the runner builds with plain `cmake`, so it runs as `python engine/CI/scripts/vs_env.py python engine/tools/perf/perf.py ...`; a Release build is `cmake --preset windows-clang-release`. The allocation counts, `ChessUiAllocTest` and the zones of a trace need the profile preset.
 - The zones a trace shows are listed in `src/Chess/Engine/CLAUDE.md` ("Profiler zones").
 - The sentinel (`todo-merge`): `ask`.

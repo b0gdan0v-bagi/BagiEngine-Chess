@@ -6,7 +6,7 @@
 
 - **Licence:** the game and its own art are Beerware (`LICENSE`); what the repository carries of other authors and the Stockfish paragraph (never shipped or linked, a separate process over UCI) are in `THIRD_PARTY_NOTICES.md`, held to the tree by ctest `BagiChessThirdPartyNotices`: a new asset or library adds its row in the same commit. The engine's notices are `engine/THIRD_PARTY_NOTICES.md`.
 - **Puzzles:** mates in 1 to 3 from `assets/puzzles/puzzles.tsv` (lichess, CC0: its row in `THIRD_PARTY_NOTICES.md`, `tools/fetch_puzzles.py` makes it again). The mode is the Menu section `Puzzles` and the bar at the bottom left; `PuzzleSession` judges, `ChessGame` owns it and the components only ask (`src/Chess/Game/CLAUDE.md`, `src/Chess/Components/CLAUDE.md`).
-- **Profiling:** preset `windows-clang-profile-editor` (zones and allocation counts); the zone names are in `src/Chess/Engine/CLAUDE.md`, the benchmark set of `/perf` in `.claude/rules/perf-project.md`, and `ChessUiAllocTest` holds that a steady frame allocates nothing (profile build only).
+- **Profiling:** the `*-profile-editor` presets (zones and allocation counts); the zone names are in `src/Chess/Engine/CLAUDE.md`, the benchmark set of `/perf` in `.claude/rules/perf-project.md`, and `ChessUiAllocTest` holds that a steady frame allocates nothing (profile build only).
 
 ## Layout
 
