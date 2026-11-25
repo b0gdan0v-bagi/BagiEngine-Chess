@@ -130,7 +130,7 @@ namespace BECore::Chess {
         return reviewed;
     }
 
-    Task<void> GameReviewer::RunSearch(IntrusivePtrAtomic<Search> search, SearchRequest request) {
+    Task<void> GameReviewer::RunSearch(IntrusivePtr<Search> search, SearchRequest request) {
         std::expected<Analysis, EngineError> answer = AnswerOfTask(co_await search->engine->AnalyseAsync(request, search->token));
         {
             const LockGuard lock(search->mutex);

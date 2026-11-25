@@ -86,7 +86,7 @@ namespace BECore::Chess {
         };
 
         /// Runs on the pool: asks the engine and leaves the answer in @p search. Takes its arguments by value, so the frame owns everything it uses
-        static Task<void> RunSearch(IntrusivePtrAtomic<Search> search, SearchRequest request);
+        static Task<void> RunSearch(IntrusivePtr<Search> search, SearchRequest request);
 
         void StartSearch(const ChessGameModel& model);
         void CancelWhenStale(const ChessGameModel& model);
@@ -96,8 +96,8 @@ namespace BECore::Chess {
         ChessEnginePtr _engine;
         PieceColor _side;
         SearchLimits _limits;
-        IntrusivePtrAtomic<Search> _search;  ///< the search under way, null when none; main thread only
-        uint64_t _searchVersion = 0;         ///< the version of the model when _search was asked
+        IntrusivePtr<Search> _search;  ///< the search under way, null when none; main thread only
+        uint64_t _searchVersion = 0;   ///< the version of the model when _search was asked
         Optional<EngineError> _lastError;
     };
 

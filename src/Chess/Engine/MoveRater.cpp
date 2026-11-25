@@ -74,7 +74,7 @@ namespace BECore::Chess {
         return _ratings[ply];
     }
 
-    Task<void> MoveRater::RunSearch(IntrusivePtrAtomic<Search> search, SearchRequest request) {
+    Task<void> MoveRater::RunSearch(IntrusivePtr<Search> search, SearchRequest request) {
         std::expected<Analysis, EngineError> answer = AnswerOfTask(co_await search->engine->AnalyseAsync(request, search->token));
         {
             const LockGuard lock(search->mutex);

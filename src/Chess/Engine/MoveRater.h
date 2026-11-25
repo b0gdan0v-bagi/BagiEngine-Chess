@@ -108,7 +108,7 @@ namespace BECore::Chess {
         };
 
         /// Runs on the pool: asks the engine and leaves the answer in @p search. Its arguments are by value, so the frame owns everything it uses
-        static Task<void> RunSearch(IntrusivePtrAtomic<Search> search, SearchRequest request);
+        static Task<void> RunSearch(IntrusivePtr<Search> search, SearchRequest request);
 
         /// How many first moves @p model has in common with the held game; 0 for another start FEN
         [[nodiscard]] size_t CommonPrefix(const ChessGameModel& model) const;
@@ -131,8 +131,8 @@ namespace BECore::Chess {
         Vector<bool> _failed;      ///< aligned with _moves: the search for this move failed and is not retried
         uint64_t _generation = 0;  ///< grows when the search in flight is for a dropped ply; its answer is thrown away
 
-        IntrusivePtrAtomic<Search> _search;  ///< the search under way, null when none; main thread only
-        size_t _searchPly = 0;               ///< the move _search rates
+        IntrusivePtr<Search> _search;  ///< the search under way, null when none; main thread only
+        size_t _searchPly = 0;         ///< the move _search rates
         uint64_t _searchGeneration = 0;
 
         Optional<EngineError> _error;

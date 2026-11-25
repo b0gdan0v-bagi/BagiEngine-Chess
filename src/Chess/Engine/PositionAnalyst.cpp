@@ -193,7 +193,7 @@ namespace BECore::Chess {
         return lines;
     }
 
-    Task<void> PositionAnalyst::RunSearch(IntrusivePtrAtomic<Search> search, SearchRequest request) {
+    Task<void> PositionAnalyst::RunSearch(IntrusivePtr<Search> search, SearchRequest request) {
         std::expected<Analysis, EngineError> answer = AnswerOfTask(co_await search->engine->AnalyseAsync(request, search->token));
         {
             const LockGuard lock(search->mutex);

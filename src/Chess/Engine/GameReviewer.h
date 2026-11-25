@@ -76,7 +76,7 @@ namespace BECore::Chess {
      * `Failed`: logged once (LOG_ERROR), kept in GetError(), the positions that came stay readable, nothing is retried by itself.
      *
      * **Threads and shutdown** are PositionAnalyst's: main thread only; the worker sees a copy of the request and a state of its own (the engine, a CancellationToken, the answer behind a
-     * mutex, an atomic `done`) shared through an IntrusivePtrAtomic, so nothing dangles whichever side ends first. The destructor, Cancel() and Shutdown() cancel the token and return at once; call
+     * mutex, an atomic `done`) shared through an IntrusivePtr, so nothing dangles whichever side ends first. The destructor, Cancel() and Shutdown() cancel the token and return at once; call
      * Shutdown() (or destroy the reviewer) before TaskManager::Shutdown(), which joins the pool and would wait for a search nobody cancelled. The destructor does not touch TaskManager.
      * Drop() forgets a search whose task may still run on the engine object; that is safe only because the reviewer always uses the own engine (OwnEngine allows concurrent calls).
      *
@@ -154,7 +154,7 @@ namespace BECore::Chess {
         };
 
         /// Runs on the pool: asks the engine and leaves the answer in @p search. Its arguments are by value, so the frame owns everything it uses
-        static Task<void> RunSearch(IntrusivePtrAtomic<Search> search, SearchRequest request);
+        static Task<void> RunSearch(IntrusivePtr<Search> search, SearchRequest request);
 
         /// The review is held and is of the game of @p model
         [[nodiscard]] bool IsHeld(const ChessGameModel& model) const;
@@ -174,7 +174,7 @@ namespace BECore::Chess {
         ReviewedPositions _positions;               ///< one per position of the game
         size_t _done = 0;                           ///< the positions searched so far, which are the first ones: the next to search is position _done
         size_t _total = 0;                          ///< the positions to search
-        IntrusivePtrAtomic<Search> _search;         ///< the search under way for position _done, null when none; main thread only
+        IntrusivePtr<Search> _search;               ///< the search under way for position _done, null when none; main thread only
 
         Optional<EngineError> _error;
         uint64_t _revision = 0;

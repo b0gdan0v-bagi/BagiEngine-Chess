@@ -29,7 +29,7 @@ namespace BECore::Chess {
      * program does not give a draw it could not judge. Nothing is retried by itself; the next offer, at a version that has not been offered, asks again.
      *
      * **Threads and shutdown** are PositionAnalyst's: main thread only; the worker sees a copy of the request and a state of its own (the engine, a CancellationToken, the answer behind a mutex, an
-     * atomic `done`) shared through an IntrusivePtrAtomic, so nothing dangles whichever side ends first. The destructor, Cancel() and Shutdown() cancel the token and return at once; call
+     * atomic `done`) shared through an IntrusivePtr, so nothing dangles whichever side ends first. The destructor, Cancel() and Shutdown() cancel the token and return at once; call
      * Shutdown() (or destroy the judge) before TaskManager::Shutdown(), which joins the pool and would wait for a search nobody cancelled. The destructor does not touch TaskManager.
      *
      * GetRevision() grows with an offer, an answer and a drop; never with a search that starts or ends, and never goes back. A display that publishes the offer adds it to the version of the model.
@@ -96,7 +96,7 @@ namespace BECore::Chess {
         };
 
         /// Runs on the pool: asks the engine and leaves the answer in @p search. Its arguments are by value, so the frame owns everything it uses
-        static Task<void> RunSearch(IntrusivePtrAtomic<Search> search, SearchRequest request);
+        static Task<void> RunSearch(IntrusivePtr<Search> search, SearchRequest request);
 
         /// Forgets the offer and the search (cancelled), and the verdict not yet given. The revision grows when a display showed the offer
         void Drop();
@@ -113,7 +113,7 @@ namespace BECore::Chess {
         PieceColor _programColor = PieceColor::Black;
         Optional<DrawVerdict> _verdict;  ///< reached, not yet given by Update()
 
-        IntrusivePtrAtomic<Search> _search;  ///< the search under way, null when none; main thread only
+        IntrusivePtr<Search> _search;  ///< the search under way, null when none; main thread only
 
         Optional<EngineError> _error;
         uint64_t _revision = 0;

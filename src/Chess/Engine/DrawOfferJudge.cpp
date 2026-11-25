@@ -69,7 +69,7 @@ namespace BECore::Chess {
         _engine.Reset();
     }
 
-    Task<void> DrawOfferJudge::RunSearch(IntrusivePtrAtomic<Search> search, SearchRequest request) {
+    Task<void> DrawOfferJudge::RunSearch(IntrusivePtr<Search> search, SearchRequest request) {
         std::expected<Analysis, EngineError> answer = AnswerOfTask(co_await search->engine->AnalyseAsync(request, search->token));
         {
             const LockGuard lock(search->mutex);
