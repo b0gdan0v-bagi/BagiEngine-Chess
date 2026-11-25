@@ -18,7 +18,8 @@ namespace BECore::Chess::Fuzzing {
         constexpr size_t kMostLines = 256;
 
         constexpr char kLineBreak = '\n';
-        constexpr StringView kWordSeparator = " ";
+        /// The C locale's white space, as `TextReader` reads it
+        constexpr StringView kWordSeparators = " \t\n\v\f\r";
 
         /// The collector is asked for one line, for a few, and for the most an analysis has
         constexpr int kLineCounts[] = {1, 3, kMaxAnalysisLines};
@@ -120,7 +121,7 @@ namespace BECore::Chess::Fuzzing {
             Vector<Optional<Info>> exact(static_cast<size_t>(lineCount));
             Vector<Optional<Info>> bound(static_cast<size_t>(lineCount));
             for (const StringView line : lines) {
-                const Optional<Info> info = ExpectedInfo(Text::WordsOf(WithoutEdges(line), kWordSeparator));
+                const Optional<Info> info = ExpectedInfo(Text::WordsOf(WithoutEdges(line), kWordSeparators));
                 if (!info || !info->score || info->multiPv < 1 || info->multiPv > lineCount) {
                     continue;
                 }
@@ -146,7 +147,7 @@ namespace BECore::Chess::Fuzzing {
             CHESS_FUZZ_CHECK(trimmed == WithoutEdges(line));
             CHESS_FUZZ_CHECK(UciProtocol::TrimLine(trimmed) == trimmed);
 
-            const Words words = Text::WordsOf(trimmed, kWordSeparator);
+            const Words words = Text::WordsOf(trimmed, kWordSeparators);
             const Optional<Info> info = UciProtocol::ParseInfo(line);
             const Optional<BestMove> bestMove = UciProtocol::ParseBestMove(line);
             CHESS_FUZZ_CHECK(!(info && bestMove));
