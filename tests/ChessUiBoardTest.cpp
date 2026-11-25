@@ -2060,7 +2060,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(Coordinates(true), "abcdefgh");
         EXPECT_EQ(Coordinates(false), "87654321");
         EXPECT_EQ(ShownMaterialRows(), "BottomPawn") << "White's captures stay in the lower group";
-        EXPECT_EQ(MaterialSprite("Bottom", "Pawn"), "BlackPawn");
+        EXPECT_EQ(MaterialSprite("Bottom", "Pawn"), "ClassicBlackPawn");
         EXPECT_EQ(Var("materialBottomBalance"), "+1");
         EXPECT_EQ(Var("materialTopBalance"), "");
     }

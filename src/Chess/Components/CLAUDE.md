@@ -47,6 +47,7 @@ Order inside the board's `OnDraw()`: squares, the last move (castling marks the 
 ## The pieces
 
 - A piece node is a reference of the prefab `config/nodes/ChessPiece.xml` (`config/CLAUDE.md`): the piece component, a sprite and a transform.
+- **The look:** the scene files name the Classic sprites (the default preset), so a start loads one atlas. `ChessPieceComponent`, `ChessMaterialComponent` (the icons) and `ChessEditorBarComponent` follow `ChessGame::GetActiveGraphics()`: each remembers what it showed (the piece its type and preset, the other two the choice's revision) and sets a sprite only when that differs, so a steady frame builds no name. A piece that is sliding or off the board takes the new sprite when it is shown next.
 - A piece stands on `GetShownSquareOf()`: the viewed position's square while viewing; a view that begins or ends places them at once.
 - **A played move slides**. Only a change of exactly one move and one version with time in the frame slides; everything else snaps (first sighting, reset, `set_state`, several moves, a frame with `deltaTime` 0). A captured piece leaves when the slide ends.
 

@@ -439,7 +439,7 @@ namespace BECore::Chess::Tests {
 
         const auto sprite = node->GetNode().GetComponent<SpriteRendererComponent>();
         ASSERT_TRUE(sprite);
-        EXPECT_EQ(sprite->_spriteId, "WhiteBishop"_intern);
+        EXPECT_EQ(sprite->_spriteId, "ClassicWhiteBishop"_intern);
     }
 
     // ---- the promotion panel: the layout ---------------------------------------------------------------------------------------------

@@ -102,7 +102,8 @@ namespace BECore::Chess {
 
         // A promotion shows when the slide ends, not while the pawn is still on its way.
         if (!IsSliding() && cur.IsInside()) {
-            ShowPieceType(model->GetShownPieceOf(this));
+            const GraphicsChoice* graphics = ChessGame::GetActiveGraphics();
+            ShowPiece(model->GetShownPieceOf(this), graphics ? graphics->Get() : kScenePreset);
         }
     }
 
@@ -164,17 +165,18 @@ namespace BECore::Chess {
         _seen = false;
     }
 
-    void ChessPieceComponent::ShowPieceType(Piece piece) {
-        if (piece.IsEmpty() || piece.type == _shownType) {
+    void ChessPieceComponent::ShowPiece(Piece piece, GraphicsPreset preset) {
+        if (piece.IsEmpty() || (piece.type == _shownType && preset == _shownPreset)) {
             return;
         }
         auto sprite = GetNode().GetComponent<SpriteRendererComponent>();
         if (!sprite) {
             return;
         }
-        sprite->_spriteId = PieceSpriteId(piece, GraphicsPreset::Beer);
+        sprite->_spriteId = PieceSpriteId(piece, preset);
         sprite->ReloadTexture();
         _shownType = piece.type;
+        _shownPreset = preset;
     }
 
     void ChessPieceComponent::RegisterWithModel() {
@@ -186,7 +188,8 @@ namespace BECore::Chess {
             return;
         }
         model->RegisterPiece(this, Square{static_cast<int8_t>(_file), static_cast<int8_t>(_rank)});
-        _shownType = model->GetPieceOf(this).type;  // the sprite of the scene already shows it
+        _shownType = model->GetPieceOf(this).type;  // the sprite of the scene already shows it, in kScenePreset
+        _shownPreset = kScenePreset;
         _registered = true;
     }
 

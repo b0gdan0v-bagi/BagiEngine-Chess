@@ -12,4 +12,4 @@ Graphics/
 
 `PieceSpriteId(Piece, GraphicsPreset)` (`Components/PieceSprite.h`) is the one table: `<SpritePrefix><Color><Type>`. Beer has no prefix (`WhiteKing` ...): the Generate panel's Accept names a sprite after its file `assets/artgen/<Name>.png`, so those names stay. Classic is `ClassicWhiteKing` ... `ClassicBlackPawn`.
 
-The choice is the person's look, not part of a game: a reset leaves it alone. The scene glue (the Graphics menu section and the theme) arrives in a later work package of the entry.
+The choice is the person's look, not part of a game: a reset leaves it alone (`ChessGame::Start()` sets Classic, a later work package of the entry restores the saved one after that). The scene files name the Classic sprites; the components that show a piece follow the choice's revision (`src/Chess/Components/CLAUDE.md`, "The pieces"). The rest of the scene glue (the Graphics menu section and the theme) arrives in a later work package of the entry.

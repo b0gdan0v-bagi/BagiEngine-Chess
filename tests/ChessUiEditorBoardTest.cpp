@@ -11,7 +11,7 @@ namespace BECore::Chess::Tests {
     namespace {
 
         constexpr int kWaitingFrames = 100;  // frames in which a program that wrongly took the turn would have answered at once (InstantEngine)
-        constexpr const char* kQueenOfWhite = "WhiteQueen";
+        constexpr const char* kQueenOfWhite = "ClassicWhiteQueen";
         constexpr int kPawnsOfOneColor = 16;
 
         SDL_MouseButtonEvent RightButton(float x, float y) {

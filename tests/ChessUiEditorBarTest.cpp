@@ -163,7 +163,7 @@ namespace BECore::Chess::Tests {
     TEST_F(ChessUiEditorBarTest, TheColorButtonTurnsTheNextPiecesAndTheIconsAndSaysTheColor) {
         BeginOn(EditStart::Empty);
         EXPECT_EQ(Var("editorColor"), "White");
-        EXPECT_EQ(IconOf("EditorBarQueen"), "WhiteQueen"_intern);
+        EXPECT_EQ(IconOf("EditorBarQueen"), "ClassicWhiteQueen"_intern);
         EXPECT_EQ(ShownText(ElementOf(kBarNode, "EditorBarColor")), "White");
 
         ASSERT_TRUE(ClickBar("EditorBarColor").Both());
@@ -173,7 +173,7 @@ namespace BECore::Chess::Tests {
         EXPECT_EQ(Var("editorColor"), "Black");
         EXPECT_EQ(ShownText(ElementOf(kBarNode, "EditorBarColor")), "Black");
         for (size_t index = 0; index < std::size(kPieceButtons); ++index) {
-            const PoolString expected = PoolString::Intern(Format("Black{}", EnumUtils<PieceType>::ToString(*FindEditorTool(kPieceIds[index]))));
+            const PoolString expected = PoolString::Intern(Format("ClassicBlack{}", EnumUtils<PieceType>::ToString(*FindEditorTool(kPieceIds[index]))));
             EXPECT_EQ(IconOf(kPieceButtons[index]), expected) << kPieceButtons[index];
         }
         ASSERT_TRUE(ClickBar("EditorBarQueen").Both());

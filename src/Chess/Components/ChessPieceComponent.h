@@ -3,6 +3,7 @@
 #include <BECore/Animation/ScopedTween.h>
 #include <BECore/Scene/IComponent.h>
 #include <Chess/Game/ChessTypes.h>
+#include <Chess/Graphics/GraphicsPreset.h>
 
 namespace BECore {
 
@@ -26,7 +27,7 @@ namespace BECore::Chess {
      * plays (one more move and one more version than the component saw, the same start position, no view or draft before or after, a frame with time in it) is slid from the old square to the new one
      * over _slideDuration with QuadOut. Every other change (the first sighting, a reset, a new position, a frame with no time, the model gone) places the piece at once and ends a slide
      * under way. A captured piece stays on its square while the slide of the capturing move runs, then goes off-screen. When the model reports another piece type (a promotion, or the reset
-     * that undoes it) the sprite switches to that piece, after the slide.
+     * that undoes it) the sprite switches to that piece, after the slide. The same happens when the person's GraphicsChoice changes: the piece shows the sprite of its type in the picked preset.
      *
      * A piece that the board reports as lifted (ChessBoardComponent::GetLiftedPiece(), a drag past the threshold) is placed under the pointer instead, its node goes to kDragLayer and
      * nothing slides it; the first update that does not lift it gives the layer back. A move played by the drop is not slid either: the piece stands on the square at once.
@@ -43,6 +44,8 @@ namespace BECore::Chess {
         static constexpr Square kOffBoard{-1, -1};
         /// The layer of the node of a piece the person holds (a drag): over the pieces, the result bar and the captured material, under the HUD and the panels
         static constexpr int32_t kDragLayer = 6;
+        /// The preset whose sprites the scene files name: a piece shows it until the first update says otherwise
+        static constexpr GraphicsPreset kScenePreset = GraphicsPreset::Classic;
 
         ChessPieceComponent() = default;
         ~ChessPieceComponent() override;
@@ -57,7 +60,8 @@ namespace BECore::Chess {
         void OnUpdate(const SceneEvents::SceneUpdateEvent& event);
         void RegisterWithModel();
         void UnregisterFromModel();
-        void ShowPieceType(Piece piece);
+        /// Gives the node the sprite of @p piece in @p preset when that is not the one it shows; the name is built only then, so a steady frame allocates nothing
+        void ShowPiece(Piece piece, GraphicsPreset preset);
 
         /// Compares the model with what was seen last frame: starts a slide for a played move, ends it for any other change.
         void Observe(const ChessGameModel& model, Square current, float deltaTime);
@@ -73,6 +77,7 @@ namespace BECore::Chess {
 
         bool _registered = false;
         PieceType _shownType = PieceType::None;
+        GraphicsPreset _shownPreset = kScenePreset;  ///< the scene files name the sprites of this preset
 
         ScopedTween _slide;             ///< The running slide; the destructor cancels it (its setter points at this).
         float _slideProgress = 0.0f;    ///< 0..1, written by the tween.

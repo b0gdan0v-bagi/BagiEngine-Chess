@@ -9,6 +9,7 @@
 #include <Chess/Game/OpeningBook.h>
 #include <Chess/Game/PositionEditor.h>
 #include <Chess/Game/PuzzleSession.h>
+#include <Chess/Graphics/GraphicsChoice.h>
 #include <Chess/Save/ChessSaveKeeper.h>
 #include <Games/IGame.h>
 
@@ -24,6 +25,8 @@ namespace BECore::Chess {
      * opponent panel makes over it (OpponentChoice: it remembers the person's color while nobody plays), the analysis of the position (PositionAnalyst, with the default factory over the settings the
      * controller holds), the judge of the person's draw offers (DrawOfferJudge, which makes its engine through the analyst's factory, so a factory given to the analyst reaches it too), the
      * save keeper and the adapter of the control API (ChessGameControl). A game starts with nobody as the opponent (it is made when a side is picked) and the analysis off.
+     *
+     * Owns the GraphicsChoice, the look the person picked: Start() sets Classic, Reset() leaves it alone.
      *
      * Owns the PositionEditor, the draft of a position the person builds on the board. The game is edited without being changed: BeginEditing() has the model show the draft
      * (ChessGameModel::ShowDraft(), IsEditing() is its IsDrafting()), CancelEditing() puts the game back as it was, and PlayFromHere() starts a new game from the draft through
@@ -76,6 +79,14 @@ namespace BECore::Chess {
         }
         const OpponentChoice& GetChoice() const noexcept {
             return _choice;
+        }
+
+        /// The look the person picked (the pieces' sprites and the board theme); no part of a game, so Reset() leaves it alone
+        GraphicsChoice& GetGraphics() noexcept {
+            return _graphics;
+        }
+        const GraphicsChoice& GetGraphics() const noexcept {
+            return _graphics;
         }
 
         PositionAnalyst& GetAnalyst() noexcept {
@@ -230,6 +241,9 @@ namespace BECore::Chess {
         /// The choice of the opponent of the active game
         static OpponentChoice* GetActiveChoice();
 
+        /// The graphics choice of the active game
+        static GraphicsChoice* GetActiveGraphics();
+
         /// The analyst of the active game
         static PositionAnalyst* GetActiveAnalyst();
 
@@ -249,6 +263,7 @@ namespace BECore::Chess {
         ChessGameModel _model;
         OpponentController _opponent;  ///< after the model (it holds a reference to it) and before the adapter
         OpponentChoice _choice;        ///< after the controller (it holds a reference to it)
+        GraphicsChoice _graphics;      ///< the person's look, not the game's: before the adapter and the keeper
         PositionAnalyst _analyst;      ///< after the controller (its factory reads the controller's settings) and before the adapter
         DrawOfferJudge _drawJudge;     ///< after the analyst (its factory asks it) and before the adapter
         OpeningBook _openings;         ///< before the adapter, which reads it

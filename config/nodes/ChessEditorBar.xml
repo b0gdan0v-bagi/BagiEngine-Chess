@@ -20,37 +20,37 @@
           <children>
             <element type="UIElement" name="EditorBarKing" width="56" height="56" color="70,70,100,255">
               <components>
-                <component type="UIImageComponent" sprite="WhiteKing"/>
+                <component type="UIImageComponent" sprite="ClassicWhiteKing"/>
                 <component type="UIInputClicker" action="ChessEditPick" value="king"/>
               </components>
             </element>
             <element type="UIElement" name="EditorBarQueen" width="56" height="56" color="70,70,100,255">
               <components>
-                <component type="UIImageComponent" sprite="WhiteQueen"/>
+                <component type="UIImageComponent" sprite="ClassicWhiteQueen"/>
                 <component type="UIInputClicker" action="ChessEditPick" value="queen"/>
               </components>
             </element>
             <element type="UIElement" name="EditorBarRook" width="56" height="56" color="70,70,100,255">
               <components>
-                <component type="UIImageComponent" sprite="WhiteRook"/>
+                <component type="UIImageComponent" sprite="ClassicWhiteRook"/>
                 <component type="UIInputClicker" action="ChessEditPick" value="rook"/>
               </components>
             </element>
             <element type="UIElement" name="EditorBarBishop" width="56" height="56" color="70,70,100,255">
               <components>
-                <component type="UIImageComponent" sprite="WhiteBishop"/>
+                <component type="UIImageComponent" sprite="ClassicWhiteBishop"/>
                 <component type="UIInputClicker" action="ChessEditPick" value="bishop"/>
               </components>
             </element>
             <element type="UIElement" name="EditorBarKnight" width="56" height="56" color="70,70,100,255">
               <components>
-                <component type="UIImageComponent" sprite="WhiteKnight"/>
+                <component type="UIImageComponent" sprite="ClassicWhiteKnight"/>
                 <component type="UIInputClicker" action="ChessEditPick" value="knight"/>
               </components>
             </element>
             <element type="UIElement" name="EditorBarPawn" width="56" height="56" color="70,70,100,255">
               <components>
-                <component type="UIImageComponent" sprite="WhitePawn"/>
+                <component type="UIImageComponent" sprite="ClassicWhitePawn"/>
                 <component type="UIInputClicker" action="ChessEditPick" value="pawn"/>
               </components>
             </element>
